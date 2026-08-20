@@ -47,9 +47,9 @@ The principal theorem and method require:
 
 * block-constrained bijection after explicit null-node padding;
 * one correspondence acting jointly on response rows and columns;
-* nonnegative target importance (w);
-* nonnegative curriculum increment (\alpha);
-* nonnegative linear curriculum cost (c);
+* nonnegative target importance $w$;
+* nonnegative curriculum increment $\alpha$;
+* nonnegative linear curriculum cost $c$;
 * a non-Byzantine source packet;
 * target-local confirmation before live assimilation;
 * no information outside the strict resource contract.
@@ -137,202 +137,188 @@ The paper must not claim:
 
 # 3. Formal Problem and Notation
 
-For each coarse group (g), let the source and target have respectively (m_g^{(s)}) and (m_g^{(t)}) real eligible transfer nodes.
+For each coarse group $g$, let the source and target have respectively $m_g^{(s)}$ and $m_g^{(t)}$ real eligible transfer nodes.
 
 Define the padded block size
 
-[
+$$
 n_g=\max\left(m_g^{(s)},m_g^{(t)}\right).
-]
+$$
 
-The smaller endpoint is padded with explicit null nodes until both endpoints have (n_g) nodes in the group.
+The smaller endpoint is padded with explicit null nodes until both endpoints have $n_g$ nodes in the group.
 
 The total padded node count is
 
-[
+$$
 K=\sum_g n_g.
-]
+$$
 
-Let (\mathcal G_g) denote padded node indices in coarse group (g). The admissible correspondence set is
+Let $\mathcal G_g$ denote padded node indices in coarse group $g$. The admissible correspondence set is
 
-[
+$$
 \Pi=\prod_g S_{n_g}.
-]
+$$
 
-Each (P\in\Pi) is one block-preserving permutation matrix.
+Each $P\in\Pi$ is one block-preserving permutation matrix.
 
 Let:
 
-* (L\in\mathbb R^{K\times K}) be the source simultaneous lower response matrix;
-* (U\in\mathbb R^{K\times K}) be the corresponding upper matrix;
-* (w\in\mathbb R_{\ge0}^K) be target importance;
-* (\alpha\in\mathbb R_{\ge0}^K) be the target curriculum increment;
-* (c\in\mathbb R_{\ge0}^K) be curriculum cost;
-* (B_\alpha) be the total action budget;
-* (\bar\alpha_j) be the coordinate cap.
+* $L\in\mathbb R^{K\times K}$ be the source simultaneous lower response matrix;
+* $U\in\mathbb R^{K\times K}$ be the corresponding upper matrix;
+* $w\in\mathbb R_{\ge0}^K$ be target importance;
+* $\alpha\in\mathbb R_{\ge0}^K$ be the target curriculum increment;
+* $c\in\mathbb R_{\ge0}^K$ be curriculum cost;
+* $B_\alpha$ be the total action budget;
+* $\bar\alpha_j$ be the coordinate cap.
 
 The action polytope is
 
-[
+$$
 \mathcal A=
-\left{
+\left\{
 \alpha\ge0:
 \mathbf 1^T\alpha\le B_\alpha,;
 0\le\alpha_j\le\bar\alpha_j
-\right}.
-]
+\right\}.
+$$
 
-For support limit (s),
+For support limit $s$,
 
-[
+$$
 \mathcal A^{(s)}
-================
-
-\left{
+=
+\left\{
 \alpha\in\mathcal A:|\alpha|_0\le s
-\right}.
-]
+\right\}.
+$$
 
 The map-conditioned objective is
 
-[
+$$
 J(\alpha;P)=w^TP^TLP\alpha-c^T\alpha.
-]
+$$
 
 The principal robust action is
 
-[
+$$
 \alpha^\star
 \in
 \arg\max_{\alpha\in\mathcal A^{(s)}}
 \min_{P\in\Pi}
 J(\alpha;P),
-]
+$$
 
 using the principal support defined in the Configuration YAML.
 
-For a permitted support (S),
+For a permitted support $S$,
 
-[
+$$
 s_g=|S\cap\mathcal G_g|,
-]
+$$
 
 and the number of active-image assignments is
 
-[
+$$
 N_S=
 \prod_g(n_g)_{s_g},
 \qquad
 (n)_r=\frac{n!}{(n-r)!}.
-]
+$$
 
 The exact orbit is
 
-[
-\mathcal O(L)={P^TLP:P\in\Pi}.
-]
+$$
+\mathcal O(L)=\{P^TLP:P\in\Pi\}.
+$$
 
 The entrywise rectangular hull is
 
-[
+$$
 \operatorname{Rect}(\mathcal O)
-===============================
-
+=
 \prod_{k,j}[\ell_{kj},u_{kj}],
-]
+$$
 
 where
 
-[
+$$
 \ell_{kj}
-=========
-
+=
 \min_{P\in\Pi}(P^TLP)_{kj},
 \qquad
 u_{kj}
-======
-
+=
 \max_{P\in\Pi}(P^TUP)_{kj}.
-]
+$$
 
 For a fixed feasible action,
 
-[
+$$
 h_{\rm orb}(\alpha)
-===================
-
+=
 \min_{P\in\Pi}w^TP^TLP\alpha,
-]
+$$
 
-[
+$$
 h_{\rm rect}(\alpha)
-====================
-
+=
 w^T\ell\alpha,
-]
+$$
 
-[
+$$
 \Gamma(\alpha)
-==============
-
+=
 h_{\rm orb}(\alpha)-h_{\rm rect}(\alpha)\ge0.
-]
+$$
 
-For any experiment-specific action set (\mathcal B\subseteq\mathcal A),
+For any experiment-specific action set $\mathcal B\subseteq\mathcal A$,
 
-[
+$$
 V_{\rm exact}(\mathcal B)
-=========================
-
+=
 \max_{\alpha\in\mathcal B}
 h_{\rm orb}(\alpha)-c^T\alpha,
-]
+$$
 
-[
+$$
 V_{\rm rect}(\mathcal B)
-========================
-
+=
 \max_{\alpha\in\mathcal B}
 h_{\rm rect}(\alpha)-c^T\alpha,
-]
+$$
 
-[
+$$
 G_{\rm coupling}(\mathcal B)
-============================
-
+=
 V_{\rm exact}(\mathcal B)-V_{\rm rect}(\mathcal B).
-]
+$$
 
 For map-value diagnostics,
 
-[
+$$
 V(P;\mathcal B)
-===============
-
+=
 \max_{\alpha\in\mathcal B}J(\alpha;P),
-]
+$$
 
-[
+$$
 V_{\rm pre}(\mathcal B)
-=======================
-
+=
 \max_{\alpha\in\mathcal B}
 \min_{P\in\Pi}J(\alpha;P),
-]
+$$
 
-[
+$$
 V_{\rm post}(\mathcal B)
-========================
-
+=
 \min_{P\in\Pi}V(P;\mathcal B),
-]
+$$
 
-[
+$$
 \Delta_{\rm map}(\mathcal B)
-============================
-
+=
 V_{\rm post}(\mathcal B)-V_{\rm pre}(\mathcal B).
-]
+$$
 
 Unless an experiment explicitly requests the dense action set, all mechanism and map-value diagnostics use the principal sparse action set.
 
@@ -344,8 +330,8 @@ Null source nodes have:
 
 Null target nodes have:
 
-* (w=0);
-* (\bar\alpha=0);
+* $w=0$;
+* $\bar\alpha=0$;
 * no action eligibility.
 
 # 4. Configuration Contract
@@ -396,26 +382,26 @@ Measured outcomes such as execution time, memory consumption, selected pilot win
 | `scientific.materiality.macro_f1_absolute`       |                         0.005 absolute |
 | `scientific.materiality.equivalence_relative_macro_ce.lower`               |                -0.01 relative macro-CE |
 | `scientific.materiality.equivalence_relative_macro_ce.upper`               |                +0.01 relative macro-CE |
-| `scientific.materiality.harmful_transfer_relative_macro_ce_gain`             | TEST relative macro-CE gain (\le-0.01) |
-| `scientific.materiality.useful_transfer_relative_macro_ce_gain`              | TEST relative macro-CE gain (\ge+0.01) |
+| `scientific.materiality.harmful_transfer_relative_macro_ce_gain`             | TEST relative macro-CE gain $\le-0.01$ |
+| `scientific.materiality.useful_transfer_relative_macro_ce_gain`              | TEST relative macro-CE gain $\ge+0.01$ |
 | scientific.transfer_support.minimum_actionable_target_concepts     |                                      4 |
 | scientific.transfer_support.minimum_nontrivial_block_size          |                                      2 |
 
-For target actionable node (j),
+For target actionable node $j$,
 
-[
-\bar\alpha_j=\texttt{scientific.action.coordinate_cap},
+$$
+\bar\alpha_j=\texttt{scientific.action.coordinate\_cap},
 \qquad
-c_j=\texttt{scientific.action.linear_cost_per_actionable_node}.
-]
+c_j=\texttt{scientific.action.linear\_cost\_per\_actionable\_node}.
+$$
 
 For normal or null nodes,
 
-[
+$$
 \bar\alpha_j=0,\qquad c_j=0.
-]
+$$
 
-The explicit zero-action candidate has objective exactly 0 by the definition of (J) with (\alpha=0); this is a mathematical consequence, not a configurable value.
+The explicit zero-action candidate has objective exactly 0 by the definition of $J$ with $\alpha=0$; this is a mathematical consequence, not a configurable value.
 
 ## 4.3 Dataset and transfer-support configuration
 
@@ -442,11 +428,11 @@ Per retained local prediction class, duplicate groups are assigned chronological
 
 | Split   | Interval      |
 | ------- | ------------- |
-| TRAIN   | ([0,0.55))    |
-| META    | ([0.55,0.70)) |
-| VALID   | ([0.70,0.80)) |
-| CONFIRM | ([0.80,0.90)) |
-| TEST    | ([0.90,1.00]) |
+| TRAIN   | $[0,0.55)$    |
+| META    | $[0.55,0.70)$ |
+| VALID   | $[0.70,0.80)$ |
+| CONFIRM | $[0.80,0.90)$ |
+| TEST    | $[0.90,1.00]$ |
 
 ### Missingness and preprocessing
 
@@ -506,9 +492,9 @@ No frequency-based ordering is permitted.
 
 TRAIN-only quartiles use Hyndman-Fan type 7 with linear interpolation. This quantile rule is fixed and is not configurable.
 
-For numeric feature (x),
+For numeric feature $x$,
 
-[
+$$
 x'=
 \operatorname{clip}
 \left(
@@ -517,7 +503,7 @@ x'=
 -10,
 10
 \right).
-]
+$$
 
 A zero-IQR feature is subsequently removed if constant across TRAIN after imputation.
 
@@ -759,7 +745,7 @@ The numerical training parameters retained in YAML are configuration data. AdamW
 | optimizer                       | AdamW                     |
 | AdamW beta1                     | 0.9                       |
 | AdamW beta2                     | 0.999                     |
-| AdamW epsilon                   | (10^{-8})                 |
+| AdamW epsilon                   | $10^{-8}$                 |
 | AdamW AMSGrad                   | false                     |
 | AdamW maximize                  | false                     |
 | AdamW fused                     | false                     |
@@ -772,8 +758,8 @@ The numerical training parameters retained in YAML are configuration data. AdamW
 | learning-rate scheduler         | none                      |
 | early-stopping metric           | VALID macro cross-entropy |
 | early-stopping patience         | 7 completed epochs        |
-| minimum improvement             | (10^{-4})                 |
-| checkpoint metric tie tolerance | (10^{-6})                 |
+| minimum improvement             | $10^{-4}$                 |
+| checkpoint metric tie tolerance | $10^{-6}$                 |
 | label smoothing                 | 0                         |
 | loss reduction                  | weighted arithmetic mean  |
 | probability log floor           | `scientific.metrics.probability_log_floor` |
@@ -836,7 +822,7 @@ Selection:
 
 1. smallest median VALID macro-CE over the three pilot seeds;
 2. smallest standard deviation;
-3. learning rate closest to (10^{-3});
+3. learning rate closest to $10^{-3}$;
 4. smaller weight decay;
 5. smaller dropout.
 
@@ -844,36 +830,36 @@ TEST and CONFIRM are inaccessible during pilot selection.
 
 ## 4.10 Local class-weight definition
 
-For TRAIN class (c),
+For TRAIN class $c$,
 
-[
+$$
 \omega_c=
 \frac{N}{|\mathcal C|N_c}.
-]
+$$
 
 After computing raw weights, divide all weights by their TRAIN-example weighted mean so that
 
-[
+$$
 \frac1N\sum_i\omega_{y_i}=1.
-]
+$$
 
 The per-example base loss is
 
-[
+$$
 \ell_i=
 -\omega_{y_i}
 \log\max(p_i(y_i),10^{-12}).
-]
+$$
 
 For minibatch \(\mathcal B\), with class-specific intervention/curriculum multiplier \(m_c\), the optimized scalar loss is exactly
 
-[
+$$
 \mathcal L_{\mathcal B}
 =
 \frac{1}{|\mathcal B|}
 \sum_{i\in\mathcal B}
 m_{y_i}\ell_i.
-]
+$$
 
 The denominator is the minibatch example count, not the sum of class or intervention weights. For base training, \(m_c=1\). Intervention and curriculum multipliers modify the fixed class weights **without subsequent renormalization**.
 
@@ -917,27 +903,26 @@ Eligibility constants:
 
 For a candidate, define
 
-[
+$$
 D_{ba}
-======
-
+=
 \frac{
 |\hat A_{ba}(\epsilon)-\hat A_{ba}(\epsilon/2)|
 }{
 \max(|\hat A_{ba}(\epsilon/2)|,0.005)
 }.
-]
+$$
 
 Define a pilot entry \((b,a)\) as useful when
 
-[
+$$
 \max\left(
 |\hat A_{ba}(\epsilon)|,
 |\hat A_{ba}(\epsilon/2)|
 \right)
 \ge
-\texttt{scientific.source_response_pilot.useful_response_magnitude_threshold}.
-]
+\texttt{scientific.source\_response\_pilot.useful\_response\_magnitude\_threshold}.
+$$
 
 Linearity is evaluated only over useful entries.
 
@@ -954,25 +939,25 @@ If there are no useful entries, the candidate is ineligible.
 
 Let \(\hat A_{ba}=\hat A_{ba}(\epsilon)\) and \(SE_{ba}=SE_{ba}(\epsilon)\) for the full candidate magnitude. The pilot score is
 
-[
+$$
 Q
 =
 \operatorname{median}_{(b,a)\in\mathcal U}
 \left(
 \frac{|\hat A_{ba}|}
-{SE_{ba}+\texttt{scientific.source_response_pilot.numerical_floor}}
+{SE_{ba}+\texttt{scientific.source\_response\_pilot.numerical\_floor}}
 \right)
 -
-\texttt{scientific.source_response_pilot.curvature_penalty_coefficient}
+\texttt{scientific.source\_response\_pilot.curvature\_penalty\_coefficient}
 \operatorname{median}_{(b,a)\in\mathcal U}
 D_{ba},
-]
+$$
 
 where \(\mathcal U\) is the candidate's useful-entry set.
 
 Tie order:
 
-1. higher (Q);
+1. higher $Q$;
 2. smaller optimizer horizon;
 3. smaller intervention magnitude.
 
@@ -984,30 +969,30 @@ The pilot useful-column minimum and the final-packet stability minimum are phase
 
 Replicate counts, confidence level, bootstrap count, numerical floors, and final stability thresholds are configuration data. Paired-shadow semantics, bootstrap construction, quantile interpolation, and no-clipping behavior are fixed rules.
 
-| Parameter / fixed response rule                     |                           Locked value |                       |       |
-| --------------------------------------------------- | -------------------------------------: | --------------------- | ----- |
-| paired replicates per intervention                  |                                     24 |                       |       |
-| simultaneous confidence level                       |                                    95% |                       |       |
-| max-(                                               |                                      t | ) bootstrap resamples | 2,000 |
-| response-risk denominator floor                     |                              (10^{-8}) |                       |       |
-| response standard-error floor                       |                             (10^{-12}) |                       |       |
-| useful response magnitude threshold                 |                                  0.005 |                       |       |
-| minimum useful intervention columns                 |                                      2 |                       |       |
-| maximum median band-width / median absolute mean-response ratio |                             4 |                       |       |
-| bootstrap critical quantile rule                    | empirical confidence-level quantile using `higher` |                       |       |
-| common random numbers within positive/negative pair |                               required |                       |       |
+| Parameter / fixed response rule                     |                           Locked value |
+| --------------------------------------------------- | -------------------------------------: |
+| paired replicates per intervention                  |                                     24 |
+| simultaneous confidence level                       |                                    95% |
+| max-$|t|$ bootstrap resamples                       |                                   2,000 |
+| response-risk denominator floor                     |                              $10^{-8}$ |
+| response standard-error floor                       |                             $10^{-12}$ |
+| useful response magnitude threshold                 |                                  0.005 |
+| minimum useful intervention columns                 |                                      2 |
+| maximum median band-width / median absolute mean-response ratio |                             4 |
+| bootstrap critical quantile rule                    | empirical confidence-level quantile using `higher` |
+| common random numbers within positive/negative pair |                               required |
 
 All source-response and target-local-response shadows update on TRAIN minibatches only. Every \(R_b(\theta)\) used by the response pilot, final source packet, or matched target-local response diagnostic is evaluated in model evaluation mode on META only, over the fixed retained native classes belonging to transfer concept \(b\), using the equal-native-class risk definition in Section 6.4. VALID, CONFIRM, and TEST never enter a response derivative.
 
-For source intervention (a), positive and negative shadows start from the exact same checkpoint, optimizer state, and RNG state.
+For source intervention $a$, positive and negative shadows start from the exact same checkpoint, optimizer state, and RNG state.
 
-The positive shadow multiplies class (a)'s base weight by (1+\epsilon_R).
+The positive shadow multiplies class $a$'s base weight by $1+\epsilon_R$.
 
-The negative shadow multiplies it by (1-\epsilon_R).
+The negative shadow multiplies it by $1-\epsilon_R$.
 
-For outcome class (b),
+For outcome class $b$,
 
-[
+$$
 A_r(b,a)=
 \frac{
 R_b(\theta^-_{r,a})-
@@ -1016,23 +1001,23 @@ R_b(\theta^+_{r,a})
 2\epsilon_R
 \max(R_b(\theta_0),10^{-8})
 }.
-]
+$$
 
-Let (R) be replicate count. For vectorized response entry (e),
+Let $R$ be replicate count. For vectorized response entry $e$,
 
-[
+$$
 \hat A_e=\frac1R\sum_r A_{re},
-]
+$$
 
-[
+$$
 SE_e=
 \frac{\operatorname{sd}(A_{1e},\ldots,A_{Re};ddof=1)}
 {\sqrt R}.
-]
+$$
 
-For bootstrap replicate (q), resample paired replicate indices with replacement, calculate (\hat A_e^{*(q)}) and (SE_e^{*(q)}), then
+For bootstrap replicate $q$, resample paired replicate indices with replacement, calculate $\hat A_e^{*(q)}$ and $SE_e^{*(q)}$, then
 
-[
+$$
 T_q=
 \max_e
 \left|
@@ -1042,35 +1027,35 @@ T_q=
 \max(SE_e^{*(q)},10^{-12})
 }
 \right|.
-]
+$$
 
-Let (q_{0.95}) be the empirical `higher` quantile at `scientific.source_response_final.simultaneous_confidence_level`. The quantile probability is derived from that confidence level and is not separately configurable. Then
+Let $q_{0.95}$ be the empirical `higher` quantile at `scientific.source_response_final.simultaneous_confidence_level`. The quantile probability is derived from that confidence level and is not separately configurable. Then
 
-[
+$$
 L_e=\hat A_e-q_{0.95}SE_e,
-]
+$$
 
-[
+$$
 U_e=\hat A_e+q_{0.95}SE_e.
-]
+$$
 
-No clipping of (L), (U), or (\hat A) is applied.
+No clipping of $L$, $U$, or $\hat A$ is applied.
 
 A final response entry \(e=(b,a)\) is useful only when both:
 
-[
+$$
 |\hat A_e|
 \ge
-\texttt{scientific.source_response_final.useful_response_magnitude_threshold},
-]
+\texttt{scientific.source\_response\_final.useful\_response\_magnitude\_threshold},
+$$
 
 and its simultaneous interval excludes zero:
 
-[
+$$
 L_e>0
 \quad\text{or}\quad
 U_e<0.
-]
+$$
 
 A final intervention column is useful when it contains at least one useful entry. The final packet stability rule counts useful columns by this definition and computes the configured median band-width / median absolute mean-response ratio over this useful-entry set only. If the useful-entry set is empty, the packet fails the final response stability rule.
 
@@ -1086,7 +1071,7 @@ The matched target-local response artifact uses:
 | simultaneous bootstrap resamples |              1,000 |
 | confidence level                 |                95% |
 
-Its estimator and max-(|t|) band construction are otherwise identical to the final source-response procedure.
+Its estimator and max-$|t|$ band construction are otherwise identical to the final source-response procedure.
 
 ## 4.14 Confirmation and assimilation specification
 
@@ -1115,19 +1100,19 @@ The one-sided lower confidence bound uses the empirical lower-tail probability d
 
 Acceptance requires
 
-[
+$$
 LCB_{0.95}
 \ge
-\texttt{scientific.confirmation.lower_bound_acceptance_threshold_relative_macro_ce}.
-]
+\texttt{scientific.confirmation.lower\_bound\_acceptance\_threshold\_relative\_macro\_ce}.
+$$
 
 The current configured acceptance threshold is 0.01 relative macro-CE.
 
-The live curriculum weight multiplier for actionable target class (j) is
+The live curriculum weight multiplier for actionable target class $j$ is
 
-[
+$$
 m_j=1+\alpha_j.
-]
+$$
 
 No post-multiplication renormalization is performed.
 
@@ -1174,15 +1159,15 @@ Numerical tolerances, limits, thread counts, concurrency, and deterministic solv
 
 | Configuration                              |              Value |
 | ------------------------------------------ | -----------------: |
-| LP primal feasibility tolerance            |          (10^{-9}) |
-| LP dual feasibility tolerance              |          (10^{-9}) |
-| LP optimality tolerance                    |          (10^{-9}) |
-| separator/cut stopping tolerance           |          (10^{-8}) |
-| exact validation tolerance                 | (10^{-9}) absolute |
-| permutation certificate residual tolerance |         (10^{-10}) |
-| action tie tolerance                       |         (10^{-10}) |
-| action tie comparison rounding precision   |         (10^{-12}) |
-| LAP objective tie tolerance                |         (10^{-12}) |
+| LP primal feasibility tolerance            |          $10^{-9}$ |
+| LP dual feasibility tolerance              |          $10^{-9}$ |
+| LP optimality tolerance                    |          $10^{-9}$ |
+| separator/cut stopping tolerance           |          $10^{-8}$ |
+| exact validation tolerance                 | $10^{-9}$ absolute |
+| permutation certificate residual tolerance |         $10^{-10}$ |
+| action tie tolerance                       |         $10^{-10}$ |
+| action tie comparison rounding precision   |         $10^{-12}$ |
+| LAP objective tie tolerance                |         $10^{-12}$ |
 | maximum cuts per support                   |                500 |
 | LP threads per solve                       |                  1 |
 | maximum concurrently executed supports     |                  4 |
@@ -1205,8 +1190,8 @@ Numerical gap/tolerance, time limit, thread count, and seed are configuration da
 
 | Configuration           |     Value |
 | ----------------------- | --------: |
-| relative MIP gap        | (10^{-9}) |
-| feasibility tolerance   | (10^{-9}) |
+| relative MIP gap        | $10^{-9}$ |
+| feasibility tolerance   | $10^{-9}$ |
 | wall-time cap per solve |   3,600 s |
 | threads                 |         1 |
 | random seed             |         0 |
@@ -1222,37 +1207,37 @@ Backend:
 
 Let \(p_{aj}=1\) mean target padded node \(j\) is mapped to source padded node \(a\). Variables exist only when source and target nodes belong to the same coarse group. For each coarse block \(g\),
 
-[
+$$
 \sum_{a\in\mathcal G_g^{source}}p_{aj}=1
 \quad
 \forall j\in\mathcal G_g^{target},
-]
+$$
 
-[
+$$
 \sum_{j\in\mathcal G_g^{target}}p_{aj}=1
 \quad
 \forall a\in\mathcal G_g^{source}.
-]
+$$
 
 For fixed action \(\alpha\), introduce \(y_{abkj}=p_{ak}p_{bj}\) for every coefficient with \(w_k\alpha_jL_{ab}\ne0\). With binary \(p\), impose exactly
 
-[
+$$
 0\le y_{abkj}\le p_{ak},
 \qquad
 0\le y_{abkj}\le p_{bj},
-]
+$$
 
-[
+$$
 y_{abkj}\ge p_{ak}+p_{bj}-1.
-]
+$$
 
 The fixed-action QAP objective is
 
-[
+$$
 \min_{p,y}
 \sum_{k,j,a,b}
 w_k\alpha_jL_{ab}y_{abkj}.
-]
+$$
 
 The curriculum cost \(-c^T\alpha\) is constant during correspondence separation and is added when reporting the full map-conditioned objective \(J(\alpha;P)\).
 
@@ -1274,20 +1259,20 @@ This definition makes `Generic Exact QAP` a solver-method comparator rather than
 
 For Point-Correspondence Commitment, the roadmap objective
 
-[
+$$
 \min_{P\in\Pi}
 \lVert P^TL_sP-L_t\rVert_F^2
-]
+$$
 
 is implemented through the permutation-invariant expansion
 
-[
+$$
 \lVert L_s\rVert_F^2
 +
 \lVert L_t\rVert_F^2
 -
 2\langle P^TL_sP,L_t\rangle_F.
-]
+$$
 
 The first two terms are constant, so SCIP minimizes the equivalent quadratic-assignment objective \(-2\langle P^TL_sP,L_t\rangle_F\) with the same binary assignment/product linearization. The registered point-map tie tolerance and lexicographic correspondence rule remain authoritative.
 
@@ -1305,30 +1290,30 @@ The Dense-CCP fallback uses the full dense action set \(\mathcal A\); it has no 
 
 Use the same assignment orientation as Section 4.17, but relax
 
-[
+$$
 0\le p_{aj}\le1.
-]
+$$
 
 The blockwise row/column assignment equalities remain exact. Introduce \(y_{abkj}\) for every nonzero coefficient and impose the same McCormick inequalities
 
-[
+$$
 0\le y_{abkj}\le p_{ak},
 \qquad
 0\le y_{abkj}\le p_{bj},
-\]
+$$
 
-[
+$$
 y_{abkj}\ge p_{ak}+p_{bj}-1.
-]
+$$
 
 For fixed action \(\alpha\), the unpenalized lifted LP minimizes
 
-[
+$$
 F_\alpha(p,y)
 =
 \sum_{k,j,a,b}
 w_k\alpha_jL_{ab}y_{abkj}.
-]
+$$
 
 Because the feasible set relaxes the permutation set, its optimum \(v_{\rm relax}(\alpha)\) is a lower bound on the true fixed-action worst-correspondence response term.
 
@@ -1336,15 +1321,15 @@ Because the feasible set relaxes the permutation set, its optimum \(v_{\rm relax
 
 For assignment variables,
 
-[
+$$
 \phi(p)
 =
 \sum_{a,j}p_{aj}(1-p_{aj}).
-]
+$$
 
 At CCP iterate \(p^{(t)}\), use the affine majorization of the concave term:
 
-[
+$$
 \phi_{\rm lin}(p;p^{(t)})
 =
 \sum_{a,j}
@@ -1353,29 +1338,29 @@ At CCP iterate \(p^{(t)}\), use the affine majorization of the concave term:
 +
 (p^{(t)}_{aj})^2
 \right].
-]
+$$
 
 At penalty \(\lambda\), the next iterate is the optimum of the LP
 
-[
+$$
 \min_{p,y}
 F_\alpha(p,y)
 +
 \lambda\phi_{\rm lin}(p;p^{(t)})
-]
+$$
 
 subject to the continuous lifted constraints above.
 
 Penalty scaling uses
 
-[
+$$
 M=
 \max\left(
 1,
 \max_{a,b,j,k}
 |w_k\alpha_jL_{ab}|
 \right),
-]
+$$
 
 and the penalty levels are exactly
 
@@ -1392,8 +1377,8 @@ Configuration:
 | Dense setting                            |     Value |
 | ---------------------------------------- | --------: |
 | maximum CCP iterations per penalty level |        50 |
-| assignment integrality residual          | (10^{-8}) |
-| relative objective convergence tolerance | (10^{-8}) |
+| assignment integrality residual          | $10^{-8}$ |
+| relative objective convergence tolerance | $10^{-8}$ |
 | deterministic starts                     |         5 |
 | outer action cuts                        |     1,000 |
 | wall-time cap                            |   3,600 s |
@@ -1401,23 +1386,23 @@ Configuration:
 
 The assignment integrality residual is
 
-[
+$$
 r_{\rm int}(p)
 =
 \max_{a,j}\min(p_{aj},1-p_{aj}).
-]
+$$
 
 Relative objective convergence between consecutive CCP iterates uses the unpenalized \(F_\alpha\) value:
 
-[
+$$
 \frac{
 |F_\alpha^{(t+1)}-F_\alpha^{(t)}|
 }{
 \max(1,|F_\alpha^{(t)}|)
 }
 \le
-\texttt{solvers.dense_ccp.relative_objective_convergence_tolerance}.
-]
+\texttt{solvers.dense\_ccp.relative\_objective\_convergence\_tolerance}.
+$$
 
 A penalty-level trajectory may stop before 50 iterations only when both this objective criterion and the configured integrality-residual criterion hold. Otherwise it executes the configured maximum iterations and proceeds to the next penalty level from the last iterate. The final convergence state records whether the final penalty level met both criteria.
 
@@ -1437,10 +1422,10 @@ Each start executes the complete penalty ladder. The final iterate of one penalt
 
 After every complete CCP trajectory, project its final \(p\) to the nearest admissible block permutation by solving, independently in every block,
 
-[
+$$
 \max_P
 \sum_j p_{P(j),j},
-]
+$$
 
 using the deterministic LAP tie rule from Section 4.16. Evaluate the unpenalized correspondence objective on the projected permutation. The best projected correspondence is the one with the smallest unpenalized fixed-action objective; ties use the global lexicographic correspondence rule.
 
@@ -1448,23 +1433,23 @@ using the deterministic LAP tie rule from Section 4.16. Evaluate the unpenalized
 
 Initialize the scenario set with the lexicographically smallest admissible block permutation. Repeatedly solve
 
-[
+$$
 \max_{\alpha,z} z
-]
+$$
 
 subject to
 
-[
+$$
 \alpha\in\mathcal A
-]
+$$
 
 and, for every accumulated projected permutation \(P_r\),
 
-[
+$$
 z
 \le
 w^TP_r^TLP_r\alpha-c^T\alpha.
-]
+$$
 
 For each master action \(\alpha^{(q)}\):
 
@@ -1511,10 +1496,10 @@ No transfer, target-local fixed base checkpoint only.
 
 Uses target TRAIN/META response artifact and solves
 
-[
+$$
 \max_{\alpha\in\mathcal A^{(s)}}
 w^TL_t\alpha-c^T\alpha.
-]
+$$
 
 It receives the same action budget, support, confirmation, live-assimilation, and target compute cap as FedORBIT.
 
@@ -1540,85 +1525,82 @@ For the single-source `Target Confirmation and Portability` comparison, this met
 
 Uses
 
-[
+$$
 \ell_{kj}
-=========
-
+=
 \min_{P\in\Pi}
 (P^TLP)_{kj}
-]
+$$
 
 and solves
 
-[
+$$
 \max_{\alpha\in\mathcal A^{(s)}}
 w^T\ell\alpha-c^T\alpha.
-]
+$$
 
 ### Point-correspondence commitment
 
 Chooses
 
-[
+$$
 \hat P
 \in
 \arg\min_{P\in\Pi}
 \lVert P^TL_sP-L_t\rVert_F^2
-]
+$$
 
 with generic exact QAP.
 
-Ties within (10^{-10}) choose the lexicographically smallest correspondence.
+Ties within $10^{-10}$ choose the lexicographically smallest correspondence.
 
-It then optimizes action under (\hat P).
+It then optimizes action under $\hat P$.
 
 ### Coarse block-mean summary
 
-For source coarse groups (g,h),
+For source coarse groups $g,h$,
 
-[
+$$
 B_{gh}
-======
-
+=
 \operatorname{mean}
-{
+\{
 L_{ab}:
 a\in\mathcal G_g^{source,real},
 b\in\mathcal G_h^{source,real}
-}.
-]
+\}.
+$$
 
 Lift to the target fine space by
 
-[
+$$
 \tilde L_{kj}=B_{g(k),g(j)}.
-]
+$$
 
 Null target coordinates retain zero action cap.
 
 ### Coarse block-min summary
 
-[
+$$
 B^{min}_{gh}
-============
-
+=
 \min
-{
+\{
 L_{ab}:
 a\in\mathcal G_g^{source,real},
 b\in\mathcal G_h^{source,real}
-}.
-]
+\}.
+$$
 
 Lift identically to the fine target space.
 
 For both coarse summaries, if an ordered source coarse-block pair contains no real source entry after endpoint eligibility, define its block summary as exactly zero:
 
-[
+$$
 B_{gh}=0,
 \qquad
 B^{min}_{gh}=0.
-]
+$$
 
 This is the explicit null-evidence continuation of the roadmap's zero-response null-node semantics; an empty-set mean or minimum is never evaluated.
 
@@ -1626,12 +1608,11 @@ This is the explicit null-evidence continuation of the roadmap's zero-response n
 
 Use
 
-[
+$$
 \bar L
-======
-
+=
 \mathbb E_{P\sim Uniform(\Pi)}[P^TLP].
-]
+$$
 
 Compute this analytically blockwise rather than enumerating the orbit:
 
@@ -1639,15 +1620,15 @@ Compute this analytically blockwise rather than enumerating the orbit:
 * same-group diagonal positions use the mean source block diagonal;
 * same-group off-diagonal positions use the mean source block off-diagonal.
 
-Action is optimized against (\bar L) without a robust minimum.
+Action is optimized against $\bar L$ without a robust minimum.
 
 ### Coupling-destroyed packet
 
-For each ordered coarse block pair ((g,h)):
+For each ordered coarse block pair $(g,h)$:
 
-1. vectorize the corresponding (L) and (U) entries in row-major order;
+1. vectorize the corresponding $L$ and $U$ entries in row-major order;
 2. derive one deterministic permutation from the packet seed namespace;
-3. apply the same permutation to (L) and (U);
+3. apply the same permutation to $L$ and $U$;
 4. reshape.
 
 This preserves:
@@ -1670,9 +1651,9 @@ Oracle information may not influence non-oracle fitting, pilot selection, or cla
 
 The class-risk floor is configuration data. META-only construction and zero weights for Normal/null nodes are fixed scientific rules.
 
-For actionable non-null target node (k),
+For actionable non-null target node $k$,
 
-[
+$$
 w_k=
 \frac{
 \max(R_k,10^{-4})
@@ -1680,11 +1661,11 @@ w_k=
 \sum_{q\in actionable}
 \max(R_q,10^{-4})
 },
-]
+$$
 
-where (R_k) is pre-transfer target META class-conditional cross-entropy.
+where $R_k$ is pre-transfer target META class-conditional cross-entropy.
 
-Normal and null nodes have (w=0).
+Normal and null nodes have $w=0$.
 
 META is the only split used to construct target importance.
 
@@ -1729,7 +1710,7 @@ The statistical base seed is used only to derive deterministic bootstrap/resampl
 
 Every secondary RNG stream is generated as:
 
-[
+$$
 seed32=
 \operatorname{SHA256}
 (
@@ -1743,7 +1724,7 @@ UTF8(
 )
 )_{0:8}
 \bmod2^{32}.
-]
+$$
 
 `canonicalCoordinates` is canonical JSON with:
 
@@ -1810,28 +1791,28 @@ Nominal alpha is derived as one minus the configured nominal confidence level; i
 
 The paired continuous test statistic is the arithmetic mean paired difference.
 
-For (n_{\rm eff}) nonzero differences, enumerate all (2^{n_{\rm eff}}) sign patterns whenever (n_{\rm eff}\le20). Confirmatory seed counts make enumeration mandatory in this study.
+For $n_{\rm eff}$ nonzero differences, enumerate all $2^{n_{\rm eff}}$ sign patterns whenever $n_{\rm eff}\le20$. Confirmatory seed counts make enumeration mandatory in this study.
 
 The exact two-sided p-value is
 
-[
+$$
 p=
 \frac{
-#{
+\#\{
 |\bar d^{perm}|
 \ge
 |\bar d^{obs}|-10^{-15}
-}
+\}
 }{
 2^{n_{\rm eff}}
 }.
-]
+$$
 
-If every paired difference is zero, (p=1).
+If every paired difference is zero, $p=1$.
 
 BCa resampling samples paired seed indices with replacement.
 
-If all paired differences are numerically identical within (10^{-15}), the confidence interval is exactly the point value rather than an undefined BCa interval.
+If all paired differences are numerically identical within $10^{-15}$, the confidence interval is exactly the point value rather than an undefined BCa interval.
 
 Holm ties are ordered by:
 
@@ -1863,7 +1844,7 @@ No unregistered confirmatory contrast may be added after the first claim-bearing
 Supported only when:
 
 1. at least the configured required number of the four primary directed pairs have mean relative macro-CE gain vs Local-Only at least `scientific.materiality.realized_relative_macro_ce`;
-2. each successful pair has Holm-adjusted (p) below the configured claim threshold;
+2. each successful pair has Holm-adjusted $p$ below the configured claim threshold;
 3. each successful pair has BCa lower bound strictly greater than the configured zero boundary;
 4. no primary pair has mean gain at or below `scientific.materiality.harmful_transfer_relative_macro_ce_gain`;
 5. the equal-pair mean of the four pair means is at least `scientific.materiality.realized_relative_macro_ce`;
@@ -1883,21 +1864,21 @@ Requires all of:
 
 1. the configured theorem zero/strict classification accuracy on the controlled designed family;
 2. at least the configured valid-packet fraction have coupling gap at least `scientific.materiality.coupling_objective_units`;
-3. at least the configured number of the four primary pairs have mean gap at least `scientific.materiality.coupling_objective_units` with Holm-adjusted (p) below the configured coupling claim threshold;
+3. at least the configured number of the four primary pairs have mean gap at least `scientific.materiality.coupling_objective_units` with Holm-adjusted $p$ below the configured coupling claim threshold;
 4. coupling destruction does not satisfy the registered mechanism-retention condition below.
 
 For primary pair \(p\), let \(\bar G^{full}_p\) and \(\bar G^{destroyed}_p\) be the seed-mean TEST relative macro-CE gains versus the identical Local-Only reference. Define
 
-[
+$$
 Retention_p
 =
 \frac{\bar G^{destroyed}_p}{\bar G^{full}_p}
-]
+$$
 
 only when \(\bar G^{full}_p>0\); otherwise `Retention_p = NA`. A pair is a **mechanism-retention pair** only when both:
 
 1. the Full-vs-Coupling-Destroyed TOST contrast for that pair establishes equivalence after Holm correction in the `Mechanism Ablations` family; and
-2. \(Retention_p\ge\texttt{scientific.claim_criteria.coupling_mechanism.destruction_positive_gain_retention_minimum}\).
+2. \(Retention_p\ge\texttt{scientific.claim\_criteria.coupling\_mechanism.destruction\_positive\_gain\_retention\_minimum}\).
 
 The registered mechanism-retention condition is present when at least `scientific.claim_criteria.coupling_mechanism.primary_pairs_with_material_mean_gap_required` primary pairs are mechanism-retention pairs. `NA` retention values never count toward this condition.
 
@@ -1906,34 +1887,34 @@ The registered mechanism-retention condition is present when at least `scientifi
 Requires:
 
 1. the registered compared sparse support lies no more than the configured dense-minus-sparse gain ceiling below dense on at least the configured fraction of valid primary pair-seed units;
-2. at least one of the predeclared sparse supports (s=2) or (s=3) has pair-mean realized gain at least `scientific.materiality.realized_relative_macro_ce` on at least the configured number of primary pairs;
+2. at least one of the predeclared sparse supports $s=2$ or $s=3$ has pair-mean realized gain at least `scientific.materiality.realized_relative_macro_ce` on at least the configured number of primary pairs;
 3. exact-sparse solver correctness remains valid.
 
-No TEST-driven choice between (s=2) and (s=3) is used to define the principal method.
+No TEST-driven choice between $s=2$ and $s=3$ is used to define the principal method.
 
 ### Confirmation safety
 
 For each pair define:
 
-[
+$$
 ARR=
 harmRate_{noConfirm}-harmRate_{confirm}.
-]
+$$
 
 Where baseline harmful rate is positive,
 
-[
+$$
 RRR=
 \frac{ARR}{harmRate_{noConfirm}}.
-]
+$$
 
 The claim requires:
 
-1. at least 3 of 4 primary pairs satisfy (ARR\ge0.02) or (RRR\ge0.30);
-2. those qualifying pairs have mean coverage loss (\le0.20);
-3. no primary pair has harmful-rate worsening (>0.02);
+1. at least 3 of 4 primary pairs satisfy $ARR\ge0.02$ or $RRR\ge0.30$;
+2. those qualifying pairs have mean coverage loss $\le0.20$;
+3. no primary pair has harmful-rate worsening $>0.02$;
 4. no primary pair loses more than 0.20 coverage;
-5. equal-pair mean satisfies either (ARR\ge0.02) or, when defined, (RRR\ge0.30).
+5. equal-pair mean satisfies either $ARR\ge0.02$ or, when defined, $RRR\ge0.30$.
 
 Pair-specific seed-level rate differences use the registered exact sign-flip procedure.
 
@@ -2586,8 +2567,8 @@ The packet contains only:
 
 * anonymous fine-node IDs;
 * exposed coarse-group ID;
-* (L);
-* (U);
+* $L$;
+* $U$;
 * per-node TRAIN support;
 * per-node META support;
 * per-node effective replicate count;
@@ -2743,13 +2724,13 @@ For intervention concept \(a\), the positive or negative intervention multiplier
 
 For outcome concept \(b\), its risk is the equal-native-class mean
 
-[
+$$
 R_b(\theta)
 =
 \frac{1}{|\mathcal C_b|}
 \sum_{c\in\mathcal C_b}
 CE_c(\theta).
-]
+$$
 
 This equal-class aggregation prevents a multi-label transfer concept such as Edge DDoS or Scanning from being dominated by its largest native subclass. Transfer support counts are the sum of row counts over the constituent native classes, while the risk itself remains the equal-native-class mean above.
 
@@ -2832,9 +2813,9 @@ Within each retained local class:
 2. order groups by earliest valid event timestamp;
 3. break equal timestamps by duplicate-group SHA-256;
 4. compute group midpoint fraction
-   [
+$$
    f_g=\frac{r_{\rm before}+0.5n_g}{N_c};
-   ]
+$$
 5. assign using the authoritative split intervals.
 
 A duplicate group is indivisible.
@@ -2926,38 +2907,36 @@ There is no offline staleness grace period.
 
 For support
 
-[
-S={j:\alpha_j>0},
-]
+$$
+S=\{j:\alpha_j>0\},
+$$
 
 enumerate every block-compatible injective image
 
-[
+$$
 \sigma:S\rightarrow[K].
-]
+$$
 
 For fixed active images,
 
-[
+$$
 C_0(\sigma)
-===========
-
+=
 \sum_{k\in S}
 w_k
 \sum_{j\in S}
 \alpha_jL_{\sigma(k),\sigma(j)}.
-]
+$$
 
-For each remaining target outcome (k\notin S) and unused source node (b) in the same block,
+For each remaining target outcome $k\notin S$ and unused source node $b$ in the same block,
 
-[
+$$
 C^\sigma_{kb}
-=============
-
+=
 w_k
 \sum_{j\in S}
 \alpha_jL_{b,\sigma(j)}.
-]
+$$
 
 Solve one minimum-cost LAP for every coarse block with remaining nodes.
 
@@ -2972,29 +2951,29 @@ Choose the correspondence minimizing the fixed-action objective.
 
 The exact work counters for one fixed-action separator call are
 
-[
+$$
 ActiveImageCandidates=N_S,
-]
+$$
 
 and
 
-[
+$$
 LAPCalls
 =
 N_S
 \sum_g
 \mathbf 1[n_g-s_g>0].
-]
+$$
 
 A size-one completion still counts as one LAP call because the implementation invokes the same deterministic assignment primitive.
 
 The work-count target is
 
-[
+$$
 O\left(
 N_S\sum_gn_g^3
 \right).
-]
+$$
 
 ## 8.2 Deterministic separator ties
 
@@ -3005,22 +2984,22 @@ If several correspondences have objective values within the configured LAP/actio
 
 ## 8.3 Robust master
 
-For each allowed coordinate set (S), solve
+For each allowed coordinate set $S$, solve
 
-[
+$$
 \max_{\alpha,z}z
-]
+$$
 
 subject to:
 
-* (\alpha\in\mathcal A);
-* (\alpha_j=0) for (j\notin S);
+* $\alpha\in\mathcal A$;
+* $\alpha_j=0$ for $j\notin S$;
 * every accumulated scenario cut
-  [
+$$
   z
   \le
   w^TP_r^TLP_r\alpha-c^T\alpha.
-  ]
+$$
 
 Initial scenario:
 
@@ -3030,8 +3009,8 @@ Iteration:
 
 1. solve LP;
 2. call exact separator;
-3. compute separator objective (v_{\rm sep});
-4. if (z-v_{\rm sep}) is within configured cut tolerance, certify;
+3. compute separator objective $v_{\rm sep}$;
+4. if $z-v_{\rm sep}$ is within configured cut tolerance, certify;
 5. otherwise add the returned correspondence and continue;
 6. hitting the configured support cut cap produces `Sparse Master Non-Convergence`; that support has no certified robust optimum.
 
@@ -3157,58 +3136,56 @@ Final metrics must come from one registered metric library. Table and figure cod
 
 ## 12.1 Class-conditional cross-entropy
 
-[
+$$
 CE_c=
 \frac1{n_c}
 \sum_{i:y_i=c}
 -\log\max(p_i(c),10^{-12}).
-]
+$$
 
 ## 12.2 Macro cross-entropy
 
-[
+$$
 CE_{\rm macro}
-==============
-
+=
 \frac1{|\mathcal C|}
 \sum_cCE_c.
-]
+$$
 
 A fixed evaluation class with zero evaluation examples makes the cell Invalid Data.
 
 ## 12.3 Relative macro-CE gain
 
-For method (m) and reference (b),
+For method $m$ and reference $b$,
 
-[
+$$
 G_{CE}(m,b)
-===========
-
+=
 \frac{
 CE_b-CE_m
 }{
 \max(CE_b,10^{-12})
 }.
-]
+$$
 
-If (CE_b<10^{-12}), the relative metric is NA; absolute CE difference is reported and the cell cannot establish a relative-gain claim.
+If $CE_b<10^{-12}$, the relative metric is NA; absolute CE difference is reported and the cell cannot establish a relative-gain claim.
 
 ## 12.4 Precision, recall, F1
 
-[
+$$
 P_c=
 \frac{TP_c}{TP_c+FP_c},
-]
+$$
 
-[
+$$
 R_c=
 \frac{TP_c}{TP_c+FN_c},
-]
+$$
 
-[
+$$
 F1_c=
 \frac{2P_cR_c}{P_c+R_c}.
-]
+$$
 
 Any zero denominator returns 0 by explicit project rule.
 
@@ -3216,11 +3193,11 @@ Macro-F1 is the arithmetic mean over the fixed evaluation class set.
 
 ## 12.5 Balanced accuracy
 
-[
+$$
 BA=
 \frac1{|\mathcal C|}
 \sum_cR_c.
-]
+$$
 
 ## 12.6 Mechanism metrics
 
@@ -3230,34 +3207,34 @@ The principal certified robust action objective.
 
 ### Fixed-action rectangularization gap
 
-[
+$$
 \Gamma(\alpha).
-]
+$$
 
 ### Robust coupling value gap
 
-[
+$$
 G_{\rm coupling}.
-]
+$$
 
 ### Coupling upper-bound diagnostic
 
-[
+$$
 \max_{\alpha\in\mathcal B}
 w^T(\bar L-\ell)\alpha.
-]
+$$
 
 ### Exact-map action value
 
-[
+$$
 \Delta_{\rm map}.
-]
+$$
 
 ### Orbit-radius map bound
 
 For every experiment-specific action set \(\mathcal B\),
 
-[
+$$
 0
 \le
 \Delta_{\rm map}(\mathcal B)
@@ -3265,25 +3242,25 @@ For every experiment-specific action set \(\mathcal B\),
 2\rho_2
 \lVert w\rVert_2
 R_\alpha,
-]
+$$
 
 where
 
-[
+$$
 \rho_2=
 \max_{P\in\Pi}
 \left\lVert
 P^TLP-\bar L
 \right\rVert_2
-]
+$$
 
 uses the matrix spectral norm, and
 
-[
+$$
 R_\alpha=
 \sup_{\alpha\in\mathcal B}
 \lVert\alpha\rVert_2.
-]
+$$
 
 For tractable controlled experiments, \(\rho_2\) and the exact map value are computed by complete orbit enumeration. The bound is evaluated in float64 and may exceed the exact value only by the configured exact-validation tolerance.
 
@@ -3317,10 +3294,10 @@ Dense Integrality Residual
 
 Relative objective error is
 
-[
+$$
 \frac{|v-v^\star|}
 {\max(|v^\star|,10^{-12})}.
-]
+$$
 
 ## 12.8 Confirmation metrics
 
@@ -3328,13 +3305,13 @@ A **proposal-eligible target decision** is a target decision for which at least 
 
 For proposal-level diagnostics:
 
-[
+$$
 Proposal\ Acceptance\ Rate
 =
 \frac{\#accepted}{\#proposed}.
-]
+$$
 
-[
+$$
 Harmful\ Accepted\ Rate
 =
 \frac{
@@ -3342,9 +3319,9 @@ Harmful\ Accepted\ Rate
 }{
 \#proposed
 }.
-]
+$$
 
-[
+$$
 Useful\ Accepted\ Rate
 =
 \frac{
@@ -3352,13 +3329,13 @@ Useful\ Accepted\ Rate
 }{
 \#proposed
 }.
-]
+$$
 
 If there are no proposals, all proposal-denominator rates are NA, not zero.
 
 For target-decision coverage:
 
-[
+$$
 Coverage_{confirm}
 =
 \frac{
@@ -3366,59 +3343,59 @@ Coverage_{confirm}
 }{
 \#(\text{proposal-eligible decisions})
 }.
-]
+$$
 
 Under `FedORBIT Without Confirmation`, every proposal-eligible decision directly assimilates its first-ranked proposal, so
 
-[
+$$
 Coverage_{noConfirm}=1
-]
+$$
 
 whenever the denominator is nonzero. Define
 
-[
+$$
 CoverageLoss
 =
 Coverage_{noConfirm}-Coverage_{confirm}.
-]
+$$
 
 For confirmation-safety harm, define the decision-level indicators
 
-[
+$$
 H^{confirm}
 =
 \mathbf 1[
 TESTGain_{confirm}\le-0.01
 ],
-]
+$$
 
-[
+$$
 H^{noConfirm}
 =
 \mathbf 1[
 TESTGain_{noConfirm}\le-0.01
 ]
-]
+$$
 
 over the same proposal-eligible target decisions. A rejected confirmed decision remains at Local-Only and therefore has \(TESTGain_{confirm}=0\) by construction. For each pair and seed, `harmRate_confirm` and `harmRate_noConfirm` are the arithmetic means of these indicators over the valid proposal-eligible decisions represented by that pair-seed artifact. The primary pair design normally contains one such decision, yielding a rate of 0 or 1. Pair summaries are arithmetic means of the seed-level rates over valid paired seeds.
 
 Then
 
-[
+$$
 ARR
 =
 harmRate_{noConfirm}
 -
 harmRate_{confirm},
-]
+$$
 
 and, when \(harmRate_{noConfirm}>0\),
 
-[
+$$
 RRR
 =
 \frac{ARR}{harmRate_{noConfirm}}.
-]
+$$
 
 `RRR` is NA when the no-confirm harmful rate is zero.
 
@@ -3426,7 +3403,7 @@ Pair-level `Coverage_confirm`, `Coverage_noConfirm`, `CoverageLoss`, `harmRate_c
 
 `Beneficial Rejected Rate` is registered only for the single-source `Target Confirmation and Portability` experiment, where each rejected principal proposal has an exact paired `FedORBIT Without Confirmation` cell using that same source/action:
 
-[
+$$
 Beneficial\ Rejected\ Rate
 =
 \frac{
@@ -3438,7 +3415,7 @@ noConfirmCounterfactualGain\ge0.01
 }{
 \#proposed
 }.
-]
+$$
 
 For multi-source diagnostics with later alternative proposals, `Beneficial Rejected Rate` is NA rather than requiring unregistered counterfactual live-assimilation runs.
 
@@ -3528,15 +3505,15 @@ Let \(d_i\) be the paired method-minus-reference difference for seed \(i\).
 
 Lower-bound test:
 
-[
+$$
 H_0:\mu_d\le\delta_L
 \qquad\text{vs}\qquad
 H_1:\mu_d>\delta_L.
-]
+$$
 
 Define \(x_i=d_i-\delta_L=d_i+0.01\). Remove exact-zero \(x_i\) values using the same zero/tolerance semantics as the registered sign-flip test, enumerate every sign pattern of the remaining values, and calculate
 
-[
+$$
 p_L
 =
 \frac{
@@ -3544,21 +3521,21 @@ p_L
 }{
 2^{n_{\rm eff,L}}
 }.
-]
+$$
 
 If every \(x_i\) is zero, \(p_L=1\).
 
 Upper-bound test:
 
-[
+$$
 H_0:\mu_d\ge\delta_U
 \qquad\text{vs}\qquad
 H_1:\mu_d<\delta_U.
-]
+$$
 
 Define \(y_i=d_i-\delta_U=d_i-0.01\). Using the same exact sign enumeration,
 
-[
+$$
 p_U
 =
 \frac{
@@ -3566,17 +3543,17 @@ p_U
 }{
 2^{n_{\rm eff,U}}
 }.
-]
+$$
 
 If every \(y_i\) is zero, \(p_U=1\).
 
 The pair-specific equivalence p-value is
 
-[
+$$
 p_{equiv}=\max(p_L,p_U).
-]
+$$
 
-Holm correction is applied to \(p_{equiv}\) within the exact registered family membership in Section 13.7. Equivalence is established only when the Holm-adjusted \(p_{equiv}\le\texttt{scientific.statistics.tost_alpha_per_one_sided_test}\). No asymptotic TOST fallback is used.
+Holm correction is applied to \(p_{equiv}\) within the exact registered family membership in Section 13.7. Equivalence is established only when the Holm-adjusted \(p_{equiv}\le\texttt{scientific.statistics.tost\_alpha\_per\_one\_sided\_test}\). No asymptotic TOST fallback is used.
 
 ## 13.6 Missingness and failed runs
 
@@ -3689,40 +3666,39 @@ For each configured block-pattern/support/seed/instance cell:
 
 ### Response matrix
 
-[
+$$
 L_{ab}
 \overset{iid}{\sim}
 Uniform(-0.20,0.20).
-]
+$$
 
 For serialization-only upper bands,
 
-[
+$$
 U_{ab}
-======
-
+=
 L_{ab}
 +
 H_{ab},
 \qquad
 H_{ab}\sim Uniform(0,0.05).
-]
+$$
 
-(U) is not used as separator truth.
+$U$ is not used as separator truth.
 
 ### Target importance
 
 Draw
 
-[
+$$
 z_k\sim Gamma(shape=2,scale=1)
-]
+$$
 
 and normalize
 
-[
+$$
 w_k=\frac{z_k}{\sum_qz_q}.
-]
+$$
 
 ### Support
 
@@ -3730,27 +3706,27 @@ Select uniformly from all supports of the required cardinality.
 
 ### Action
 
-For (j\in S),
+For $j\in S$,
 
-[
+$$
 r_j\sim Uniform(0.05,0.25).
-]
+$$
 
-If (\sum_jr_j\le0.50),
+If $\sum_jr_j\le0.50$,
 
-[
+$$
 \alpha_j=r_j.
-]
+$$
 
 Otherwise
 
-[
+$$
 \alpha_j=
 0.50
 \frac{r_j}{\sum_qr_q}.
-]
+$$
 
-Coordinates outside (S) are zero.
+Coordinates outside $S$ are zero.
 
 ### Cost
 
@@ -3800,28 +3776,28 @@ support:
 For every candidate:
 
 1. draw an unconstrained matrix
-   [
+$$
    R_{ab}\sim Uniform(-0.10,0.10);
-   ]
+$$
 2. compute symmetric component
-   [
+$$
    S=(R+R^T)/2;
-   ]
-3. apply asymmetry level (a):
-   [
+$$
+3. apply asymmetry level $a$:
+$$
    Q=(1-a)S+aR;
-   ]
+$$
 4. for each ordered coarse block pair, center entries around their block-pair mean and multiply deviations by configured heterogeneity;
 5. apply exact deterministic sparsity by retaining
-   [
+$$
    \max(1,\operatorname{round}(qK^2))
-   ]
+$$
    entries chosen by the smallest deterministic hash ranks and setting others to zero;
-6. draw (w) and (\alpha) by the theorem-generator rules.
+6. draw $w$ and $\alpha$ by the theorem-generator rules.
 
 For sparsity ranking, every matrix coordinate \((a,b)\) receives
 
-[
+$$
 h_{ab}
 =
 \operatorname{SHA256}
@@ -3837,7 +3813,7 @@ UTF8(
 \Vert b
 )
 \right),
-]
+$$
 
 where `canonicalCoordinates` contains generator name, compatibility, heterogeneity, asymmetry, sparsity, block pattern, support, seed, and instance index using the canonical JSON rule in Section 4.21. Rank by the full 256-bit digest interpreted as an unsigned big-endian integer; break the practically impossible digest tie by ascending \((a,b)\). No RNG draw or library hash function is used for this selection.
 
@@ -3846,7 +3822,7 @@ For each positive-weight active term, compute its exact set of orbit permutation
 Define:
 
 * `jointly_realizable`: intersection of every positive-weight active-term minimizer set is nonempty;
-* `incompatible`: that intersection is empty and fixed-action rectangularization gap exceeds (10^{-6}).
+* `incompatible`: that intersection is empty and fixed-action rectangularization gap exceeds $10^{-6}$.
 
 Use rejection sampling until the requested structural class is obtained.
 
@@ -3868,19 +3844,19 @@ Block pattern:
 
 Every coarse block-pair response is constant:
 
-[
+$$
 L_{ab}=\beta_{g(a),g(b)},
-]
+$$
 
 where
 
-[
+$$
 \beta_{gh}\sim Uniform(0.04,0.12).
-]
+$$
 
 Target weights use the configured Gamma-normalized generator.
 
-All four blockwise maps remain admissible, but (P^TLP=L) for all (P).
+All four blockwise maps remain admissible, but $P^TLP=L$ for all $P$.
 
 The common action must have positive robust value. With the configured positive response range and project action cost, a generated fixture failing positive value is rejected.
 
@@ -3900,17 +3876,17 @@ Block pattern:
 
 Draw candidate response matrices
 
-[
+$$
 L_{ab}\sim Uniform(-0.10,0.20).
-]
+$$
 
-Draw (w) as configured.
+Draw $w$ as configured.
 
 Use the principal sparse action set.
 
 Accept a fixture only when:
 
-1. (|\Pi|>1);
+1. $|\Pi|>1$;
 2. the intersection of map-conditioned optimal-action sets is empty within action tie tolerance;
 3. robust pre-map value exceeds 0.005.
 
@@ -3930,15 +3906,15 @@ Block pattern:
 
 Draw
 
-[
+$$
 L_{ab}\sim Uniform(-0.15,0.25).
-]
+$$
 
 Accept only when:
 
-[
+$$
 \Delta_{\rm map}\ge0.01.
-]
+$$
 
 The robust method must either:
 
@@ -3963,40 +3939,40 @@ Both use the principal sparse action set.
 
 ## 14.8 Scalability generator
 
-For (K) in the registered scalability grid:
+For $K$ in the registered scalability grid:
 
 Balanced blocks:
 
-[
+$$
 (\lfloor K/2\rfloor,\lceil K/2\rceil).
-]
+$$
 
 Maximally skewed two-block pattern:
 
-[
+$$
 (K-1,1).
-]
+$$
 
 Generate
 
-[
+$$
 L_{ab}\sim Uniform(-0.10,0.10).
-]
+$$
 
 Use
 
-[
+$$
 w_k=1/K.
-]
+$$
 
-For fixed-action separator timing with support (s), choose the first (s) pseudonymous nodes in the largest block.
+For fixed-action separator timing with support $s$, choose the first $s$ pseudonymous nodes in the largest block.
 
 Action values are:
 
-[
+$$
 \alpha_j=
 \min\left(0.25,\frac{0.50}{s}\right)
-]
+$$
 
 on the selected support.
 
@@ -4042,7 +4018,7 @@ Inputs:
 Pass:
 
 * 100% registered tests pass;
-* scalar/matrix fixture error (\le10^{-10});
+* scalar/matrix fixture error $\le10^{-10}$;
 * zero invalid permutations accepted.
 
 Failure blocks every downstream experiment.
@@ -4062,7 +4038,7 @@ Block patterns:
 (3,3)
 ```
 
-Support values use every registered feasible (s\in{1,2,3}), producing 17 block-pattern/support cells.
+Support values use every registered feasible $s\in\{1,2,3\}$, producing 17 block-pattern/support cells.
 
 Per cell:
 
@@ -4094,12 +4070,11 @@ Uses the complete coupling generator factorial.
 
 Derived instance count:
 
-[
+$$
 2\times3\times3\times3\times3\times3\times10
-============================================
-
+=
 4,860.
-]
+$$
 
 Pass:
 
@@ -4133,15 +4108,15 @@ If a primary pair has insufficient valid seeds, its claim scope is removed **bef
 
 Derived fits:
 
-[
+$$
 4\ clients\times12\ configurations\times3\ pilot\ seeds=144.
-]
+$$
 
 After deterministic selection:
 
-[
+$$
 4\times10=40
-]
+$$
 
 confirmatory base checkpoints are trained.
 
@@ -4154,15 +4129,15 @@ No TEST data are accessed.
 Per client/model family:
 
 * three pilot checkpoints;
-* nine ((\epsilon_R,K_R)) candidates.
+* nine $(\epsilon_R,K_R)$ candidates.
 
 Derived candidate cells:
 
-[
+$$
 4\times3\times9=108.
-]
+$$
 
-Each candidate uses configured paired schedules at (\epsilon_R) and (\epsilon_R/2).
+Each candidate uses configured paired schedules at $\epsilon_R$ and $\epsilon_R/2$.
 
 Exact shadow-step totals are derived after source transfer-node eligibility is observed.
 
@@ -4174,9 +4149,9 @@ Every primary source domain must obtain one eligible candidate.
 
 Planned before eligibility exclusions:
 
-[
+$$
 4\ source\ clients\times10\ seeds=40
-]
+$$
 
 packets.
 
@@ -4240,9 +4215,9 @@ Seeds:
 
 Exhaustive truth is computed whenever
 
-[
+$$
 |\Pi|\le100,000.
-]
+$$
 
 For larger correspondence sets, certified generic-QAP optimum may supply truth. If QAP fails to certify within its limit, truth is unavailable for that cell.
 
@@ -4274,9 +4249,9 @@ Pass interpretation follows the central mechanism criteria.
 
 Planned units:
 
-[
+$$
 4\ primary\ pairs\times10\ seeds=40.
-]
+$$
 
 Compare:
 
@@ -4295,9 +4270,9 @@ Use the registered coupling multiplicity family.
 
 Fixtures:
 
-[
+$$
 50\times10=500.
-]
+$$
 
 Required:
 
@@ -4311,14 +4286,14 @@ Required:
 
 Fixtures:
 
-[
+$$
 50\times10=500.
-]
+$$
 
 Required:
 
 * no common map-conditioned optimum;
-* robust value (>0.005).
+* robust value $>0.005$.
 
 ## Map-Dependent Action Boundary
 
@@ -4326,15 +4301,15 @@ Required:
 
 Fixtures:
 
-[
+$$
 50\times10=500.
-]
+$$
 
 Required:
 
-[
+$$
 \Delta_{\rm map}\ge0.01.
-]
+$$
 
 FedORBIT must compromise or abstain without claiming recovered semantics.
 
@@ -4385,9 +4360,9 @@ Principal support:
 
 Planned cells before deterministic data invalidations:
 
-[
+$$
 4\times10\times7=280.
-]
+$$
 
 Primary outcome:
 
@@ -4452,9 +4427,9 @@ Local-SIR
 
 Derived condition cells before identity reuse:
 
-[
+$$
 4\times10\times8=320.
-]
+$$
 
 Already valid semantic cells are reused rather than duplicated.
 
@@ -4473,9 +4448,9 @@ dense CCP
 
 Primary pair-seed units:
 
-[
+$$
 4\times10.
-]
+$$
 
 Derived cells:
 
@@ -4483,7 +4458,7 @@ Derived cells:
 160
 ```
 
-Principal (s=2) cells are reused when already complete.
+Principal $s=2$ cells are reused when already complete.
 
 ## Target Confirmation and Portability
 
@@ -4503,9 +4478,9 @@ FedORBIT Without Confirmation
 
 Derived planned cells:
 
-[
+$$
 8\times10\times2=160.
-]
+$$
 
 Primary claim uses the four primary pairs only.
 
@@ -4561,9 +4536,9 @@ Primary pairs × confirmatory seeds.
 
 Derived cells:
 
-[
+$$
 4\times3\times4\times10=480.
-]
+$$
 
 The singleton condition is oracle/diagnostic and not strict-interface evidence.
 
@@ -4629,44 +4604,43 @@ Local-Only
 
 Derived cells:
 
-[
+$$
 15\times3\times4\times10=1,800.
-]
+$$
 
 ### Perturbation semantics
 
 For source packet midpoint and half-width,
 
-[
+$$
 A=(L+U)/2,
 \qquad
 H=(U-L)/2.
-]
+$$
 
-Response-scale condition (r):
+Response-scale condition $r$:
 
-[
+$$
 L'=rA-H,\qquad U'=rA+H.
-]
+$$
 
-CI-width condition (q):
+CI-width condition $q$:
 
-[
+$$
 L'=A-qH,\qquad U'=A+qH.
-]
+$$
 
-Heterogeneity condition (h), for each ordered coarse block pair:
+Heterogeneity condition $h$, for each ordered coarse block pair:
 
-[
+$$
 A'_{ab}
-=======
-
+=
 \bar A_{gh}
 +
 h(A_{ab}-\bar A_{gh}),
-]
+$$
 
-with original half-width (H).
+with original half-width $H$.
 
 Target support fractions use deterministic smallest-hash subsampling independently within each retained class of:
 
@@ -4692,9 +4666,9 @@ Packet-only recovery:
 
 Derived recovery attempts:
 
-[
+$$
 2\times40=80.
-]
+$$
 
 Human public-resource audit:
 
@@ -4777,15 +4751,15 @@ Seeds:
 
 Derived synthetic exact/QAP cells:
 
-[
+$$
 8\times2\times3\times10\times2=960.
-]
+$$
 
 Derived dense cells:
 
-[
+$$
 8\times2\times10=160.
-]
+$$
 
 Total synthetic solver cells:
 
@@ -4795,9 +4769,9 @@ Total synthetic solver cells:
 
 Real primary timing cells:
 
-[
+$$
 40\times3=120
-]
+$$
 
 before deterministic data exclusions.
 
@@ -4805,11 +4779,11 @@ Timing uses the authoritative warmup/repetition protocol.
 
 For the `Sparse Solver Work-Structure Agreement` claim, define the predicted work coordinate for each fixed-action exact-sparse scalability cell as
 
-[
+$$
 X
 =
 N_S\sum_g n_g^3.
-]
+$$
 
 Within each block-pattern × support stratum having at least `scientific.statistics.spearman_minimum_valid_points` distinct non-timeout \(K\) values, compute Spearman correlation between \(\log X\) and \(\log\) median exact-sparse runtime. The efficiency-trend component passes only when every eligible stratum has \(\rho>0\). The correlation is descriptive and receives no p-value threshold. A stratum with fewer than the configured minimum points is `Insufficient Trend Evidence` and cannot establish the runtime-trend component.
 
@@ -5001,13 +4975,13 @@ MIP exactness/certificate logic
 
 Both therefore have roadmap complexity count 5; no subjective code-size, line-count, developer-effort, or library-preference judgment enters the trigger.
 
-**Trigger on intended (s\le2) exact cases:** QAP is exact on every required case; median runtime (\le1.0\times) exact-sparse; p95 runtime (\le1.2\times); peak memory (\le1.0\times); no more timeouts; and its roadmap complexity count is no greater than exact-sparse.
+**Trigger on intended $s\le2$ exact cases:** QAP is exact on every required case; median runtime $\le1.0\times$ exact-sparse; p95 runtime $\le1.2\times$; peak memory $\le1.0\times$; no more timeouts; and its roadmap complexity count is no greater than exact-sparse.
 
 **Consequence:** generic QAP becomes preferred implementation and solver-novelty framing is simplified.
 
 ## Sparse Support Is Operationally Irrelevant
 
-**Trigger:** dense improves TEST relative macro-CE by at least 0.02 over (s=3) on at least 75% of valid primary units and every (s\le3) condition fails useful-transfer materiality in those units.
+**Trigger:** dense improves TEST relative macro-CE by at least 0.02 over $s=3$ on at least 75% of valid primary units and every $s\le3$ condition fails useful-transfer materiality in those units.
 
 **Consequence:** sparse theorem becomes peripheral to the empirical contribution.
 
@@ -6444,7 +6418,7 @@ If any scientific input referenced by an active table, figure, metric summary, s
 * Confirmation Results Table — pair, proposals, accepted, harmful accepted rate, useful accepted rate, beneficial rejected rate, coverage, no-confirm harmful rate, ARR, RRR, CI, p.
 * Generalization Results Table — rows: secondary pair × method; same predictive metrics as the primary table and explicitly labeled secondary.
 * Failure-Boundary Results Table — boundary dimension, setting, pair, method, certified value, realized gain, abstention, null-node count, confirmation coverage, state.
-* Scalability Results Table — K, block, support, method, (N_S), LAP calls, cuts, runtime median/p95, RSS, CUDA memory, timeout, exactness status.
+* Scalability Results Table — K, block, support, method, $N_S$, LAP calls, cuts, runtime median/p95, RSS, CUDA memory, timeout, exactness status.
 * Claim Support Table — claim, final state, materiality result, statistical result, evidence completeness, scope, supporting table, supporting figure, forbidden wording.
 
 ## 23.2 Required figures
@@ -6453,11 +6427,11 @@ If any scientific input referenced by an active table, figure, metric summary, s
 * Baseline Paired-Difference Plot — comparators: Local-SIR, Matched-Resource Rectangular, Point-Correspondence Commitment. Show seed-level paired differences by pair; no pooled cross-pair inferential annotation.
 * Coupling-Gap Phase Figure — factors: compatibility, response heterogeneity, asymmetry, response sparsity, support; overlay predicted structural zero/strict state.
 * Predicted vs Realized Transfer Figure — X: certified robust predicted value. Y: TEST relative macro-CE gain. Facet by pair; annotate descriptive Spearman rho and n where eligible.
-* Sparsity Utility-Efficiency Figure — X: runtime. Y: realized gain. Marker size: peak memory. Conditions: (s=1,2,3), dense.
+* Sparsity Utility-Efficiency Figure — X: runtime. Y: realized gain. Marker size: peak memory. Conditions: $s=1,2,3$, dense.
 * Confirmation Safety-Coverage Figure — X: confirmation coverage. Y: harmful accepted rate. Show paired no-confirm → confirm arrows by primary pair.
-* Semantic Sufficiency Frontier Figure — X: (\log|\Pi|). Y: realized gain. Lines: FedORBIT, rectangular, oracle.
+* Semantic Sufficiency Frontier Figure — X: $\log|\Pi|$. Y: realized gain. Lines: FedORBIT, rectangular, oracle.
 * Failure-Boundary Figure — panels: response scale, CI width, target support, response heterogeneity, support budget. Show certified value, realized gain, abstention/ineligibility boundary.
-* Scalability Figure — X: (N_S\sum_gn_g^3), log scale. Y: runtime, log scale. Show methods, timeout markers, descriptive trend only.
+* Scalability Figure — X: $N_S\sum_gn_g^3$, log scale. Y: runtime, log scale. Show methods, timeout markers, descriptive trend only.
 * Map-Value Bound Figure — X: orbit-radius bound. Y: exact map action value. Show diagonal bound and fixture family.
 
 ## 23.3 Reporting dependency map

@@ -5404,12 +5404,24 @@ project/
     ├── conftest.py
     │
     ├── architecture/
-    │   ├── test_structure.py
-    │   ├── test_dependencies.py
-    │   ├── test_framework_confinement.py
-    │   ├── test_code_contracts.py
-    │   ├── test_config_contracts.py
-    │   └── test_output_result_boundaries.py
+    │   ├── test_dependency_boundaries.py         # Enforces allowed dependency directions between architectural layers and prevents forbidden cross-layer imports.
+    │   ├── test_public_type_boundaries.py        # Ensures public APIs use explicit domain types instead of leaking raw primitives or loosely typed payloads.
+    │   ├── test_no_any.py                        # Rejects explicit or inferred use of Any in production and test code except narrowly approved third-party boundaries.
+    │   ├── test_no_anonymous_dicts.py            # Prevents anonymous dict-based domain/config/artifact payloads where typed models or dataclasses should be used.
+    │   ├── test_no_primitive_leaks.py            # Detects inappropriate str/int/float/bool/list/dict primitives crossing domain and application API boundaries.
+    │   ├── test_no_hardcoded_scientific_values.py # Detects scientific, experimental, statistical, seed, threshold, dataset, and algorithm values hardcoded outside their authoritative configuration owner.
+    │   ├── test_configuration_ownership.py       # Ensures configuration values have a single authoritative owner and are not duplicated in implementation, CLI defaults, constants, or tests.
+    │   ├── test_no_duplicate_constants.py        # Detects duplicated constants or equivalent scientific/runtime values declared in multiple locations.
+    │   ├── test_no_dead_enums.py                 # Ensures declared enums are actually used by production code and prevents unused or superseded domain identities from remaining.
+    │   ├── test_no_redirect_modules.py           # Rejects obsolete modules whose only purpose is forwarding imports, calls, or symbols to replacement implementations.
+    │   ├── test_no_compatibility_shims.py        # Prevents legacy wrappers, aliases, compatibility adapters, and transitional APIs unless explicitly allowlisted.
+    │   ├── test_no_reexport_only_modules.py      # Detects unnecessary modules that merely re-export symbols from another module without owning real behavior.
+    │   ├── test_no_test_only_production_code.py  # Detects production symbols that exist solely to satisfy tests and have no legitimate production usage.
+    │   ├── test_naming_policy.py                 # Enforces descriptive module, class, method, function, parameter, and variable names and rejects overly short, generic, or ambiguous names.
+    │   ├── test_canonical_vocabulary.py          # Enforces canonical project terminology and rejects stale aliases, obsolete names, opaque experiment labels, and artificial version names.
+    │   ├── test_no_comments.py                   # Rejects Python comments when the repository policy requires source code to remain comment-free.
+    │   ├── test_no_docstrings.py                 # Rejects module, class, function, and method docstrings when the repository policy requires docstring-free source code.
+    │   └── test_no_todos.py                      # Rejects TODO, FIXME, HACK, XXX, temporary markers, commented-out implementation remnants, and unfinished-work annotations.
     │
     ├── unit/
     │   ├── config/

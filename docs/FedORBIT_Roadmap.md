@@ -185,8 +185,7 @@ $$
 For support limit $s$,
 
 $$
-\mathcal A^{(s)}
-=
+\mathcal A^{(s)} =
 \left\{
 \alpha\in\mathcal A:|\alpha|_0\le s
 \right\}.
@@ -234,89 +233,76 @@ $$
 The entrywise rectangular hull is
 
 $$
-\operatorname{Rect}(\mathcal O)
-=
+\operatorname{Rect}(\mathcal O) =
 \prod_{k,j}[\ell_{kj},u_{kj}],
 $$
 
 where
 
 $$
-\ell_{kj}
-=
+\ell_{kj} =
 \min_{P\in\Pi}(P^TLP)_{kj},
 \qquad
-u_{kj}
-=
+u_{kj} =
 \max_{P\in\Pi}(P^TUP)_{kj}.
 $$
 
 For a fixed feasible action,
 
 $$
-h_{\rm orb}(\alpha)
-=
+h_{\rm orb}(\alpha) =
 \min_{P\in\Pi}w^TP^TLP\alpha,
 $$
 
 $$
-h_{\rm rect}(\alpha)
-=
+h_{\rm rect}(\alpha) =
 w^T\ell\alpha,
 $$
 
 $$
-\Gamma(\alpha)
-=
+\Gamma(\alpha) =
 h_{\rm orb}(\alpha)-h_{\rm rect}(\alpha)\ge0.
 $$
 
 For any experiment-specific action set $\mathcal B\subseteq\mathcal A$,
 
 $$
-V_{\rm exact}(\mathcal B)
-=
+V_{\rm exact}(\mathcal B) =
 \max_{\alpha\in\mathcal B}
 h_{\rm orb}(\alpha)-c^T\alpha,
 $$
 
 $$
-V_{\rm rect}(\mathcal B)
-=
+V_{\rm rect}(\mathcal B) =
 \max_{\alpha\in\mathcal B}
 h_{\rm rect}(\alpha)-c^T\alpha,
 $$
 
 $$
-G_{\rm coupling}(\mathcal B)
-=
+G_{\rm coupling}(\mathcal B) =
 V_{\rm exact}(\mathcal B)-V_{\rm rect}(\mathcal B).
 $$
 
 For map-value diagnostics,
 
 $$
-V(P;\mathcal B)
-=
+V(P;\mathcal B) =
 \max_{\alpha\in\mathcal B}J(\alpha;P),
 $$
 
 $$
-V_{\rm pre}(\mathcal B)
-=
+V_{\rm pre}(\mathcal B) =
 \max_{\alpha\in\mathcal B}
 \min_{P\in\Pi}J(\alpha;P),
 $$
 
 $$
-V_{\rm post}(\mathcal B)
-=
+V_{\rm post}(\mathcal B) =
 \min_{P\in\Pi}V(P;\mathcal B),
 $$
 
 $$
-\Delta_{\rm map}(\mathcal B)
-=
+\Delta_{\rm map}(\mathcal B) =
 V_{\rm post}(\mathcal B)-V_{\rm pre}(\mathcal B).
 $$
 
@@ -854,8 +840,7 @@ $$
 For minibatch \(\mathcal B\), with class-specific intervention/curriculum multiplier \(m_c\), the optimized scalar loss is exactly
 
 $$
-\mathcal L_{\mathcal B}
-=
+\mathcal L_{\mathcal B} =
 \frac{1}{|\mathcal B|}
 \sum_{i\in\mathcal B}
 m_{y_i}\ell_i.
@@ -904,8 +889,7 @@ Eligibility constants:
 For a candidate, define
 
 $$
-D_{ba}
-=
+D_{ba} =
 \frac{
 |\hat A_{ba}(\epsilon)-\hat A_{ba}(\epsilon/2)|
 }{
@@ -940,14 +924,12 @@ If there are no useful entries, the candidate is ineligible.
 Let \(\hat A_{ba}=\hat A_{ba}(\epsilon)\) and \(SE_{ba}=SE_{ba}(\epsilon)\) for the full candidate magnitude. The pilot score is
 
 $$
-Q
-=
+Q =
 \operatorname{median}_{(b,a)\in\mathcal U}
 \left(
 \frac{|\hat A_{ba}|}
 {SE_{ba}+\texttt{scientific.source\_response\_pilot.numerical\_floor}}
-\right)
--
+\right) -
 \texttt{scientific.source\_response\_pilot.curvature\_penalty\_coefficient}
 \operatorname{median}_{(b,a)\in\mathcal U}
 D_{ba},
@@ -1269,8 +1251,7 @@ is implemented through the permutation-invariant expansion
 $$
 \lVert L_s\rVert_F^2
 +
-\lVert L_t\rVert_F^2
--
+\lVert L_t\rVert_F^2 -
 2\langle P^TL_sP,L_t\rangle_F.
 $$
 
@@ -1309,8 +1290,7 @@ $$
 For fixed action \(\alpha\), the unpenalized lifted LP minimizes
 
 $$
-F_\alpha(p,y)
-=
+F_\alpha(p,y) =
 \sum_{k,j,a,b}
 w_k\alpha_jL_{ab}y_{abkj}.
 $$
@@ -1322,16 +1302,14 @@ Because the feasible set relaxes the permutation set, its optimum \(v_{\rm relax
 For assignment variables,
 
 $$
-\phi(p)
-=
+\phi(p) =
 \sum_{a,j}p_{aj}(1-p_{aj}).
 $$
 
 At CCP iterate \(p^{(t)}\), use the affine majorization of the concave term:
 
 $$
-\phi_{\rm lin}(p;p^{(t)})
-=
+\phi_{\rm lin}(p;p^{(t)}) =
 \sum_{a,j}
 \left[
 (1-2p^{(t)}_{aj})p_{aj}
@@ -1387,8 +1365,7 @@ Configuration:
 The assignment integrality residual is
 
 $$
-r_{\rm int}(p)
-=
+r_{\rm int}(p) =
 \max_{a,j}\min(p_{aj},1-p_{aj}).
 $$
 
@@ -1526,8 +1503,7 @@ For the single-source `Target Confirmation and Portability` comparison, this met
 Uses
 
 $$
-\ell_{kj}
-=
+\ell_{kj} =
 \min_{P\in\Pi}
 (P^TLP)_{kj}
 $$
@@ -1561,8 +1537,7 @@ It then optimizes action under $\hat P$.
 For source coarse groups $g,h$,
 
 $$
-B_{gh}
-=
+B_{gh} =
 \operatorname{mean}
 \{
 L_{ab}:
@@ -1582,8 +1557,7 @@ Null target coordinates retain zero action cap.
 ### Coarse block-min summary
 
 $$
-B^{min}_{gh}
-=
+B^{min}_{gh} =
 \min
 \{
 L_{ab}:
@@ -1609,8 +1583,7 @@ This is the explicit null-evidence continuation of the roadmap's zero-response n
 Use
 
 $$
-\bar L
-=
+\bar L =
 \mathbb E_{P\sim Uniform(\Pi)}[P^TLP].
 $$
 
@@ -1870,8 +1843,7 @@ Requires all of:
 For primary pair \(p\), let \(\bar G^{full}_p\) and \(\bar G^{destroyed}_p\) be the seed-mean TEST relative macro-CE gains versus the identical Local-Only reference. Define
 
 $$
-Retention_p
-=
+Retention_p =
 \frac{\bar G^{destroyed}_p}{\bar G^{full}_p}
 $$
 
@@ -2725,8 +2697,7 @@ For intervention concept \(a\), the positive or negative intervention multiplier
 For outcome concept \(b\), its risk is the equal-native-class mean
 
 $$
-R_b(\theta)
-=
+R_b(\theta) =
 \frac{1}{|\mathcal C_b|}
 \sum_{c\in\mathcal C_b}
 CE_c(\theta).
@@ -2920,8 +2891,7 @@ $$
 For fixed active images,
 
 $$
-C_0(\sigma)
-=
+C_0(\sigma) =
 \sum_{k\in S}
 w_k
 \sum_{j\in S}
@@ -2931,8 +2901,7 @@ $$
 For each remaining target outcome $k\notin S$ and unused source node $b$ in the same block,
 
 $$
-C^\sigma_{kb}
-=
+C^\sigma_{kb} =
 w_k
 \sum_{j\in S}
 \alpha_jL_{b,\sigma(j)}.
@@ -2958,8 +2927,7 @@ $$
 and
 
 $$
-LAPCalls
-=
+LAPCalls =
 N_S
 \sum_g
 \mathbf 1[n_g-s_g>0].
@@ -3146,8 +3114,7 @@ $$
 ## 12.2 Macro cross-entropy
 
 $$
-CE_{\rm macro}
-=
+CE_{\rm macro} =
 \frac1{|\mathcal C|}
 \sum_cCE_c.
 $$
@@ -3159,8 +3126,7 @@ A fixed evaluation class with zero evaluation examples makes the cell Invalid Da
 For method $m$ and reference $b$,
 
 $$
-G_{CE}(m,b)
-=
+G_{CE}(m,b) =
 \frac{
 CE_b-CE_m
 }{
@@ -3306,14 +3272,12 @@ A **proposal-eligible target decision** is a target decision for which at least 
 For proposal-level diagnostics:
 
 $$
-Proposal\ Acceptance\ Rate
-=
+Proposal\ Acceptance\ Rate =
 \frac{\#accepted}{\#proposed}.
 $$
 
 $$
-Harmful\ Accepted\ Rate
-=
+Harmful\ Accepted\ Rate =
 \frac{
 \#(accepted\land TESTGain\le-0.01)
 }{
@@ -3322,8 +3286,7 @@ Harmful\ Accepted\ Rate
 $$
 
 $$
-Useful\ Accepted\ Rate
-=
+Useful\ Accepted\ Rate =
 \frac{
 \#(accepted\land TESTGain\ge0.01)
 }{
@@ -3336,8 +3299,7 @@ If there are no proposals, all proposal-denominator rates are NA, not zero.
 For target-decision coverage:
 
 $$
-Coverage_{confirm}
-=
+Coverage_{confirm} =
 \frac{
 \#(\text{proposal-eligible decisions ending in live transfer})
 }{
@@ -3354,24 +3316,21 @@ $$
 whenever the denominator is nonzero. Define
 
 $$
-CoverageLoss
-=
+CoverageLoss =
 Coverage_{noConfirm}-Coverage_{confirm}.
 $$
 
 For confirmation-safety harm, define the decision-level indicators
 
 $$
-H^{confirm}
-=
+H^{confirm} =
 \mathbf 1[
 TESTGain_{confirm}\le-0.01
 ],
 $$
 
 $$
-H^{noConfirm}
-=
+H^{noConfirm} =
 \mathbf 1[
 TESTGain_{noConfirm}\le-0.01
 ]
@@ -3382,18 +3341,15 @@ over the same proposal-eligible target decisions. A rejected confirmed decision 
 Then
 
 $$
-ARR
-=
-harmRate_{noConfirm}
--
+ARR =
+harmRate_{noConfirm} -
 harmRate_{confirm},
 $$
 
 and, when \(harmRate_{noConfirm}>0\),
 
 $$
-RRR
-=
+RRR =
 \frac{ARR}{harmRate_{noConfirm}}.
 $$
 
@@ -3404,8 +3360,7 @@ Pair-level `Coverage_confirm`, `Coverage_noConfirm`, `CoverageLoss`, `harmRate_c
 `Beneficial Rejected Rate` is registered only for the single-source `Target Confirmation and Portability` experiment, where each rejected principal proposal has an exact paired `FedORBIT Without Confirmation` cell using that same source/action:
 
 $$
-Beneficial\ Rejected\ Rate
-=
+Beneficial\ Rejected\ Rate =
 \frac{
 \#(
 rejected
@@ -3514,8 +3469,7 @@ $$
 Define \(x_i=d_i-\delta_L=d_i+0.01\). Remove exact-zero \(x_i\) values using the same zero/tolerance semantics as the registered sign-flip test, enumerate every sign pattern of the remaining values, and calculate
 
 $$
-p_L
-=
+p_L =
 \frac{
 \#\{\bar x^{perm}\ge \bar x^{obs}-10^{-15}\}
 }{
@@ -3536,8 +3490,7 @@ $$
 Define \(y_i=d_i-\delta_U=d_i-0.01\). Using the same exact sign enumeration,
 
 $$
-p_U
-=
+p_U =
 \frac{
 \#\{\bar y^{perm}\le \bar y^{obs}+10^{-15}\}
 }{
@@ -3675,8 +3628,7 @@ $$
 For serialization-only upper bands,
 
 $$
-U_{ab}
-=
+U_{ab} =
 L_{ab}
 +
 H_{ab},
@@ -3798,8 +3750,7 @@ $$
 For sparsity ranking, every matrix coordinate \((a,b)\) receives
 
 $$
-h_{ab}
-=
+h_{ab} =
 \operatorname{SHA256}
 \left(
 UTF8(
@@ -4071,8 +4022,7 @@ Uses the complete coupling generator factorial.
 Derived instance count:
 
 $$
-2\times3\times3\times3\times3\times3\times10
-=
+2\times3\times3\times3\times3\times3\times10 =
 4,860.
 $$
 
@@ -4633,8 +4583,7 @@ $$
 Heterogeneity condition $h$, for each ordered coarse block pair:
 
 $$
-A'_{ab}
-=
+A'_{ab} =
 \bar A_{gh}
 +
 h(A_{ab}-\bar A_{gh}),
@@ -4780,8 +4729,7 @@ Timing uses the authoritative warmup/repetition protocol.
 For the `Sparse Solver Work-Structure Agreement` claim, define the predicted work coordinate for each fixed-action exact-sparse scalability cell as
 
 $$
-X
-=
+X =
 N_S\sum_g n_g^3.
 $$
 

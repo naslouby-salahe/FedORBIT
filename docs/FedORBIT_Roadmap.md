@@ -1771,11 +1771,11 @@ The exact two-sided p-value is
 $$
 p=
 \frac{
-\#\lbrace
+\left\lvert\lbrace
 |\bar d^{perm}|
 \ge
 |\bar d^{obs}|-10^{-15}
-\rbrace
+\rbrace\right\rvert
 }{
 2^{n_{\rm eff}}
 }.
@@ -3273,24 +3273,24 @@ For proposal-level diagnostics:
 
 $$
 Proposal\ Acceptance\ Rate =
-\frac{\#accepted}{\#proposed}.
+\frac{N_{accepted}}{N_{proposed}}.
 $$
 
 $$
 Harmful\ Accepted\ Rate =
 \frac{
-\#(accepted\land TESTGain\le-0.01)
+N_{(accepted\land TESTGain\le-0.01)}
 }{
-\#proposed
+N_{proposed}
 }.
 $$
 
 $$
 Useful\ Accepted\ Rate =
 \frac{
-\#(accepted\land TESTGain\ge0.01)
+N_{(accepted\land TESTGain\ge0.01)}
 }{
-\#proposed
+N_{proposed}
 }.
 $$
 
@@ -3301,9 +3301,9 @@ For target-decision coverage:
 $$
 Coverage_{confirm} =
 \frac{
-\#(\text{proposal-eligible decisions ending in live transfer})
+N_{(\text{proposal-eligible decisions ending in live transfer})}
 }{
-\#(\text{proposal-eligible decisions})
+N_{(\text{proposal-eligible decisions})}
 }.
 $$
 
@@ -3362,13 +3362,13 @@ Pair-level `Coverage_confirm`, `Coverage_noConfirm`, `CoverageLoss`, `harmRate_c
 $$
 Beneficial\ Rejected\ Rate =
 \frac{
-\#(
+N_{(
 rejected
 \land
 noConfirmCounterfactualGain\ge0.01
-)
+)}
 }{
-\#proposed
+N_{proposed}
 }.
 $$
 
@@ -3471,7 +3471,7 @@ Define \(x_i=d_i-\delta_L=d_i+0.01\). Remove exact-zero \(x_i\) values using the
 $$
 p_L =
 \frac{
-\#\lbrace\bar x^{perm}\ge \bar x^{obs}-10^{-15}\rbrace
+\left\lvert\lbrace\bar x^{perm}\ge \bar x^{obs}-10^{-15}\rbrace\right\rvert
 }{
 2^{n_{\rm eff,L}}
 }.
@@ -3492,7 +3492,7 @@ Define \(y_i=d_i-\delta_U=d_i-0.01\). Using the same exact sign enumeration,
 $$
 p_U =
 \frac{
-\#\lbrace\bar y^{perm}\le \bar y^{obs}+10^{-15}\rbrace
+\left\lvert\lbrace\bar y^{perm}\le \bar y^{obs}+10^{-15}\rbrace\right\rvert
 }{
 2^{n_{\rm eff,U}}
 }.

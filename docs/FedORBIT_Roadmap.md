@@ -1034,9 +1034,9 @@ $$
 and its simultaneous interval excludes zero:
 
 $$
-L_e>0
+L_e\gt 0
 \quad\text{or}\quad
-U_e<0.
+U_e\lt 0.
 $$
 
 A final intervention column is useful when it contains at least one useful entry. The final packet stability rule counts useful columns by this definition and computes the configured median band-width / median absolute mean-response ratio over this useful-entry set only. If the useful-entry set is empty, the packet fails the final response stability rule.
@@ -1847,7 +1847,7 @@ Retention_p =
 \frac{\bar G^{destroyed}_p}{\bar G^{full}_p}
 $$
 
-only when \(\bar G^{full}_p>0\); otherwise `Retention_p = NA`. A pair is a **mechanism-retention pair** only when both:
+only when \(\bar G^{full}_p\gt 0\); otherwise `Retention_p = NA`. A pair is a **mechanism-retention pair** only when both:
 
 1. the Full-vs-Coupling-Destroyed TOST contrast for that pair establishes equivalence after Holm correction in the `Mechanism Ablations` family; and
 2. \(Retention_p\ge\texttt{scientific.claim＿criteria.coupling＿mechanism.destruction＿positive＿gain＿retention＿minimum}\).
@@ -1884,7 +1884,7 @@ The claim requires:
 
 1. at least 3 of 4 primary pairs satisfy $ARR\ge0.02$ or $RRR\ge0.30$;
 2. those qualifying pairs have mean coverage loss $\le0.20$;
-3. no primary pair has harmful-rate worsening $>0.02$;
+3. no primary pair has harmful-rate worsening $\gt 0.02$;
 4. no primary pair loses more than 0.20 coverage;
 5. equal-pair mean satisfies either $ARR\ge0.02$ or, when defined, $RRR\ge0.30$.
 
@@ -2879,7 +2879,7 @@ There is no offline staleness grace period.
 For support
 
 $$
-S=\lbrace j:\alpha_j>0\rbrace,
+S=\lbrace j:\alpha_j\gt 0\rbrace,
 $$
 
 enumerate every block-compatible injective image
@@ -2930,7 +2930,7 @@ $$
 LAPCalls =
 N_S
 \sum_g
-\mathbf 1[n_g-s_g>0].
+\mathbf 1[n_g-s_g\gt 0].
 $$
 
 A size-one completion still counts as one LAP call because the implementation invokes the same deterministic assignment primitive.
@@ -3134,7 +3134,7 @@ CE_b-CE_m
 }.
 $$
 
-If $CE_b<10^{-12}$, the relative metric is NA; absolute CE difference is reported and the cell cannot establish a relative-gain claim.
+If $CE_b\lt 10^{-12}$, the relative metric is NA; absolute CE difference is reported and the cell cannot establish a relative-gain claim.
 
 ## 12.4 Precision, recall, F1
 
@@ -3346,7 +3346,7 @@ harmRate_{noConfirm} -
 harmRate_{confirm},
 $$
 
-and, when \(harmRate_{noConfirm}>0\),
+and, when \(harmRate_{noConfirm}\gt 0\),
 
 $$
 RRR =
@@ -3463,7 +3463,7 @@ Lower-bound test:
 $$
 H_0:\mu_d\le\delta_L
 \qquad\text{vs}\qquad
-H_1:\mu_d>\delta_L.
+H_1:\mu_d\gt \delta_L.
 $$
 
 Define \(x_i=d_i-\delta_L=d_i+0.01\). Remove exact-zero \(x_i\) values using the same zero/tolerance semantics as the registered sign-flip test, enumerate every sign pattern of the remaining values, and calculate
@@ -3484,7 +3484,7 @@ Upper-bound test:
 $$
 H_0:\mu_d\ge\delta_U
 \qquad\text{vs}\qquad
-H_1:\mu_d<\delta_U.
+H_1:\mu_d\lt \delta_U.
 $$
 
 Define \(y_i=d_i-\delta_U=d_i-0.01\). Using the same exact sign enumeration,
@@ -3837,7 +3837,7 @@ Use the principal sparse action set.
 
 Accept a fixture only when:
 
-1. $|\Pi|>1$;
+1. $|\Pi|\gt 1$;
 2. the intersection of map-conditioned optimal-action sets is empty within action tie tolerance;
 3. robust pre-map value exceeds 0.005.
 
@@ -4243,7 +4243,7 @@ $$
 Required:
 
 * no common map-conditioned optimum;
-* robust value $>0.005$.
+* robust value $\gt 0.005$.
 
 ## Map-Dependent Action Boundary
 
@@ -4733,7 +4733,7 @@ X =
 N_S\sum_g n_g^3.
 $$
 
-Within each block-pattern × support stratum having at least `scientific.statistics.spearman_minimum_valid_points` distinct non-timeout \(K\) values, compute Spearman correlation between \(\log X\) and \(\log\) median exact-sparse runtime. The efficiency-trend component passes only when every eligible stratum has \(\rho>0\). The correlation is descriptive and receives no p-value threshold. A stratum with fewer than the configured minimum points is `Insufficient Trend Evidence` and cannot establish the runtime-trend component.
+Within each block-pattern × support stratum having at least `scientific.statistics.spearman_minimum_valid_points` distinct non-timeout \(K\) values, compute Spearman correlation between \(\log X\) and \(\log\) median exact-sparse runtime. The efficiency-trend component passes only when every eligible stratum has \(\rho\gt 0\). The correlation is descriptive and receives no p-value threshold. A stratum with fewer than the configured minimum points is `Insufficient Trend Evidence` and cannot establish the runtime-trend component.
 
 The work-structure claim is Supported only when:
 

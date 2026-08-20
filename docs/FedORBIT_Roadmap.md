@@ -175,20 +175,20 @@ The action polytope is
 
 $$
 \mathcal A=
-\left\{
+\left\lbrace
 \alpha\ge0:
 \mathbf 1^T\alpha\le B_\alpha,;
 0\le\alpha_j\le\bar\alpha_j
-\right\}.
+\right\rbrace.
 $$
 
 For support limit $s$,
 
 $$
 \mathcal A^{(s)} =
-\left\{
+\left\lbrace
 \alpha\in\mathcal A:|\alpha|_0\le s
-\right\}.
+\right\rbrace.
 $$
 
 The map-conditioned objective is
@@ -227,13 +227,13 @@ $$
 The exact orbit is
 
 $$
-\mathcal O(L)=\{P^TLP:P\in\Pi\}.
+\mathcal O(L)=\lbrace P^TLP:P\in\Pi\rbrace.
 $$
 
 The entrywise rectangular hull is
 
 $$
-\operatorname{Rect}(\mathcal O) =
+\mathrm{Rect}(\mathcal O) =
 \prod_{k,j}[\ell_{kj},u_{kj}],
 $$
 
@@ -376,9 +376,9 @@ Measured outcomes such as execution time, memory consumption, selected pilot win
 For target actionable node $j$,
 
 $$
-\bar\alpha_j=\texttt{scientific.action.coordinate\_cap},
+\bar\alpha_j=\texttt{scientific.action.coordinate＿cap},
 \qquad
-c_j=\texttt{scientific.action.linear\_cost\_per\_actionable\_node}.
+c_j=\texttt{scientific.action.linear＿cost＿per＿actionable＿node}.
 $$
 
 For normal or null nodes,
@@ -482,9 +482,9 @@ For numeric feature $x$,
 
 $$
 x'=
-\operatorname{clip}
+\mathrm{clip}
 \left(
-\frac{x-\operatorname{median}_{TRAIN}(x)}
+\frac{x-\mathrm{median}_{TRAIN}(x)}
 {\max(IQR_{TRAIN}(x),1\text{ when }IQR=0)},
 -10,
 10
@@ -905,7 +905,7 @@ $$
 |\hat A_{ba}(\epsilon/2)|
 \right)
 \ge
-\texttt{scientific.source\_response\_pilot.useful\_response\_magnitude\_threshold}.
+\texttt{scientific.source＿response＿pilot.useful＿response＿magnitude＿threshold}.
 $$
 
 Linearity is evaluated only over useful entries.
@@ -925,13 +925,13 @@ Let \(\hat A_{ba}=\hat A_{ba}(\epsilon)\) and \(SE_{ba}=SE_{ba}(\epsilon)\) for 
 
 $$
 Q =
-\operatorname{median}_{(b,a)\in\mathcal U}
+\mathrm{median}_{(b,a)\in\mathcal U}
 \left(
 \frac{|\hat A_{ba}|}
-{SE_{ba}+\texttt{scientific.source\_response\_pilot.numerical\_floor}}
+{SE_{ba}+\texttt{scientific.source＿response＿pilot.numerical＿floor}}
 \right) -
-\texttt{scientific.source\_response\_pilot.curvature\_penalty\_coefficient}
-\operatorname{median}_{(b,a)\in\mathcal U}
+\texttt{scientific.source＿response＿pilot.curvature＿penalty＿coefficient}
+\mathrm{median}_{(b,a)\in\mathcal U}
 D_{ba},
 $$
 
@@ -993,7 +993,7 @@ $$
 
 $$
 SE_e=
-\frac{\operatorname{sd}(A_{1e},\ldots,A_{Re};ddof=1)}
+\frac{\mathrm{sd}(A_{1e},\ldots,A_{Re};ddof=1)}
 {\sqrt R}.
 $$
 
@@ -1028,7 +1028,7 @@ A final response entry \(e=(b,a)\) is useful only when both:
 $$
 |\hat A_e|
 \ge
-\texttt{scientific.source\_response\_final.useful\_response\_magnitude\_threshold},
+\texttt{scientific.source＿response＿final.useful＿response＿magnitude＿threshold},
 $$
 
 and its simultaneous interval excludes zero:
@@ -1085,7 +1085,7 @@ Acceptance requires
 $$
 LCB_{0.95}
 \ge
-\texttt{scientific.confirmation.lower\_bound\_acceptance\_threshold\_relative\_macro\_ce}.
+\texttt{scientific.confirmation.lower＿bound＿acceptance＿threshold＿relative＿macro＿ce}.
 $$
 
 The current configured acceptance threshold is 0.01 relative macro-CE.
@@ -1378,7 +1378,7 @@ $$
 \max(1,|F_\alpha^{(t)}|)
 }
 \le
-\texttt{solvers.dense\_ccp.relative\_objective\_convergence\_tolerance}.
+\texttt{solvers.dense＿ccp.relative＿objective＿convergence＿tolerance}.
 $$
 
 A penalty-level trajectory may stop before 50 iterations only when both this objective criterion and the configured integrality-residual criterion hold. Otherwise it executes the configured maximum iterations and proceeds to the next penalty level from the last iterate. The final convergence state records whether the final penalty level met both criteria.
@@ -1538,12 +1538,12 @@ For source coarse groups $g,h$,
 
 $$
 B_{gh} =
-\operatorname{mean}
-\{
+\mathrm{mean}
+\lbrace
 L_{ab}:
 a\in\mathcal G_g^{source,real},
 b\in\mathcal G_h^{source,real}
-\}.
+\rbrace.
 $$
 
 Lift to the target fine space by
@@ -1559,11 +1559,11 @@ Null target coordinates retain zero action cap.
 $$
 B^{min}_{gh} =
 \min
-\{
+\lbrace
 L_{ab}:
 a\in\mathcal G_g^{source,real},
 b\in\mathcal G_h^{source,real}
-\}.
+\rbrace.
 $$
 
 Lift identically to the fine target space.
@@ -1685,7 +1685,7 @@ Every secondary RNG stream is generated as:
 
 $$
 seed32=
-\operatorname{SHA256}
+\mathrm{SHA256}
 (
 UTF8(
 "FedORBIT|"
@@ -1771,11 +1771,11 @@ The exact two-sided p-value is
 $$
 p=
 \frac{
-\#\{
+\#\lbrace
 |\bar d^{perm}|
 \ge
 |\bar d^{obs}|-10^{-15}
-\}
+\rbrace
 }{
 2^{n_{\rm eff}}
 }.
@@ -1850,7 +1850,7 @@ $$
 only when \(\bar G^{full}_p>0\); otherwise `Retention_p = NA`. A pair is a **mechanism-retention pair** only when both:
 
 1. the Full-vs-Coupling-Destroyed TOST contrast for that pair establishes equivalence after Holm correction in the `Mechanism Ablations` family; and
-2. \(Retention_p\ge\texttt{scientific.claim\_criteria.coupling\_mechanism.destruction\_positive\_gain\_retention\_minimum}\).
+2. \(Retention_p\ge\texttt{scientific.claim＿criteria.coupling＿mechanism.destruction＿positive＿gain＿retention＿minimum}\).
 
 The registered mechanism-retention condition is present when at least `scientific.claim_criteria.coupling_mechanism.primary_pairs_with_material_mean_gap_required` primary pairs are mechanism-retention pairs. `NA` retention values never count toward this condition.
 
@@ -2879,7 +2879,7 @@ There is no offline staleness grace period.
 For support
 
 $$
-S=\{j:\alpha_j>0\},
+S=\lbrace j:\alpha_j>0\rbrace,
 $$
 
 enumerate every block-compatible injective image
@@ -3471,7 +3471,7 @@ Define \(x_i=d_i-\delta_L=d_i+0.01\). Remove exact-zero \(x_i\) values using the
 $$
 p_L =
 \frac{
-\#\{\bar x^{perm}\ge \bar x^{obs}-10^{-15}\}
+\#\lbrace\bar x^{perm}\ge \bar x^{obs}-10^{-15}\rbrace
 }{
 2^{n_{\rm eff,L}}
 }.
@@ -3492,7 +3492,7 @@ Define \(y_i=d_i-\delta_U=d_i-0.01\). Using the same exact sign enumeration,
 $$
 p_U =
 \frac{
-\#\{\bar y^{perm}\le \bar y^{obs}+10^{-15}\}
+\#\lbrace\bar y^{perm}\le \bar y^{obs}+10^{-15}\rbrace
 }{
 2^{n_{\rm eff,U}}
 }.
@@ -3506,7 +3506,7 @@ $$
 p_{equiv}=\max(p_L,p_U).
 $$
 
-Holm correction is applied to \(p_{equiv}\) within the exact registered family membership in Section 13.7. Equivalence is established only when the Holm-adjusted \(p_{equiv}\le\texttt{scientific.statistics.tost\_alpha\_per\_one\_sided\_test}\). No asymptotic TOST fallback is used.
+Holm correction is applied to \(p_{equiv}\) within the exact registered family membership in Section 13.7. Equivalence is established only when the Holm-adjusted \(p_{equiv}\le\texttt{scientific.statistics.tost＿alpha＿per＿one＿sided＿test}\). No asymptotic TOST fallback is used.
 
 ## 13.6 Missingness and failed runs
 
@@ -3742,7 +3742,7 @@ $$
 4. for each ordered coarse block pair, center entries around their block-pair mean and multiply deviations by configured heterogeneity;
 5. apply exact deterministic sparsity by retaining
 $$
-   \max(1,\operatorname{round}(qK^2))
+   \max(1,\mathrm{round}(qK^2))
 $$
    entries chosen by the smallest deterministic hash ranks and setting others to zero;
 6. draw $w$ and $\alpha$ by the theorem-generator rules.
@@ -3751,7 +3751,7 @@ For sparsity ranking, every matrix coordinate \((a,b)\) receives
 
 $$
 h_{ab} =
-\operatorname{SHA256}
+\mathrm{SHA256}
 \left(
 UTF8(
 "FedORBIT|synthetic-sparsity|"
@@ -3989,7 +3989,7 @@ Block patterns:
 (3,3)
 ```
 
-Support values use every registered feasible $s\in\{1,2,3\}$, producing 17 block-pattern/support cells.
+Support values use every registered feasible $s\in\lbrace1,2,3\rbrace$, producing 17 block-pattern/support cells.
 
 Per cell:
 

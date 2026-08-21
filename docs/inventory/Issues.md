@@ -196,9 +196,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0748** (§4.25; Configuration YAML; Configuration) — Set `scientific.claim_criteria.confirmation_safety.pair_coverage_loss_maximum` exactly to `0.2`.
 - **REQ-0749** (§4.25; Configuration YAML; Configuration) — Set `scientific.claim_criteria.confirmation_safety.equal_pair_absolute_risk_reduction_minimum` exactly to `0.02`.
 - **REQ-0750** (§4.25; Configuration YAML; Configuration) — Set `scientific.claim_criteria.confirmation_safety.equal_pair_relative_risk_reduction_minimum` exactly to `0.3`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Immutable typed `configs/fedorbit.yaml` contract with single-source scientific authority so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -231,8 +228,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M02 — I07 Implement Deterministic RNG and Reproducibility Identity** — provides Immutable typed `configs/fedorbit.yaml` contract with single-source scientific authority as an upstream contract/evidence dependency for Deterministic seed namespaces, replay behavior, and reproducibility/environment identity.
 - **M05 — I25 Implement Formal Correspondence, Orbit, Action, and Null-Node Semantics** — provides Immutable typed `configs/fedorbit.yaml` contract with single-source scientific authority as an upstream contract/evidence dependency for Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions.
 - **M07 — I37 Implement Deterministic Synthetic and Controlled Generators** — provides Immutable typed `configs/fedorbit.yaml` contract with single-source scientific authority as an upstream contract/evidence dependency for Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -528,9 +523,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0819** (§4.28; Configuration YAML; Reporting) — Set `reporting.precision.p_value_less_than_threshold` exactly to `0.0001`.
 - **REQ-0820** (§4.28; Configuration YAML; Reporting) — Set `reporting.precision.runtime_seconds_decimals` exactly to `3`.
 - **REQ-0821** (§4.28; Configuration YAML; Reporting) — Set `reporting.precision.memory_decimals` exactly to `1`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Validated runtime/environment/reference-hardware and reporting-precision configuration so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -556,8 +548,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M01 — I06 Enforce Nonclaim Test Boundaries and Scientific-Contract Readiness** — provides Validated runtime/environment/reference-hardware and reporting-precision configuration as an upstream contract/evidence dependency for Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates.
 - **M02 — I07 Implement Deterministic RNG and Reproducibility Identity** — provides Validated runtime/environment/reference-hardware and reporting-precision configuration as an upstream contract/evidence dependency for Deterministic seed namespaces, replay behavior, and reproducibility/environment identity.
 - **M08 — I44 Run Reference-GPU Scalability, Efficiency, and Work-Structure Study** — provides Validated runtime/environment/reference-hardware and reporting-precision configuration as an upstream contract/evidence dependency for Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -743,9 +733,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1456** (§15; Configuration YAML; Experiment) — Set `experiments.scalability_and_efficiency.k_values` exactly to `[6,8,10,12,16,20,24,32]`.
 - **REQ-1457** (§15; Configuration YAML; Experiment) — Set `experiments.scalability_and_efficiency.block_patterns` exactly to `["balanced","maximally_skewed"]`.
 - **REQ-1458** (§15; Configuration YAML; Experiment) — Set `experiments.scalability_and_efficiency.exact_qap_supports` exactly to `[1,2,3]`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed registered experiment, metric, generator, and multi-source configuration catalogue so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -770,8 +757,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M01 — I06 Enforce Nonclaim Test Boundaries and Scientific-Contract Readiness** — provides Typed registered experiment, metric, generator, and multi-source configuration catalogue as an upstream contract/evidence dependency for Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates.
 - **M07 — I38 Materialize Pre-Confirmatory Experiment Catalogue and Dependency Map** — provides Typed registered experiment, metric, generator, and multi-source configuration catalogue as an upstream contract/evidence dependency for Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -953,9 +938,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2038** (§§19–21; Configuration YAML; Artifact) — Set `runtime.artifact_layout.project_summary_subdirectories.metrics` exactly to `["primary","summary"]`.
 - **REQ-2039** (§§19–21; Configuration YAML; Artifact) — Set `runtime.artifact_layout.project_summary_subdirectories.statistics` exactly to `["comparisons","confidence_intervals","effects","multiplicity"]`.
 - **REQ-2040** (§§19–21; Configuration YAML; Artifact) — Set `runtime.artifact_layout.project_summary_subdirectories.reproducibility` exactly to `["configuration","datasets","seeds","software","execution"]`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed execution-policy configuration for kill rules, retries, roots, and canonical runtime layout so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -981,8 +963,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M01 — I06 Enforce Nonclaim Test Boundaries and Scientific-Contract Readiness** — provides Typed execution-policy configuration for kill rules, retries, roots, and canonical runtime layout as an upstream contract/evidence dependency for Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates.
 - **M02 — I08 Implement Canonical Artifact Reuse and Completion Manifests** — provides Typed execution-policy configuration for kill rules, retries, roots, and canonical runtime layout as an upstream contract/evidence dependency for Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse.
 - **M02 — I09 Implement Failure Taxonomy, Retry, and Scientific Failure Semantics** — provides Typed execution-policy configuration for kill rules, retries, roots, and canonical runtime layout as an upstream contract/evidence dependency for Typed failure states, retry behavior, and scientific/infrastructure failure handling.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -1529,9 +1509,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2472** (§19.1 — Required repository layout; Testing) — Provide required repository file `project/tests/e2e/test_claim_evidence_pipeline.py`.
 - **REQ-2473** (§19.1 — Required repository layout; Testing) — Provide required repository directory `project/tests/smoke/`.
 - **REQ-2474** (§19.1 — Required repository layout; Testing) — Provide required repository file `project/tests/smoke/test_smoke.py`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Roadmap-mandated repository tree, dependency boundaries, and structural enforcement tests so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -1560,8 +1537,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M02 — I10 Implement Public CLI Idempotency, Status, and Overwrite Semantics** — provides Roadmap-mandated repository tree, dependency boundaries, and structural enforcement tests as an upstream contract/evidence dependency for Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior.
 - **M02 — I12 Implement Canonical Workspace, Serialization, and Provenance Lifecycle** — provides Roadmap-mandated repository tree, dependency boundaries, and structural enforcement tests as an upstream contract/evidence dependency for Canonical computational workspace and validated artifact/provenance lifecycle.
 - **M03 — I14 Enforce Strict No-Common-Interface Resource Boundary** — provides Roadmap-mandated repository tree, dependency boundaries, and structural enforcement tests as an upstream contract/evidence dependency for Whitelisted strict-resource interface with dynamic access validation and readiness gates.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2071,9 +2046,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3172** (§26; Testing) — Implementation may begin only when the typed scientific contract matches the roadmap.
 - **REQ-3173** (§26; Testing) — Implementation may begin only when all scientific decisions are bound.
 - **REQ-3182** (§26; Testing) — Implementation may begin only when no implementation agent must invent a scientific value or rule.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -2104,8 +2076,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M02 — I07 Implement Deterministic RNG and Reproducibility Identity** — provides Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates as an upstream contract/evidence dependency for Deterministic seed namespaces, replay behavior, and reproducibility/environment identity.
 - **M02 — I08 Implement Canonical Artifact Reuse and Completion Manifests** — provides Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates as an upstream contract/evidence dependency for Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2261,9 +2231,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3169** (§25; Reproducibility) — An incompatible experiment catalogue may not silently replace an artifact under the same active identity.
 - **REQ-3170** (§25; Reproducibility) — An incompatible statistical specification may not silently replace an artifact under the same active identity.
 - **REQ-3171** (§25; Reproducibility) — An incompatible claim criterion may not silently replace an artifact under the same active identity.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Deterministic seed namespaces, replay behavior, and reproducibility/environment identity so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -2301,8 +2268,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M05 — I29 Implement FedORBIT Dense-CCP Fallback** — provides Deterministic seed namespaces, replay behavior, and reproducibility/environment identity as an upstream contract/evidence dependency for Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling.
 - **M06 — I35 Implement Statistical Analysis, Multiplicity, Materiality, and Equivalence** — provides Deterministic seed namespaces, replay behavior, and reproducibility/environment identity as an upstream contract/evidence dependency for Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior.
 - **M07 — I37 Implement Deterministic Synthetic and Controlled Generators** — provides Deterministic seed namespaces, replay behavior, and reproducibility/environment identity as an upstream contract/evidence dependency for Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2486,9 +2451,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3045** (§22.9 Reusable artifact manifest; Artifact) — Require schema field `completion_manifest_sha256`.
 - **REQ-3046** (§22.9; Artifact) — Every reusable project-wide payload in `outputs/preprocessing/` or `outputs/artifacts/` has exactly one reusable-artifact manifest.
 - **REQ-3047** (§22.9; Provenance) — Treat `artifact_id` as a stable content/provenance reference, not as a replacement for semantic experiment identity.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -2519,8 +2481,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M02 — I10 Implement Public CLI Idempotency, Status, and Overwrite Semantics** — provides Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse as an upstream contract/evidence dependency for Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior.
 - **M02 — I11 Implement Semantic Cells, Fingerprints, Selective Invalidation, and Recovery** — provides Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse as an upstream contract/evidence dependency for Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery.
 - **M02 — I12 Implement Canonical Workspace, Serialization, and Provenance Lifecycle** — provides Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse as an upstream contract/evidence dependency for Canonical computational workspace and validated artifact/provenance lifecycle.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2670,9 +2630,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2016** (§18; Failure Semantics) — Do not automatically retry scientific algorithmic failure with a different support.
 - **REQ-2017** (§18; Failure Semantics) — Do not automatically retry scientific algorithmic failure with an alternate solver.
 - **REQ-2018** (§18; Statistical Analysis) — Paired statistical contrasts treat scientific-algorithmic-failure cells as missing under §13.6.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed failure states, retry behavior, and scientific/infrastructure failure handling so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -2699,8 +2656,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M02 — I10 Implement Public CLI Idempotency, Status, and Overwrite Semantics** — provides Typed failure states, retry behavior, and scientific/infrastructure failure handling as an upstream contract/evidence dependency for Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior.
 - **M02 — I11 Implement Semantic Cells, Fingerprints, Selective Invalidation, and Recovery** — provides Typed failure states, retry behavior, and scientific/infrastructure failure handling as an upstream contract/evidence dependency for Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2874,9 +2829,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2542** (§19.2; CLI / Execution) — `--overwrite` never means delete all upstream work.
 - **REQ-2543** (§19.2; CLI / Execution) — `--overwrite` never means rerun every ancestor.
 - **REQ-2544** (§19.2; CLI / Execution) — If overwrite reconstruction yields the same dependency fingerprint and validated content identity, descendants remain valid.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -2902,8 +2854,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M02 — I13 Implement Ordered Execution Pipeline and Execution-Readiness Gates** — provides Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior as an upstream contract/evidence dependency for Layered restartable execution pipeline and M02 readiness verification.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3235,9 +3185,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2725** (§20.8; Claim Boundary) — No solver checkpoint is required by the roadmap. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-2726** (§20.8; Reproducibility) — A downstream-only producer-code fix must preserve already-valid upstream artifacts whose fingerprints are unchanged.
 - **REQ-2727** (§20.8; CLI / Execution) — A recovery-boundary mismatch forces clean recomputation from the nearest earlier valid boundary of the same semantic cell, not necessarily from raw inputs.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -3266,8 +3213,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M02 — I12 Implement Canonical Workspace, Serialization, and Provenance Lifecycle** — provides Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery as an upstream contract/evidence dependency for Canonical computational workspace and validated artifact/provenance lifecycle.
 - **M02 — I13 Implement Ordered Execution Pipeline and Execution-Readiness Gates** — provides Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery as an upstream contract/evidence dependency for Layered restartable execution pipeline and M02 readiness verification.
 - **M03 — I14 Enforce Strict No-Common-Interface Resource Boundary** — provides Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery as an upstream contract/evidence dependency for Whitelisted strict-resource interface with dynamic access validation and readiness gates.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3689,9 +3634,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2882** (§21.6; Artifact) — External conversion of SVG for manuscript submission is not a scientific artifact and does not enter results/.
 - **REQ-2883** (§21.6; Artifact) — A canonical artifact may contain multiple payload categories only when its manifest lists every mandatory path and checksum.
 - **REQ-2884** (§21.6; Artifact) — Producer-specific alternate filenames/formats are forbidden for active canonical artifacts.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Canonical computational workspace and validated artifact/provenance lifecycle so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -3722,8 +3664,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M04 — I19 Implement Modality-Specific Local Models and Base Training** — provides Canonical computational workspace and validated artifact/provenance lifecycle as an upstream contract/evidence dependency for Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts.
 - **M06 — I36 Persist Prediction, Metric, Paired-Comparison, and Statistical Schemas** — provides Canonical computational workspace and validated artifact/provenance lifecycle as an upstream contract/evidence dependency for Typed canonical evaluation/statistical result schemas and metadata.
 - **M07 — I37 Implement Deterministic Synthetic and Controlled Generators** — provides Canonical computational workspace and validated artifact/provenance lifecycle as an upstream contract/evidence dependency for Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4013,9 +3953,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3179** (§26; Testing) — Implementation may begin only when semantic execution is implemented.
 - **REQ-3180** (§26; Testing) — Implementation may begin only when nearest-valid-boundary recovery is implemented.
 - **REQ-3181** (§26; Testing) — Implementation may begin only when stale descendants cannot remain active after parent replacement.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Layered restartable execution pipeline and M02 readiness verification so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -4044,8 +3981,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M03 — I14 Enforce Strict No-Common-Interface Resource Boundary** — provides Layered restartable execution pipeline and M02 readiness verification as an upstream contract/evidence dependency for Whitelisted strict-resource interface with dynamic access validation and readiness gates.
 - **M07 — I38 Materialize Pre-Confirmatory Experiment Catalogue and Dependency Map** — provides Layered restartable execution pipeline and M02 readiness verification as an upstream contract/evidence dependency for Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4267,9 +4202,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0924** (§5.7; Failure Semantics) — Any strict-resource validation violation makes the scientific cell `Invalid`.
 - **REQ-3175** (§26; Testing) — Implementation may begin only when strict-resource enforcement is testable.
 - **REQ-3183** (§26; Claim Boundary) — The roadmap's implementation-readiness state is `Pass`. **[Governing `NON_IMPLEMENTATION` constraint]**
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Whitelisted strict-resource interface with dynamic access validation and readiness gates so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -4302,8 +4234,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M03 — I15 Implement Duplicate-Safe Chronological Splits and Transfer Eligibility** — provides Whitelisted strict-resource interface with dynamic access validation and readiness gates as an upstream contract/evidence dependency for Deterministic duplicate-safe chronological splitting and source/target transfer eligibility.
 - **M03 — I16 Implement Dataset Registry, Client Construction, Ontology, and Adapters** — provides Whitelisted strict-resource interface with dynamic access validation and readiness gates as an upstream contract/evidence dependency for Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation.
 - **M04 — I22 Implement Final Source Response Bands and Anonymous Packet Export** — provides Whitelisted strict-resource interface with dynamic access validation and readiness gates as an upstream contract/evidence dependency for Simultaneous response-band estimator and strict anonymous procedural-response packet.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4503,9 +4433,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0171** (§4.3; Preprocessing) — Map TRAIN categorical levels below the rare-frequency threshold to the fixed token `<RARE>`.
 - **REQ-0172** (§4.3; Preprocessing) — Map categorical levels unseen in TRAIN to the fixed token `<UNK>`.
 - **REQ-0173** (§4.3; Preprocessing) — One-hot encoding must drop no category.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Deterministic duplicate-safe chronological splitting and source/target transfer eligibility so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -4532,8 +4459,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M03 — I16 Implement Dataset Registry, Client Construction, Ontology, and Adapters** — provides Deterministic duplicate-safe chronological splitting and source/target transfer eligibility as an upstream contract/evidence dependency for Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation.
 - **M03 — I17 Implement Leakage-Safe Feature Selection, Deduplication, and Preprocessing** — provides Deterministic duplicate-safe chronological splitting and source/target transfer eligibility as an upstream contract/evidence dependency for Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline.
 - **M03 — I18 Persist Dataset, Eligibility, and Semantic-Cell Manifests** — provides Deterministic duplicate-safe chronological splitting and source/target transfer eligibility as an upstream contract/evidence dependency for Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4845,9 +4770,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1045** (§6.10; Dataset) — Observe and record `exact source packet count after eligibility` from actual data rather than hardcoding literature values.
 - **REQ-1046** (§6.10; Dataset) — Observe and record `exact dataset checksum` from actual data rather than hardcoding literature values.
 - **REQ-1047** (§6.10; CLI / Execution) — `fedorbit preprocess` must record every §6.10 observed dataset value.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -4877,8 +4799,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M03 — I17 Implement Leakage-Safe Feature Selection, Deduplication, and Preprocessing** — provides Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation as an upstream contract/evidence dependency for Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline.
 - **M03 — I18 Persist Dataset, Eligibility, and Semantic-Cell Manifests** — provides Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation as an upstream contract/evidence dependency for Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5187,9 +5107,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0293** (§4.6; Dataset) — Treat duplicate rows differing only in label as conflicting duplicates.
 - **REQ-0294** (§4.6; Failure Semantics) — If a duplicate feature group contains more than one local prediction label, mark the dataset `Invalid Data`.
 - **REQ-0295** (§4.6; Preprocessing) — Never split a duplicate group across data partitions.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -5216,8 +5133,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M03 — I18 Persist Dataset, Eligibility, and Semantic-Cell Manifests** — provides Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline as an upstream contract/evidence dependency for Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance.
 - **M04 — I19 Implement Modality-Specific Local Models and Base Training** — provides Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline as an upstream contract/evidence dependency for Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5381,9 +5296,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-2952** (§22.3 Semantic cell manifest; Artifact) — Require schema field `state`.
 - **REQ-2953** (§22.3 Semantic cell manifest; Artifact) — Require schema field `state_reason`.
 - **REQ-2954** (§22.3; Provenance) — Treat semantic-cell hashes as compatibility/provenance fields, not as scientific experiment identity.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -5415,8 +5327,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M05 — I25 Implement Formal Correspondence, Orbit, Action, and Null-Node Semantics** — provides Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance as an upstream contract/evidence dependency for Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions.
 - **M05 — I30 Implement Target-Importance Construction** — provides Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance as an upstream contract/evidence dependency for Roadmap-defined nonnegative target-importance vector construction.
 - **M07 — I40 Validate Real Data, Local Models, and Source-Response Bands** — provides Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance as an upstream contract/evidence dependency for Dataset/resource readiness, base-model pilot, response-estimator pilot, and final band validation evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5611,9 +5521,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0352** (§4.8; Training) — Set AdamW `maximize=false`.
 - **REQ-0353** (§4.8; Training) — Set AdamW `fused=false`.
 - **REQ-0354** (§4.8; Training) — Set AdamW `foreach=false`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -5645,8 +5552,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M04 — I23 Implement Target-Local Response Diagnostics** — provides Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts as an upstream contract/evidence dependency for Target-local response diagnostic computed only from permitted target-local evidence.
 - **M05 — I26 Implement Paired Confirmation Decisions and Target Compute Budgets** — provides Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts as an upstream contract/evidence dependency for Roadmap-exact paired confirmation bootstrap logic and target-local optimizer-step budgets.
 - **M06 — I34 Implement Fair Baselines, Oracles, and Matched Resource Budgets** — provides Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts as an upstream contract/evidence dependency for Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5791,9 +5696,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0373** (§4.10; Training) — Use minibatch example count, not the sum of class/intervention weights, as the loss denominator.
 - **REQ-0374** (§4.10; Training) — For base training use intervention multiplier `m_c=1`.
 - **REQ-0375** (§4.10; Training) — Intervention and curriculum multipliers modify fixed class weights without subsequent renormalization.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered base-model pilot and final class-weight/minibatch objective behavior so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -5817,8 +5719,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M04 — I21 Implement Source-Response Estimator Pilot** — provides Registered base-model pilot and final class-weight/minibatch objective behavior as an upstream contract/evidence dependency for Registered source-response estimator pilot and selection evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5932,9 +5832,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0402** (§4.11; Algorithm) — Break remaining source-response pilot ties third by smaller intervention magnitude.
 - **REQ-0403** (§4.11; Algorithm) — Select exactly one source-response configuration per local model family/client before confirmatory packet construction.
 - **REQ-0404** (§4.11; Configuration) — Keep the pilot useful-column minimum and final-packet stability minimum as distinct configuration fields even if current values match.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered source-response estimator pilot and selection evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -5958,8 +5855,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M04 — I22 Implement Final Source Response Bands and Anonymous Packet Export** — provides Registered source-response estimator pilot and selection evidence as an upstream contract/evidence dependency for Simultaneous response-band estimator and strict anonymous procedural-response packet.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6083,9 +5978,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0435** (§4.12; Algorithm) — Count final packet stability useful columns using the final-entry useful definition only.
 - **REQ-0436** (§4.12; Algorithm) — Compute the configured median band-width / median absolute mean-response ratio over useful entries only.
 - **REQ-0437** (§4.12; Failure Semantics) — If the final useful-entry set is empty, the packet fails the final response stability rule.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Simultaneous response-band estimator and strict anonymous procedural-response packet so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6115,8 +6007,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M04 — I23 Implement Target-Local Response Diagnostics** — provides Simultaneous response-band estimator and strict anonymous procedural-response packet as an upstream contract/evidence dependency for Target-local response diagnostic computed only from permitted target-local evidence.
 - **M04 — I24 Integrate Local Model, Response Packet, Seed, and Resource Contracts** — provides Simultaneous response-band estimator and strict anonymous procedural-response packet as an upstream contract/evidence dependency for Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior.
 - **M05 — I31 Implement Multi-Source Proposal Ranking and Sequential Selection** — provides Simultaneous response-band estimator and strict anonymous procedural-response packet as an upstream contract/evidence dependency for Deterministic multi-source source-proposal ranking, limits, and sequential selection.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6225,9 +6115,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0443** (§4.13; Experiment) — The matched target-local response artifact uses the registered intervention magnitude, shadow horizon, replicate count, bootstrap count, and confidence level.
 - **REQ-0444** (§4.13; Algorithm) — The target-local diagnostic estimator is otherwise identical to the final source-response estimator.
 - **REQ-0445** (§4.13; Statistical Analysis) — The target-local diagnostic simultaneous max-\|t\| band construction is otherwise identical to the final source-response procedure.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Target-local response diagnostic computed only from permitted target-local evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6252,8 +6139,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M04 — I24 Integrate Local Model, Response Packet, Seed, and Resource Contracts** — provides Target-local response diagnostic computed only from permitted target-local evidence as an upstream contract/evidence dependency for Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6353,9 +6238,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1067** (§7.3; Artifact) — A source response packet is valid only for the exact coarse groups.
 - **REQ-1068** (§7.3; Artifact) — A source response packet is valid only for the exact seed.
 - **REQ-1069** (§7.3; Artifact) — Source-response packets have no offline staleness grace period.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6384,8 +6266,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M05 — I27 Implement FedORBIT Exact-Sparse Solver and Certificates** — provides Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior as an upstream contract/evidence dependency for Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates.
 - **M06 — I33 Implement Canonical Predictive, Mechanism, Confirmation, and Efficiency Metrics** — provides Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior as an upstream contract/evidence dependency for Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures.
 - **M07 — I40 Validate Real Data, Local Models, and Source-Response Bands** — provides Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior as an upstream contract/evidence dependency for Dataset/resource readiness, base-model pilot, response-estimator pilot, and final band validation evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6541,9 +6421,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0129** (§4.2; Algorithm) — For normal or null target nodes, set `alpha_bar_j=0`.
 - **REQ-0130** (§4.2; Algorithm) — For normal or null target nodes, set `c_j=0`.
 - **REQ-0131** (§4.2; Mathematics) — Treat the explicit zero-action candidate as having objective exactly 0 by the definition of `J`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6579,8 +6456,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M05 — I29 Implement FedORBIT Dense-CCP Fallback** — provides Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions as an upstream contract/evidence dependency for Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling.
 - **M05 — I30 Implement Target-Importance Construction** — provides Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions as an upstream contract/evidence dependency for Roadmap-defined nonnegative target-importance vector construction.
 - **M07 — I37 Implement Deterministic Synthetic and Controlled Generators** — provides Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions as an upstream contract/evidence dependency for Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6746,9 +6621,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0482** (§4.15; Mathematics) — Derive the target-response maximum as eight interventions × eight replicate pairs × two shadows × 25 steps.
 - **REQ-0483** (§4.15; CLI / Execution) — Unused target-local optimizer budget from one category must not be transferred to another category.
 - **REQ-0484** (§4.15; CLI / Execution) — Unused target-local optimizer budget must not be transferred to another method.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Roadmap-exact paired confirmation bootstrap logic and target-local optimizer-step budgets so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6773,8 +6645,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M05 — I32 Implement Target Confirmation and Live Assimilation** — provides Roadmap-exact paired confirmation bootstrap logic and target-local optimizer-step budgets as an upstream contract/evidence dependency for Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6924,9 +6794,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1098** (§8; Algorithm) — Break remaining final action ties third by lexicographically smaller target pseudonymous-node sequence.
 - **REQ-1099** (§8; Algorithm) — Break remaining final action ties fourth by lexicographically smaller action vector after configured comparison rounding.
 - **REQ-1100** (§8.3; Algorithm) — Certify a support master when the nonnegative master-minus-separator gap `z-v_sep` is at most `solvers.exact_sparse.separator_cut_stopping_tolerance`; otherwise add the returned correspondence cut.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -6959,8 +6826,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M07 — I39 Validate Mathematical Primitives, Exact-Sparse Theorem, Coupling, and Map Bounds** — provides Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates as an upstream contract/evidence dependency for Completed primitive/exhaustive exactness/coupling/map-bound validation evidence.
 - **M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure** — provides Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates as an upstream contract/evidence dependency for Comparator/oracle correctness and exact-sparse benchmark evidence.
 - **M08 — I44 Run Reference-GPU Scalability, Efficiency, and Work-Structure Study** — provides Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates as an upstream contract/evidence dependency for Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7120,9 +6985,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0545** (§4.17; Failure Semantics) — A QAP run is exact only when SCIP returns an optimal certificate satisfying the configured MIP gap and feasibility tolerance.
 - **REQ-0546** (§4.17; Claim Boundary) — A time-limited QAP incumbent must never be relabeled exact. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-0547** (§4.17; Claim Boundary) — Generic Exact QAP registered uses are limited to exact small/medium comparator cases, listed method-level robust-action comparison, point-map structural matching, certified exactness verification, and applicability/map-recovery diagnostics. **[Governing `NON_IMPLEMENTATION` constraint]**
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Generic exact-QAP truth/comparator backend with exactness and failure semantics so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7151,8 +7013,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M06 — I34 Implement Fair Baselines, Oracles, and Matched Resource Budgets** — provides Generic exact-QAP truth/comparator backend with exactness and failure semantics as an upstream contract/evidence dependency for Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness.
 - **M07 — I39 Validate Mathematical Primitives, Exact-Sparse Theorem, Coupling, and Map Bounds** — provides Generic exact-QAP truth/comparator backend with exactness and failure semantics as an upstream contract/evidence dependency for Completed primitive/exhaustive exactness/coupling/map-bound validation evidence.
 - **M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure** — provides Generic exact-QAP truth/comparator backend with exactness and failure semantics as an upstream contract/evidence dependency for Comparator/oracle correctness and exact-sparse benchmark evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7316,9 +7176,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0605** (§4.18; Claim Boundary) — Neither dense projected objective nor dense relaxation bound may certify the global dense robust optimum. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-0606** (§4.18; Claim Boundary) — Dense-CCP never establishes dense exactness or supplies exactness truth. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-0607** (§4.18; Claim Boundary) — Dense-CCP registered uses are limited to dense-support sensitivity, fallback diagnostics, and scalability comparisons. **[Governing `NON_IMPLEMENTATION` constraint]**
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7348,8 +7205,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure** — provides Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling as an upstream contract/evidence dependency for Comparator/oracle correctness and exact-sparse benchmark evidence.
 - **M08 — I43 Run Mechanism Ablations and Sparse/Dense Sensitivity** — provides Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling as an upstream contract/evidence dependency for Registered mechanism ablations plus principal sparse-support alternatives and Dense-CCP sensitivity evidence.
 - **M08 — I44 Run Reference-GPU Scalability, Efficiency, and Work-Structure Study** — provides Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling as an upstream contract/evidence dependency for Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7487,9 +7342,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-0655** (§4.20; Mathematics) — For each actionable non-null target node, compute weight proportional to `max(R_k, class_risk_floor)` and normalize across actionable nodes.
 - **REQ-0656** (§4.20; Algorithm) — Set target importance of Normal nodes to zero.
 - **REQ-0657** (§4.20; Algorithm) — Set target importance of null nodes to zero.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Roadmap-defined nonnegative target-importance vector construction so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7515,8 +7367,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M05 — I31 Implement Multi-Source Proposal Ranking and Sequential Selection** — provides Roadmap-defined nonnegative target-importance vector construction as an upstream contract/evidence dependency for Deterministic multi-source source-proposal ranking, limits, and sequential selection.
 - **M06 — I33 Implement Canonical Predictive, Mechanism, Confirmation, and Efficiency Metrics** — provides Roadmap-defined nonnegative target-importance vector construction as an upstream contract/evidence dependency for Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7606,9 +7456,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1111** (§9; Algorithm) — Use zero communication-cost coefficient in the principal scientific source ranking objective.
 - **REQ-1112** (§9; Algorithm) — Use zero confirmation-cost coefficient in the principal scientific source ranking objective.
 - **REQ-1113** (§9; Algorithm) — Do not average source packets in the principal method.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Deterministic multi-source source-proposal ranking, limits, and sequential selection so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7635,8 +7482,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M05 — I32 Implement Target Confirmation and Live Assimilation** — provides Deterministic multi-source source-proposal ranking, limits, and sequential selection as an upstream contract/evidence dependency for Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation.
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Deterministic multi-source source-proposal ranking, limits, and sequential selection as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7739,9 +7584,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1129** (§10; Testing) — TEST may be read only after live assimilation is complete or explicitly rejected.
 - **REQ-1130** (§10; Testing) — TEST may be read only after all method-specific pre-TEST artifacts are committed.
 - **REQ-1131** (§10; Failure Semantics) — Any earlier TEST read invalidates the cell.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7768,8 +7610,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M06 — I33 Implement Canonical Predictive, Mechanism, Confirmation, and Efficiency Metrics** — provides Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation as an upstream contract/evidence dependency for Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures.
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
 - **M08 — I46 Run Target Confirmation, Portability, and Secondary Generalization** — provides Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation as an upstream contract/evidence dependency for Confirmation-safety/portability and secondary cross-modality generalization evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7946,9 +7786,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1240** (§12.9; Metric) — Record efficiency field `live assimilation optimizer steps` for applicable cells.
 - **REQ-1241** (§12.9; Metric) — Record efficiency field `timeout indicator` for applicable cells.
 - **REQ-1242** (§12.9; Metric) — Record efficiency field `resource-limit indicator` for applicable cells.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -7985,8 +7822,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M07 — I37 Implement Deterministic Synthetic and Controlled Generators** — provides Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures as an upstream contract/evidence dependency for Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
 - **M07 — I39 Validate Mathematical Primitives, Exact-Sparse Theorem, Coupling, and Map Bounds** — provides Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures as an upstream contract/evidence dependency for Completed primitive/exhaustive exactness/coupling/map-bound validation evidence.
 - **M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries** — provides Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures as an upstream contract/evidence dependency for Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8220,9 +8055,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1156** (§11; Comparator) — No comparator may receive additional tuning seeds.
 - **REQ-1157** (§11; Comparator) — No comparator may receive a larger target compute budget.
 - **REQ-1158** (§11; Comparator) — No comparator may receive a more favorable local base checkpoint.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -8254,8 +8086,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M06 — I35 Implement Statistical Analysis, Multiplicity, Materiality, and Equivalence** — provides Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness as an upstream contract/evidence dependency for Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior.
 - **M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure** — provides Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness as an upstream contract/evidence dependency for Comparator/oracle correctness and exact-sparse benchmark evidence.
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8553,9 +8383,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1331** (§13.7; Statistical Analysis) — Register exactly `8` potential pair-specific p-value inputs in the `Mechanism Ablations` multiplicity family before validity exclusions.
 - **REQ-1332** (§13.7; Statistical Analysis) — Register exactly `12` potential pair-specific p-value inputs in the `Sparsity Sensitivity` multiplicity family before validity exclusions.
 - **REQ-1333** (§13.7; Statistical Analysis) — Register exactly `4` potential pair-specific p-value inputs in the `Confirmation Safety` multiplicity family before validity exclusions.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -8587,8 +8414,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
 - **M09 — I50 Perform Statistical Synthesis and Claim-Evidence Aggregation** — provides Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior as an upstream contract/evidence dependency for Registered paired statistical synthesis and adjudication-ready evidence dependency outputs.
 - **M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication** — provides Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior as an upstream contract/evidence dependency for Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8886,9 +8711,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3012** (§22.7 Statistical metadata; Artifact) — Require schema field `holm_rank`.
 - **REQ-3013** (§22.7 Statistical metadata; Artifact) — Require schema field `family_size`.
 - **REQ-3014** (§22.7 Statistical metadata; Artifact) — Require schema field `statistical_code_sha256`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Typed canonical evaluation/statistical result schemas and metadata so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -8917,8 +8739,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Typed canonical evaluation/statistical result schemas and metadata as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
 - **M09 — I50 Perform Statistical Synthesis and Claim-Evidence Aggregation** — provides Typed canonical evaluation/statistical result schemas and metadata as an upstream contract/evidence dependency for Registered paired statistical synthesis and adjudication-ready evidence dependency outputs.
 - **M09 — I53 Generate Verified Publication Tables, Figures, and Manuscript Evidence** — provides Typed canonical evaluation/statistical result schemas and metadata as an upstream contract/evidence dependency for Precision-controlled manuscript-facing tables, figures, source data, and publication evidence from verified artifacts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9114,9 +8934,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1422** (§14.8; Experiment) — Set each selected scalability action coordinate to `min(0.25,0.50/s)`.
 - **REQ-1423** (§14.8; Artifact) — Every synthetic scalability cell records fixed-action separator metrics.
 - **REQ-1424** (§14.8; Artifact) — Every synthetic scalability cell records full registered robust-action solver metrics where applicable.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -9147,8 +8964,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M07 — I38 Materialize Pre-Confirmatory Experiment Catalogue and Dependency Map** — provides Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization as an upstream contract/evidence dependency for Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts.
 - **M07 — I39 Validate Mathematical Primitives, Exact-Sparse Theorem, Coupling, and Map Bounds** — provides Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization as an upstream contract/evidence dependency for Completed primitive/exhaustive exactness/coupling/map-bound validation evidence.
 - **M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries** — provides Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization as an upstream contract/evidence dependency for Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9336,9 +9151,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1793** (§15 — Experiment dependency and artifact map; Artifact) — `Exact Map-Value Bound Validation` must consume exactly the registered dependency/reusable-input set: zero/high map-value fixtures, exact solver, orbit-radius implementation.
 - **REQ-1794** (§15 — Experiment dependency and artifact map; Artifact) — `Exact Map-Value Bound Validation` must produce the registered primary artifact set: exact map-action values, orbit-radius bounds, validation metrics.
 - **REQ-1795** (§15 — Experiment dependency and artifact map; Artifact) — `Exact Map-Value Bound Validation` artifacts must be exposed only to the registered downstream/reuse scope: map-value-bound figure and claim adjudication.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -9370,8 +9182,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M07 — I40 Validate Real Data, Local Models, and Source-Response Bands** — provides Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts as an upstream contract/evidence dependency for Dataset/resource readiness, base-model pilot, response-estimator pilot, and final band validation evidence.
 - **M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure** — provides Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts as an upstream contract/evidence dependency for Comparator/oracle correctness and exact-sparse benchmark evidence.
 - **M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries** — provides Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts as an upstream contract/evidence dependency for Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9535,9 +9345,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1491** (§15 — Coupling and Map-Bound Validation; Experiment) — Pass only when structural zero/strict classification is correct for every instance.
 - **REQ-1492** (§15 — Coupling and Map-Bound Validation; Experiment) — Pass only when every designed incompatible instance satisfies the required positive strict gap.
 - **REQ-1493** (§15 — Coupling and Map-Bound Validation; Experiment) — Pass only when every map-value fixture respects the orbit-radius bound within exactness tolerance.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Completed primitive/exhaustive exactness/coupling/map-bound validation evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -9565,8 +9372,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries** — provides Completed primitive/exhaustive exactness/coupling/map-bound validation evidence as an upstream contract/evidence dependency for Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9698,9 +9503,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1517** (§15 — Final Source-Response Band Validation; Experiment) — A principal source domain requires at least the inferential minimum valid seed packets.
 - **REQ-1518** (§15 — Final Source-Response Band Validation; Experiment) — A valid principal source packet must have at least the configured minimum useful intervention columns.
 - **REQ-1519** (§15 — Final Source-Response Band Validation; Experiment) — A valid principal source packet's median band-width / median absolute mean-response ratio over useful entries must not exceed the configured maximum.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Dataset/resource readiness, base-model pilot, response-estimator pilot, and final band validation evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -9726,8 +9528,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - None — this is a terminal implementation/evidence issue within the current roadmap dependency chain.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9848,9 +9648,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1537** (§15 — Exact-Sparse Solver Benchmark; Experiment) — Benchmark method `Generic Exact QAP`.
 - **REQ-1538** (§15 — Exact-Sparse Solver Benchmark; Experiment) — Benchmark method `FedORBIT Dense-CCP Fallback`.
 - **REQ-1539** (§15 — Exact-Sparse Solver Benchmark; Experiment) — Additionally benchmark all valid primary real response packets.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Comparator/oracle correctness and exact-sparse benchmark evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -9879,8 +9676,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries** — provides Comparator/oracle correctness and exact-sparse benchmark evidence as an upstream contract/evidence dependency for Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
 - **M08 — I44 Run Reference-GPU Scalability, Efficiency, and Work-Structure Study** — provides Comparator/oracle correctness and exact-sparse benchmark evidence as an upstream contract/evidence dependency for Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10009,9 +9804,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1570** (§15 — Exact Map-Value Bound Validation; Experiment) — Per seed, generate 25 zero-map-value and 25 high-map-value fixtures.
 - **REQ-1571** (§15 — Exact Map-Value Bound Validation; Experiment) — Generate 500 total map-bound fixtures.
 - **REQ-1572** (§15 — Exact Map-Value Bound Validation; Experiment) — Every fixture must respect the registered map bound.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10045,8 +9837,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation** — provides Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries as an upstream contract/evidence dependency for Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
 - **M08 — I48 Run Map-Availability Applicability Audit** — provides Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries as an upstream contract/evidence dependency for Packet-only recovery and controlled two-researcher map-availability audit evidence.
 - **M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication** — provides Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries as an upstream contract/evidence dependency for Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10180,9 +9970,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1618** (§15 — Sparsity and Dense Fallback; Robustness) — Evaluate all 40 primary pair-seed units.
 - **REQ-1619** (§15 — Sparsity and Dense Fallback; Robustness) — The unreused design contains 160 cells.
 - **REQ-1620** (§15 — Sparsity and Dense Fallback; Robustness) — Reuse principal `s=2` cells when already complete and dependency-identical.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered mechanism ablations plus principal sparse-support alternatives and Dense-CCP sensitivity evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10210,8 +9997,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M08 — I46 Run Target Confirmation, Portability, and Secondary Generalization** — provides Registered mechanism ablations plus principal sparse-support alternatives and Dense-CCP sensitivity evidence as an upstream contract/evidence dependency for Confirmation-safety/portability and secondary cross-modality generalization evidence.
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Registered mechanism ablations plus principal sparse-support alternatives and Dense-CCP sensitivity evidence as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10337,9 +10122,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1726** (§15 — Scalability and Efficiency; Statistical Analysis) — Work-structure claim requires the runtime-trend component to pass.
 - **REQ-1727** (§15 — Scalability and Efficiency; Claim Boundary) — Exact counters passing with insufficient/nonpositive runtime trend yields at most `Partially Supported`.
 - **REQ-1728** (§15 — Scalability and Efficiency; Claim Boundary) — Any counter mismatch or required approximation yields `Not Supported`.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10369,8 +10151,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10508,9 +10288,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1598** (§15 — Multi-Source Selection Validation; Experiment) — Validate multi-source sequential confirmation.
 - **REQ-1599** (§15 — Multi-Source Selection Validation; Experiment) — Validate multi-source first-accepted stop.
 - **REQ-1600** (§15 — Multi-Source Selection Validation; Experiment) — Validate multi-source no-source fallback.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10542,8 +10319,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M08 — I47 Run Semantic Sufficiency, Weak-Signal, Support, and Heterogeneity Boundaries** — provides Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources as an upstream contract/evidence dependency for Registered semantic-partition frontier and one-factor-at-a-time applicability boundary evidence.
 - **M08 — I48 Run Map-Availability Applicability Audit** — provides Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources as an upstream contract/evidence dependency for Packet-only recovery and controlled two-researcher map-availability audit evidence.
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10663,9 +10438,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1635** (§15 — Secondary Cross-Modality Generalization; Experiment) — Plan 200 secondary generalization cells.
 - **REQ-1636** (§15 — Secondary Cross-Modality Generalization; Claim Boundary) — Treat this evidence as secondary within-ToN-suite evidence and do not let it independently establish cross-dataset generalization.
 - **REQ-1842** (§15 — Secondary Cross-Modality Generalization; Experiment) — Use all ten registered confirmatory seeds.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Confirmation-safety/portability and secondary cross-modality generalization evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10691,8 +10463,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Confirmation-safety/portability and secondary cross-modality generalization evidence as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10820,9 +10590,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1670** (§15 — Weak-Signal, Support, and Heterogeneity Boundaries; Failure Semantics) — If a perturbed support condition violates transfer eligibility, record expected `INELIGIBLE/ABSTAIN` scientific outcome rather than infrastructure failure.
 - **REQ-1843** (§15 — Semantic Sufficiency Frontier; Experiment) — Use all ten registered confirmatory seeds.
 - **REQ-1844** (§15 — Weak-Signal, Support, and Heterogeneity Boundaries; Experiment) — Use all ten registered confirmatory seeds.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered semantic-partition frontier and one-factor-at-a-time applicability boundary evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -10846,8 +10613,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Registered semantic-partition frontier and one-factor-at-a-time applicability boundary evidence as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10999,9 +10764,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1709** (§15 — Map-Availability Applicability Audit; Experiment) — If every eligible primary pair is `Trivial To Reconstruct`, fire the practical-motivation kill rule.
 - **REQ-1710** (§15 — Map-Availability Applicability Audit; Claim Boundary) — If only a subset is trivial, restrict practical unresolved-map wording to the nontrivial subset and continue forbidding a benchmark-wide natural-unavailability claim.
 - **REQ-3184** (§15 — Map-Availability Applicability Audit; CLI / Execution) — `fedorbit run "Map-Availability Applicability Audit"` must deterministically manage the experiment's human-submission prerequisite using the registered missing-template, timed-session validation, submission-hash, and oracle-comparison gating protocol.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Packet-only recovery and controlled two-researcher map-availability audit evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -11026,8 +10788,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure** — provides Packet-only recovery and controlled two-researcher map-availability audit evidence as an upstream contract/evidence dependency for Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -11192,9 +10952,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1823** (§15 — Experiment dependency and artifact map; Artifact) — `Scalability and Efficiency` must consume exactly the registered dependency/reusable-input set: scalability generator instances, registered solvers, timing protocol; valid real response packets for real timing cells.
 - **REQ-1824** (§15 — Experiment dependency and artifact map; Artifact) — `Scalability and Efficiency` must produce the registered primary artifact set: timing repetitions, runtime/memory/counter artifacts, timeout/resource-limit states, exactness status.
 - **REQ-1825** (§15 — Experiment dependency and artifact map; Artifact) — `Scalability and Efficiency` artifacts must be exposed only to the registered downstream/reuse scope: scalability statistics/table/figure and operational-structure claim.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -11226,8 +10983,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 - **M09 — I51 Implement Immutable Kill and Simplification Rules** — provides Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments as an upstream contract/evidence dependency for Mechanical non-neutralizable kill/simplification rules over verified experiment evidence.
 - **M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication** — provides Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments as an upstream contract/evidence dependency for Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
 - **M09 — I53 Generate Verified Publication Tables, Figures, and Manuscript Evidence** — provides Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments as an upstream contract/evidence dependency for Precision-controlled manuscript-facing tables, figures, source data, and publication evidence from verified artifacts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -11374,9 +11129,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1829** (§15 — Experiment dependency and artifact map; Artifact) — `Claim-Evidence Adjudication` must consume exactly the registered dependency/reusable-input set: completed valid registered results, verified statistical synthesis, claim catalogue, kill/simplification rules.
 - **REQ-1830** (§15 — Experiment dependency and artifact map; Artifact) — `Claim-Evidence Adjudication` must produce the registered primary artifact set: final claim-state artifact, permitted scope, forbidden extrapolations, evidence references.
 - **REQ-1831** (§15 — Experiment dependency and artifact map; Artifact) — `Claim-Evidence Adjudication` artifacts must be exposed only to the registered downstream/reuse scope: `fedorbit report` and manuscript evidence only.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Registered paired statistical synthesis and adjudication-ready evidence dependency outputs so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -11405,8 +11157,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 
 - **M09 — I51 Implement Immutable Kill and Simplification Rules** — provides Registered paired statistical synthesis and adjudication-ready evidence dependency outputs as an upstream contract/evidence dependency for Mechanical non-neutralizable kill/simplification rules over verified experiment evidence.
 - **M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication** — provides Registered paired statistical synthesis and adjudication-ready evidence dependency outputs as an upstream contract/evidence dependency for Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -11579,9 +11329,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1987** (§17; Claim Boundary) — No kill rule may be neutralized by widening equivalence margins. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-1988** (§17; Claim Boundary) — No kill rule may be neutralized by changing a claim threshold. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-1989** (§17; Claim Boundary) — No kill rule may be neutralized by reclassifying a scientific null as technical failure. **[Governing `NON_IMPLEMENTATION` constraint]**
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Mechanical non-neutralizable kill/simplification rules over verified experiment evidence so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -11607,8 +11354,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication** — provides Mechanical non-neutralizable kill/simplification rules over verified experiment evidence as an upstream contract/evidence dependency for Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -11852,9 +11597,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-1906** (§16.1; Claim Boundary) — A pre-outcome pair exclusion must not create a replacement pair. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-1907** (§16.1; Claim Boundary) — Any `Conditional` manuscript wording must name the reduced empirical scope explicitly. **[Governing `NON_IMPLEMENTATION` constraint]**
 - **REQ-1908** (§16.1; Claim Boundary) — Final manuscript wording must not exceed the scope allowed by the adjudicated claim state. **[Governing `NON_IMPLEMENTATION` constraint]**
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -11885,8 +11627,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - **M09 — I53 Generate Verified Publication Tables, Figures, and Manuscript Evidence** — provides Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording as an upstream contract/evidence dependency for Precision-controlled manuscript-facing tables, figures, source data, and publication evidence from verified artifacts.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -12116,9 +11856,6 @@ The following atomic requirements are the executable authority for this issue. `
 - **REQ-3090** (§23.3; Reporting) — `claim support` must consume only verified Statistical Synthesis plus final Claim-Evidence Adjudication.
 - **REQ-3091** (§23.3; Reporting) — `figures` must consume the same verified source artifacts as corresponding tables, never recomputing a metric or statistical test.
 - **REQ-3092** (§23.3; Reporting) — A table/figure renderer change must never make a scientific ancestor stale.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue must trace to the roadmap authority above or to prerequisite implementation strictly necessary to satisfy it.
-
 ## Objective
 
 Deliver Precision-controlled manuscript-facing tables, figures, source data, and publication evidence from verified artifacts so that every implementation-bearing requirement allocated to this issue is executable and objectively verifiable, while every governing constraint is preserved without being misrepresented as new implementation scope.
@@ -12146,8 +11883,6 @@ No requirement may exist only implicitly in acceptance criteria, tests, or imple
 ### Blocks
 
 - None — this is a terminal implementation/evidence issue within the current roadmap dependency chain.
-
-Dependencies describe the actual contract or evidence exchanged between issues; dependency completion alone is insufficient unless the consumed output is valid, current, provenance-compatible, and scientifically admissible.
 ## Implementation Surface
 
 Expected areas affected by this issue:

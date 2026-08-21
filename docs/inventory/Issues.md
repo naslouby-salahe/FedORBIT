@@ -215,16 +215,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -462,20 +452,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Typed-contract/config ownership tests reject any scientific value or definition that is not sourced from the roadmap-owned configuration contract.
@@ -490,25 +466,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M01 — I02 Lock Runtime, CUDA, Environment, and Reporting Configuration
 
 ## Issue Summary
@@ -588,16 +545,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -694,20 +641,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Runtime/environment checks validate CUDA policy, reference hardware identity, exact Python/dependency lock, and registered reporting precision values.
@@ -720,25 +653,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M01 — I03 Register Metrics, Generators, Multi-Source, and Experiment Configuration
 
 ## Issue Summary
@@ -846,16 +760,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -979,20 +883,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Config-schema and experiment-catalogue tests prove exact registered constants, seeds, grids, and experiment membership controls.
@@ -1005,25 +895,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M01 — I04 Bind Kill Rules, Retry Policy, Artifact Roots, and Runtime Layout
 
 ## Issue Summary
@@ -1099,16 +970,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -1201,20 +1062,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Config validation proves falsification thresholds, retry count, canonical roots, and runtime layout cannot drift from the authoritative values.
@@ -1227,25 +1074,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M01 — I05 Enforce Canonical Repository Architecture and Package Boundaries
 
 ## Issue Summary
@@ -1718,16 +1546,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -2202,20 +2020,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Repository-tree, import-boundary, AST/static, naming, dead-code, primitive-leak, and architecture tests enforce the required layout and responsibility boundaries.
@@ -2228,25 +2032,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M01 — I06 Enforce Nonclaim Test Boundaries and Scientific-Contract Readiness
 
 ## Issue Summary
@@ -2305,16 +2090,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -2391,20 +2166,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Schema/architecture tests reject scientific values in test/smoke configs and enforce only registered nonclaim fixture controls.
@@ -2419,25 +2180,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I07 Implement Deterministic RNG and Reproducibility Identity
 
 ## Issue Summary
@@ -2539,16 +2281,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -2673,20 +2405,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Seed-contract and replay tests reproduce identical stochastic choices and reject post-lock confirmatory-seed changes.
@@ -2702,25 +2420,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I08 Implement Canonical Artifact Reuse and Completion Manifests
 
 ## Issue Summary
@@ -2806,16 +2505,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -2918,20 +2607,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Artifact-reference tests prove dependency-fingerprint reuse without duplicate prepared splits, checkpoints, predictions, packets, solver results, confirmations, or other immutable payloads.
@@ -2946,25 +2621,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I09 Implement Failure Taxonomy, Retry, and Scientific Failure Semantics
 
 ## Issue Summary
@@ -3031,16 +2687,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -3125,20 +2771,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Failure-injection tests distinguish infrastructure from scientific algorithmic failure, enforce retry limits, and preserve paired missingness semantics.
@@ -3151,25 +2783,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I10 Implement Public CLI Idempotency, Status, and Overwrite Semantics
 
 ## Issue Summary
@@ -3278,16 +2891,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -3416,20 +3019,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] CLI/E2E tests prove exact command semantics, no-op reuse, selective overwrite, and descendant validity behavior.
@@ -3442,25 +3031,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I11 Implement Semantic Cells, Fingerprints, Selective Invalidation, and Recovery
 
 ## Issue Summary
@@ -3683,16 +3253,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -3938,20 +3498,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Fingerprint/provenance tests detect meaningful dependency changes, preserve unaffected ancestors, and recompute from the nearest valid boundary.
@@ -3965,25 +3511,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I12 Implement Canonical Workspace, Serialization, and Provenance Lifecycle
 
 ## Issue Summary
@@ -4179,16 +3706,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -4411,20 +3928,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Artifact-layout/schema/checksum tests prove canonical paths, payload identity, manifest completeness, and prohibition of active alternate artifacts.
@@ -4437,25 +3940,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M02 — I13 Implement Ordered Execution Pipeline and Execution-Readiness Gates
 
 ## Issue Summary
@@ -4548,16 +4032,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -4669,20 +4143,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Execution-plan/E2E tests enforce the registered layer order while permitting reuse of valid upstream boundaries and isolating downstream failures.
@@ -4697,25 +4157,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M03 — I14 Enforce Strict No-Common-Interface Resource Boundary
 
 ## Issue Summary
@@ -4848,16 +4289,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -5004,20 +4435,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Architecture/resource tests prove that only the roadmap-whitelisted source/target resources are accessible.
@@ -5035,25 +4452,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M03 — I15 Implement Duplicate-Safe Chronological Splits and Transfer Eligibility
 
 ## Issue Summary
@@ -5122,16 +4520,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -5217,20 +4605,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Split/property tests validate exact intervals from configuration, deduplication, eligibility thresholds, deterministic ordering, and failure states.
@@ -5243,25 +4617,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M03 — I16 Implement Dataset Registry, Client Construction, Ontology, and Adapters
 
 ## Issue Summary
@@ -5510,16 +4865,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -5788,20 +5133,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Dataset validators compare configured identities to immutable raw bytes and record observed checksums/counts/schema facts without hardcoding literature values.
@@ -5817,25 +5148,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M03 — I17 Implement Leakage-Safe Feature Selection, Deduplication, and Preprocessing
 
 ## Issue Summary
@@ -5893,16 +5205,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -5975,20 +5277,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Preprocessing tests prove forbidden identity/provenance fields are excluded before hashing/model input and deterministic transformations preserve split semantics.
@@ -6002,25 +5290,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M03 — I18 Persist Dataset, Eligibility, and Semantic-Cell Manifests
 
 ## Issue Summary
@@ -6129,16 +5398,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -6270,20 +5529,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Schema tests enforce every required field, identity coordinate, provenance reference, eligibility decision, and semantic-cell contract.
@@ -6296,25 +5541,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I19 Implement Modality-Specific Local Models and Base Training
 
 ## Issue Summary
@@ -6404,16 +5630,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -6522,20 +5738,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Architecture/numerical tests validate exact layer order, dimensions derived from fitted preprocessors, modality branching, and deterministic initialization.
@@ -6550,25 +5752,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I20 Implement Base-Model Pilot, Class Weights, and Minibatch Objective
 
 ## Issue Summary
@@ -6625,16 +5808,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -6706,20 +5879,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Pilot matrix/selection artifacts and numeric tests validate the registered grid consumption, VALID-only deterministic selection, class weights, and minibatch loss.
@@ -6732,25 +5891,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I21 Implement Source-Response Estimator Pilot
 
 ## Issue Summary
@@ -6809,16 +5949,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -6892,20 +6022,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Pilot artifacts cover every configured intervention/horizon candidate and validate derivative/diagnostic selection logic.
@@ -6918,25 +6034,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I22 Implement Final Source Response Bands and Anonymous Packet Export
 
 ## Issue Summary
@@ -7005,16 +6102,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -7100,20 +6187,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Integration tests demonstrate anonymous packet production and simultaneous lower/upper response bands from permitted source-local resources.
@@ -7128,25 +6201,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I23 Implement Target-Local Response Diagnostics
 
 ## Issue Summary
@@ -7188,16 +6242,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -7254,20 +6298,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Diagnostic artifact uses only registered target-local inputs and statistical settings and passes deterministic replay.
@@ -7280,25 +6310,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M04 — I24 Integrate Local Model, Response Packet, Seed, and Resource Contracts
 
 ## Issue Summary
@@ -7359,16 +6370,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -7449,20 +6450,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Model/packet integration tests validate modality input dimensions, exact seed identity, packet integrity, and immediate invalidation on material dependency changes.
@@ -7475,25 +6462,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I25 Implement Formal Correspondence, Orbit, Action, and Null-Node Semantics
 
 ## Issue Summary
@@ -7595,16 +6563,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -7722,20 +6680,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Canonical-vocabulary, theorem-assumption, algorithm, and scope tests enforce joint correspondence, robust action selection, target confirmation, and dense-fallback non-exactness.
@@ -7753,25 +6697,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I26 Implement Paired Confirmation Decisions and Target Compute Budgets
 
 ## Issue Summary
@@ -7838,16 +6763,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -7935,20 +6850,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Confirmation-shadow tests prove exact pairing, pre-TEST isolation, configured bootstrap decisions, and hard optimizer-step budget enforcement.
@@ -7961,25 +6862,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I27 Implement FedORBIT Exact-Sparse Solver and Certificates
 
 ## Issue Summary
@@ -8061,16 +6943,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -8177,20 +7049,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Solver unit tests and certificate checks validate master feasibility, LAP/action tie semantics, cut generation, and configured stopping tolerance.
@@ -8205,25 +7063,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I28 Implement Generic Exact-QAP Truth and Comparator Solver
 
 ## Issue Summary
@@ -8299,16 +7138,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -8401,20 +7230,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] SCIP/PySCIPOpt tests validate exact-QAP formulation, tie rules, truth availability, timeout/failure semantics, and no oracle leakage.
@@ -8428,25 +7243,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I29 Implement FedORBIT Dense-CCP Fallback
 
 ## Issue Summary
@@ -8538,16 +7334,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -8663,20 +7449,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Dense-CCP numerical tests validate full dense action use, configured penalties/restarts/stopping, deterministic selection, diagnostics, and explicit non-exact metadata.
@@ -8690,25 +7462,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I30 Implement Target-Importance Construction
 
 ## Issue Summary
@@ -8751,16 +7504,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -8819,20 +7562,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Target-META-only construction tests reproduce the configured nonnegative importance vector and risk floor.
@@ -8845,25 +7574,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I31 Implement Multi-Source Proposal Ranking and Sequential Selection
 
 ## Issue Summary
@@ -8913,16 +7623,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -8988,20 +7688,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Selection tests enforce the configured ranking objective, deterministic proposal order, and prohibition on principal packet averaging.
@@ -9014,25 +7700,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M05 — I32 Implement Target Confirmation and Live Assimilation
 
 ## Issue Summary
@@ -9089,16 +7756,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -9173,20 +7830,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Shadow/live-assimilation E2E tests enforce target-local paired confirmation, TEST read barrier, acceptance/rejection semantics, and invalidation on early TEST access.
@@ -9199,25 +7842,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M06 — I33 Implement Canonical Predictive, Mechanism, Confirmation, and Efficiency Metrics
 
 ## Issue Summary
@@ -9342,16 +7966,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -9498,20 +8112,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Canonical evaluation records separately expose map-identification and action-certification diagnostics without conflation.
@@ -9527,25 +8127,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M06 — I34 Implement Fair Baselines, Oracles, and Matched Resource Budgets
 
 ## Issue Summary
@@ -9658,16 +8239,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -9799,20 +8370,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Comparator tests validate Local-Only, Local-SIR, rectangular, point-correspondence, oracle, and related registered behavior under strict resources.
@@ -9827,25 +8384,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M06 — I35 Implement Statistical Analysis, Multiplicity, Materiality, and Equivalence
 
 ## Issue Summary
@@ -10035,16 +8573,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -10262,20 +8790,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Statistical tests reproduce configured alpha/CI/bootstrap/randomization/Holm/materiality criteria and claim-gate decisions without redefining constants.
@@ -10291,25 +8805,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M06 — I36 Persist Prediction, Metric, Paired-Comparison, and Statistical Schemas
 
 ## Issue Summary
@@ -10408,16 +8903,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -10535,20 +9020,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Schema validation ensures canonical field sets, identities, provenance links, statistical metadata, and reusable source records.
@@ -10561,25 +9032,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I37 Implement Deterministic Synthetic and Controlled Generators
 
 ## Issue Summary
@@ -10680,16 +9132,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -10810,20 +9252,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Generator/property tests consume the authoritative configured values and reproduce exact fixture classes, truth labels, generation semantics, and serialization invariants.
@@ -10837,25 +9265,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I38 Materialize Pre-Confirmatory Experiment Catalogue and Dependency Map
 
 ## Issue Summary
@@ -10946,16 +9355,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -11070,20 +9469,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Experiment catalogue/plan output materializes the registered execution semantics without duplicate or unregistered cells.
@@ -11098,25 +9483,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I39 Validate Mathematical Primitives, Exact-Sparse Theorem, Coupling, and Map Bounds
 
 ## Issue Summary
@@ -11186,16 +9552,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -11283,20 +9639,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Completed validation manifests prove numerical primitives, exhaustive orbit/QAP truth agreement, coupling inequalities, and map-bound fixtures pass.
@@ -11309,25 +9651,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I40 Validate Real Data, Local Models, and Source-Response Bands
 
 ## Issue Summary
@@ -11392,16 +9715,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -11482,20 +9795,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Validation/pilot artifacts prove dataset/resource admissibility, deterministic model selection, response-estimator selection, and final packet-band correctness.
@@ -11508,25 +9807,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I41 Validate Baselines, Oracles, and Exact-Sparse Solver Work Structure
 
 ## Issue Summary
@@ -11585,16 +9865,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -11672,20 +9942,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Correctness certificates and benchmark manifests demonstrate baseline semantics, oracle ACL separation, exact truth agreement, counters, runtime/memory, and valid solver certificates.
@@ -11698,25 +9954,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M07 — I42 Validate Coupling Mechanism, Action Certifiability, and Map-Value Boundaries
 
 ## Issue Summary
@@ -11791,16 +10028,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -11895,20 +10122,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Per-instance/per-pair coupling artifacts compute orbit versus rectangular behavior and registered destruction/mechanism checks.
@@ -11923,25 +10136,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I43 Run Mechanism Ablations and Sparse/Dense Sensitivity
 
 ## Issue Summary
@@ -12005,16 +10199,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -12091,20 +10275,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Robustness manifests demonstrate exactly the registered sparse support alternatives and Dense-CCP sensitivity path.
@@ -12119,25 +10289,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I44 Run Reference-GPU Scalability, Efficiency, and Work-Structure Study
 
 ## Issue Summary
@@ -12205,16 +10356,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -12304,20 +10445,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Efficiency manifests prove runs use and record the configured reference hardware and required comparable execution conditions.
@@ -12332,25 +10459,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I45 Run Primary Strict Cross-Telemetry Transfer and Multi-Source Validation
 
 ## Issue Summary
@@ -12417,16 +10525,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -12515,20 +10613,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Completed cell manifests cover exact pair×seed×method membership, valid strict-resource inputs, actions/confirmations, TEST predictions, and metrics.
@@ -12541,25 +10625,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I46 Run Target Confirmation, Portability, and Secondary Generalization
 
 ## Issue Summary
@@ -12615,16 +10680,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -12696,20 +10751,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Experiment manifests cover exact primary/secondary pair membership, methods, all ten confirmatory seeds, and scope-qualified secondary evidence.
@@ -12722,25 +10763,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I47 Run Semantic Sufficiency, Weak-Signal, Support, and Heterogeneity Boundaries
 
 ## Issue Summary
@@ -12815,16 +10837,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -12913,20 +10925,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Boundary manifests implement exact condition grids, deterministic support subsampling/packet transforms, eligibility semantics, and all ten seeds.
@@ -12939,25 +10937,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I48 Run Map-Availability Applicability Audit
 
 ## Issue Summary
@@ -13037,16 +11016,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -13172,25 +11141,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M08 — I49 Finalize Confirmatory Experiment Dependencies and Evidence Exposure
 
 ## Issue Summary
@@ -13259,16 +11209,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -13385,25 +11325,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M09 — I50 Perform Statistical Synthesis and Claim-Evidence Aggregation
 
 ## Issue Summary
@@ -13472,16 +11393,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -13566,20 +11477,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Synthesis artifacts contain paired contrasts, BCa CIs, exact randomization tests, Holm/equivalence/materiality/completeness results, followed by immutable claim-state outputs.
@@ -13594,25 +11491,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M09 — I51 Implement Immutable Kill and Simplification Rules
 
 ## Issue Summary
@@ -13719,16 +11597,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -13849,20 +11717,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Kill-rule fixtures prove configured thresholds, comparator outcomes, failure classifications, and prohibition on post-result threshold/reclassification changes.
@@ -13876,25 +11730,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M09 — I52 Implement Claim Scope and Mechanical Claim-State Adjudication
 
 ## Issue Summary
@@ -14037,16 +11872,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -14204,20 +12029,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Claim catalogue and scope tests preserve exact allowed/excluded wording and encode every registered support/falsification condition mechanically.
@@ -14233,25 +12044,6 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.
-
-
----
-
 # M09 — I53 Generate Verified Publication Tables, Figures, and Manuscript Evidence
 
 ## Issue Summary
@@ -14343,16 +12135,6 @@ Implement only the work required to satisfy the referenced roadmap requirements:
 - Expose only the interfaces, artifacts, schemas, CLI behavior, experiment evidence, or reporting surfaces required by these requirements and by declared downstream dependencies.
 
 No requirement may exist only implicitly in acceptance criteria, tests, or implementation notes.
-
-## Out of Scope
-
-- Requirements allocated to another milestone or issue, except prerequisite integration strictly necessary to consume their declared outputs.
-- Speculative features, alternative scientific behavior, unregistered experiments, additional baselines, convenience modes, or implementation variants not required by the roadmap.
-- New scientific constants, thresholds, tolerances, defaults, seeds, grids, claim rules, fallback semantics, or reporting rules.
-- Compatibility shims, alternate artifact trees, duplicate implementations, or parallel configuration authorities introduced only for convenience.
-
-Anything not required by the referenced roadmap authority or strictly necessary prerequisite implementation is out of scope.
-
 ## Dependencies
 
 ### Blocked By
@@ -14458,20 +12240,6 @@ Each atomic requirement is independently verifiable. The evidence wording below 
 ## Required Tests
 
 A category that genuinely does not apply must be recorded as `N/A — <reason>` in the completion record rather than silently ignored.
-
-- [ ] Unit tests
-- [ ] Boundary and edge-case tests
-- [ ] Invalid-input and failure-path tests
-- [ ] Numerical / formula tests where scientific calculations are involved
-- [ ] Determinism / reproducibility tests where stochastic or deterministic behavior is specified
-- [ ] Serialization / integrity / corruption tests where persisted artifacts are involved
-- [ ] Provenance / stale-evidence tests where evidence dependencies are involved
-- [ ] Resume / reuse / rebuild tests where execution state is involved
-- [ ] Integration tests
-- [ ] CLI / end-to-end tests where an execution surface is involved
-- [ ] Smoke tests where the real execution path must be exercised cheaply
-- [ ] Regression tests for every bug discovered while implementing this issue
-
 ### Issue-Specific Validation
 
 - [ ] Renderer golden tests enforce configured decimal/threshold formatting without changing source scientific values.
@@ -14486,18 +12254,3 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 - [ ] Automated test evidence for all applicable required-test categories is present and reproducible.
 - [ ] Required completion/provenance evidence identifies the active configuration/protocol, code revision, data/model/upstream dependencies, schema versions, and content digests wherever the roadmap requires them.
 - [ ] Any persisted outputs required by the covered requirements are canonical, schema-valid, integrity-checked, provenance-valid, and readable by downstream consumers.
-## Definition of Done
-
-This issue is complete only when **all** of the following are true:
-
-- [ ] Every in-scope roadmap requirement is implemented completely.
-- [ ] Every acceptance criterion passes.
-- [ ] Every required test is implemented and passes, or a genuinely inapplicable category is explicitly justified.
-- [ ] Every required output exists and passes schema, integrity, provenance, and validity checks.
-- [ ] Every mandatory repository quality gate passes with no ignored pre-existing or unrelated failures.
-- [ ] The Mandatory Engineering & Research Checklist is fully satisfied.
-- [ ] Roadmap semantics and scientific claim boundaries remain unchanged unless an explicit linked correction authorizes otherwise.
-- [ ] No unresolved ambiguity requires the implementer or downstream issue to guess a scientific or implementation decision.
-- [ ] Roadmap deviations are `None` or explicitly documented and linked to an authorized clarification/correction issue.
-- [ ] The completion record is filled with reproducible evidence.
-- [ ] The issue leaves the repository in a valid, tested, clean, and internally consistent state.

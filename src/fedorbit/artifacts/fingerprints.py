@@ -131,11 +131,7 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
     )
 
 
-def configuration_subset_digest(
-    config: FedorbitConfig,
-    stage: str,
-    relevant_sections: frozenset[str],
-) -> str:
+def configuration_subset_digest(config: FedorbitConfig, relevant_sections: frozenset[str]) -> str:
     section_values: dict[str, object] = {}
     for section in relevant_sections:
         if section == "generators":
@@ -186,7 +182,7 @@ def stage_dependency_fingerprint(
 ) -> str:
     implementation = implementation_fingerprint(producer_module)
     runtime = runtime_fingerprint(stage)
-    configuration = configuration_subset_digest(config, stage, config_sections)
+    configuration = configuration_subset_digest(config, config_sections)
     payload = canonical_json(
         {
             "stage": stage,

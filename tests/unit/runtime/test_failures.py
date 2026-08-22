@@ -103,7 +103,8 @@ def test_validation_failure_is_not_retried() -> None:
 
 def test_algorithmic_failure_is_not_retried() -> None:
     policy = RetryPolicy(2)
-    decision = policy.decide(0, classify_failure(SparseMasterNonConvergenceError()))
+    classification = classify_failure(SparseMasterNonConvergenceError())
+    decision = policy.decide(0, classification)
     assert not decision.retry
     assert decision.terminal_state == TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC
 

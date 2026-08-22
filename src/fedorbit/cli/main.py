@@ -49,7 +49,7 @@ def doctor() -> None:
         typer.echo(f"lockfile packages: {lockfile.hashed_package_count} hashed")
         typer.echo(f"reference gpu matches: {gpu_ok}")
         typer.echo(f"raw data root present: {raw_root.is_dir()}")
-    except EnvironmentMismatchError as error:
+    except (EnvironmentMismatchError, CliUsageError) as error:
         typer.echo(f"environment mismatch: {error}")
         raise Exit(EXIT_RUNTIME) from error
     if not gpu_ok or not raw_root.is_dir():
@@ -70,7 +70,7 @@ def preprocess(
         from fedorbit.execution.pipeline import preprocess_pipeline
 
         preprocess_pipeline(selected, overwrite=overwrite)
-    except BaseException as error:
+    except (CliUsageError, NotReadyError) as error:
         _translate(error)
 
 
@@ -94,7 +94,7 @@ def smoke(overwrite: bool = typer.Option(False, "--overwrite")) -> None:
         from fedorbit.execution.pipeline import smoke_pipeline
 
         smoke_pipeline(overwrite=overwrite)
-    except BaseException as error:
+    except (CliUsageError, NotReadyError) as error:
         _translate(error)
 
 
@@ -111,7 +111,7 @@ def run(
         from fedorbit.execution.pipeline import run_pipeline
 
         run_pipeline(experiment, definition, overwrite=overwrite)
-    except BaseException as error:
+    except (CliUsageError, NotReadyError) as error:
         _translate(error)
 
 
@@ -135,7 +135,7 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
                 f"{index:>2} {name.value:<50} {definition.classification.value:<22} "
                 f"{'pending':<10} {'-':<8} {'-':<8}"
             )
-    except BaseException as error:
+    except CliUsageError as error:
         _translate(error)
 
 
@@ -148,7 +148,7 @@ def report(
         if experiment_name is not None:
             experiment_identifier(experiment_name)
         typer.echo("no verified persisted evidence available for report generation")
-    except BaseException as error:
+    except CliUsageError as error:
         _translate(error)
 
 

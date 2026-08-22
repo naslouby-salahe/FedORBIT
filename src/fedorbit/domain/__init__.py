@@ -1,6 +1,7 @@
 from fedorbit.domain.canonical import CanonicalSerializationError, canonical_json
 from fedorbit.domain.enums import (
     ArtifactState,
+    ArtifactType,
     ClaimId,
     ClaimState,
     ClientRole,
@@ -23,6 +24,7 @@ from fedorbit.domain.records import DirectedPair, SemanticCell
 
 __all__ = [
     "ArtifactState",
+    "ArtifactType",
     "CanonicalSerializationError",
     "ClaimId",
     "ClaimState",

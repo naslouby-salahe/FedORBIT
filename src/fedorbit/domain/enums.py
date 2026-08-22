@@ -158,6 +158,17 @@ class RngNamespace(StrEnum):
     DENSE_START = "dense_start"
 
 
+class ArtifactType(StrEnum):
+    PREPARED_SPLIT = "prepared_split"
+    CHECKPOINT = "checkpoint"
+    PREDICTION = "prediction"
+    RESPONSE_PACKET = "response_packet"
+    TARGET_IMPORTANCE = "target_importance"
+    SOLVER_RESULT = "solver_result"
+    CONFIRMATION_INPUT = "confirmation_input"
+    OTHER = "other"
+
+
 class SeedRole(StrEnum):
     PILOT = "pilot"
     CONFIRMATORY = "confirmatory"

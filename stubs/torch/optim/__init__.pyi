@@ -1,9 +1,21 @@
 from typing import Iterator
 
+from torch import Tensor
 from torch.nn import Parameter
 
 
 class AdamW:
+    def load_state_dict(
+        self,
+        state: dict[
+            str,
+            Tensor | float | int | list[float] | list[int] | dict[str, Tensor],
+        ],
+    ) -> None: ...
+    def state_dict(self) -> dict[
+        str,
+        Tensor | float | int | list[float] | list[int] | dict[str, Tensor],
+    ]: ...
     def __init__(
         self,
         params: Iterator[Parameter],

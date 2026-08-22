@@ -32,12 +32,13 @@ def macro_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
     class_weights: torch.Tensor,
-    numerical_floor: float,
+    probability_log_floor: float,
 ) -> float:
     probabilities = torch.softmax(logits, dim=1)
     one_hot = torch.zeros_like(probabilities)
     one_hot.scatter_(1, targets.unsqueeze(1), 1.0)
-    per_class_ce = -(one_hot * torch.log(probabilities + numerical_floor)).sum(dim=0)
+    per_example_ce = -torch.log(torch.clamp(probabilities, min=probability_log_floor))
+    per_class_ce = (one_hot * per_example_ce).sum(dim=0)
     class_present = one_hot.sum(dim=0)
     present = class_present > 0
     if not bool(present.any()):
@@ -67,6 +68,8 @@ def train_base_model(
     learning_rate: float,
     weight_decay: float,
 ) -> TrainingOutcome:
+    torch.manual_seed(derive_seed32(seed, RngNamespace.MODEL_INITIALIZATION, "base-model"))
+    model.reset_parameters()
     training = config.scientific.training
     adamw = training.adamw
     coordinates = {"experiment": "base-training", "seed": seed}
@@ -108,7 +111,7 @@ def train_base_model(
                 valid_logits,
                 valid_targets,
                 class_weights,
-                config.scientific.source_response_pilot.numerical_floor,
+                config.scientific.metrics.probability_log_floor,
             )
 
         if valid_metric < best_metric - training.checkpoint.tie_tolerance:

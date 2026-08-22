@@ -1,11 +1,8 @@
-from fedorbit.experiments.catalogue import (
-    ExperimentDefinition,
-    build_catalogue,
-    registered_experiment_names,
-)
+from fedorbit.experiments.catalogue import ExperimentDefinition, build_catalogue
+from fedorbit.experiments.cells import experiment_relevance
 
 __all__ = [
     "ExperimentDefinition",
     "build_catalogue",
-    "registered_experiment_names",
+    "experiment_relevance",
 ]

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
+from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
 
 
@@ -28,22 +28,25 @@ class SemanticCell:
     support: int | None = None
     seed: int | None = None
 
-    def coordinates_json(self) -> str:
-        payload: dict[str, str | int] = {"experiment": self.experiment.value}
-        if self.dataset is not None:
-            payload["dataset"] = self.dataset.value
-        if self.source_client is not None:
-            payload["source_client"] = self.source_client.value
-        if self.target_client is not None:
-            payload["target_client"] = self.target_client.value
-        if self.directed_pair is not None:
-            payload["directed_pair"] = self.directed_pair.direction
-        if self.method is not None:
-            payload["method"] = self.method.value
-        if self.condition is not None:
-            payload["condition"] = self.condition
-        if self.support is not None:
-            payload["support"] = self.support
-        if self.seed is not None:
-            payload["seed"] = self.seed
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    def identity_json(self, relevance: frozenset[str]) -> str:
+        values: dict[str, object] = {"experiment": self.experiment.value}
+        if "dataset" in relevance and self.dataset is not None:
+            values["dataset"] = self.dataset.value
+        if "source_client" in relevance and self.source_client is not None:
+            values["source_client"] = self.source_client.value
+        if "target_client" in relevance and self.target_client is not None:
+            values["target_client"] = self.target_client.value
+        if "directed_pair" in relevance and self.directed_pair is not None:
+            values["directed_pair"] = [
+                self.directed_pair.source.value,
+                self.directed_pair.target.value,
+            ]
+        if "method" in relevance and self.method is not None:
+            values["method"] = self.method.value
+        if "condition" in relevance and self.condition is not None:
+            values["condition"] = self.condition
+        if "support" in relevance and self.support is not None:
+            values["support"] = self.support
+        if "seed" in relevance and self.seed is not None:
+            values["seed"] = self.seed
+        return canonical_json(values)

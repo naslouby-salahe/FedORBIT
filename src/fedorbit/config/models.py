@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from fedorbit.domain.enums import ClientRole, DatasetId
+from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
 
 
 class FrozenModel(BaseModel):
@@ -640,7 +640,7 @@ def nominal_alpha(config: FedorbitConfig) -> float:
     return round(1.0 - config.scientific.statistics.confidence_level, 10)
 
 
-def all_registered_methods(config: FedorbitConfig) -> tuple[str, ...]:
+def all_registered_methods(config: FedorbitConfig) -> tuple[TransferMethod, ...]:
     experiment_configs: tuple[
         PrimaryStrictCrossTelemetryTransferConfig
         | MechanismAblationsConfig
@@ -661,17 +661,22 @@ def all_registered_methods(config: FedorbitConfig) -> tuple[str, ...]:
         config.experiments.exact_sparse_solver_benchmark,
         config.experiments.synthetic_coupling_mechanism_validation,
     )
-    methods: list[str] = []
+    methods: list[TransferMethod] = []
     for experiment in experiment_configs:
         for method in experiment.methods:
-            if method not in methods:
-                methods.append(method)
+            candidate = TransferMethod(method) if method in _registered_method_values else None
+            if candidate is not None and candidate not in methods:
+                methods.append(candidate)
     for (
         method
     ) in config.experiments.map_availability_applicability_audit.packet_only_recovery_methods:
-        if method not in methods:
-            methods.append(method)
+        candidate = TransferMethod(method) if method in _registered_method_values else None
+        if candidate is not None and candidate not in methods:
+            methods.append(candidate)
     return tuple(methods)
+
+
+_registered_method_values = {method.value for method in TransferMethod}
 
 
 def registered_client_ids(config: FedorbitConfig) -> tuple[DatasetId, ...]:

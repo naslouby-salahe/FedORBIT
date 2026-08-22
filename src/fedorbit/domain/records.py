@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
@@ -27,22 +28,22 @@ class SemanticCell:
     support: int | None = None
     seed: int | None = None
 
-    def coordinates(self) -> dict[str, str | int]:
-        result: dict[str, str | int] = {"experiment": self.experiment.value}
+    def coordinates_json(self) -> str:
+        payload: dict[str, str | int] = {"experiment": self.experiment.value}
         if self.dataset is not None:
-            result["dataset"] = self.dataset.value
+            payload["dataset"] = self.dataset.value
         if self.source_client is not None:
-            result["source_client"] = self.source_client.value
+            payload["source_client"] = self.source_client.value
         if self.target_client is not None:
-            result["target_client"] = self.target_client.value
+            payload["target_client"] = self.target_client.value
         if self.directed_pair is not None:
-            result["directed_pair"] = self.directed_pair.direction
+            payload["directed_pair"] = self.directed_pair.direction
         if self.method is not None:
-            result["method"] = self.method.value
+            payload["method"] = self.method.value
         if self.condition is not None:
-            result["condition"] = self.condition
+            payload["condition"] = self.condition
         if self.support is not None:
-            result["support"] = self.support
+            payload["support"] = self.support
         if self.seed is not None:
-            result["seed"] = self.seed
-        return result
+            payload["seed"] = self.seed
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"))

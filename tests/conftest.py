@@ -9,6 +9,7 @@ import yaml
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
+from tests.typed_access import ConfigDocument
 
 
 @pytest.fixture(scope="session")
@@ -25,5 +26,5 @@ def config_dict() -> dict[str, object]:
 
 
 @pytest.fixture()
-def mutable_config(config_dict: dict[str, object]) -> dict[str, object]:
-    return copy.deepcopy(config_dict)
+def mutable_config(config_dict: dict[str, object]) -> ConfigDocument:
+    return ConfigDocument(copy.deepcopy(config_dict))

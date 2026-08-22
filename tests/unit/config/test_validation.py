@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
-from tests.typed_access import as_dict, as_list
+from tests.typed_access import ConfigDocument
 
 from fedorbit.config.models import FedorbitConfig, nominal_alpha
 from fedorbit.config.validation import ConfigurationContractError, validate_cross_field_contract
 from fedorbit.domain.enums import TransferMethod
 
 
-def _validate_raw(mutable_config: dict[str, object]) -> FedorbitConfig:
-    model = FedorbitConfig.model_validate(mutable_config)
+def _validate_raw(config: ConfigDocument) -> FedorbitConfig:
+    model = FedorbitConfig.model_validate(config.as_dict())
     validate_cross_field_contract(model)
     return model
 
@@ -218,173 +218,177 @@ def test_all_experiment_methods_are_registered(fedorbit_config: FedorbitConfig) 
         for method in experiment.methods:
             assert method in registered or method == "exact_orbit"
     audit = fedorbit_config.experiments.map_availability_applicability_audit
-    recovery_methods = audit.packet_only_recovery_methods
-    for method in recovery_methods:
+    for method in audit.packet_only_recovery_methods:
         assert method in registered
 
 
-def _expect_contract_error(mutable_config: dict[str, object]) -> None:
+def _expect_contract_error(config: ConfigDocument) -> None:
     with pytest.raises(ConfigurationContractError):
-        _validate_raw(mutable_config)
+        _validate_raw(config)
 
 
-def test_rejects_nine_confirmatory_seeds(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    randomness = as_dict(scientific["randomness"])
-    seeds = as_list(randomness["confirmatory_seeds"])
-    randomness["confirmatory_seeds"] = seeds[:-1]
+def test_rejects_nine_confirmatory_seeds(mutable_config: ConfigDocument) -> None:
+    seeds = mutable_config.list("scientific", "randomness", "confirmatory_seeds")
+    mutable_config.set_value("scientific", "randomness", "confirmatory_seeds", value=seeds[:-1])
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_duplicate_pilot_seed(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    randomness = as_dict(scientific["randomness"])
-    randomness["pilot_seeds"] = [101, 101, 303]
+def test_rejects_duplicate_pilot_seed(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "randomness", "pilot_seeds", value=[101, 101, 303])
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_gap_in_split_intervals(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    split = as_dict(scientific["split"])
-    intervals = as_dict(split["duplicate_safe_chronological_intervals"])
-    intervals["train"] = [0.0, 0.54]
+def test_rejects_gap_in_split_intervals(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "split",
+        "duplicate_safe_chronological_intervals",
+        "train",
+        value=[0.0, 0.54],
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_unknown_pair_client(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    datasets = as_dict(scientific["datasets"])
-    pairs = as_list(datasets["primary_directed_pairs"])
-    assert len(pairs) > 0
-    first = as_dict(pairs[0])
-    first["target"] = "invented_client"
+def test_rejects_unknown_pair_client(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "datasets",
+        "primary_directed_pairs",
+        0,
+        "target",
+        value="invented_client",
+    )
     with pytest.raises(ValidationError):
         _validate_raw(mutable_config)
 
 
-def test_rejects_self_pair(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    datasets = as_dict(scientific["datasets"])
-    pairs = as_list(datasets["primary_directed_pairs"])
-    assert len(pairs) > 0
-    first = as_dict(pairs[0])
-    first["target"] = first["source"]
+def test_rejects_self_pair(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "datasets",
+        "primary_directed_pairs",
+        0,
+        "target",
+        value="edge_iiotset_network",
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_secondary_client_in_primary_pair(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    datasets = as_dict(scientific["datasets"])
-    pairs = as_list(datasets["primary_directed_pairs"])
-    assert len(pairs) > 0
-    first = as_dict(pairs[0])
-    first["target"] = "ton_iot_network"
+def test_rejects_secondary_client_in_primary_pair(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "datasets",
+        "primary_directed_pairs",
+        0,
+        "target",
+        value="ton_iot_network",
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_nonzero_dataloader_workers(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    training = as_dict(scientific["training"])
-    training["dataloader_workers"] = 2
+def test_rejects_nonzero_dataloader_workers(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "training", "dataloader_workers", value=2)
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_unknown_experiment_method(mutable_config: dict[str, object]) -> None:
-    experiments = as_dict(mutable_config["experiments"])
-    primary = as_dict(experiments["primary_strict_cross_telemetry_transfer"])
-    primary["methods"] = ["FedORBIT Exact-Sparse Solver", "Local-Only", "Invented Method"]
+def test_rejects_unknown_experiment_method(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "experiments",
+        "primary_strict_cross_telemetry_transfer",
+        "methods",
+        value=["FedORBIT Exact-Sparse Solver", "Local-Only", "Invented Method"],
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_benchmark_without_principal_solver(mutable_config: dict[str, object]) -> None:
-    experiments = as_dict(mutable_config["experiments"])
-    benchmark = as_dict(experiments["exact_sparse_solver_benchmark"])
-    methods = as_list(benchmark["methods"])
-    benchmark["methods"] = [
-        method for method in methods if method != "FedORBIT Exact-Sparse Solver"
-    ]
+def test_rejects_benchmark_without_principal_solver(mutable_config: ConfigDocument) -> None:
+    methods = mutable_config.list("experiments", "exact_sparse_solver_benchmark", "methods")
+    filtered = [method for method in methods if method != "FedORBIT Exact-Sparse Solver"]
+    mutable_config.set_value(
+        "experiments", "exact_sparse_solver_benchmark", "methods", value=filtered
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_budget_overflow(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    budget = as_dict(scientific["target_optimizer_budget"])
-    reserved = as_dict(budget["reserved"])
-    reserved["nontransferable_safety_reserve"] = 1000
+def test_rejects_budget_overflow(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "target_optimizer_budget",
+        "reserved",
+        "nontransferable_safety_reserve",
+        value=1000,
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_invalid_split_width(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    split = as_dict(scientific["split"])
-    intervals = as_dict(split["duplicate_safe_chronological_intervals"])
-    intervals["test"] = [0.9, 0.9]
+def test_rejects_invalid_split_width(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "split",
+        "duplicate_safe_chronological_intervals",
+        "test",
+        value=[0.9, 0.9],
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_unsupported_sensitivity_value(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    action = as_dict(scientific["action"])
-    action["sparse_support_sensitivity"] = [1, 4]
+def test_rejects_unsupported_sensitivity_value(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "action", "sparse_support_sensitivity", value=[1, 4])
     _expect_contract_error(mutable_config)
 
 
 def test_rejects_sensitivity_containing_principal_support(
-    mutable_config: dict[str, object],
+    mutable_config: ConfigDocument,
 ) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    action = as_dict(scientific["action"])
-    action["sparse_support_sensitivity"] = [1, 2]
+    mutable_config.set_value("scientific", "action", "sparse_support_sensitivity", value=[1, 2])
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_unknown_generator_support(mutable_config: dict[str, object]) -> None:
-    generators = as_dict(mutable_config["generators"])
-    theorem = as_dict(generators["exact_separator_theorem"])
-    theorem["supports"] = [1, 2, 4]
+def test_rejects_unknown_generator_support(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("generators", "exact_separator_theorem", "supports", value=[1, 2, 4])
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_wrong_artifact_layout(mutable_config: dict[str, object]) -> None:
-    runtime = as_dict(mutable_config["runtime"])
-    layout = as_dict(runtime["artifact_layout"])
-    layout["execution_root"] = "artifacts"
+def test_rejects_wrong_artifact_layout(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("runtime", "artifact_layout", "execution_root", value="artifacts")
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_wrong_preprocessing_subdirectories(mutable_config: dict[str, object]) -> None:
-    runtime = as_dict(mutable_config["runtime"])
-    layout = as_dict(runtime["artifact_layout"])
-    layout["preprocessing_subdirectories"] = ["inventories", "prepared"]
+def test_rejects_wrong_preprocessing_subdirectories(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "runtime",
+        "artifact_layout",
+        "preprocessing_subdirectories",
+        value=["inventories", "prepared"],
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_missing_primary_pair(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    datasets = as_dict(scientific["datasets"])
-    pairs = as_list(datasets["primary_directed_pairs"])
-    datasets["primary_directed_pairs"] = pairs[:-1]
+def test_rejects_missing_primary_pair(mutable_config: ConfigDocument) -> None:
+    pairs = mutable_config.list("scientific", "datasets", "primary_directed_pairs")
+    mutable_config.set_value("scientific", "datasets", "primary_directed_pairs", value=pairs[:-1])
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_claim_requiring_five_pairs(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    criteria = as_dict(scientific["claim_criteria"])
-    strict = as_dict(criteria["strict_cross_telemetry_utility"])
-    strict["successful_primary_pairs_required"] = 5
+def test_rejects_claim_requiring_five_pairs(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "claim_criteria",
+        "strict_cross_telemetry_utility",
+        "successful_primary_pairs_required",
+        value=5,
+    )
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_wrong_nominal_confidence(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    statistics = as_dict(scientific["statistics"])
-    statistics["confidence_level"] = 1.5
+def test_rejects_wrong_nominal_confidence(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "statistics", "confidence_level", value=1.5)
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_unknown_multi_source_target(mutable_config: dict[str, object]) -> None:
-    experiments = as_dict(mutable_config["experiments"])
-    multi = as_dict(experiments["multi_source_selection_validation"])
-    multi["targets"] = ["invented_target"]
+def test_rejects_unknown_multi_source_target(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "experiments", "multi_source_selection_validation", "targets", value=["invented_target"]
+    )
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config)
+        _validate_raw(mutable_config)

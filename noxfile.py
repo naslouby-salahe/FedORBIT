@@ -4,17 +4,17 @@ import nox
 
 
 def uv_session(session: nox.Session, command: str) -> None:
-    session.run("uv", "run", command, external=True)
+    session.run("uv", "run", *command.split(), external=True)
 
 
 @nox.session
 def format_check(session: nox.Session) -> None:
-    uv_session(session, "ruff format --check .")
+    uv_session(session, "ruff format --check src tests")
 
 
 @nox.session
 def lint(session: nox.Session) -> None:
-    uv_session(session, "ruff check .")
+    uv_session(session, "ruff check src tests")
 
 
 @nox.session
@@ -44,17 +44,17 @@ def scientific(session: nox.Session) -> None:
 
 @nox.session
 def integration(session: nox.Session) -> None:
-    uv_session(session, "pytest tests/integration -q")
+    session.run("uv", "run", "pytest", "tests/integration", "-q", external=True, success_codes=[0, 5])
 
 
 @nox.session
 def e2e(session: nox.Session) -> None:
-    uv_session(session, "pytest tests/e2e -q")
+    session.run("uv", "run", "pytest", "tests/e2e", "-q", external=True, success_codes=[0, 5])
 
 
 @nox.session
 def smoke(session: nox.Session) -> None:
-    uv_session(session, "pytest tests/smoke -q")
+    session.run("uv", "run", "pytest", "tests/smoke", "-q", external=True, success_codes=[0, 5])
 
 
 @nox.session

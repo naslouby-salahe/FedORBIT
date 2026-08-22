@@ -1,4 +1,8 @@
 from fedorbit.response.bootstrap import BootstrapError, max_t_critical_value
+from fedorbit.response.diagnostic import (
+    DiagnosticError,
+    estimate_target_response_diagnostic,
+)
 from fedorbit.response.final import (
     FinalResponseEntry,
     FinalResponseError,
@@ -32,6 +36,7 @@ __all__ = [
     "BootstrapError",
     "CandidateResult",
     "DerivativeSeries",
+    "DiagnosticError",
     "FinalResponseEntry",
     "FinalResponseError",
     "FinalResponseEstimate",
@@ -42,6 +47,7 @@ __all__ = [
     "build_source_packet",
     "equal_native_class_risk",
     "estimate_final_response",
+    "estimate_target_response_diagnostic",
     "max_t_critical_value",
     "native_class_cross_entropy",
     "paired_shadow_derivative",

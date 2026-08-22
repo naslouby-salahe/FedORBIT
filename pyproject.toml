@@ -16,10 +16,13 @@ dependencies = [
     "highspy==1.15.1",
     "pyscipopt==6.2.1",
     "pydantic==2.13.4",
-    "typer==0.27.1",
+    "typer==0.20.1",
     "psutil==7.2.2",
     "pyyaml>=6.0.2",
 ]
+
+[tool.uv]
+constraint-dependencies = ["click==8.1.8"]
 
 [project.optional-dependencies]
 dev = [
@@ -33,7 +36,7 @@ dev = [
 ]
 
 [project.scripts]
-fedorbit = "fedorbit.cli.main:app"
+fedorbit = "fedorbit.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -69,4 +72,4 @@ reportMissingTypeStubs = "none"
 reportMissingImports = "warning"
 
 [tool.deptry]
-per_rule_ignores = { DEP002 = ["scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "typer", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }
+per_rule_ignores = { DEP002 = ["scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }

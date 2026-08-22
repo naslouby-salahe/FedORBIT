@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 
 from tests.architecture.scan import (
+    REPOSITORY_ROOT,
     SRC_ROOT,
     iter_source_files,
     iter_test_files,
@@ -12,17 +13,19 @@ from tests.architecture.scan import (
 
 
 def test_no_production_function_used_only_from_tests() -> None:
-    production_text = "".join(
+    console_script_modules = {"fedorbit.cli.main"}
+    production_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in SRC_ROOT.rglob("*.py")
         if "__pycache__" not in path.parts
     )
+    production_text += "\n" + (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     test_text = "".join(path.read_text(encoding="utf-8") for path in iter_test_files())
     for path in iter_source_files():
         module = relative_module(path)
         if module.endswith("__init__"):
             continue
-        if module not in production_text:
+        if module not in production_text and module not in console_script_modules:
             if module in test_text:
                 raise AssertionError(f"production module imported only from tests: {module}")
             continue

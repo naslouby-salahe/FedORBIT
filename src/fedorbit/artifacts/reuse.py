@@ -19,6 +19,9 @@ class ArtifactStore:
     def manifest_path(self, artifact_id: str) -> Path:
         return self._manifests / f"{artifact_id}.json"
 
+    def manifest_dir(self) -> Path:
+        return self._manifests
+
     def write_reusable(self, manifest: ReusableArtifactManifest) -> None:
         self._manifests.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(

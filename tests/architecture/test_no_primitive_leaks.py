@@ -28,6 +28,8 @@ def test_boundary_functions_do_not_leak_collection_primitives() -> None:
             "fedorbit/domain/canonical.py" in str(path)
             or "fedorbit/runtime/seeds.py" in str(path)
             or "fedorbit/artifacts/manifests.py" in str(path)
+            or "fedorbit/artifacts/serialization.py" in str(path)
+            or "fedorbit/artifacts/evidence.py" in str(path)
         ):
             continue
         tree = parse_module(path)

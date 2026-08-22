@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from tests.typed_access import as_dict
+from tests.typed_access import ConfigDocument
 
 from fedorbit.config.loading import (
     canonical_json,
@@ -54,26 +54,22 @@ def test_load_rejects_non_mapping_document(tmp_path: Path) -> None:
         load_fedorbit_config(path)
 
 
-def test_load_rejects_unknown_top_level_field(mutable_config: dict[str, object]) -> None:
-    mutable_config["invented_section"] = {"value": 1}
+def test_load_rejects_unknown_top_level_field(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("invented_section", value={"value": 1})
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config)
+        FedorbitConfig.model_validate(mutable_config.as_dict())
 
 
-def test_load_rejects_unknown_nested_field(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    action = as_dict(scientific["action"])
-    action["invented_parameter"] = 1
+def test_load_rejects_unknown_nested_field(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "action", "invented_parameter", value=1)
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config)
+        FedorbitConfig.model_validate(mutable_config.as_dict())
 
 
-def test_load_rejects_wrong_type(mutable_config: dict[str, object]) -> None:
-    scientific = as_dict(mutable_config["scientific"])
-    action = as_dict(scientific["action"])
-    action["principal_sparse_support"] = "two"
+def test_load_rejects_wrong_type(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "action", "principal_sparse_support", value="two")
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config)
+        FedorbitConfig.model_validate(mutable_config.as_dict())
 
 
 def test_canonical_json_is_deterministic(fedorbit_config: FedorbitConfig) -> None:
@@ -114,11 +110,9 @@ def test_snapshot_changed_when_contract_changes(
     target = tmp_path / "snapshot.json"
     monkeypatch.setattr("fedorbit.config.loading.contract_snapshot_path", lambda: target)
     write_contract_snapshot(fedorbit_config)
-    altered_dict = fedorbit_config.model_dump(mode="json")
-    scientific = as_dict(altered_dict["scientific"])
-    action = as_dict(scientific["action"])
-    action["principal_sparse_support"] = 3
-    changed = FedorbitConfig.model_validate(altered_dict)
+    altered = ConfigDocument(fedorbit_config.model_dump(mode="json"))
+    altered.set_value("scientific", "action", "principal_sparse_support", value=3)
+    changed = FedorbitConfig.model_validate(altered.as_dict())
     assert not snapshot_matches_contract(changed)
 
 

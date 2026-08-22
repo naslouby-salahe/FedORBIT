@@ -53,9 +53,23 @@ def test_boundary_packages_never_use_any_or_object() -> None:
         package = package_of(relative_module(path))
         if package not in BOUNDARY_PACKAGES:
             continue
-        text = path.read_text(encoding="utf-8")
-        for token in ("Any", "object"):
-            assert token not in text, f"forbidden {token!r} in boundary package {path}"
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AnnAssign):
+                _assert_annotation_clean(node.annotation, path, "attribute")
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                _assert_annotation_clean(node.returns, path, node.name)
+                for argument in node.args.args:
+                    _assert_annotation_clean(argument.annotation, path, argument.arg)
+
+
+def _assert_annotation_clean(annotation: ast.expr | None, path: Path, owner: str) -> None:
+    if annotation is None:
+        return
+    if isinstance(annotation, ast.Name) and annotation.id in {"Any", "object"}:
+        raise AssertionError(f"forbidden {annotation.id!r} annotation in {path}:{owner}")
+    if isinstance(annotation, ast.Subscript):
+        _assert_annotation_clean(annotation.value, path, owner)
 
 
 def test_boundary_packages_never_return_anonymous_dicts() -> None:

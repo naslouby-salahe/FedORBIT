@@ -10,6 +10,13 @@ from fedorbit.domain.enums import (
     TransferMethod,
 )
 
+_PRIMARY_PAIRS_LABEL = "four primary directed pairs"
+_SECONDARY_PAIRS_LABEL = "four secondary directed pairs"
+
+
+def _experiment_name(name: ExperimentName) -> str:
+    return name.value
+
 
 @dataclass(frozen=True, slots=True)
 class ExperimentDefinition:
@@ -82,7 +89,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         theorem_cells,
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.EXACT_SPARSE_SEPARATOR_EXACTNESS,),
     )
 
@@ -103,7 +110,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         coupling_factorial,
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
@@ -135,7 +142,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         (*pilot_seeds, *confirmatory_seeds),
         pilot_fits + confirmatory_checkpoints,
-        ("Dataset, Client, and Strict-Resource Validation",),
+        (_experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),),
         (),
     )
 
@@ -150,7 +157,10 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         pilot_seeds,
         client_count * len(pilot_seeds) * response_candidates,
-        ("Base-Model Hyperparameter Pilot", "Dataset, Client, and Strict-Resource Validation"),
+        (
+            _experiment_name(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT),
+            _experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),
+        ),
         (),
     )
 
@@ -163,7 +173,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         planned_packets,
-        ("Source-Response Estimator Pilot",),
+        (_experiment_name(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT),),
         (ClaimId.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE,),
     )
 
@@ -183,7 +193,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         validation_seeds,
         primary_pair_count * len(validation_seeds),
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
@@ -206,7 +216,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         benchmark_cells,
-        ("Exact Sparse Theorem Exhaustive Validation",),
+        (_experiment_name(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION),),
         (ClaimId.EXACT_SPARSE_SEPARATOR_EXACTNESS, ClaimId.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT),
     )
 
@@ -218,7 +228,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         coupling_factorial * len(experiments.synthetic_coupling_mechanism_validation.methods),
-        ("Coupling and Map-Bound Validation",),
+        (_experiment_name(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION),),
         (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
@@ -230,7 +240,10 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds),
-        ("Final Source-Response Band Validation", "Baseline and Oracle Correctness Validation"),
+        (
+            _experiment_name(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION),
+            _experiment_name(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION),
+        ),
         (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
@@ -245,7 +258,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         diagnostic_fixtures,
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -257,7 +270,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         diagnostic_fixtures,
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -269,7 +282,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         diagnostic_fixtures,
-        ("Mathematical Primitive Validation",),
+        (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -285,7 +298,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         bound_fixtures,
-        ("Coupling and Map-Bound Validation",),
+        (_experiment_name(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -293,13 +306,13 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         ExperimentClassification.CONFIRMATORY,
         methods,
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * len(methods),
         (
-            "Final Source-Response Band Validation",
-            "Baseline and Oracle Correctness Validation",
+            _experiment_name(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION),
+            _experiment_name(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION),
         ),
         (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
@@ -313,7 +326,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         multi_source_targets * len(confirmatory_seeds),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
@@ -322,11 +335,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.MECHANISM_ABLATIONS,
         ExperimentClassification.ABLATION,
         ablation_methods,
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * len(ablation_methods),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
@@ -340,11 +353,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
             "exact sparse s=3",
             TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK.value,
         ),
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * sparse_conditions,
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT,),
     )
 
@@ -359,7 +372,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (primary_pair_count + secondary_pair_count)
         * len(confirmatory_seeds)
         * len(confirmation_methods),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.TARGET_CONFIRMATION_SAFETY,),
     )
 
@@ -368,11 +381,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION,
         ExperimentClassification.GENERALIZATION,
         secondary_methods,
-        ("four secondary directed pairs",),
+        (_SECONDARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         secondary_pair_count * len(confirmatory_seeds) * len(secondary_methods),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (),
     )
 
@@ -382,11 +395,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER,
         ExperimentClassification.FAILURE_BOUNDARY,
         frontier_methods,
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         experiments.semantic_sufficiency_frontier.partitions,
         confirmatory_seeds,
         primary_pair_count * frontier_partitions * len(frontier_methods) * len(confirmatory_seeds),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -403,11 +416,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES,
         ExperimentClassification.FAILURE_BOUNDARY,
         weak_signal.methods,
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         weak_conditions * len(weak_signal.methods) * primary_pair_count * len(confirmatory_seeds),
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (),
     )
 
@@ -417,11 +430,11 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT,
         ExperimentClassification.DIAGNOSTIC,
         recovery_methods,
-        ("four primary directed pairs",),
+        (_PRIMARY_PAIRS_LABEL,),
         (),
         confirmatory_seeds,
         recovery_attempts,
-        ("Primary Strict Cross-Telemetry Transfer",),
+        (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
         (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
@@ -449,7 +462,7 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         (),
         confirmatory_seeds,
         scalability_exact_cells + scalability_dense_cells + real_timing_cells,
-        ("Exact-Sparse Solver Benchmark",),
+        (_experiment_name(ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK),),
         (ClaimId.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT,),
     )
 

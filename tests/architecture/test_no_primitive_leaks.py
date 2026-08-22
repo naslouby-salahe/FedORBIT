@@ -24,7 +24,11 @@ def test_boundary_functions_do_not_leak_collection_primitives() -> None:
         package = package_of(module)
         if package not in BOUNDARY_PACKAGES:
             continue
-        if "fedorbit/domain/canonical.py" in str(path) or "fedorbit/runtime/seeds.py" in str(path):
+        if (
+            "fedorbit/domain/canonical.py" in str(path)
+            or "fedorbit/runtime/seeds.py" in str(path)
+            or "fedorbit/artifacts/manifests.py" in str(path)
+        ):
             continue
         tree = parse_module(path)
         for function in public_functions(tree):

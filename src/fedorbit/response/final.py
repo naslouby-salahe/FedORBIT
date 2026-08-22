@@ -9,8 +9,13 @@ import torch
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.bootstrap import max_t_critical_value
-from fedorbit.response.pilot import DerivativeSeries
-from fedorbit.response.shadows import paired_shadow_derivative, run_shadow_pair
+from fedorbit.response.pilot import DerivativeSeries, PilotData
+from fedorbit.response.shadows import (
+    ShadowData,
+    ShadowSettings,
+    paired_shadow_derivative,
+    run_shadow_pair,
+)
 from fedorbit.strict_interface.packet import SourcePacket
 
 RESPONSE_PACKET_SCHEMA = "source-response-packet/v1"
@@ -44,22 +49,14 @@ def estimate_final_response(
     config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
+    data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
-    epsilon: float,
-    horizon: int,
-    learning_rate: float,
-    weight_decay: float,
+    settings: ShadowSettings,
     seed: int,
 ) -> FinalResponseEstimate:
     final = config.scientific.source_response_final
     replicate_count = final.paired_replicates_per_intervention
-    outcome_count = len(outcome_native_class_sets)
+    outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
     series = [
         DerivativeSeries(outcome, intervention, [])
@@ -69,23 +66,23 @@ def estimate_final_response(
     all_finite = True
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
+            shadow_data = ShadowData(
+                data.train_features,
+                data.train_targets,
+                data.meta_features,
+                data.meta_targets,
+                concept_classes,
+                data.outcome_native_class_sets,
+                data.base_class_weights,
+            )
             risks = run_shadow_pair(
                 config,
                 model,
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,
                 checkpoint.rng_state,
-                train_features,
-                train_targets,
-                meta_features,
-                meta_targets,
-                concept_classes,
-                outcome_native_class_sets,
-                base_class_weights,
-                epsilon,
-                horizon,
-                learning_rate,
-                weight_decay,
+                shadow_data,
+                settings,
                 seed + replicate * (intervention_count + 1) + intervention_index,
             )
             for outcome_index in range(outcome_count):
@@ -94,7 +91,7 @@ def estimate_final_response(
                     positive,
                     negative,
                     baseline,
-                    epsilon,
+                    settings.epsilon,
                     final.response_risk_denominator_floor,
                 )
                 if not all(

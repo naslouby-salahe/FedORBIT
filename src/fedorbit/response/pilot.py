@@ -8,13 +8,30 @@ import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.models.training import BaseCheckpoint
-from fedorbit.response.shadows import paired_shadow_derivative, run_shadow_pair
+from fedorbit.response.shadows import (
+    ShadowData,
+    ShadowSettings,
+    paired_shadow_derivative,
+    run_shadow_pair,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ResponseCandidate:
     intervention_magnitude: float
     optimizer_step_horizon: int
+
+
+@dataclass(frozen=True, slots=True)
+class PilotData:
+    train_features: torch.Tensor
+    train_targets: torch.Tensor
+    meta_features: torch.Tensor
+    meta_targets: torch.Tensor
+    outcome_native_class_sets: tuple[tuple[int, ...], ...]
+    base_class_weights: torch.Tensor
+    learning_rate: float
+    weight_decay: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,15 +71,8 @@ def run_source_response_pilot(
     config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
+    data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
-    learning_rate: float,
-    weight_decay: float,
     seed: int,
 ) -> tuple[CandidateResult, ...]:
     pilot = config.scientific.source_response_pilot
@@ -76,17 +86,10 @@ def run_source_response_pilot(
                     config,
                     model,
                     checkpoint,
-                    train_features,
-                    train_targets,
-                    meta_features,
-                    meta_targets,
+                    data,
                     intervention_classes,
-                    outcome_native_class_sets,
-                    base_class_weights,
                     candidate,
                     replicate_count,
-                    learning_rate,
-                    weight_decay,
                     seed,
                 )
             )
@@ -116,21 +119,14 @@ def _evaluate_candidate(
     config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
+    data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
     candidate: ResponseCandidate,
     replicate_count: int,
-    learning_rate: float,
-    weight_decay: float,
     seed: int,
 ) -> CandidateResult:
     pilot = config.scientific.source_response_pilot
-    outcome_count = len(outcome_native_class_sets)
+    outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
     full_series = [
         DerivativeSeries(outcome, intervention, [])
@@ -146,24 +142,36 @@ def _evaluate_candidate(
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
             pair_seed = seed + replicate * (intervention_count + 1) + intervention_index
+            shadow_data = ShadowData(
+                data.train_features,
+                data.train_targets,
+                data.meta_features,
+                data.meta_targets,
+                concept_classes,
+                data.outcome_native_class_sets,
+                data.base_class_weights,
+            )
+            full_settings = ShadowSettings(
+                candidate.intervention_magnitude,
+                candidate.optimizer_step_horizon,
+                data.learning_rate,
+                data.weight_decay,
+            )
             full_risks = run_shadow_pair(
                 config,
                 model,
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,
                 checkpoint.rng_state,
-                train_features,
-                train_targets,
-                meta_features,
-                meta_targets,
-                concept_classes,
-                outcome_native_class_sets,
-                base_class_weights,
-                candidate.intervention_magnitude,
-                candidate.optimizer_step_horizon,
-                learning_rate,
-                weight_decay,
+                shadow_data,
+                full_settings,
                 pair_seed,
+            )
+            half_settings = ShadowSettings(
+                candidate.intervention_magnitude / 2,
+                candidate.optimizer_step_horizon,
+                data.learning_rate,
+                data.weight_decay,
             )
             half_risks = run_shadow_pair(
                 config,
@@ -171,17 +179,8 @@ def _evaluate_candidate(
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,
                 checkpoint.rng_state,
-                train_features,
-                train_targets,
-                meta_features,
-                meta_targets,
-                concept_classes,
-                outcome_native_class_sets,
-                base_class_weights,
-                candidate.intervention_magnitude / 2,
-                candidate.optimizer_step_horizon,
-                learning_rate,
-                weight_decay,
+                shadow_data,
+                half_settings,
                 pair_seed,
             )
             for outcome_index in range(outcome_count):

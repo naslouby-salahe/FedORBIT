@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 
@@ -20,20 +22,24 @@ def _count_linear_layers(module: nn.Module) -> int:
 def test_network_flow_architecture_order() -> None:
     model = NetworkFlowClassifier(input_dim=8, n_classes=5, dropout_probability=0.3)
     blocks = list(model.block1) + list(model.block2) + list(model.block3) + [model.classifier]
-    assert isinstance(blocks[0], nn.Linear) and blocks[0].in_features == 8
+    assert isinstance(blocks[0], nn.Linear)
+    assert blocks[0].in_features == 8
     assert blocks[0].out_features == 256
     assert isinstance(blocks[1], nn.LayerNorm)
     assert isinstance(blocks[2], nn.GELU)
     assert isinstance(blocks[3], nn.Dropout)
-    assert isinstance(blocks[4], nn.Linear) and blocks[4].in_features == 256
+    assert isinstance(blocks[4], nn.Linear)
+    assert blocks[4].in_features == 256
     assert blocks[4].out_features == 128
     assert isinstance(blocks[5], nn.LayerNorm)
     assert isinstance(blocks[6], nn.GELU)
     assert isinstance(blocks[7], nn.Dropout)
-    assert isinstance(blocks[8], nn.Linear) and blocks[8].in_features == 128
+    assert isinstance(blocks[8], nn.Linear)
+    assert blocks[8].in_features == 128
     assert blocks[8].out_features == 64
     assert isinstance(blocks[9], nn.GELU)
-    assert isinstance(blocks[10], nn.Linear) and blocks[10].in_features == 64
+    assert isinstance(blocks[10], nn.Linear)
+    assert blocks[10].in_features == 64
     assert blocks[10].out_features == 5
     assert _count_linear_layers(model) == 4
 
@@ -78,15 +84,19 @@ def test_network_flow_xavier_uniform_zero_bias() -> None:
 def test_host_architecture_order() -> None:
     model = HostClassifier(input_dim=16, n_classes=4, dropout_probability=0.2)
     blocks = list(model.block1) + list(model.block2) + list(model.block3) + [model.classifier]
-    assert isinstance(blocks[0], nn.Linear) and blocks[0].in_features == 16
+    assert isinstance(blocks[0], nn.Linear)
+    assert blocks[0].in_features == 16
     assert blocks[0].out_features == 192
-    assert isinstance(blocks[1], nn.ReLU) and not blocks[1].inplace
+    assert isinstance(blocks[1], nn.ReLU)
+    assert not blocks[1].inplace
     assert isinstance(blocks[2], nn.BatchNorm1d)
     assert isinstance(blocks[3], nn.Dropout)
-    assert isinstance(blocks[4], nn.Linear) and blocks[4].out_features == 96
+    assert isinstance(blocks[4], nn.Linear)
+    assert blocks[4].out_features == 96
     assert isinstance(blocks[5], nn.ReLU)
     assert isinstance(blocks[6], nn.Dropout)
-    assert isinstance(blocks[7], nn.Linear) and blocks[7].out_features == 48
+    assert isinstance(blocks[7], nn.Linear)
+    assert blocks[7].out_features == 48
     assert isinstance(blocks[8], nn.ReLU)
     assert isinstance(blocks[9], nn.Linear) and blocks[9].out_features == 4
 
@@ -171,7 +181,7 @@ def test_train_base_model_smoke() -> None:
         weight_decay=0.0,
     )
     assert outcome.epoch >= 0
-    assert outcome.valid_macro_cross_entropy == outcome.valid_macro_cross_entropy
+    assert math.isfinite(outcome.valid_macro_cross_entropy)
     assert outcome.checkpoint.epoch == outcome.epoch
     assert outcome.checkpoint.valid_macro_cross_entropy == outcome.valid_macro_cross_entropy
     assert set(outcome.checkpoint.state_dict) == set(model.state_dict())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 import torch
 
@@ -13,6 +14,25 @@ from fedorbit.runtime.seeds import RngNamespace, derive_seed32
 
 class ShadowError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowData:
+    train_features: torch.Tensor
+    train_targets: torch.Tensor
+    meta_features: torch.Tensor
+    meta_targets: torch.Tensor
+    intervention_classes: tuple[int, ...]
+    outcome_native_class_sets: tuple[tuple[int, ...], ...]
+    base_class_weights: torch.Tensor
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowSettings:
+    epsilon: float
+    horizon: int
+    learning_rate: float
+    weight_decay: float
 
 
 def shadow_batch_schedule(
@@ -53,17 +73,8 @@ def run_shadow_pair(
     base_state_dict: dict[str, torch.Tensor],
     base_optimizer_state: OptimizerState,
     base_rng_state: torch.Tensor,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
-    intervention_classes: tuple[int, ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
-    epsilon: float,
-    horizon: int,
-    learning_rate: float,
-    weight_decay: float,
+    data: ShadowData,
+    settings: ShadowSettings,
     seed: int,
 ) -> tuple[tuple[float, float, float], ...]:
     training = config.scientific.training
@@ -77,17 +88,9 @@ def run_shadow_pair(
         base_state_dict,
         base_optimizer_state,
         base_rng_state,
-        train_features,
-        train_targets,
-        meta_features,
-        meta_targets,
-        intervention_classes,
-        outcome_native_class_sets,
-        base_class_weights,
-        1.0 + epsilon,
-        horizon,
-        learning_rate,
-        weight_decay,
+        data,
+        settings,
+        1.0 + settings.epsilon,
         batch_size,
         schedule_rng,
     )
@@ -97,17 +100,9 @@ def run_shadow_pair(
         base_state_dict,
         base_optimizer_state,
         base_rng_state,
-        train_features,
-        train_targets,
-        meta_features,
-        meta_targets,
-        intervention_classes,
-        outcome_native_class_sets,
-        base_class_weights,
-        1.0 - epsilon,
-        horizon,
-        learning_rate,
-        weight_decay,
+        data,
+        settings,
+        1.0 - settings.epsilon,
         batch_size,
         schedule_rng,
     )
@@ -115,13 +110,13 @@ def run_shadow_pair(
     baseline = _evaluate_risks(
         config,
         model,
-        meta_features,
-        meta_targets,
-        outcome_native_class_sets,
+        data.meta_features,
+        data.meta_targets,
+        data.outcome_native_class_sets,
     )
     return tuple(
         (positive[outcome], negative[outcome], baseline[outcome])
-        for outcome in range(len(outcome_native_class_sets))
+        for outcome in range(len(data.outcome_native_class_sets))
     )
 
 
@@ -131,17 +126,9 @@ def _run_shadow(
     base_state_dict: dict[str, torch.Tensor],
     base_optimizer_state: OptimizerState,
     base_rng_state: torch.Tensor,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
-    intervention_classes: tuple[int, ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
+    data: ShadowData,
+    settings: ShadowSettings,
     multiplier: float,
-    horizon: int,
-    learning_rate: float,
-    weight_decay: float,
     batch_size: int,
     schedule_rng: torch.Generator,
 ) -> tuple[float, ...]:
@@ -150,23 +137,26 @@ def _run_shadow(
     training = config.scientific.training
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=learning_rate,
+        lr=settings.learning_rate,
         betas=(training.adamw.beta1, training.adamw.beta2),
         eps=training.adamw.epsilon,
-        weight_decay=weight_decay,
+        weight_decay=settings.weight_decay,
     )
     optimizer.load_state_dict(base_optimizer_state)
     model.train()
     steps = 0
-    schedule = shadow_batch_schedule(train_features.shape[0], batch_size, schedule_rng)
+    schedule = shadow_batch_schedule(data.train_features.shape[0], batch_size, schedule_rng)
     for batch in schedule:
-        if steps >= horizon:
+        if steps >= settings.horizon:
             break
         optimizer.zero_grad()
-        logits = model(train_features[batch].float())
-        per_example_ce = _shadow_ce(logits, train_targets[batch], config)
+        logits = model(data.train_features[batch].float())
+        per_example_ce = _shadow_ce(logits, data.train_targets[batch], config)
         weights = _shadow_weights(
-            base_class_weights, train_targets[batch], intervention_classes, multiplier
+            data.base_class_weights,
+            data.train_targets[batch],
+            data.intervention_classes,
+            multiplier,
         )
         loss = (per_example_ce * weights).mean()
         loss.backward()
@@ -176,15 +166,15 @@ def _run_shadow(
         raise ShadowError("shadow consumed no optimizer steps")
     model.eval()
     with torch.no_grad():
-        shadow_logits = model(meta_features.float())
+        shadow_logits = model(data.meta_features.float())
     return tuple(
         equal_native_class_risk(
             shadow_logits,
-            meta_targets,
+            data.meta_targets,
             class_set,
             config.scientific.metrics.probability_log_floor,
         )
-        for class_set in outcome_native_class_sets
+        for class_set in data.outcome_native_class_sets
     )
 
 

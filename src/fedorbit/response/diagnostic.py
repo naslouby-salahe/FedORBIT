@@ -9,8 +9,13 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.bootstrap import max_t_critical_value
 from fedorbit.response.final import FinalResponseEntry, FinalResponseEstimate
-from fedorbit.response.pilot import DerivativeSeries
-from fedorbit.response.shadows import paired_shadow_derivative, run_shadow_pair
+from fedorbit.response.pilot import DerivativeSeries, PilotData
+from fedorbit.response.shadows import (
+    ShadowData,
+    ShadowSettings,
+    paired_shadow_derivative,
+    run_shadow_pair,
+)
 
 
 class DiagnosticError(ValueError):
@@ -21,22 +26,30 @@ def estimate_target_response_diagnostic(
     config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    meta_features: torch.Tensor,
-    meta_targets: torch.Tensor,
+    data: PilotData,
     intervention_classes: tuple[int, ...],
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
-    learning_rate: float,
-    weight_decay: float,
     seed: int,
 ) -> FinalResponseEstimate:
     diagnostic = config.scientific.target_response_diagnostic
     final = config.scientific.source_response_final
-    outcome_count = len(outcome_native_class_sets)
+    outcome_count = len(data.outcome_native_class_sets)
     series = [DerivativeSeries(outcome, 0, []) for outcome in range(outcome_count)]
     all_finite = True
+    settings = ShadowSettings(
+        diagnostic.intervention_magnitude,
+        diagnostic.shadow_optimizer_steps,
+        data.learning_rate,
+        data.weight_decay,
+    )
+    shadow_data = ShadowData(
+        data.train_features,
+        data.train_targets,
+        data.meta_features,
+        data.meta_targets,
+        intervention_classes,
+        data.outcome_native_class_sets,
+        data.base_class_weights,
+    )
     for replicate in range(diagnostic.paired_replicates):
         risks = run_shadow_pair(
             config,
@@ -44,17 +57,8 @@ def estimate_target_response_diagnostic(
             checkpoint.state_dict,
             checkpoint.optimizer_state,
             checkpoint.rng_state,
-            train_features,
-            train_targets,
-            meta_features,
-            meta_targets,
-            intervention_classes,
-            outcome_native_class_sets,
-            base_class_weights,
-            diagnostic.intervention_magnitude,
-            diagnostic.shadow_optimizer_steps,
-            learning_rate,
-            weight_decay,
+            shadow_data,
+            settings,
             seed + replicate,
         )
         for outcome_index in range(outcome_count):

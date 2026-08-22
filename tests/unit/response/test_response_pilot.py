@@ -109,8 +109,9 @@ def test_shadow_schedule_is_deterministic() -> None:
 def test_shadow_schedule_rejects_empty_train() -> None:
     import torch
 
+    schedule = shadow_batch_schedule(0, 4, torch.Generator())
     with pytest.raises(ShadowError):
-        next(shadow_batch_schedule(0, 4, torch.Generator()))
+        next(schedule)
 
 
 def test_sign_agreement_larger_fraction_and_zero_disagreement() -> None:
@@ -137,8 +138,9 @@ def test_selection_prefers_higher_score_then_smaller_horizon_then_smaller_magnit
 
 
 def test_selection_raises_without_eligible_candidates() -> None:
+    results = (_result(ResponseCandidate(0.1, 25), 3.0, eligible=False),)
     with pytest.raises(ResponsePilotError):
-        select_response_configuration((_result(ResponseCandidate(0.1, 25), 3.0, eligible=False),))
+        select_response_configuration(results)
 
 
 def test_selection_orders_by_higher_q() -> None:

@@ -632,10 +632,6 @@ class FedorbitConfig(FrozenModel):
     reporting: ReportingConfig
 
 
-def directed_pair_specs(pairs: tuple[DirectedPairSpec, ...]) -> tuple[tuple[str, str], ...]:
-    return tuple((pair.source.value, pair.target.value) for pair in pairs)
-
-
 def nominal_alpha(config: FedorbitConfig) -> float:
     return round(1.0 - config.scientific.statistics.confidence_level, 10)
 

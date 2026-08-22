@@ -116,7 +116,7 @@ def _lossless_float64(value: str | int | float) -> bool:
     return math.isfinite(parsed)
 
 
-def infer_feature_type(field: str, samples: tuple[str | int | float | None, ...]) -> str:
+def infer_feature_type(samples: tuple[str | int | float | None, ...]) -> str:
     non_missing: list[str | int | float] = [
         sample for sample in samples if sample is not None and not is_missing_sample(sample)
     ]

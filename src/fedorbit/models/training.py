@@ -14,11 +14,19 @@ class TrainingError(ValueError):
     pass
 
 
+OptimizerState = dict[
+    str,
+    torch.Tensor | float | int | list[float] | list[int] | dict[str, torch.Tensor],
+]
+
+
 @dataclass(frozen=True, slots=True)
 class BaseCheckpoint:
     epoch: int
     valid_macro_cross_entropy: float
     state_dict: dict[str, torch.Tensor]
+    optimizer_state: OptimizerState
+    rng_state: torch.Tensor
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +98,9 @@ def train_base_model(
     criterion = nn.CrossEntropyLoss(reduction="none", label_smoothing=training.label_smoothing)
     best_epoch = -1
     best_metric = float("inf")
+    best_state_dict: dict[str, torch.Tensor] = {}
+    best_optimizer_state: OptimizerState = {}
+    best_rng_state = torch.empty(0)
     epochs_without_improvement = 0
     for epoch in range(training.maximum_epochs):
         model.train()
@@ -117,6 +128,11 @@ def train_base_model(
         if valid_metric < best_metric - training.checkpoint.tie_tolerance:
             best_metric = valid_metric
             best_epoch = epoch
+            best_state_dict = {
+                key: value.detach().clone() for key, value in model.state_dict().items()
+            }
+            best_optimizer_state = optimizer.state_dict()
+            best_rng_state = torch.get_rng_state()
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1
@@ -131,6 +147,8 @@ def train_base_model(
         checkpoint=BaseCheckpoint(
             epoch=best_epoch,
             valid_macro_cross_entropy=best_metric,
-            state_dict={key: value.detach().clone() for key, value in model.state_dict().items()},
+            state_dict=best_state_dict,
+            optimizer_state=best_optimizer_state,
+            rng_state=best_rng_state,
         ),
     )

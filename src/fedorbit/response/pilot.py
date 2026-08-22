@@ -1,0 +1,291 @@
+from __future__ import annotations
+
+import math
+import statistics
+from dataclasses import dataclass
+
+import torch
+
+from fedorbit.config.models import FedorbitConfig
+from fedorbit.models.training import BaseCheckpoint
+from fedorbit.response.shadows import paired_shadow_derivative, run_shadow_pair
+
+
+@dataclass(frozen=True, slots=True)
+class ResponseCandidate:
+    intervention_magnitude: float
+    optimizer_step_horizon: int
+
+
+@dataclass(frozen=True, slots=True)
+class PilotEntry:
+    outcome_index: int
+    intervention_index: int
+    a_hat_full: float
+    se_full: float
+    a_hat_half: float
+    se_half: float
+    derivative_discrepancy: float
+    useful: bool
+    sign_agreement: float
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateResult:
+    candidate: ResponseCandidate
+    entries: tuple[PilotEntry, ...]
+    eligible: bool
+    ineligibility_reasons: tuple[str, ...]
+    pilot_score: float
+
+
+class ResponsePilotError(ValueError):
+    pass
+
+
+def run_source_response_pilot(
+    config: FedorbitConfig,
+    model: torch.nn.Module,
+    checkpoint: BaseCheckpoint,
+    train_features: torch.Tensor,
+    train_targets: torch.Tensor,
+    meta_features: torch.Tensor,
+    meta_targets: torch.Tensor,
+    intervention_classes: tuple[tuple[int, ...], ...],
+    outcome_native_class_sets: tuple[tuple[int, ...], ...],
+    base_class_weights: torch.Tensor,
+    learning_rate: float,
+    weight_decay: float,
+    seed: int,
+) -> tuple[CandidateResult, ...]:
+    pilot = config.scientific.source_response_pilot
+    replicate_count = pilot.paired_schedules_per_candidate
+    results: list[CandidateResult] = []
+    for magnitude in pilot.intervention_magnitudes:
+        for horizon in pilot.optimizer_step_horizons:
+            candidate = ResponseCandidate(magnitude, horizon)
+            results.append(
+                _evaluate_candidate(
+                    config,
+                    model,
+                    checkpoint,
+                    train_features,
+                    train_targets,
+                    meta_features,
+                    meta_targets,
+                    intervention_classes,
+                    outcome_native_class_sets,
+                    base_class_weights,
+                    candidate,
+                    replicate_count,
+                    learning_rate,
+                    weight_decay,
+                    seed,
+                )
+            )
+    return tuple(results)
+
+
+def select_response_configuration(
+    results: tuple[CandidateResult, ...],
+) -> ResponseCandidate:
+    eligible = tuple(result for result in results if result.eligible)
+    if not eligible:
+        raise ResponsePilotError("no eligible source-response pilot candidate")
+    ordered = tuple(
+        sorted(
+            eligible,
+            key=lambda result: (
+                -result.pilot_score,
+                result.candidate.optimizer_step_horizon,
+                result.candidate.intervention_magnitude,
+            ),
+        )
+    )
+    return ordered[0].candidate
+
+
+def _evaluate_candidate(
+    config: FedorbitConfig,
+    model: torch.nn.Module,
+    checkpoint: BaseCheckpoint,
+    train_features: torch.Tensor,
+    train_targets: torch.Tensor,
+    meta_features: torch.Tensor,
+    meta_targets: torch.Tensor,
+    intervention_classes: tuple[tuple[int, ...], ...],
+    outcome_native_class_sets: tuple[tuple[int, ...], ...],
+    base_class_weights: torch.Tensor,
+    candidate: ResponseCandidate,
+    replicate_count: int,
+    learning_rate: float,
+    weight_decay: float,
+    seed: int,
+) -> CandidateResult:
+    pilot = config.scientific.source_response_pilot
+    outcome_count = len(outcome_native_class_sets)
+    intervention_count = len(intervention_classes)
+    full_derivatives: list[list[list[float]]] = [
+        [[] for _ in range(intervention_count)] for _ in range(outcome_count)
+    ]
+    half_derivatives: list[list[list[float]]] = [
+        [[] for _ in range(intervention_count)] for _ in range(outcome_count)
+    ]
+    all_finite = True
+    for replicate in range(replicate_count):
+        for intervention_index, concept_classes in enumerate(intervention_classes):
+            pair_seed = seed + replicate * (intervention_count + 1) + intervention_index
+            full_risks = run_shadow_pair(
+                config,
+                model,
+                checkpoint.state_dict,
+                checkpoint.optimizer_state,
+                checkpoint.rng_state,
+                train_features,
+                train_targets,
+                meta_features,
+                meta_targets,
+                concept_classes,
+                outcome_native_class_sets,
+                base_class_weights,
+                candidate.intervention_magnitude,
+                candidate.optimizer_step_horizon,
+                learning_rate,
+                weight_decay,
+                pair_seed,
+            )
+            half_risks = run_shadow_pair(
+                config,
+                model,
+                checkpoint.state_dict,
+                checkpoint.optimizer_state,
+                checkpoint.rng_state,
+                train_features,
+                train_targets,
+                meta_features,
+                meta_targets,
+                concept_classes,
+                outcome_native_class_sets,
+                base_class_weights,
+                candidate.intervention_magnitude / 2,
+                candidate.optimizer_step_horizon,
+                learning_rate,
+                weight_decay,
+                pair_seed,
+            )
+            for outcome_index in range(outcome_count):
+                positive, negative, baseline = full_risks[outcome_index]
+                positive_half, negative_half, baseline_half = half_risks[outcome_index]
+                full = paired_shadow_derivative(
+                    positive,
+                    negative,
+                    baseline,
+                    candidate.intervention_magnitude,
+                    pilot.numerical_floor,
+                )
+                half = paired_shadow_derivative(
+                    positive_half,
+                    negative_half,
+                    baseline_half,
+                    candidate.intervention_magnitude / 2,
+                    pilot.numerical_floor,
+                )
+                if not all(
+                    math.isfinite(value)
+                    for value in (
+                        positive,
+                        negative,
+                        baseline,
+                        positive_half,
+                        negative_half,
+                        baseline_half,
+                        full,
+                        half,
+                    )
+                ):
+                    all_finite = False
+                full_derivatives[outcome_index][intervention_index].append(full)
+                half_derivatives[outcome_index][intervention_index].append(half)
+    entries: list[PilotEntry] = []
+    useful_columns: set[int] = set()
+    for outcome_index in range(outcome_count):
+        for intervention_index in range(intervention_count):
+            full_values = tuple(full_derivatives[outcome_index][intervention_index])
+            half_values = tuple(half_derivatives[outcome_index][intervention_index])
+            a_hat_full = statistics.fmean(full_values)
+            se_full = standard_error(full_values)
+            a_hat_half = statistics.fmean(half_values)
+            se_half = standard_error(half_values)
+            discrepancy = abs(a_hat_full - a_hat_half) / max(
+                abs(a_hat_half), pilot.useful_response_magnitude_threshold
+            )
+            useful = (
+                max(abs(a_hat_full), abs(a_hat_half)) >= pilot.useful_response_magnitude_threshold
+            )
+            if useful:
+                useful_columns.add(intervention_index)
+            sign_agreement_value = sign_agreement(full_values)
+            entries.append(
+                PilotEntry(
+                    outcome_index,
+                    intervention_index,
+                    a_hat_full,
+                    se_full,
+                    a_hat_half,
+                    se_half,
+                    discrepancy,
+                    useful,
+                    sign_agreement_value,
+                )
+            )
+    reasons: list[str] = []
+    if not all_finite:
+        reasons.append("non-finite shadow state or loss")
+    useful_entries = tuple(entry for entry in entries if entry.useful)
+    if not useful_entries:
+        reasons.append("no useful entries")
+    else:
+        if (
+            statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
+            > pilot.relative_derivative_discrepancy_ceiling
+        ):
+            reasons.append("median derivative discrepancy above ceiling")
+        if (
+            statistics.median(tuple(entry.sign_agreement for entry in useful_entries))
+            < pilot.sign_agreement_minimum
+        ):
+            reasons.append("median sign agreement below minimum")
+        if len(useful_columns) < pilot.minimum_useful_intervention_columns:
+            reasons.append("too few useful intervention columns")
+    if useful_entries:
+        score = statistics.median(
+            tuple(
+                abs(entry.a_hat_full) / (entry.se_full + pilot.numerical_floor)
+                for entry in useful_entries
+            )
+        ) - pilot.curvature_penalty_coefficient * statistics.median(
+            tuple(entry.derivative_discrepancy for entry in useful_entries)
+        )
+    else:
+        score = math.nan
+    return CandidateResult(
+        candidate,
+        tuple(entries),
+        eligible=not reasons,
+        ineligibility_reasons=tuple(reasons),
+        pilot_score=score,
+    )
+
+
+def standard_error(values: tuple[float, ...]) -> float:
+    if len(values) < 2:
+        return math.nan
+    return statistics.stdev(values) / math.sqrt(len(values))
+
+
+def sign_agreement(values: tuple[float, ...]) -> float:
+    if not values:
+        return 0.0
+    positive = sum(1 for value in values if value > 0)
+    negative = sum(1 for value in values if value < 0)
+    return max(positive, negative) / len(values)

@@ -6,7 +6,7 @@ from fedorbit.config.loading import repository_root
 
 _OBSERVED_FACT_KEY_PATTERN = re.compile(
     r"(^|_)(observed|row_count|file_count|sha256|checksum|timestamp_range|"
-    r"duplicate_count|measurement|runtime_seconds|peak_memory|created_at)(_|$)",
+    r"duplicate_count|measurement|created_at)(_|$)",
     re.IGNORECASE,
 )
 

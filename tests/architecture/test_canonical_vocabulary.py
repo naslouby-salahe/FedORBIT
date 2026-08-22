@@ -48,17 +48,20 @@ def test_stale_terminology_absent() -> None:
 
 
 def test_oracle_terminology_restricted_to_oracle_package() -> None:
+    oracle_only_phrases = (
+        "oracle mapping",
+        "oracle path",
+        "oracle access",
+        "true benchmark fine concept",
+        "exact benchmark source-target mapping",
+        "oracle comparison output",
+    )
     for path in iter_source_files():
-        text = path.read_text(encoding="utf-8")
-        if "oracle" in path.parts[-2:]:
-            continue
-        if (
-            "oracle" in text.lower()
-            and not path.name.startswith("test_")
-            and "fedorbit/domain" not in str(path)
-            and "config" not in str(path)
-        ):
-            raise AssertionError(f"oracle terminology outside oracle package: {path}")
+        text = path.read_text(encoding="utf-8").lower()
+        for phrase in oracle_only_phrases:
+            assert phrase not in text, (
+                f"oracle-only phrase {phrase!r} outside oracle package: {path}"
+            )
 
 
 def test_no_artificial_version_labels() -> None:

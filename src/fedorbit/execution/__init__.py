@@ -7,11 +7,11 @@ from fedorbit.execution.semantics import CellDecision, ExecutionSemantics, Seman
 
 __all__ = [
     "EXECUTION_LAYERS",
+    "PROGRAMME_PREREQUISITES",
     "CellDecision",
     "ExecutionReadiness",
     "ExecutionSemantics",
     "NotReadyError",
-    "PROGRAMME_PREREQUISITES",
     "PrerequisiteState",
     "ReadinessError",
     "RecoveryBoundary",

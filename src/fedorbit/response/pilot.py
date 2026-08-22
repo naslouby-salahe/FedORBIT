@@ -109,39 +109,47 @@ def _pair_derivatives(
     half_values: list[float] = []
     all_finite = True
     for outcome_index in range(outcome_count):
-        positive, negative, baseline = full_risks[outcome_index]
-        positive_half, negative_half, baseline_half = half_risks[outcome_index]
-        full = paired_shadow_derivative(
-            positive,
-            negative,
-            baseline,
+        full, half, finite = _outcome_derivatives(
+            full_risks[outcome_index],
+            half_risks[outcome_index],
             full_settings.epsilon,
-            pilot.numerical_floor,
-        )
-        half = paired_shadow_derivative(
-            positive_half,
-            negative_half,
-            baseline_half,
             half_settings.epsilon,
             pilot.numerical_floor,
         )
-        if not all(
-            math.isfinite(value)
-            for value in (
-                positive,
-                negative,
-                baseline,
-                positive_half,
-                negative_half,
-                baseline_half,
-                full,
-                half,
-            )
-        ):
+        if not finite:
             all_finite = False
         full_values.append(full)
         half_values.append(half)
     return PairDerivatives(tuple(full_values), tuple(half_values), all_finite)
+
+
+def _outcome_derivatives(
+    full_risks: tuple[float, float, float],
+    half_risks: tuple[float, float, float],
+    full_epsilon: float,
+    half_epsilon: float,
+    numerical_floor: float,
+) -> tuple[float, float, bool]:
+    positive, negative, baseline = full_risks
+    positive_half, negative_half, baseline_half = half_risks
+    full = paired_shadow_derivative(positive, negative, baseline, full_epsilon, numerical_floor)
+    half = paired_shadow_derivative(
+        positive_half, negative_half, baseline_half, half_epsilon, numerical_floor
+    )
+    finite = all(
+        math.isfinite(value)
+        for value in (
+            positive,
+            negative,
+            baseline,
+            positive_half,
+            negative_half,
+            baseline_half,
+            full,
+            half,
+        )
+    )
+    return full, half, finite
 
 
 def run_source_response_pilot(

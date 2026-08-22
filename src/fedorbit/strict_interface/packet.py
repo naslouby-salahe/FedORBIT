@@ -55,6 +55,9 @@ class SourcePacket:
     response_configuration_sha256: str
     packet_integrity_sha256: str
     packet_validity_state: str
+    preprocessing_state_sha256: str = ""
+    transfer_node_manifest_sha256: str = ""
+    response_seed: int = 0
     technical_creation_timestamp: str = ""
     forbidden_content: tuple[str, ...] = field(default_factory=tuple)
 
@@ -74,6 +77,9 @@ class SourcePacket:
             "source_checkpoint_sha256": self.source_checkpoint_sha256,
             "response_configuration_sha256": self.response_configuration_sha256,
             "packet_validity_state": self.packet_validity_state,
+            "preprocessing_state_sha256": self.preprocessing_state_sha256,
+            "transfer_node_manifest_sha256": self.transfer_node_manifest_sha256,
+            "response_seed": self.response_seed,
         }
         return canonical_json(values)
 

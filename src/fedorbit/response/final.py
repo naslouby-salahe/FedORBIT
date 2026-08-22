@@ -159,38 +159,31 @@ def build_source_packet(
     source_checkpoint_sha256: str,
     response_configuration_sha256: str,
     creation_timestamp: str,
+    preprocessing_state_sha256: str = "",
+    transfer_node_manifest_sha256: str = "",
+    response_seed: int = 0,
 ) -> SourcePacket:
-    packet = SourcePacket(
-        anonymous_fine_node_ids=anonymous_fine_node_ids,
-        exposed_coarse_group_id=exposed_coarse_group_id,
-        L=tuple(entry.lower for entry in estimate.entries),
-        U=tuple(entry.upper for entry in estimate.entries),
-        per_node_train_support=per_node_train_support,
-        per_node_meta_support=per_node_meta_support,
-        per_node_effective_replicate_count=per_node_effective_replicate_count,
-        packet_schema_metadata=RESPONSE_PACKET_SCHEMA,
-        source_checkpoint_sha256=source_checkpoint_sha256,
-        response_configuration_sha256=response_configuration_sha256,
-        packet_integrity_sha256="",
-        packet_validity_state=_validity_state(estimate),
-        technical_creation_timestamp=creation_timestamp,
-    )
-    integrity = packet.compute_integrity_sha256()
-    return SourcePacket(
-        anonymous_fine_node_ids=anonymous_fine_node_ids,
-        exposed_coarse_group_id=exposed_coarse_group_id,
-        L=tuple(entry.lower for entry in estimate.entries),
-        U=tuple(entry.upper for entry in estimate.entries),
-        per_node_train_support=per_node_train_support,
-        per_node_meta_support=per_node_meta_support,
-        per_node_effective_replicate_count=per_node_effective_replicate_count,
-        packet_schema_metadata=RESPONSE_PACKET_SCHEMA,
-        source_checkpoint_sha256=source_checkpoint_sha256,
-        response_configuration_sha256=response_configuration_sha256,
-        packet_integrity_sha256=integrity,
-        packet_validity_state=_validity_state(estimate),
-        technical_creation_timestamp=creation_timestamp,
-    )
+    def build(integrity: str) -> SourcePacket:
+        return SourcePacket(
+            anonymous_fine_node_ids=anonymous_fine_node_ids,
+            exposed_coarse_group_id=exposed_coarse_group_id,
+            L=tuple(entry.lower for entry in estimate.entries),
+            U=tuple(entry.upper for entry in estimate.entries),
+            per_node_train_support=per_node_train_support,
+            per_node_meta_support=per_node_meta_support,
+            per_node_effective_replicate_count=per_node_effective_replicate_count,
+            packet_schema_metadata=RESPONSE_PACKET_SCHEMA,
+            source_checkpoint_sha256=source_checkpoint_sha256,
+            response_configuration_sha256=response_configuration_sha256,
+            packet_integrity_sha256=integrity,
+            packet_validity_state=_validity_state(estimate),
+            preprocessing_state_sha256=preprocessing_state_sha256,
+            transfer_node_manifest_sha256=transfer_node_manifest_sha256,
+            response_seed=response_seed,
+            technical_creation_timestamp=creation_timestamp,
+        )
+
+    return build(build("").compute_integrity_sha256())
 
 
 def _validity_state(estimate: FinalResponseEstimate) -> str:

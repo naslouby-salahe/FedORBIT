@@ -47,6 +47,17 @@ class NetworkFlowClassifier(nn.Module):
         return self.classifier(hidden)
 
 
+def classifier_for_modality(
+    modality: str,
+    input_dim: int,
+    n_classes: int,
+    dropout_probability: float,
+) -> nn.Module:
+    if modality == "network":
+        return NetworkFlowClassifier(input_dim, n_classes, dropout_probability)
+    return HostClassifier(input_dim, n_classes, dropout_probability)
+
+
 class HostClassifier(nn.Module):
     def __init__(
         self,

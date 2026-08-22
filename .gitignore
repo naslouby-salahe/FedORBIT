@@ -206,6 +206,10 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# FedORBIT generated computational workspace and manuscript evidence
+/outputs/
+/results/
+
 # PyPI configuration file
 .pypirc
 

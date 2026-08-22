@@ -4,7 +4,7 @@
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Immutable typed `configs/fedorbit.yaml` contract with single-source scientific authority.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 176 total (176 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -303,7 +303,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Validated runtime/environment/reference-hardware and reporting-precision configuration.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 41 total (41 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -485,7 +485,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Typed registered experiment, metric, generator, and multi-source configuration catalogue.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 69 total (69 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -722,7 +722,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Typed execution-policy configuration for kill rules, retries, roots, and canonical runtime layout.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 37 total (37 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -896,7 +896,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Roadmap-mandated repository tree, dependency boundaries, and structural enforcement tests.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 434 total (434 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -1443,7 +1443,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M01 — Authoritative Scientific Contract and Repository Foundation
 - **Primary deliverable:** Nonclaim test/smoke boundary and executable M01 scientific-contract readiness gates.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 17 total (17 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -1586,7 +1586,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Deterministic seed namespaces, replay behavior, and reproducibility/environment identity.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 59 total (50 implementation-bearing; 9 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -1821,7 +1821,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Reusable-artifact and completion manifests with dependency-aware immutable artifact reuse.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 44 total (44 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -2017,7 +2017,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Typed failure states, retry behavior, and scientific/infrastructure failure handling.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 28 total (28 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -2174,7 +2174,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Roadmap-defined public CLI execution surface with validated idempotent status/overwrite behavior.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 70 total (70 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -2417,7 +2417,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Semantic-cell execution graph with dependency fingerprints, staleness, invalidation, crash safety, and recovery.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 183 total (182 implementation-bearing; 1 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -2717,7 +2717,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Canonical computational workspace and validated artifact/provenance lifecycle.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 157 total (157 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -3141,7 +3141,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M02 — Deterministic Execution, Artifact, and Provenance Backbone
 - **Primary deliverable:** Layered restartable execution pipeline and M02 readiness verification.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 51 total (51 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -3353,7 +3353,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M03 — Data Preparation and Strict Resource Interface
 - **Primary deliverable:** Whitelisted strict-resource interface with dynamic access validation and readiness gates.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 87 total (86 implementation-bearing; 1 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -3643,7 +3643,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M03 — Data Preparation and Strict Resource Interface
 - **Primary deliverable:** Deterministic duplicate-safe chronological splitting and source/target transfer eligibility.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 30 total (30 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -3803,7 +3803,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M03 — Data Preparation and Strict Resource Interface
 - **Primary deliverable:** Immutable raw-data-backed dataset/client registry, hidden ontology, adapters, and observed-value validation.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 206 total (202 implementation-bearing; 4 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4136,7 +4136,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M03 — Data Preparation and Strict Resource Interface
 - **Primary deliverable:** Leakage-safe feature exclusion, duplicate hashing, and deterministic preprocessing pipeline.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 18 total (17 implementation-bearing; 1 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4273,7 +4273,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M03 — Data Preparation and Strict Resource Interface
 - **Primary deliverable:** Typed dataset, transfer-eligibility, and semantic-cell manifests with provenance.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 70 total (70 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4519,7 +4519,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Deterministic modality-specific classifiers, training loop, checkpoints, and training artifacts.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 48 total (48 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4725,7 +4725,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Registered base-model pilot and final class-weight/minibatch objective behavior.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 18 total (18 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4859,7 +4859,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Registered source-response estimator pilot and selection evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 20 total (20 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -4997,7 +4997,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Simultaneous response-band estimator and strict anonymous procedural-response packet.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 27 total (27 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5159,7 +5159,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Target-local response diagnostic computed only from permitted target-local evidence.
-- **Issue type:** Evaluation
+- **Issue type:** Evaluation / Validation
 - **Requirement coverage:** 3 total (3 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5263,7 +5263,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M04 — Local Models and Procedural Response Packets
 - **Primary deliverable:** Integrated §7 local-model and response-packet execution contract with zero-support and seed/resource behavior.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 22 total (22 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5410,7 +5410,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Typed formal problem objects and executable action/correspondence semantics preserving theorem assumptions.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 56 total (45 implementation-bearing; 11 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5640,7 +5640,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Roadmap-exact paired confirmation bootstrap logic and target-local optimizer-step budgets.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 28 total (28 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5800,7 +5800,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Exact sparse separator/master implementation with deterministic ties, work counters, and validity certificates.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 40 total (40 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -5996,7 +5996,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Generic exact-QAP truth/comparator backend with exactness and failure semantics.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 36 total (33 implementation-bearing; 3 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -6171,7 +6171,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Non-exact Dense-CCP fallback with deterministic starts, projection, CCP/master behavior, and scope labeling.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 52 total (46 implementation-bearing; 6 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -6385,7 +6385,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Roadmap-defined nonnegative target-importance vector construction.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 4 total (4 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -6492,7 +6492,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Deterministic multi-source source-proposal ranking, limits, and sequential selection.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 11 total (11 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -6613,7 +6613,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M05 — Robust Correspondence, Selection, and Confirmation Engine
 - **Primary deliverable:** Paired proposal confirmation, reject/accept behavior, TEST opening, and live assimilation.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 18 total (18 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -6750,7 +6750,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M06 — Comparator, Metric, and Statistical Evaluation Framework
 - **Primary deliverable:** Single canonical metric layer including map/action diagnostics and solver/confirmation/efficiency measures.
-- **Issue type:** Evaluation
+- **Issue type:** Evaluation / Validation
 - **Requirement coverage:** 82 total (79 implementation-bearing; 3 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -7030,7 +7030,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M06 — Comparator, Metric, and Statistical Evaluation Framework
 - **Primary deliverable:** Complete comparator/oracle catalogue with descriptive identities and matched checkpoint/compute/resource fairness.
-- **Issue type:** Comparator
+- **Issue type:** Comparator / Implementation
 - **Requirement coverage:** 71 total (71 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -7282,7 +7282,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M06 — Comparator, Metric, and Statistical Evaluation Framework
 - **Primary deliverable:** Predefined paired statistical framework, multiplicity families, equivalence/materiality, and insufficient-evidence behavior.
-- **Issue type:** Evaluation
+- **Issue type:** Evaluation / Validation
 - **Requirement coverage:** 147 total (142 implementation-bearing; 5 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -7698,7 +7698,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M06 — Comparator, Metric, and Statistical Evaluation Framework
 - **Primary deliverable:** Typed canonical evaluation/statistical result schemas and metadata.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 60 total (60 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -7920,7 +7920,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Registered synthetic/exhaustive/coupling/map/scalability generators with deterministic serialization.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 - **Requirement coverage:** 61 total (60 implementation-bearing; 1 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8148,7 +8148,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Enumerated pre-confirmatory experiment cells, canonical dependencies, and output exposure contracts.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 49 total (49 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8361,7 +8361,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Completed primitive/exhaustive exactness/coupling/map-bound validation evidence.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 31 total (31 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8524,7 +8524,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Dataset/resource readiness, base-model pilot, response-estimator pilot, and final band validation evidence.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 26 total (26 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8675,7 +8675,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Comparator/oracle correctness and exact-sparse benchmark evidence.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 20 total (20 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8817,7 +8817,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M07 — Pre-Confirmatory Validation and Solver Benchmarking
 - **Primary deliverable:** Synthetic/real coupling and unresolved-map controlled-world evidence with exact map-value boundaries.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 33 total (33 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -8994,7 +8994,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Registered mechanism ablations plus principal sparse-support alternatives and Dense-CCP sensitivity evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 22 total (22 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9142,7 +9142,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Reference-hardware solver scalability, active-image/LAP work counters, runtime, and efficiency evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 26 total (26 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9307,7 +9307,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Primary directed-pair confirmatory transfer and multi-source selection evidence under strict resources.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 28 total (28 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9468,7 +9468,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Confirmation-safety/portability and secondary cross-modality generalization evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 17 total (17 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9601,7 +9601,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Registered semantic-partition frontier and one-factor-at-a-time applicability boundary evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 36 total (36 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9770,7 +9770,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Packet-only recovery and controlled two-researcher map-availability audit evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 - **Requirement coverage:** 41 total (41 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -9969,7 +9969,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M08 — Confirmatory Transfer, Robustness, and Applicability Experiments
 - **Primary deliverable:** Canonical dependency/output/downstream-exposure map for all confirmatory and robustness experiments.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 - **Requirement coverage:** 30 total (30 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -10148,7 +10148,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M09 — Statistical Synthesis, Claim Adjudication, and Manuscript Evidence
 - **Primary deliverable:** Registered paired statistical synthesis and adjudication-ready evidence dependency outputs.
-- **Issue type:** Evaluation
+- **Issue type:** Evaluation / Validation
 - **Requirement coverage:** 27 total (27 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -10309,7 +10309,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M09 — Statistical Synthesis, Claim Adjudication, and Manuscript Evidence
 - **Primary deliverable:** Mechanical non-neutralizable kill/simplification rules over verified experiment evidence.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 67 total (46 implementation-bearing; 21 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -10543,7 +10543,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M09 — Statistical Synthesis, Claim Adjudication, and Manuscript Evidence
 - **Primary deliverable:** Claim-state engine preserving contribution scope, research questions, hypotheses, falsification boundaries, evidence sufficiency, and allowed wording.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 - **Requirement coverage:** 100 total (52 implementation-bearing; 48 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority
@@ -10852,7 +10852,7 @@ A category that genuinely does not apply must be recorded as `N/A — <reason>` 
 
 - **Milestone:** M09 — Statistical Synthesis, Claim Adjudication, and Manuscript Evidence
 - **Primary deliverable:** Precision-controlled manuscript-facing tables, figures, source data, and publication evidence from verified artifacts.
-- **Issue type:** Reporting
+- **Issue type:** Reporting / Validation
 - **Requirement coverage:** 50 total (50 implementation-bearing; 0 `NON_IMPLEMENTATION` governing constraints).
 
 ## Roadmap Authority

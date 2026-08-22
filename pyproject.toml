@@ -28,6 +28,8 @@ dev = [
     "ruff==0.16.4",
     "pyright==1.1.411",
     "nox>=2024.10.9",
+    "vulture>=2.14",
+    "deptry>=0.23",
 ]
 
 [project.scripts]
@@ -61,6 +63,10 @@ filterwarnings = ["error"]
 [tool.pyright]
 typeCheckingMode = "strict"
 include = ["src", "tests"]
+exclude = ["vulture_whitelist.py"]
 pythonVersion = "3.13"
 reportMissingTypeStubs = "none"
 reportMissingImports = "warning"
+
+[tool.deptry]
+per_rule_ignores = { DEP002 = ["numpy", "scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "typer", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }

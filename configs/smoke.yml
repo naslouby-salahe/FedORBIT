@@ -1,0 +1,4 @@
+fixture_seed: 0
+synthetic_instances_per_case: 2
+tiny_rows_per_class: 64
+tiny_optimizer_steps: 2

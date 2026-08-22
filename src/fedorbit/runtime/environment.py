@@ -4,7 +4,6 @@ import hashlib
 import importlib.metadata
 import json
 import platform
-import re
 import subprocess
 import tomllib
 from dataclasses import dataclass
@@ -278,7 +277,10 @@ def reference_gpu_matches(config: FedorbitConfig) -> bool:
     reference = config.runtime.reference_model_gpu
     if hardware.gpu_name is None or hardware.gpu_memory_bytes is None:
         return False
-    normalized_reference = re.sub(r"\s+\d+\s*GB$", "", reference).strip()
+    reference_parts = reference.split()
+    if len(reference_parts) >= 2 and reference_parts[-1] == "GB" and reference_parts[-2].isdigit():
+        reference_parts = reference_parts[:-2]
+    normalized_reference = " ".join(reference_parts)
     name_matches = hardware.gpu_name.strip() == normalized_reference
     memory_gib = hardware.gpu_memory_bytes / (1024**3)
     memory_matches = 15.0 <= memory_gib <= 17.0

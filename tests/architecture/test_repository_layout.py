@@ -64,7 +64,15 @@ REQUIRED_CONFIG_FILES = {
 
 
 def test_repository_root_entries_are_allowed() -> None:
-    machine_local = {".venv", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".nox", "__pycache__"}
+    machine_local = {
+        ".venv",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        ".nox",
+        "__pycache__",
+        ".scannerwork",
+    }
     actual = {
         entry.name
         for entry in REPOSITORY_ROOT.iterdir()

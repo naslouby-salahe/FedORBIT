@@ -56,20 +56,23 @@ def test_load_rejects_non_mapping_document(tmp_path: Path) -> None:
 
 def test_load_rejects_unknown_top_level_field(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value("invented_section", value={"value": 1})
+    payload = mutable_config.as_dict()
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config.as_dict())
+        FedorbitConfig.model_validate(payload)
 
 
 def test_load_rejects_unknown_nested_field(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value("scientific", "action", "invented_parameter", value=1)
+    payload = mutable_config.as_dict()
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config.as_dict())
+        FedorbitConfig.model_validate(payload)
 
 
 def test_load_rejects_wrong_type(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value("scientific", "action", "principal_sparse_support", value="two")
+    payload = mutable_config.as_dict()
     with pytest.raises(ValidationError):
-        FedorbitConfig.model_validate(mutable_config.as_dict())
+        FedorbitConfig.model_validate(payload)
 
 
 def test_canonical_json_is_deterministic(fedorbit_config: FedorbitConfig) -> None:

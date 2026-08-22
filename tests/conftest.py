@@ -25,6 +25,6 @@ def config_dict() -> dict[str, object]:
     return cast(dict[str, object], raw)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mutable_config(config_dict: dict[str, object]) -> ConfigDocument:
     return ConfigDocument(copy.deepcopy(config_dict))

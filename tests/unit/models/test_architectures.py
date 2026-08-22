@@ -124,7 +124,7 @@ def test_macro_cross_entropy_hand_solvable() -> None:
     logits = torch.tensor([[2.0, 0.0], [0.0, 2.0]])
     targets = torch.tensor([0, 1])
     weights = torch.tensor([1.0, 1.0])
-    metric = macro_cross_entropy(logits, targets, weights, numerical_floor=1e-12)
+    metric = macro_cross_entropy(logits, targets, weights, probability_log_floor=1e-12)
     expected = -(float(torch.log(torch.softmax(torch.tensor([2.0, 0.0]), dim=0)[0])))
     assert metric == expected
 
@@ -132,8 +132,12 @@ def test_macro_cross_entropy_hand_solvable() -> None:
 def test_macro_cross_entropy_weights_classes() -> None:
     logits = torch.tensor([[2.0, 0.0], [2.0, 0.0], [0.0, 2.0]])
     targets = torch.tensor([0, 0, 1])
-    equal = macro_cross_entropy(logits, targets, torch.tensor([1.0, 1.0]), numerical_floor=1e-12)
-    weighted = macro_cross_entropy(logits, targets, torch.tensor([2.0, 1.0]), numerical_floor=1e-12)
+    equal = macro_cross_entropy(
+        logits, targets, torch.tensor([1.0, 1.0]), probability_log_floor=1e-12
+    )
+    weighted = macro_cross_entropy(
+        logits, targets, torch.tensor([2.0, 1.0]), probability_log_floor=1e-12
+    )
     assert weighted != equal
 
 

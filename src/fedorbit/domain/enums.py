@@ -6,6 +6,8 @@ from enum import StrEnum
 class ClientRole(StrEnum):
     PRIMARY = "primary"
     SECONDARY = "secondary"
+    SOURCE = "source"
+    TARGET = "target"
 
 
 class DatasetId(StrEnum):

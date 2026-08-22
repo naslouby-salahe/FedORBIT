@@ -102,7 +102,7 @@ class DatasetAdapter:
             else:
                 role = role_for_field(column)
                 if role == BEHAVIORAL_CATEGORICAL_ROLE and observed_value_samples is not None:
-                    role = infer_feature_type(column, observed_value_samples.get(column, ()))
+                    role = infer_feature_type(observed_value_samples.get(column, ()))
                 roles[column] = role
         order_source = (
             self._contract.official_feature_order

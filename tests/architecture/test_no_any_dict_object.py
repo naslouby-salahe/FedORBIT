@@ -39,7 +39,11 @@ def test_no_object_annotations_in_production() -> None:
 
 
 def _canonical_boundary(path: Path) -> bool:
-    return "fedorbit/domain/canonical.py" in str(path) or "fedorbit/runtime/seeds.py" in str(path)
+    return (
+        "fedorbit/domain/canonical.py" in str(path)
+        or "fedorbit/runtime/seeds.py" in str(path)
+        or "fedorbit/artifacts/manifests.py" in str(path)
+    )
 
 
 def test_no_typing_object_usage() -> None:

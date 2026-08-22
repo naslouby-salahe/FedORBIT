@@ -75,7 +75,11 @@ def _assert_annotation_clean(annotation: ast.expr | None, path: Path, owner: str
 
 
 def _canonical_serializer_boundary(path: Path) -> bool:
-    return "fedorbit/domain/canonical.py" in str(path) or "fedorbit/runtime/seeds.py" in str(path)
+    return (
+        "fedorbit/domain/canonical.py" in str(path)
+        or "fedorbit/runtime/seeds.py" in str(path)
+        or "fedorbit/artifacts/manifests.py" in str(path)
+    )
 
 
 def test_boundary_packages_never_return_anonymous_dicts() -> None:

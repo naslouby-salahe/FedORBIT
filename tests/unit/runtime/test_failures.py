@@ -70,8 +70,9 @@ def test_algorithmic_failures_classified() -> None:
 
 
 def test_unregistered_failure_rejected() -> None:
+    unregistered = ValueError("unregistered")
     with pytest.raises(TypeError):
-        classify_failure(ValueError("unregistered"))
+        classify_failure(unregistered)
 
 
 def test_retry_exactly_twice_after_initial_attempt(

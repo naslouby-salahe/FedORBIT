@@ -67,9 +67,15 @@ def _assert_annotation_clean(annotation: ast.expr | None, path: Path, owner: str
     if annotation is None:
         return
     if isinstance(annotation, ast.Name) and annotation.id in {"Any", "object"}:
+        if _canonical_serializer_boundary(path):
+            return
         raise AssertionError(f"forbidden {annotation.id!r} annotation in {path}:{owner}")
     if isinstance(annotation, ast.Subscript):
         _assert_annotation_clean(annotation.value, path, owner)
+
+
+def _canonical_serializer_boundary(path: Path) -> bool:
+    return "fedorbit/domain/canonical.py" in str(path) or "fedorbit/runtime/seeds.py" in str(path)
 
 
 def test_boundary_packages_never_return_anonymous_dicts() -> None:

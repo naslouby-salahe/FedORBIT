@@ -69,4 +69,4 @@ reportMissingTypeStubs = "none"
 reportMissingImports = "warning"
 
 [tool.deptry]
-per_rule_ignores = { DEP002 = ["numpy", "scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "typer", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }
+per_rule_ignores = { DEP002 = ["scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "typer", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }

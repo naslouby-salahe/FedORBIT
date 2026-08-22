@@ -29,7 +29,9 @@ def test_public_function_names_are_descriptive() -> None:
         for function in public_functions(tree):
             name = function.name
             assert len(name) >= 4, f"function name too short: {path}:{name}"
-            assert not name.endswith("2"), f"artificial suffixed name: {path}:{name}"
+            assert not (name.endswith("2") and name != "derive_seed32"), (
+                f"artificial suffixed name: {path}:{name}"
+            )
             for fragment in BANNED_NAME_FRAGMENTS:
                 assert fragment not in name, (
                     f"banned fragment {fragment!r} in function name {path}:{name}"

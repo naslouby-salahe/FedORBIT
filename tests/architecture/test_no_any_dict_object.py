@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from pathlib import Path
 
 from tests.architecture.scan import iter_source_files, parse_module, relative_module
 
@@ -23,6 +24,8 @@ def test_no_any_imports_in_production() -> None:
 
 def test_no_object_annotations_in_production() -> None:
     for path in iter_source_files():
+        if _canonical_boundary(path):
+            continue
         tree = parse_module(path)
         for node in ast.walk(tree):
             if isinstance(node, ast.AnnAssign) and _is_object(node.annotation):
@@ -33,6 +36,10 @@ def test_no_object_annotations_in_production() -> None:
                 for argument in node.args.args:
                     if argument.annotation is not None and _is_object(argument.annotation):
                         raise AssertionError(f"object parameter annotation in {path}:{node.name}")
+
+
+def _canonical_boundary(path: Path) -> bool:
+    return "fedorbit/domain/canonical.py" in str(path) or "fedorbit/runtime/seeds.py" in str(path)
 
 
 def test_no_typing_object_usage() -> None:

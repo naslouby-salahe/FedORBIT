@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.models import FedorbitConfig, SourceResponsePilotConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.shadows import (
     ShadowData,
@@ -65,6 +65,83 @@ class CandidateResult:
 
 class ResponsePilotError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class PairDerivatives:
+    full_values: tuple[float, ...]
+    half_values: tuple[float, ...]
+    derivatives_finite: bool
+
+
+def _pair_derivatives(
+    config: FedorbitConfig,
+    model: torch.nn.Module,
+    checkpoint: BaseCheckpoint,
+    shadow_data: ShadowData,
+    full_settings: ShadowSettings,
+    half_settings: ShadowSettings,
+    pair_seed: int,
+    outcome_count: int,
+    pilot: SourceResponsePilotConfig,
+) -> PairDerivatives:
+    full_risks = run_shadow_pair(
+        config,
+        model,
+        checkpoint.state_dict,
+        checkpoint.optimizer_state,
+        checkpoint.rng_state,
+        shadow_data,
+        full_settings,
+        pair_seed,
+    )
+    half_risks = run_shadow_pair(
+        config,
+        model,
+        checkpoint.state_dict,
+        checkpoint.optimizer_state,
+        checkpoint.rng_state,
+        shadow_data,
+        half_settings,
+        pair_seed,
+    )
+    full_values: list[float] = []
+    half_values: list[float] = []
+    all_finite = True
+    for outcome_index in range(outcome_count):
+        positive, negative, baseline = full_risks[outcome_index]
+        positive_half, negative_half, baseline_half = half_risks[outcome_index]
+        full = paired_shadow_derivative(
+            positive,
+            negative,
+            baseline,
+            full_settings.epsilon,
+            pilot.numerical_floor,
+        )
+        half = paired_shadow_derivative(
+            positive_half,
+            negative_half,
+            baseline_half,
+            half_settings.epsilon,
+            pilot.numerical_floor,
+        )
+        if not all(
+            math.isfinite(value)
+            for value in (
+                positive,
+                negative,
+                baseline,
+                positive_half,
+                negative_half,
+                baseline_half,
+                full,
+                half,
+            )
+        ):
+            all_finite = False
+        full_values.append(full)
+        half_values.append(half)
+    return PairDerivatives(tuple(full_values), tuple(half_values), all_finite)
 
 
 def run_source_response_pilot(
@@ -157,66 +234,29 @@ def _evaluate_candidate(
                 data.learning_rate,
                 data.weight_decay,
             )
-            full_risks = run_shadow_pair(
-                config,
-                model,
-                checkpoint.state_dict,
-                checkpoint.optimizer_state,
-                checkpoint.rng_state,
-                shadow_data,
-                full_settings,
-                pair_seed,
-            )
             half_settings = ShadowSettings(
                 candidate.intervention_magnitude / 2,
                 candidate.optimizer_step_horizon,
                 data.learning_rate,
                 data.weight_decay,
             )
-            half_risks = run_shadow_pair(
+            pair_derivatives = _pair_derivatives(
                 config,
                 model,
-                checkpoint.state_dict,
-                checkpoint.optimizer_state,
-                checkpoint.rng_state,
+                checkpoint,
                 shadow_data,
+                full_settings,
                 half_settings,
                 pair_seed,
+                outcome_count,
+                pilot,
             )
+            if not pair_derivatives.derivatives_finite:
+                all_finite = False
             for outcome_index in range(outcome_count):
-                positive, negative, baseline = full_risks[outcome_index]
-                positive_half, negative_half, baseline_half = half_risks[outcome_index]
-                full = paired_shadow_derivative(
-                    positive,
-                    negative,
-                    baseline,
-                    candidate.intervention_magnitude,
-                    pilot.numerical_floor,
-                )
-                half = paired_shadow_derivative(
-                    positive_half,
-                    negative_half,
-                    baseline_half,
-                    candidate.intervention_magnitude / 2,
-                    pilot.numerical_floor,
-                )
-                if not all(
-                    math.isfinite(value)
-                    for value in (
-                        positive,
-                        negative,
-                        baseline,
-                        positive_half,
-                        negative_half,
-                        baseline_half,
-                        full,
-                        half,
-                    )
-                ):
-                    all_finite = False
                 entry_index = outcome_index * intervention_count + intervention_index
-                full_series[entry_index].values.append(full)
-                half_series[entry_index].values.append(half)
+                full_series[entry_index].values.append(pair_derivatives.full_values[outcome_index])
+                half_series[entry_index].values.append(pair_derivatives.half_values[outcome_index])
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):

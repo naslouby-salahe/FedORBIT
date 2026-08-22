@@ -98,7 +98,8 @@ def test_host_architecture_order() -> None:
     assert isinstance(blocks[7], nn.Linear)
     assert blocks[7].out_features == 48
     assert isinstance(blocks[8], nn.ReLU)
-    assert isinstance(blocks[9], nn.Linear) and blocks[9].out_features == 4
+    assert isinstance(blocks[9], nn.Linear)
+    assert blocks[9].out_features == 4
 
 
 def test_host_batch_norm_parameters() -> None:

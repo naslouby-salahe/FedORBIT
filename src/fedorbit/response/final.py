@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.models import FedorbitConfig, SourceResponseFinalConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.bootstrap import max_t_critical_value
 from fedorbit.response.pilot import DerivativeSeries, PilotData
@@ -63,43 +63,20 @@ def estimate_final_response(
         for outcome in range(outcome_count)
         for intervention in range(intervention_count)
     ]
-    all_finite = True
-    for replicate in range(replicate_count):
-        for intervention_index, concept_classes in enumerate(intervention_classes):
-            shadow_data = ShadowData(
-                data.train_features,
-                data.train_targets,
-                data.meta_features,
-                data.meta_targets,
-                concept_classes,
-                data.outcome_native_class_sets,
-                data.base_class_weights,
-            )
-            risks = run_shadow_pair(
-                config,
-                model,
-                checkpoint.state_dict,
-                checkpoint.optimizer_state,
-                checkpoint.rng_state,
-                shadow_data,
-                settings,
-                seed + replicate * (intervention_count + 1) + intervention_index,
-            )
-            for outcome_index in range(outcome_count):
-                positive, negative, baseline = risks[outcome_index]
-                derivative = paired_shadow_derivative(
-                    positive,
-                    negative,
-                    baseline,
-                    settings.epsilon,
-                    final.response_risk_denominator_floor,
-                )
-                if not all(
-                    math.isfinite(value) for value in (positive, negative, baseline, derivative)
-                ):
-                    all_finite = False
-                entry_index = outcome_index * intervention_count + intervention_index
-                series[entry_index].values.append(derivative)
+    all_finite = _collect_final_derivatives(
+        config,
+        model,
+        checkpoint,
+        data,
+        intervention_classes,
+        settings,
+        seed,
+        replicate_count,
+        outcome_count,
+        intervention_count,
+        final,
+        series,
+    )
     if not all_finite:
         raise FinalResponseError("non-finite shadow state or loss in final response estimation")
     entry_derivatives = tuple(tuple(entry.values) for entry in series)
@@ -144,6 +121,60 @@ def estimate_final_response(
         and ratio <= final.median_band_width_to_median_absolute_mean_response_maximum
     )
     return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), ratio, stable)
+
+
+def _collect_final_derivatives(
+    config: FedorbitConfig,
+    model: torch.nn.Module,
+    checkpoint: BaseCheckpoint,
+    data: PilotData,
+    intervention_classes: tuple[tuple[int, ...], ...],
+    settings: ShadowSettings,
+    seed: int,
+    replicate_count: int,
+    outcome_count: int,
+    intervention_count: int,
+    final: SourceResponseFinalConfig,
+    series: list[DerivativeSeries],
+) -> bool:
+    all_finite = True
+    for replicate in range(replicate_count):
+        for intervention_index, concept_classes in enumerate(intervention_classes):
+            shadow_data = ShadowData(
+                data.train_features,
+                data.train_targets,
+                data.meta_features,
+                data.meta_targets,
+                concept_classes,
+                data.outcome_native_class_sets,
+                data.base_class_weights,
+            )
+            risks = run_shadow_pair(
+                config,
+                model,
+                checkpoint.state_dict,
+                checkpoint.optimizer_state,
+                checkpoint.rng_state,
+                shadow_data,
+                settings,
+                seed + replicate * (intervention_count + 1) + intervention_index,
+            )
+            for outcome_index in range(outcome_count):
+                positive, negative, baseline = risks[outcome_index]
+                derivative = paired_shadow_derivative(
+                    positive,
+                    negative,
+                    baseline,
+                    settings.epsilon,
+                    final.response_risk_denominator_floor,
+                )
+                if not all(
+                    math.isfinite(value) for value in (positive, negative, baseline, derivative)
+                ):
+                    all_finite = False
+                entry_index = outcome_index * intervention_count + intervention_index
+                series[entry_index].values.append(derivative)
+    return all_finite
 
 
 def build_source_packet(

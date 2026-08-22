@@ -128,4 +128,4 @@ def is_missing_token(token: str, categorical: bool) -> bool:
 
 
 def numeric_zero_is_not_missing(value: float) -> bool:
-    return not math.isnan(value) and value == 0.0
+    return not math.isnan(value) and math.isclose(value, 0.0)

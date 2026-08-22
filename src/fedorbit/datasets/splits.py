@@ -19,9 +19,7 @@ def interval_edges(config: FedorbitConfig) -> tuple[tuple[Split, float, float], 
     return tuple(edges)
 
 
-def split_for_duplicate_group(
-    config: FedorbitConfig, midpoint_fraction: float, split_seed: int
-) -> Split:
+def split_for_duplicate_group(config: FedorbitConfig, midpoint_fraction: float) -> Split:
     if not 0.0 <= midpoint_fraction <= 1.0:
         raise SplitError(f"midpoint fraction outside [0, 1]: {midpoint_fraction}")
     for split, lower, upper in interval_edges(config):
@@ -39,10 +37,6 @@ def duplicate_group_midpoint_fraction(
 def assign_duplicate_groups_chronologically(
     config: FedorbitConfig,
     duplicate_group_midpoints: tuple[tuple[str, float], ...],
-    split_seed: int,
 ) -> dict[str, Split]:
     ordered = sorted(duplicate_group_midpoints, key=lambda pair: pair[1])
-    return {
-        group_id: split_for_duplicate_group(config, midpoint, split_seed)
-        for group_id, midpoint in ordered
-    }
+    return {group_id: split_for_duplicate_group(config, midpoint) for group_id, midpoint in ordered}

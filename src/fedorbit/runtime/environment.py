@@ -205,18 +205,22 @@ class LockfileSummary:
         return self.hashed_package_count == len(self.package_names)
 
 
-def _package_has_hash(package: dict[str, object]) -> bool:
+LockfileEntry = dict[str, str | dict[str, str] | list[dict[str, str]]]
+
+
+SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"})
+
+
+def _package_has_hash(package: LockfileEntry) -> bool:
     source = package.get("source")
-    if isinstance(source, dict) and any(
-        marker in source for marker in ("editable", "path", "git", "url")
-    ):
+    if isinstance(source, dict) and any(marker in source for marker in SOURCE_MARKERS):
         return True
     sdist = package.get("sdist")
     if isinstance(sdist, dict) and "hash" in sdist:
         return True
     wheels = package.get("wheels")
     if isinstance(wheels, list):
-        for wheel in cast(list[dict[str, object]], wheels):
+        for wheel in wheels:
             if "hash" in wheel:
                 return True
     return False
@@ -233,7 +237,7 @@ def validate_lockfile(
     raw_packages = lock.get("package", [])
     if not isinstance(raw_packages, list) or not raw_packages:
         raise ValueError("uv.lock contains no package entries")
-    packages = cast(list[dict[str, object]], raw_packages)
+    packages = cast(list[LockfileEntry], raw_packages)
     package_names: list[str] = []
     locked_versions: dict[str, str] = {}
     for package in packages:

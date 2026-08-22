@@ -29,7 +29,7 @@ class SemanticCell:
     seed: int | None = None
 
     def identity_json(self, relevance: frozenset[str]) -> str:
-        present: dict[str, object] = {
+        present: dict[str, str | int | float | list[str] | None] = {
             "dataset": self.dataset.value if self.dataset is not None else None,
             "source_client": self.source_client.value if self.source_client is not None else None,
             "target_client": self.target_client.value if self.target_client is not None else None,
@@ -43,7 +43,9 @@ class SemanticCell:
                 self.directed_pair.source.value,
                 self.directed_pair.target.value,
             ]
-        values: dict[str, object] = {"experiment": self.experiment.value}
+        values: dict[str, str | int | float | list[str] | None] = {
+            "experiment": self.experiment.value
+        }
         for coordinate in relevance:
             value = present.get(coordinate)
             if value is not None:

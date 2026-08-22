@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.adapters import (
     BEHAVIORAL_CATEGORICAL_ROLE,
     BEHAVIORAL_NUMERIC_ROLE,
@@ -98,8 +100,12 @@ EDGE_COLUMNS = (
 )
 
 
+def _fedorbit_config() -> FedorbitConfig:
+    return load_fedorbit_config()
+
+
 def test_edge_adapter_resolves_real_schema() -> None:
-    adapter = edge_iiotset_adapter()
+    adapter = edge_iiotset_adapter(_fedorbit_config())
     schema = adapter.resolve_schema(
         observed_columns=EDGE_COLUMNS,
         timestamp_parse_success_fraction=1.0,
@@ -131,7 +137,7 @@ def test_edge_exclusion_sets_exact() -> None:
 
 
 def test_ton_adapter_resolves_real_schema() -> None:
-    adapter = ton_iot_adapter(DatasetId.TON_IOT_WINDOWS10_HOST)
+    adapter = ton_iot_adapter(DatasetId.TON_IOT_WINDOWS10_HOST, _fedorbit_config())
     schema = adapter.resolve_schema(
         observed_columns=("ts", "src_ip", "label", "type", "Processor_pct_User_Time"),
         timestamp_parse_success_fraction=1.0,
@@ -144,7 +150,7 @@ def test_ton_adapter_resolves_real_schema() -> None:
 
 
 def test_timestamp_alias_requires_parse_success() -> None:
-    adapter = edge_iiotset_adapter()
+    adapter = edge_iiotset_adapter(_fedorbit_config())
     with pytest.raises(SchemaError):
         adapter.resolve_schema(
             observed_columns=EDGE_COLUMNS,
@@ -165,7 +171,7 @@ def test_ambiguous_timestamp_rejected() -> None:
 
 
 def test_missing_label_field_rejected() -> None:
-    adapter = ton_iot_adapter(DatasetId.TON_IOT_NETWORK)
+    adapter = ton_iot_adapter(DatasetId.TON_IOT_NETWORK, _fedorbit_config())
     with pytest.raises(SchemaError):
         adapter.resolve_schema(
             observed_columns=("ts", "label", "type_missing"),
@@ -175,10 +181,14 @@ def test_missing_label_field_rejected() -> None:
 
 
 def test_registry_covers_all_clients() -> None:
-    adapters = registered_adapters()
+    config = _fedorbit_config()
+    adapters = registered_adapters(config)
     assert set(adapters) == set(DatasetId)
-    assert adapter_for(DatasetId.EDGE_IIOTSET_NETWORK).dataset_id == DatasetId.EDGE_IIOTSET_NETWORK
-    assert adapter_for(DatasetId.TON_IOT_NETWORK).dataset_id == DatasetId.TON_IOT_NETWORK
+    assert (
+        adapter_for(DatasetId.EDGE_IIOTSET_NETWORK, _fedorbit_config()).dataset_id
+        == DatasetId.EDGE_IIOTSET_NETWORK
+    )
+    assert adapter_for(DatasetId.TON_IOT_NETWORK, config).dataset_id == DatasetId.TON_IOT_NETWORK
 
 
 def test_role_for_field_markers() -> None:

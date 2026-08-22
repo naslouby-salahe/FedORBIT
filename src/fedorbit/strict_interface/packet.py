@@ -59,7 +59,7 @@ class SourcePacket:
     forbidden_content: tuple[str, ...] = field(default_factory=tuple)
 
     def integrity_payload(self) -> str:
-        values: dict[str, object] = {
+        values: dict[str, str | int | float | list[str] | list[float] | list[int] | None] = {
             "anonymous_fine_node_ids": list(self.anonymous_fine_node_ids),
             "exposed_coarse_group_id": self.exposed_coarse_group_id,
             "L": self.L,

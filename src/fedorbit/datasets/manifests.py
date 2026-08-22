@@ -30,7 +30,7 @@ class DatasetManifest(FrozenModel):
     conflicting_duplicate_counts: dict[str, int]
     local_class_counts: dict[str, int]
     transfer_candidate_counts: dict[str, int]
-    feature_quality: dict[str, object]
+    feature_quality: dict[str, str | int | float | bool | None]
     preprocessing_state: str
     dependency_fingerprint_sha256: str
     producer_code_sha256: str

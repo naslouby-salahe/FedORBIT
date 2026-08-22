@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import DatasetId, TransferMethod
+from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
 
 
 class ConfigurationContractError(ValueError):
@@ -20,6 +20,7 @@ def _require(condition: bool, message: str) -> None:
 
 def _validate_split_intervals(config: FedorbitConfig) -> None:
     intervals = config.scientific.split.duplicate_safe_chronological_intervals
+    numerical_tolerance = config.scientific.source_response_pilot.numerical_floor
     named = {
         "train": intervals.train,
         "meta": intervals.meta,
@@ -30,7 +31,7 @@ def _validate_split_intervals(config: FedorbitConfig) -> None:
     previous_upper = 0.0
     for name, (lower, upper) in named.items():
         _require(
-            abs(lower - previous_upper) <= 1e-9,
+            abs(lower - previous_upper) <= numerical_tolerance,
             f"split interval {name} must be contiguous with the previous interval",
         )
         _require(
@@ -38,12 +39,12 @@ def _validate_split_intervals(config: FedorbitConfig) -> None:
             f"split interval {name} must have positive width",
         )
         _require(
-            upper <= 1.0 + 1e-9,
+            upper <= 1.0 + numerical_tolerance,
             f"split interval {name} must end at or before 1.0",
         )
         previous_upper = upper
     _require(
-        abs(previous_upper - 1.0) <= 1e-15,
+        abs(previous_upper - 1.0) <= numerical_tolerance,
         "split intervals must cover the full [0, 1] range",
     )
 
@@ -160,13 +161,13 @@ def _validate_datasets(config: FedorbitConfig) -> None:
     )
     roles = {client_id: client.role for client_id, client in datasets.clients.items()}
     _require(
-        roles[DatasetId.EDGE_IIOTSET_NETWORK].value == "primary"
-        and roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == "primary"
-        and roles[DatasetId.TON_IOT_LINUX_PROCESS_HOST].value == "primary",
+        roles[DatasetId.EDGE_IIOTSET_NETWORK].value == ClientRole.PRIMARY.value
+        and roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == ClientRole.PRIMARY.value
+        and roles[DatasetId.TON_IOT_LINUX_PROCESS_HOST].value == ClientRole.PRIMARY.value,
         "the three primary benchmark clients must have role primary",
     )
     _require(
-        roles[DatasetId.TON_IOT_NETWORK].value == "secondary",
+        roles[DatasetId.TON_IOT_NETWORK].value == ClientRole.SECONDARY.value,
         "the network client must have role secondary",
     )
 

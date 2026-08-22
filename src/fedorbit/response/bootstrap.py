@@ -18,8 +18,20 @@ def max_t_critical_value(
     config: FedorbitConfig,
     entry_derivatives: tuple[tuple[float, ...], ...],
     seed: int,
+    resamples: int | None = None,
+    confidence_level: float | None = None,
+    standard_error_floor: float | None = None,
 ) -> float:
     final = config.scientific.source_response_final
+    resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
+    level = (
+        confidence_level if confidence_level is not None else final.simultaneous_confidence_level
+    )
+    se_floor = (
+        standard_error_floor
+        if standard_error_floor is not None
+        else final.response_standard_error_floor
+    )
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     if not means:
         raise BootstrapError("no response entries for bootstrap")
@@ -28,7 +40,7 @@ def max_t_critical_value(
     )
     replicate_count = len(entry_derivatives[0])
     statistics_values: list[float] = []
-    for _ in range(final.max_t_bootstrap_resamples):
+    for _ in range(resample_count):
         indices = tuple(
             int(torch.randint(0, replicate_count, (1,), generator=rng)[0])
             for _ in range(replicate_count)
@@ -39,8 +51,7 @@ def max_t_critical_value(
             bootstrap_mean = statistics.fmean(resampled)
             bootstrap_se = _bootstrap_se(resampled)
             studentized.append(
-                abs(bootstrap_mean - means[entry_index])
-                / max(bootstrap_se, final.response_standard_error_floor)
+                abs(bootstrap_mean - means[entry_index]) / max(bootstrap_se, se_floor)
             )
         statistics_values.append(max(studentized))
     if not statistics_values:
@@ -48,7 +59,7 @@ def max_t_critical_value(
     return float(
         np.quantile(
             np.asarray(statistics_values, dtype=np.float64),
-            final.simultaneous_confidence_level,
+            level,
             method="higher",
         )
     )

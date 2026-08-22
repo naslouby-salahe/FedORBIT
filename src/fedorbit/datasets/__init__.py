@@ -1,3 +1,17 @@
+from fedorbit.datasets.adapters.contract import (
+    EDGE_EXCLUSIONS,
+    EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
+    AdapterContract,
+    DatasetAdapter,
+    edge_iiotset_adapter,
+    ton_iot_adapter,
+)
+from fedorbit.datasets.adapters.registry import AdapterError, adapter_for, registered_adapters
+from fedorbit.datasets.adapters.schema import (
+    AdapterSchema,
+    SchemaError,
+    role_for_field,
+)
 from fedorbit.datasets.eligibility import (
     EligibilityError,
     TransferEligibility,
@@ -16,6 +30,16 @@ from fedorbit.datasets.feature_quality import (
     is_missing_token,
     numeric_zero_is_not_missing,
 )
+from fedorbit.datasets.ontology import (
+    NORMAL_LABEL,
+    TRANSFER_CONCEPTS,
+    TRANSFER_ONTOLOGY,
+    OntologyError,
+    canonicalize_label,
+    coarse_group_for,
+    native_labels_for,
+    transfer_concept_for,
+)
 from fedorbit.datasets.splits import (
     SplitError,
     assign_duplicate_groups_chronologically,
@@ -26,22 +50,42 @@ from fedorbit.datasets.splits import (
 
 __all__ = [
     "ABSENT_TOKEN",
+    "EDGE_EXCLUSIONS",
+    "EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS",
     "MISSING_TOKEN_VOCABULARY",
+    "NORMAL_LABEL",
     "RARE_TOKEN",
+    "TRANSFER_CONCEPTS",
+    "TRANSFER_ONTOLOGY",
     "UNK_TOKEN",
+    "AdapterContract",
+    "AdapterError",
+    "AdapterSchema",
     "CandidateFeature",
+    "DatasetAdapter",
     "EligibilityError",
     "FeatureQualityError",
     "FeatureQualityReport",
+    "OntologyError",
+    "SchemaError",
     "SplitError",
     "TransferEligibility",
+    "adapter_for",
     "assign_duplicate_groups_chronologically",
+    "canonicalize_label",
     "categorical_vocabulary",
+    "coarse_group_for",
     "duplicate_group_midpoint_fraction",
+    "edge_iiotset_adapter",
     "evaluate_feature_quality",
     "interval_edges",
     "is_missing_token",
+    "native_labels_for",
     "numeric_zero_is_not_missing",
+    "registered_adapters",
+    "role_for_field",
     "split_for_duplicate_group",
+    "ton_iot_adapter",
+    "transfer_concept_for",
     "transfer_eligibility",
 ]

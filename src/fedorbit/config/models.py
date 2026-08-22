@@ -636,6 +636,20 @@ def nominal_alpha(config: FedorbitConfig) -> float:
     return round(1.0 - config.scientific.statistics.confidence_level, 10)
 
 
+def _registered_method_values() -> set[str]:
+    return {method.value for method in TransferMethod}
+
+
+def _append_registered_method(
+    methods: list[TransferMethod], candidate_name: str, registered_values: set[str]
+) -> None:
+    if candidate_name not in registered_values:
+        return
+    candidate = TransferMethod(candidate_name)
+    if candidate not in methods:
+        methods.append(candidate)
+
+
 def all_registered_methods(config: FedorbitConfig) -> tuple[TransferMethod, ...]:
     experiment_configs: tuple[
         PrimaryStrictCrossTelemetryTransferConfig
@@ -657,22 +671,16 @@ def all_registered_methods(config: FedorbitConfig) -> tuple[TransferMethod, ...]
         config.experiments.exact_sparse_solver_benchmark,
         config.experiments.synthetic_coupling_mechanism_validation,
     )
+    registered_values = _registered_method_values()
     methods: list[TransferMethod] = []
     for experiment in experiment_configs:
         for method in experiment.methods:
-            candidate = TransferMethod(method) if method in _registered_method_values else None
-            if candidate is not None and candidate not in methods:
-                methods.append(candidate)
+            _append_registered_method(methods, method, registered_values)
     for (
         method
     ) in config.experiments.map_availability_applicability_audit.packet_only_recovery_methods:
-        candidate = TransferMethod(method) if method in _registered_method_values else None
-        if candidate is not None and candidate not in methods:
-            methods.append(candidate)
+        _append_registered_method(methods, method, registered_values)
     return tuple(methods)
-
-
-_registered_method_values = {method.value for method in TransferMethod}
 
 
 def registered_client_ids(config: FedorbitConfig) -> tuple[DatasetId, ...]:

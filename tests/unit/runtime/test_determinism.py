@@ -71,8 +71,8 @@ def test_assert_float32_training_rejects_float64() -> None:
         assert_float32_training(torch.float64)
 
 
-def test_state_reflects_manual_flag_changes() -> None:
+def test_state_reflects_manual_flag_changes(monkeypatch: pytest.MonkeyPatch) -> None:
     apply_deterministic_backend(require_cuda_device=False)
-    torch.backends.cudnn.benchmark = True
+    monkeypatch.setattr(torch.backends.cudnn, "benchmark", True)
     state = deterministic_backend_state()
     assert state.cudnn_benchmark

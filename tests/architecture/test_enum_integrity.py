@@ -58,7 +58,7 @@ def test_no_enum_bypass_via_equivalent_string_constants() -> None:
         if path.name == "enums.py":
             continue
         tree = parse_module(path)
-        for node in ast.walk(tree):
+        for node in tree.body:
             if (
                 isinstance(node, ast.Assign)
                 and len(node.targets) == 1

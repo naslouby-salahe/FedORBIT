@@ -107,8 +107,8 @@ def _packet(integrity_sha256: str = "") -> SourcePacket:
     return SourcePacket(
         anonymous_fine_node_ids=("node-1", "node-2"),
         exposed_coarse_group_id="coarse-1",
-        L=0.1,
-        U=0.9,
+        L=(0.1,),
+        U=(0.9,),
         per_node_train_support=(1.0, 2.0),
         per_node_meta_support=(0.5, 0.5),
         per_node_effective_replicate_count=(1, 1),
@@ -194,7 +194,7 @@ def test_packet_validates_integrity() -> None:
     corrupted = SourcePacket(
         anonymous_fine_node_ids=packet.anonymous_fine_node_ids,
         exposed_coarse_group_id=packet.exposed_coarse_group_id,
-        L=0.999,
+        L=(0.999,),
         U=packet.U,
         per_node_train_support=packet.per_node_train_support,
         per_node_meta_support=packet.per_node_meta_support,

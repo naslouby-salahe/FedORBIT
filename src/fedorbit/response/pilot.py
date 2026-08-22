@@ -18,6 +18,13 @@ class ResponseCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class DerivativeSeries:
+    outcome_index: int
+    intervention_index: int
+    values: list[float]
+
+
+@dataclass(frozen=True, slots=True)
 class PilotEntry:
     outcome_index: int
     intervention_index: int
@@ -125,11 +132,15 @@ def _evaluate_candidate(
     pilot = config.scientific.source_response_pilot
     outcome_count = len(outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    full_derivatives: list[list[list[float]]] = [
-        [[] for _ in range(intervention_count)] for _ in range(outcome_count)
+    full_series = [
+        DerivativeSeries(outcome, intervention, [])
+        for outcome in range(outcome_count)
+        for intervention in range(intervention_count)
     ]
-    half_derivatives: list[list[list[float]]] = [
-        [[] for _ in range(intervention_count)] for _ in range(outcome_count)
+    half_series = [
+        DerivativeSeries(outcome, intervention, [])
+        for outcome in range(outcome_count)
+        for intervention in range(intervention_count)
     ]
     all_finite = True
     for replicate in range(replicate_count):
@@ -204,14 +215,16 @@ def _evaluate_candidate(
                     )
                 ):
                     all_finite = False
-                full_derivatives[outcome_index][intervention_index].append(full)
-                half_derivatives[outcome_index][intervention_index].append(half)
+                entry_index = outcome_index * intervention_count + intervention_index
+                full_series[entry_index].values.append(full)
+                half_series[entry_index].values.append(half)
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):
         for intervention_index in range(intervention_count):
-            full_values = tuple(full_derivatives[outcome_index][intervention_index])
-            half_values = tuple(half_derivatives[outcome_index][intervention_index])
+            entry_index = outcome_index * intervention_count + intervention_index
+            full_values = tuple(full_series[entry_index].values)
+            half_values = tuple(half_series[entry_index].values)
             a_hat_full = statistics.fmean(full_values)
             se_full = standard_error(full_values)
             a_hat_half = statistics.fmean(half_values)

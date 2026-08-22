@@ -45,8 +45,8 @@ class PacketError(ValueError):
 class SourcePacket:
     anonymous_fine_node_ids: tuple[str, ...]
     exposed_coarse_group_id: str
-    L: float
-    U: float
+    L: tuple[float, ...]
+    U: tuple[float, ...]
     per_node_train_support: tuple[float, ...]
     per_node_meta_support: tuple[float, ...]
     per_node_effective_replicate_count: tuple[int, ...]
@@ -59,7 +59,10 @@ class SourcePacket:
     forbidden_content: tuple[str, ...] = field(default_factory=tuple)
 
     def integrity_payload(self) -> str:
-        values: dict[str, str | int | float | list[str] | list[float] | list[int] | None] = {
+        values: dict[
+            str,
+            str | int | float | tuple[float, ...] | list[str] | list[float] | list[int] | None,
+        ] = {
             "anonymous_fine_node_ids": list(self.anonymous_fine_node_ids),
             "exposed_coarse_group_id": self.exposed_coarse_group_id,
             "L": self.L,

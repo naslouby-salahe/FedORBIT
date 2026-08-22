@@ -4,6 +4,7 @@ import pytest
 
 from fedorbit.datasets.adapters import (
     BEHAVIORAL_CATEGORICAL_ROLE,
+    BEHAVIORAL_NUMERIC_ROLE,
     BINARY_LABEL_ROLE,
     EDGE_EXCLUSIONS,
     EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
@@ -103,7 +104,12 @@ def test_edge_adapter_resolves_real_schema() -> None:
         observed_columns=EDGE_COLUMNS,
         timestamp_parse_success_fraction=1.0,
         timestamp_alias_minimum=0.999,
+        observed_value_samples={
+            "tcp.ack": ("1", "2", "3.5"),
+            "http.request.method": ("GET", "POST", "PUT"),
+        },
     )
+    assert schema.role_of("tcp.ack") == BEHAVIORAL_NUMERIC_ROLE
     assert schema.timestamp_column == "frame.time"
     assert schema.multiclass_label_column == "Attack_type"
     assert schema.binary_label_column == "Attack_label"

@@ -100,6 +100,37 @@ def resolve_label_columns(
     return multiclass, binary
 
 
+def _lossless_float64(value: str | int | float) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    text = str(value).strip()
+    if text in ("nan", "inf", "-inf", "infinity", "-infinity"):
+        return False
+    try:
+        parsed = float(text)
+    except ValueError:
+        return False
+    return parsed == parsed and parsed not in (float("inf"), float("-inf"))
+
+
+def infer_feature_type(field: str, samples: tuple[str | int | float | None, ...]) -> str:
+    non_missing: list[str | int | float] = [
+        sample for sample in samples if sample is not None and not is_missing_sample(sample)
+    ]
+    if not non_missing:
+        return BEHAVIORAL_CATEGORICAL_ROLE
+    if all(_lossless_float64(sample) for sample in non_missing):
+        return BEHAVIORAL_NUMERIC_ROLE
+    return BEHAVIORAL_CATEGORICAL_ROLE
+
+
+def is_missing_sample(value: str | int | float | None) -> bool:
+    lowered = str(value).strip().lower()
+    return lowered in ("", "0", "0.0", "nan", "none", "null")
+
+
 def role_for_field(field: str) -> str:
     lowered = field.lower()
     if any(marker in lowered for marker in PROVENANCE_MARKERS):

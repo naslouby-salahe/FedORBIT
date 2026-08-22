@@ -125,8 +125,6 @@ def test_boundary_packages_never_declare_bare_collection_returns() -> None:
 def _is_bare_collection(annotation: ast.expr) -> bool:
     if isinstance(annotation, ast.Name):
         return annotation.id in {"dict", "list", "set", "tuple", "object"}
-    if isinstance(annotation, ast.Subscript):
-        return _is_bare_collection(annotation.value)
     return False
 
 

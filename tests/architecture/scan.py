@@ -23,6 +23,7 @@ ALLOWED_ROOT_ENTRIES = {
     "noxfile.py",
     "pyproject.toml",
     "src",
+    "stubs",
     "tests",
     "uv.lock",
     "vulture_whitelist.py",

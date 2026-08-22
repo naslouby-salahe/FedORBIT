@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.reuse import ArtifactStore
+from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.semantics import ExecutionSemantics
 from fedorbit.experiments.catalogue import ExperimentDefinition
+
+
+def _execution_root() -> Path:
+    return build_layout(load_fedorbit_config()).execution_root
 
 
 def _cells_for_datasets(datasets: tuple[DatasetId, ...]) -> tuple[tuple[str, str], ...]:
@@ -18,7 +24,7 @@ def _cells_for_datasets(datasets: tuple[DatasetId, ...]) -> tuple[tuple[str, str
 
 
 def preprocess_pipeline(datasets: tuple[DatasetId, ...], overwrite: bool) -> None:
-    store = ArtifactStore(Path("outputs"))
+    store = ArtifactStore(_execution_root())
     semantics = ExecutionSemantics(store)
     cells = _cells_for_datasets(datasets)
     decisions = semantics.decide(cells, overwrite)
@@ -29,7 +35,7 @@ def preprocess_pipeline(datasets: tuple[DatasetId, ...], overwrite: bool) -> Non
 
 
 def smoke_pipeline(overwrite: bool) -> None:
-    store = ArtifactStore(Path("outputs"))
+    store = ArtifactStore(_execution_root())
     semantics = ExecutionSemantics(store)
     decisions = semantics.decide((("smoke-nonclaim", "smoke-fixture"),), overwrite)
     semantics.validate_existing(decisions)
@@ -43,7 +49,7 @@ def run_pipeline(
     definition: ExperimentDefinition,
     overwrite: bool,
 ) -> None:
-    store = ArtifactStore(Path("outputs"))
+    store = ArtifactStore(_execution_root())
     semantics = ExecutionSemantics(store)
     cells = tuple(
         (f"{experiment.value}:{seed}", f"cell-{experiment.value}-{seed}")

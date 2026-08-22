@@ -70,7 +70,11 @@ def _is_object(annotation: ast.expr) -> bool:
     if isinstance(annotation, ast.Name):
         return annotation.id == "object"
     if isinstance(annotation, ast.Subscript):
-        return _is_object(annotation.value)
+        return _is_object(annotation.slice)
+    if isinstance(annotation, ast.Tuple):
+        return any(_is_object(element) for element in annotation.elts)
+    if isinstance(annotation, ast.BinOp):
+        return _is_object(annotation.left) or _is_object(annotation.right)
     return False
 
 

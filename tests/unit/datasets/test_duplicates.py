@@ -4,6 +4,8 @@ import math
 
 import pytest
 
+from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.adapters import (
     FORBIDDEN_IDENTITY_ROLE,
     FORBIDDEN_PAYLOAD_ROLE,
@@ -32,8 +34,12 @@ EDGE_COLUMNS = (
 )
 
 
+def _fedorbit_config() -> FedorbitConfig:
+    return load_fedorbit_config()
+
+
 def _edge_schema() -> AdapterSchema:
-    return edge_iiotset_adapter().resolve_schema(
+    return edge_iiotset_adapter(_fedorbit_config()).resolve_schema(
         observed_columns=EDGE_COLUMNS,
         timestamp_parse_success_fraction=1.0,
         timestamp_alias_minimum=0.999,
@@ -175,7 +181,7 @@ def test_duplicate_hashing_ignores_forbidden_identity() -> None:
     )
 
 
-def _row(schema: AdapterSchema, tcp_ack: float, label: str, fraction: float) -> CanonicalRow:
+def _row(tcp_ack: float, label: str, fraction: float) -> CanonicalRow:
     features: dict[str, str | int | float | None] = {
         "frame.time": "0",
         "ip.src_host": "x",
@@ -196,9 +202,9 @@ def _row(schema: AdapterSchema, tcp_ack: float, label: str, fraction: float) -> 
 def test_deduplicate_groups_exact_duplicates() -> None:
     schema = _edge_schema()
     rows = (
-        _row(schema, 1.0, "ddos", 0.1),
-        _row(schema, 1.0, "ddos", 0.2),
-        _row(schema, 2.0, "normal", 0.9),
+        _row(1.0, "ddos", 0.1),
+        _row(1.0, "ddos", 0.2),
+        _row(2.0, "normal", 0.9),
     )
     groups = deduplicate_rows(schema, rows)
     assert len(groups) == 2
@@ -207,7 +213,7 @@ def test_deduplicate_groups_exact_duplicates() -> None:
 
 def test_conflicting_duplicates_invalid_data() -> None:
     schema = _edge_schema()
-    rows = (_row(schema, 1.0, "ddos", 0.1), _row(schema, 1.0, "normal", 0.1))
+    rows = (_row(1.0, "ddos", 0.1), _row(1.0, "normal", 0.1))
     groups = deduplicate_rows(schema, rows)
     with pytest.raises(DuplicateError):
         validate_duplicate_groups(groups)

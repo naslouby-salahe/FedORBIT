@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.adapters.schema import (
     BEHAVIORAL_CATEGORICAL_ROLE,
     BINARY_LABEL_ROLE,
@@ -125,11 +126,14 @@ class DatasetAdapter:
         )
 
 
-def edge_iiotset_adapter() -> DatasetAdapter:
+def edge_iiotset_adapter(config: FedorbitConfig) -> DatasetAdapter:
+    expected_timestamp = config.scientific.datasets.clients[
+        DatasetId.EDGE_IIOTSET_NETWORK
+    ].expected_timestamp_field
     return DatasetAdapter(
         AdapterContract(
             dataset_id=DatasetId.EDGE_IIOTSET_NETWORK,
-            timestamp_candidates=("frame.time",),
+            timestamp_candidates=(expected_timestamp,),
             multiclass_label_candidates=("Attack_type",),
             binary_label_candidates=("Attack_label",),
             additional_exclusions=EDGE_EXCLUSIONS | EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
@@ -137,11 +141,12 @@ def edge_iiotset_adapter() -> DatasetAdapter:
     )
 
 
-def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
+def ton_iot_adapter(dataset_id: DatasetId, config: FedorbitConfig) -> DatasetAdapter:
+    expected_timestamp = config.scientific.datasets.clients[dataset_id].expected_timestamp_field
     return DatasetAdapter(
         AdapterContract(
             dataset_id=dataset_id,
-            timestamp_candidates=("ts",),
+            timestamp_candidates=(expected_timestamp,),
             multiclass_label_candidates=("type",),
             binary_label_candidates=("label",),
         )

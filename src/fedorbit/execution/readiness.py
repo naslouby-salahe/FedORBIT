@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.reuse import ArtifactStore
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
@@ -50,7 +51,7 @@ class ExecutionReadiness:
             return PrerequisiteState(index, name, False, owning_experiment, "no completed evidence")
         return PrerequisiteState(index, name, True, owning_experiment)
 
-    def _experiment_evidence(self, experiment: ExperimentName) -> object | None:
+    def _experiment_evidence(self, experiment: ExperimentName) -> ReusableArtifactManifest | None:
         manifest_dir = self._store.manifest_dir()
         if not manifest_dir.is_dir():
             return None

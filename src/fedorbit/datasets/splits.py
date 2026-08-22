@@ -31,7 +31,7 @@ def split_for_duplicate_group(config: FedorbitConfig, midpoint_fraction: float) 
 def duplicate_group_midpoint_fraction(
     first_timestamp_fraction: float, last_timestamp_fraction: float
 ) -> float:
-    return (first_timestamp_fraction + last_timestamp_fraction) / 2.0
+    return (first_timestamp_fraction + last_timestamp_fraction) / 2
 
 
 def assign_duplicate_groups_chronologically(

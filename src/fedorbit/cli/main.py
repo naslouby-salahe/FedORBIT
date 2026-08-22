@@ -142,7 +142,7 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
 @app.command()
 def report(
     experiment_name: str | None = typer.Argument(None),
-    overwrite: bool = typer.Option(False, "--overwrite"),
+    _overwrite: bool = typer.Option(False, "--overwrite"),
 ) -> None:
     try:
         if experiment_name is not None:

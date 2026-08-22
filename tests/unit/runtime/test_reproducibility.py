@@ -39,7 +39,7 @@ def test_identity_rejects_environment_replacement(
 
     original_version = importlib.metadata.version
 
-    def _fake_version(name: str) -> str:
+    def _fake_version(_name: str) -> str:
         return "0.0.0"
 
     monkeypatch.setattr(importlib.metadata, "version", _fake_version)

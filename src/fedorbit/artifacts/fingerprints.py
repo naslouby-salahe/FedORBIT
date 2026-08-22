@@ -11,6 +11,8 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.records import SemanticCell
 
+JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+
 STAGES = (
     "raw",
     "preprocessing",
@@ -132,7 +134,7 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
 
 
 def configuration_subset_digest(config: FedorbitConfig, relevant_sections: frozenset[str]) -> str:
-    section_values: dict[str, object] = {}
+    section_values: dict[str, JsonValue] = {}
     for section in relevant_sections:
         if section == "generators":
             section_values[section] = config.generators.model_dump(mode="json")

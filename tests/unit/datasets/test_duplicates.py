@@ -95,6 +95,7 @@ def test_missing_numeric_is_canonical_quiet_nan() -> None:
     second = canonical_row_bytes(missing_none, schema.canonical_feature_order, schema.roles)
     assert first == second
     assert b"\x00\x00\x00\x00\x00\x00\xf8\x7f" in first
+    assert len(first) >= 9
 
 
 def test_numeric_zero_is_distinct_from_missing() -> None:
@@ -217,4 +218,5 @@ def test_normalize_value_missing_spelling_canonicalization() -> None:
     assert normalize_value("0.0", is_categorical=True) == ""
     assert normalize_value("1", is_categorical=True) == "1"
     numeric_missing = normalize_value("NAN", is_categorical=False)
-    assert isinstance(numeric_missing, float) and math.isnan(numeric_missing)
+    assert isinstance(numeric_missing, float)
+    assert math.isnan(numeric_missing)

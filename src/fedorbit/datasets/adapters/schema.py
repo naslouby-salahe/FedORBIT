@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from fedorbit.domain.enums import DatasetId
@@ -112,7 +113,7 @@ def _lossless_float64(value: str | int | float) -> bool:
         parsed = float(text)
     except ValueError:
         return False
-    return parsed == parsed and parsed not in (float("inf"), float("-inf"))
+    return math.isfinite(parsed)
 
 
 def infer_feature_type(field: str, samples: tuple[str | int | float | None, ...]) -> str:

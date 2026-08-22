@@ -44,20 +44,20 @@ def test_split_edges_are_contiguous_and_ordered(fedorbit_config: FedorbitConfig)
 
 
 def test_split_for_duplicate_group_midpoint(fedorbit_config: FedorbitConfig) -> None:
-    assert split_for_duplicate_group(fedorbit_config, 0.1, 1103) == Split.TRAIN
-    assert split_for_duplicate_group(fedorbit_config, 0.60, 1103) == Split.META
-    assert split_for_duplicate_group(fedorbit_config, 0.75, 1103) == Split.VALID
-    assert split_for_duplicate_group(fedorbit_config, 0.85, 1103) == Split.CONFIRM
-    assert split_for_duplicate_group(fedorbit_config, 0.95, 1103) == Split.TEST
+    assert split_for_duplicate_group(fedorbit_config, 0.1) == Split.TRAIN
+    assert split_for_duplicate_group(fedorbit_config, 0.60) == Split.META
+    assert split_for_duplicate_group(fedorbit_config, 0.75) == Split.VALID
+    assert split_for_duplicate_group(fedorbit_config, 0.85) == Split.CONFIRM
+    assert split_for_duplicate_group(fedorbit_config, 0.95) == Split.TEST
 
 
 def test_split_rejects_out_of_range_midpoint(fedorbit_config: FedorbitConfig) -> None:
     from fedorbit.datasets.splits import SplitError
 
     with pytest.raises(SplitError):
-        split_for_duplicate_group(fedorbit_config, -0.1, 1103)
+        split_for_duplicate_group(fedorbit_config, -0.1)
     with pytest.raises(SplitError):
-        split_for_duplicate_group(fedorbit_config, 1.5, 1103)
+        split_for_duplicate_group(fedorbit_config, 1.5)
 
 
 def test_midpoint_fraction_is_average() -> None:
@@ -68,7 +68,6 @@ def test_duplicate_groups_assigned_chronologically(fedorbit_config: FedorbitConf
     assignments = assign_duplicate_groups_chronologically(
         fedorbit_config,
         (("g1", 0.1), ("g2", 0.9), ("g3", 0.75)),
-        1103,
     )
     assert assignments["g1"] == Split.TRAIN
     assert assignments["g2"] == Split.TEST

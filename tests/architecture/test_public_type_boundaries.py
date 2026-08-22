@@ -79,6 +79,8 @@ def _canonical_serializer_boundary(path: Path) -> bool:
         "fedorbit/domain/canonical.py" in str(path)
         or "fedorbit/runtime/seeds.py" in str(path)
         or "fedorbit/artifacts/manifests.py" in str(path)
+        or "fedorbit/artifacts/serialization.py" in str(path)
+        or "fedorbit/artifacts/evidence.py" in str(path)
     )
 
 

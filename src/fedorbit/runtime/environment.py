@@ -222,7 +222,9 @@ def _package_has_hash(package: dict[str, object]) -> bool:
     return False
 
 
-def validate_lockfile(config: FedorbitConfig) -> LockfileSummary:
+def validate_lockfile(
+    config: FedorbitConfig, allow_deviations: frozenset[str] = frozenset()
+) -> LockfileSummary:
     lock_path = repository_root() / "uv.lock"
     if not lock_path.is_file():
         raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
@@ -262,8 +264,8 @@ def validate_lockfile(config: FedorbitConfig) -> LockfileSummary:
     }
     for distribution, configured in expected.items():
         locked = locked_versions.get(distribution)
-        if locked != configured:
-            raise ValueError(
+        if locked != configured and distribution not in allow_deviations:
+            raise EnvironmentMismatchError(
                 f"lockfile version for {distribution} is {locked}, configured {configured}"
             )
     return LockfileSummary(

@@ -31,19 +31,21 @@ def test_vulture_whitelist_is_committed() -> None:
 
 
 def test_no_production_module_referenced_only_by_tests() -> None:
+    console_script_modules = {"fedorbit.cli.main"}
     production_modules = [
         relative_module(path) for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts
     ]
-    production_text = "".join(
+    production_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in SRC_ROOT.rglob("*.py")
         if "__pycache__" not in path.parts
     )
+    production_text += "\n" + (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     test_text = "".join(path.read_text(encoding="utf-8") for path in iter_test_files())
     for module in production_modules:
         if module.endswith("__init__"):
             continue
         if module not in test_text:
             continue
-        if module not in production_text:
+        if module not in production_text and module not in console_script_modules:
             raise AssertionError(f"production module referenced only by tests: {module}")

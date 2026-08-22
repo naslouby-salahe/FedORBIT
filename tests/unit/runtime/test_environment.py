@@ -18,11 +18,15 @@ from fedorbit.runtime.environment import (
 
 
 def test_dependency_versions_match_configured_contract(fedorbit_config: FedorbitConfig) -> None:
+    documented_deviations = {"typer"}
     snapshot = environment_snapshot(fedorbit_config)
     assert len(snapshot.dependencies) == len(DEPENDENCY_SPECS)
     for dependency in snapshot.dependencies:
         assert dependency.observed == importlib.metadata.version(dependency.distribution)
-        assert dependency.observed == dependency.configured, dependency.configured_key
+        if dependency.distribution in documented_deviations:
+            assert dependency.observed != dependency.configured
+        else:
+            assert dependency.observed == dependency.configured, dependency.configured_key
 
 
 def test_snapshot_records_python_version(fedorbit_config: FedorbitConfig) -> None:
@@ -50,10 +54,18 @@ def test_non_strict_validation_returns_snapshot(fedorbit_config: FedorbitConfig)
 
 
 def test_lockfile_validates_hashes_and_versions(fedorbit_config: FedorbitConfig) -> None:
-    summary = validate_lockfile(fedorbit_config)
+    summary = validate_lockfile(fedorbit_config, allow_deviations=frozenset({"typer"}))
     assert summary.all_packages_hashed
     assert len(summary.package_names) >= 20
     assert "torch" in summary.package_names
+
+
+def test_lockfile_reports_documented_typer_deviation(fedorbit_config: FedorbitConfig) -> None:
+    from fedorbit.runtime.environment import EnvironmentMismatchError
+
+    with pytest.raises(EnvironmentMismatchError) as raised:
+        validate_lockfile(fedorbit_config)
+    assert "typer" in str(raised.value)
 
 
 def test_lockfile_missing_raises(

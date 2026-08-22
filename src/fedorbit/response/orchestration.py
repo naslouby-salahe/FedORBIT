@@ -13,7 +13,8 @@ from fedorbit.response.final import (
     build_source_packet,
     estimate_final_response,
 )
-from fedorbit.response.pilot import ResponseCandidate
+from fedorbit.response.pilot import PilotData, ResponseCandidate
+from fedorbit.response.shadows import ShadowSettings
 from fedorbit.runtime.seeds import RngNamespace, derive_seed32
 from fedorbit.strict_interface.packet import SourcePacket
 
@@ -69,21 +70,29 @@ def construct_source_packet(
             context.n_classes,
             context.dropout_probability,
         )
-    estimate = estimate_final_response(
-        config,
-        model,
-        checkpoint,
+    pilot_data = PilotData(
         train_features,
         train_targets,
         meta_features,
         meta_targets,
-        intervention_classes,
         outcome_native_class_sets,
         base_class_weights,
+        context.learning_rate,
+        context.weight_decay,
+    )
+    settings = ShadowSettings(
         selected_configuration.intervention_magnitude,
         selected_configuration.optimizer_step_horizon,
         context.learning_rate,
         context.weight_decay,
+    )
+    estimate = estimate_final_response(
+        config,
+        model,
+        checkpoint,
+        pilot_data,
+        intervention_classes,
+        settings,
         context.seed,
     )
     absent_estimate = pad_absent_transfer_nodes(

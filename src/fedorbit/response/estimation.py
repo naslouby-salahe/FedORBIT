@@ -8,11 +8,9 @@ import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.models.training import ModelParameterState, OptimizerState
-from fedorbit.response.risk import equal_native_class_risk
-from fedorbit.runtime.seeds import RngNamespace, derive_seed32
 
 
-class ShadowError(ValueError):
+class ResponseEstimationError(ValueError):
     pass
 
 
@@ -35,15 +33,45 @@ class ShadowSettings:
     weight_decay: float
 
 
+def native_class_cross_entropy(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    class_index: int,
+    probability_log_floor: float,
+) -> float:
+    class_examples = targets == class_index
+    if not bool(class_examples.any()):
+        return math.nan
+    log_probabilities = torch.log_softmax(logits, dim=1)
+    per_example = -log_probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
+    per_example = torch.clamp(per_example, max=-math.log(probability_log_floor))
+    return float(per_example[class_examples].mean())
+
+
+def equal_native_class_risk(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    native_classes: tuple[int, ...],
+    probability_log_floor: float,
+) -> float:
+    risks = tuple(
+        native_class_cross_entropy(logits, targets, class_index, probability_log_floor)
+        for class_index in native_classes
+    )
+    if not risks or any(math.isnan(risk) for risk in risks):
+        return math.nan
+    return sum(risks) / len(risks)
+
+
 def shadow_batch_schedule(
     train_size: int,
     batch_size: int,
     rng: torch.Generator,
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
-        raise ShadowError("shadow TRAIN set is empty")
+        raise ResponseEstimationError("shadow TRAIN set is empty")
     if batch_size <= 0:
-        raise ShadowError("shadow batch size must be positive")
+        raise ResponseEstimationError("shadow batch size must be positive")
     permutation = torch.randperm(train_size, generator=rng)
     position = 0
     while True:
@@ -62,9 +90,13 @@ def paired_shadow_derivative(
     epsilon: float,
     denominator_floor: float,
 ) -> float:
-    if epsilon <= 0:
-        raise ShadowError("intervention magnitude must be positive")
-    return (negative_risk - positive_risk) / (2 * epsilon * max(baseline_risk, denominator_floor))
+    if epsilon <= 0.0:
+        raise ResponseEstimationError("intervention magnitude must be positive")
+    if denominator_floor <= 0.0:
+        raise ResponseEstimationError("risk denominator floor must be positive")
+    return (negative_risk - positive_risk) / (
+        2.0 * epsilon * max(baseline_risk, denominator_floor)
+    )
 
 
 def run_shadow_pair(
@@ -75,13 +107,11 @@ def run_shadow_pair(
     base_rng_state: torch.Tensor,
     data: ShadowData,
     settings: ShadowSettings,
-    seed: int,
+    schedule_seed: int,
 ) -> tuple[tuple[float, float, float], ...]:
-    training = config.scientific.training
-    batch_size = training.batch_size
-    schedule_rng = torch.Generator().manual_seed(
-        derive_seed32(seed, RngNamespace.RESPONSE_SCHEDULE, "shadow-pair")
-    )
+    batch_size = config.scientific.training.batch_size
+    positive_rng = torch.Generator().manual_seed(schedule_seed)
+    negative_rng = torch.Generator().manual_seed(schedule_seed)
     positive = _run_shadow(
         config,
         model,
@@ -92,7 +122,7 @@ def run_shadow_pair(
         settings,
         1.0 + settings.epsilon,
         batch_size,
-        schedule_rng,
+        positive_rng,
     )
     negative = _run_shadow(
         config,
@@ -104,7 +134,7 @@ def run_shadow_pair(
         settings,
         1.0 - settings.epsilon,
         batch_size,
-        schedule_rng,
+        negative_rng,
     )
     base_state.load_into(model)
     baseline = _evaluate_risks(
@@ -115,8 +145,8 @@ def run_shadow_pair(
         data.outcome_native_class_sets,
     )
     return tuple(
-        (positive[outcome], negative[outcome], baseline[outcome])
-        for outcome in range(len(data.outcome_native_class_sets))
+        (positive[index], negative[index], baseline[index])
+        for index in range(len(data.outcome_native_class_sets))
     )
 
 
@@ -133,7 +163,7 @@ def _run_shadow(
     schedule_rng: torch.Generator,
 ) -> tuple[float, ...]:
     base_state.load_into(model)
-    torch.set_rng_state(base_rng_state)
+    torch.set_rng_state(base_rng_state.clone())
     training = config.scientific.training
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -144,11 +174,9 @@ def _run_shadow(
     )
     optimizer.load_state_dict(base_optimizer_state)
     model.train()
-    steps = 0
     schedule = shadow_batch_schedule(data.train_features.shape[0], batch_size, schedule_rng)
-    for batch in schedule:
-        if steps >= settings.horizon:
-            break
+    for step in range(settings.horizon):
+        batch = next(schedule)
         optimizer.zero_grad()
         logits = model(data.train_features[batch].float())
         per_example_ce = _shadow_ce(logits, data.train_targets[batch], config)
@@ -159,11 +187,12 @@ def _run_shadow(
             multiplier,
         )
         loss = (per_example_ce * weights).mean()
+        if not bool(torch.isfinite(loss)):
+            raise ResponseEstimationError(f"non-finite shadow loss at optimizer step {step}")
         loss.backward()
         optimizer.step()
-        steps += 1
-    if steps == 0:
-        raise ShadowError("shadow consumed no optimizer steps")
+    if settings.horizon <= 0:
+        raise ResponseEstimationError("shadow optimizer horizon must be positive")
     model.eval()
     with torch.no_grad():
         shadow_logits = model(data.meta_features.float())
@@ -178,7 +207,11 @@ def _run_shadow(
     )
 
 
-def _shadow_ce(logits: torch.Tensor, targets: torch.Tensor, config: FedorbitConfig) -> torch.Tensor:
+def _shadow_ce(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    config: FedorbitConfig,
+) -> torch.Tensor:
     probability_log_floor = config.scientific.metrics.probability_log_floor
     log_probabilities = torch.log_softmax(logits, dim=1)
     per_example = -log_probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)

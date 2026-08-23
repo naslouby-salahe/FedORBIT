@@ -12,7 +12,7 @@ from fedorbit.transfer.assimilation import (
     AssimilationError,
     PreConfirmTargetState,
     PreTestLifecycle,
-    TestOpeningRuleError,
+    TestOpeningRuleError as OpeningRuleError,
     apply_accepted_assimilation,
     capture_pre_confirm_pair,
     settle_rejected_proposal,
@@ -101,13 +101,13 @@ def test_assimilation_coordinates_are_total_and_method_free() -> None:
 
 def test_pre_test_lifecycle_fails_closed_and_enforces_order() -> None:
     lifecycle = PreTestLifecycle()
-    with pytest.raises(TestOpeningRuleError):
+    with pytest.raises(OpeningRuleError):
         lifecycle.complete_phase("action_finalized")
     lifecycle.complete_phase("source_selection_finalized")
     lifecycle.complete_phase("action_finalized")
     lifecycle.complete_phase("confirmation_decision_finalized")
     lifecycle.complete_phase("assimilation_settled")
-    with pytest.raises(TestOpeningRuleError):
+    with pytest.raises(OpeningRuleError):
         lifecycle.open_test()
     lifecycle.complete_phase("pre_test_artifacts_committed")
     grant = lifecycle.open_test()

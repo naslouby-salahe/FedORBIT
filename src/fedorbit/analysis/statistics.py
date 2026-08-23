@@ -7,11 +7,10 @@ import warnings
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.random import PCG64, Generator
+from numpy.random import Generator, PCG64
 from scipy import stats as scipy_stats
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.runtime.seeds import derive_seed32
 
@@ -25,6 +24,8 @@ def nominal_alpha(config: FedorbitConfig) -> float:
 
 
 def _mean(values: tuple[float, ...]) -> float:
+    if not values:
+        raise StatisticsError("statistical mean requires at least one value")
     return math.fsum(values) / len(values)
 
 
@@ -32,17 +33,16 @@ def sign_flip_p_value(
     differences: tuple[float, ...],
     comparison_tolerance: float,
 ) -> float:
-    nonzero = [value for value in differences if value != 0.0]
-    effective_count = len(nonzero)
-    if effective_count == 0:
+    nonzero = tuple(value for value in differences if value != 0.0)
+    if not nonzero:
         return 1.0
-    observed_mean = _mean(tuple(nonzero))
+    observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=effective_count):
-        permuted_mean = math.fsum(s * v for s, v in zip(signs, nonzero, strict=True)) / (
-            effective_count
-        )
+    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
+        permuted_mean = math.fsum(
+            sign * value for sign, value in zip(signs, nonzero, strict=True)
+        ) / len(nonzero)
         if abs(permuted_mean) >= abs(observed_mean) - comparison_tolerance:
             extremes += 1
         total += 1
@@ -56,23 +56,21 @@ def one_sided_sign_flip_p_value(
 ) -> float:
     if alternative not in {"greater", "less"}:
         raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
-    nonzero = [value for value in differences if value != 0.0]
-    effective_count = len(nonzero)
-    if effective_count == 0:
+    nonzero = tuple(value for value in differences if value != 0.0)
+    if not nonzero:
         return 1.0
-    observed_mean = _mean(tuple(nonzero))
+    observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=effective_count):
-        permuted_mean = math.fsum(s * v for s, v in zip(signs, nonzero, strict=True)) / (
-            effective_count
-        )
+    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
+        permuted_mean = math.fsum(
+            sign * value for sign, value in zip(signs, nonzero, strict=True)
+        ) / len(nonzero)
         if alternative == "greater":
-            if permuted_mean >= observed_mean - comparison_tolerance:
-                extremes += 1
+            extreme = permuted_mean >= observed_mean - comparison_tolerance
         else:
-            if permuted_mean <= observed_mean + comparison_tolerance:
-                extremes += 1
+            extreme = permuted_mean <= observed_mean + comparison_tolerance
+        extremes += int(extreme)
         total += 1
     return extremes / total
 
@@ -92,17 +90,24 @@ def exact_sign_flip_test(
 ) -> SignFlipResult:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
+    if not method_values:
+        raise StatisticsError("paired sign-flip test requires at least one pair")
     differences = tuple(
         method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
+    nonzero_count = sum(value != 0.0 for value in differences)
+    maximum = config.scientific.statistics.exact_sign_flip_max_nonzero_differences_for_enumeration
+    if nonzero_count > maximum:
+        raise StatisticsError(
+            f"exact sign-flip enumeration has {nonzero_count} nonzero differences; maximum is {maximum}"
+        )
     tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
-    p_value = sign_flip_p_value(differences, tolerance)
     return SignFlipResult(
-        p_value=p_value,
+        p_value=sign_flip_p_value(differences, tolerance),
         mean_difference=_mean(differences),
         median_difference=statistics.median(differences),
-        nonzero_difference_count=sum(1 for d in differences if d != 0.0),
+        nonzero_difference_count=nonzero_count,
     )
 
 
@@ -114,7 +119,6 @@ def statistical_bootstrap_seed(
     metric: str,
     purpose: str,
 ) -> int:
-    base_seed = config.scientific.randomness.statistical_seed
     coordinates = {
         "contrast": contrast_name,
         "family": family,
@@ -122,7 +126,11 @@ def statistical_bootstrap_seed(
         "pair": directed_pair,
         "purpose": purpose,
     }
-    return derive_seed32(base_seed, RngNamespace.STATISTICAL_BOOTSTRAP, canonical_json(coordinates))
+    return derive_seed32(
+        config.scientific.randomness.statistical_seed,
+        RngNamespace.STATISTICAL_BOOTSTRAP,
+        coordinates,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,14 +149,17 @@ def paired_bca_interval(
 ) -> BcaInterval:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
+    if not method_values:
+        raise StatisticsError("paired BCa interval requires at least one pair")
     differences = tuple(
         method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
+    if any(not math.isfinite(value) for value in differences):
+        return BcaInterval(None, None, math.nan, True)
     point_estimate = _mean(differences)
     identical_tolerance = config.scientific.statistics.identical_difference_tolerance
-    all_identical = all(abs(value - differences[0]) <= identical_tolerance for value in differences)
-    if all_identical:
+    if all(abs(value - differences[0]) <= identical_tolerance for value in differences):
         return BcaInterval(point_estimate, point_estimate, point_estimate, False)
     method_array = np.asarray(method_values, dtype=np.float64)
     reference_array = np.asarray(reference_values, dtype=np.float64)
@@ -189,22 +200,24 @@ def tost_equivalence(
     method_values: tuple[float, ...],
     reference_values: tuple[float, ...],
 ) -> TostResult:
+    if len(method_values) != len(reference_values):
+        raise StatisticsError("paired sample sizes differ")
     margins = config.scientific.materiality.equivalence_relative_macro_ce
     tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
     differences = tuple(
         method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
-    shifted_lower = tuple(d - margins.lower for d in differences)
-    shifted_upper = tuple(d - margins.upper for d in differences)
+    shifted_lower = tuple(difference - margins.lower for difference in differences)
+    shifted_upper = tuple(difference - margins.upper for difference in differences)
     p_lower = one_sided_sign_flip_p_value(shifted_lower, "greater", tolerance)
     p_upper = one_sided_sign_flip_p_value(shifted_upper, "less", tolerance)
-    return TostResult(p_lower=p_lower, p_upper=p_upper, p_equiv=max(p_lower, p_upper))
+    return TostResult(p_lower, p_upper, max(p_lower, p_upper))
 
 
-def holm_step_down(
-    raw_p_values: dict[str, float],
-) -> dict[str, float]:
+def holm_step_down(raw_p_values: dict[str, float]) -> dict[str, float]:
+    if any(not 0.0 <= value <= 1.0 for value in raw_p_values.values()):
+        raise StatisticsError("Holm input p-values must lie in [0,1]")
     ordered = sorted(raw_p_values.items(), key=lambda item: (item[1], item[0]))
     adjusted: dict[str, float] = {}
     running_max = 0.0
@@ -217,21 +230,23 @@ def holm_step_down(
 
 
 def mcnemar_exact_p(b01: int, b10: int) -> float:
+    if b01 < 0 or b10 < 0:
+        raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
     if discordant == 0:
         return 1.0
     count = min(b01, b10)
-    tail = sum(math.comb(discordant, k) for k in range(0, count + 1))
+    tail = sum(math.comb(discordant, k) for k in range(count + 1))
     return min(1.0, 2.0 * tail / 2**discordant)
 
 
 def mcnemar_asymptotic_continuity_corrected_p(b01: int, b10: int) -> float:
+    if b01 < 0 or b10 < 0:
+        raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
     if discordant == 0:
         return 1.0
-    numerator = (abs(b01 - b10) - 1.0) ** 2
-    denominator = b01 + b10
-    chi_square = numerator / denominator
+    chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
     survival = 1.0 - float(scipy_stats.chi2.cdf(chi_square, df=1))
     return max(0.0, min(1.0, survival))
 
@@ -242,8 +257,7 @@ def mcnemar_test(
     b10: int,
 ) -> tuple[str, float]:
     switch = config.scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
-    discordant = b01 + b10
-    if discordant <= switch:
+    if b01 + b10 <= switch:
         return "exact", mcnemar_exact_p(b01, b10)
     return "asymptotic", mcnemar_asymptotic_continuity_corrected_p(b01, b10)
 

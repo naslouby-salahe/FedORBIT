@@ -8,7 +8,7 @@ from fedorbit.models.architectures import (
     NetworkFlowClassifier,
     classifier_for_modality,
 )
-from fedorbit.models.training import BaseCheckpoint
+from fedorbit.models.training import BaseCheckpoint, ModelParameterState
 from fedorbit.response.final import (
     FinalResponseEntry,
     FinalResponseEstimate,
@@ -164,7 +164,9 @@ def _random_checkpoint(model: torch.nn.Module) -> BaseCheckpoint:
     return BaseCheckpoint(
         epoch=0,
         valid_macro_cross_entropy=1.0,
-        state_dict={key: value.detach().clone() for key, value in model.state_dict().items()},
+        state_dict=ModelParameterState(
+            {key: value.detach().clone() for key, value in model.state_dict().items()}
+        ),
         optimizer_state=optimizer.state_dict(),
         rng_state=torch.get_rng_state(),
     )

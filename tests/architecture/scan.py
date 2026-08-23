@@ -187,6 +187,16 @@ LOCKED_VALUE_CONSTANT_PATTERN = {
 
 BOUNDARY_PACKAGES = frozenset({"domain", "config", "artifacts", "reporting", "cli"})
 
+CANONICAL_SERIALIZER_BOUNDARY_MODULES = frozenset(
+    {
+        "domain.canonical",
+        "runtime.seeds",
+        "artifacts.manifests",
+        "artifacts.serialization",
+        "artifacts.evidence",
+    }
+)
+
 TODO_MARKERS = ("TODO", "FIXME", "HACK", "XXX")
 
 

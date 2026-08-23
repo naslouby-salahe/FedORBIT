@@ -21,10 +21,18 @@ OptimizerState = dict[
 
 
 @dataclass(frozen=True, slots=True)
+class ModelParameterState:
+    tensors_by_name: dict[str, torch.Tensor]
+
+    def load_into(self, model: torch.nn.Module) -> None:
+        model.load_state_dict(self.tensors_by_name)
+
+
+@dataclass(frozen=True, slots=True)
 class BaseCheckpoint:
     epoch: int
     valid_macro_cross_entropy: float
-    state_dict: dict[str, torch.Tensor]
+    state_dict: ModelParameterState
     optimizer_state: OptimizerState
     rng_state: torch.Tensor
 
@@ -147,7 +155,7 @@ def train_base_model(
         checkpoint=BaseCheckpoint(
             epoch=best_epoch,
             valid_macro_cross_entropy=best_metric,
-            state_dict=best_state_dict,
+            state_dict=ModelParameterState(best_state_dict),
             optimizer_state=best_optimizer_state,
             rng_state=best_rng_state,
         ),

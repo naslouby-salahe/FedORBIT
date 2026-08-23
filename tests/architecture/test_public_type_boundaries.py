@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import ast
 import re
-from pathlib import Path
 
 from tests.architecture.scan import (
     BOUNDARY_PACKAGES,
+    CANONICAL_SERIALIZER_BOUNDARY_MODULES,
     iter_source_files,
     package_of,
     parse_module,
@@ -50,38 +50,30 @@ def test_public_classes_have_annotated_attributes() -> None:
 
 def test_boundary_packages_never_use_any_or_object() -> None:
     for path in iter_source_files():
-        package = package_of(relative_module(path))
-        if package not in BOUNDARY_PACKAGES:
+        module = relative_module(path)
+        if package_of(module) not in BOUNDARY_PACKAGES:
             continue
         tree = parse_module(path)
         for node in ast.walk(tree):
             if isinstance(node, ast.AnnAssign):
-                _assert_annotation_clean(node.annotation, path, "attribute")
+                _assert_annotation_clean(node.annotation, module, path, "attribute")
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                _assert_annotation_clean(node.returns, path, node.name)
+                _assert_annotation_clean(node.returns, module, path, node.name)
                 for argument in node.args.args:
-                    _assert_annotation_clean(argument.annotation, path, argument.arg)
+                    _assert_annotation_clean(argument.annotation, module, path, argument.arg)
 
 
-def _assert_annotation_clean(annotation: ast.expr | None, path: Path, owner: str) -> None:
+def _assert_annotation_clean(
+    annotation: ast.expr | None, module: str, path: object, owner: str
+) -> None:
     if annotation is None:
         return
     if isinstance(annotation, ast.Name) and annotation.id in {"Any", "object"}:
-        if _canonical_serializer_boundary(path):
+        if module in CANONICAL_SERIALIZER_BOUNDARY_MODULES:
             return
         raise AssertionError(f"forbidden {annotation.id!r} annotation in {path}:{owner}")
     if isinstance(annotation, ast.Subscript):
-        _assert_annotation_clean(annotation.value, path, owner)
-
-
-def _canonical_serializer_boundary(path: Path) -> bool:
-    return (
-        "fedorbit/domain/canonical.py" in str(path)
-        or "fedorbit/runtime/seeds.py" in str(path)
-        or "fedorbit/artifacts/manifests.py" in str(path)
-        or "fedorbit/artifacts/serialization.py" in str(path)
-        or "fedorbit/artifacts/evidence.py" in str(path)
-    )
+        _assert_annotation_clean(annotation.value, module, path, owner)
 
 
 def test_boundary_packages_never_return_anonymous_dicts() -> None:
@@ -131,7 +123,7 @@ def _is_bare_collection(annotation: ast.expr) -> bool:
 
 
 def _assert_not_dict_annotation(
-    annotation: ast.expr | None, path: Path, owner: str, role: str
+    annotation: ast.expr | None, path: object, owner: str, role: str
 ) -> None:
     if (
         isinstance(annotation, ast.Subscript)

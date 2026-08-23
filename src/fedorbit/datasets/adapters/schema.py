@@ -91,14 +91,23 @@ def resolve_timestamp_column(
     return column
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedLabelColumns:
+    multiclass_label_field: str
+    binary_label_field: str
+
+
 def resolve_label_columns(
     columns: tuple[str, ...],
     expected_multiclass: tuple[str, ...],
     expected_binary: tuple[str, ...],
-) -> tuple[str, str]:
-    multiclass = exactly_one_candidate(columns, expected_multiclass, "multiclass label")
-    binary = exactly_one_candidate(columns, expected_binary, "binary label")
-    return multiclass, binary
+) -> ResolvedLabelColumns:
+    return ResolvedLabelColumns(
+        multiclass_label_field=exactly_one_candidate(
+            columns, expected_multiclass, "multiclass label"
+        ),
+        binary_label_field=exactly_one_candidate(columns, expected_binary, "binary label"),
+    )
 
 
 def _lossless_float64(value: str | int | float) -> bool:

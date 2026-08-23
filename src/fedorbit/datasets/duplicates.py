@@ -4,6 +4,7 @@ import hashlib
 import math
 import struct
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,8 +25,22 @@ RawFeatureValue = str | int | float | np.float64 | None
 
 
 @dataclass(frozen=True, slots=True)
+class CanonicalFeatureVector:
+    values_by_feature: Mapping[str, RawFeatureValue]
+
+    def value_of(self, feature_name: str) -> RawFeatureValue:
+        return self.values_by_feature[feature_name]
+
+
+@dataclass(frozen=True, slots=True)
+class PartitionedFeatureValues:
+    numeric: CanonicalFeatureVector
+    categorical: CanonicalFeatureVector
+
+
+@dataclass(frozen=True, slots=True)
 class CanonicalRow:
-    features: dict[str, RawFeatureValue]
+    features: CanonicalFeatureVector
     label: str
     timestamp_fraction: float
     group_id: str
@@ -49,18 +64,14 @@ def _numeric_bytes(value: RawFeatureValue) -> bytes:
     return struct.pack("<d", float(str(value)))
 
 
-def canonical_row_bytes(
-    features: dict[str, RawFeatureValue],
-    schema_order: tuple[str, ...],
-    roles: dict[str, str],
-) -> bytes:
+def canonical_row_bytes(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> bytes:
     validity: list[int] = []
     data_buffers: list[bytes] = []
-    for column in schema_order:
-        role = roles.get(column)
+    for column in schema.canonical_feature_order:
+        role = schema.role_of(column)
         if role not in (BEHAVIORAL_NUMERIC_ROLE, BEHAVIORAL_CATEGORICAL_ROLE):
             continue
-        value = features[column]
+        value = row_features.value_of(column)
         if role == BEHAVIORAL_NUMERIC_ROLE:
             missing = value is None or (isinstance(value, float) and math.isnan(value))
             validity.append(0 if missing else 1)
@@ -76,45 +87,82 @@ def canonical_row_bytes(
     return bytes(validity_bytes) + b"".join(data_buffers)
 
 
-def exact_duplicate_hash(
-    features: dict[str, RawFeatureValue],
-    schema_order: tuple[str, ...],
-    roles: dict[str, str],
-) -> str:
-    return hashlib.sha256(canonical_row_bytes(features, schema_order, roles)).hexdigest()
+def exact_duplicate_hash(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> str:
+    return hashlib.sha256(canonical_row_bytes(row_features, schema)).hexdigest()
 
 
 def deduplicate_rows(
     schema: AdapterSchema,
     rows: tuple[CanonicalRow, ...],
-) -> tuple[tuple[str, tuple[CanonicalRow, ...]], ...]:
+) -> DuplicateGroups:
     groups: dict[str, list[CanonicalRow]] = {}
     for row in rows:
-        row_hash = exact_duplicate_hash(row.features, schema.canonical_feature_order, schema.roles)
+        row_hash = exact_duplicate_hash(row.features, schema)
         groups.setdefault(row_hash, []).append(row)
-    return tuple((row_hash, tuple(members)) for row_hash, members in groups.items())
+    return DuplicateGroups(
+        groups=tuple((row_hash, tuple(members)) for row_hash, members in groups.items())
+    )
 
 
-def validate_duplicate_groups(
-    groups: tuple[tuple[str, tuple[CanonicalRow, ...]], ...],
-) -> None:
-    for row_hash, members in groups:
-        labels = {member.label for member in members}
-        if len(labels) > 1:
+@dataclass(frozen=True, slots=True)
+class DuplicateGroupMembers:
+    group_sha256: str
+    members: tuple[CanonicalRow, ...]
+
+    def has_conflicting_labels(self) -> bool:
+        return len({member.label for member in self.members}) > 1
+
+    def conflicting_labels(self) -> tuple[str, ...]:
+        return tuple(sorted({member.label for member in self.members}))
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateGroups:
+    groups: tuple[tuple[str, tuple[CanonicalRow, ...]], ...]
+
+    def __post_init__(self) -> None:
+        seen: set[str] = set()
+        for group_sha256, _ in self.groups:
+            if group_sha256 in seen:
+                raise DuplicateError(f"duplicate group {group_sha256[:16]} appears more than once")
+            seen.add(group_sha256)
+
+    @property
+    def group_count(self) -> int:
+        return len(self.groups)
+
+    def members_of(self, group_sha256: str) -> tuple[CanonicalRow, ...] | None:
+        for candidate_sha256, members in self.groups:
+            if candidate_sha256 == group_sha256:
+                return members
+        return None
+
+    def as_member_records(self) -> tuple[DuplicateGroupMembers, ...]:
+        return tuple(
+            DuplicateGroupMembers(group_sha256=group_sha256, members=members)
+            for group_sha256, members in self.groups
+        )
+
+
+def validate_duplicate_groups(groups: DuplicateGroups) -> None:
+    for members in groups.as_member_records():
+        if members.has_conflicting_labels():
             raise DuplicateError(
-                f"duplicate group {row_hash[:16]} contains conflicting labels: {sorted(labels)}"
+                f"duplicate group {members.group_sha256[:16]} contains conflicting labels: "
+                f"{members.conflicting_labels()}"
             )
 
 
-def partition_features(
-    schema: AdapterSchema, row: CanonicalRow
-) -> tuple[dict[str, RawFeatureValue], dict[str, RawFeatureValue]]:
+def partition_features(schema: AdapterSchema, row: CanonicalRow) -> PartitionedFeatureValues:
     numeric: dict[str, RawFeatureValue] = {}
     categorical: dict[str, RawFeatureValue] = {}
     for column in schema.canonical_feature_order:
         role = schema.role_of(column)
         if role == BEHAVIORAL_NUMERIC_ROLE:
-            numeric[column] = row.features[column]
+            numeric[column] = row.features.value_of(column)
         elif role == BEHAVIORAL_CATEGORICAL_ROLE:
-            categorical[column] = row.features[column]
-    return numeric, categorical
+            categorical[column] = row.features.value_of(column)
+    return PartitionedFeatureValues(
+        numeric=CanonicalFeatureVector(numeric),
+        categorical=CanonicalFeatureVector(categorical),
+    )

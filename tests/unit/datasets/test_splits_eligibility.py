@@ -7,6 +7,7 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.eligibility import transfer_eligibility
 from fedorbit.datasets.feature_quality import (
     MISSING_TOKEN_VOCABULARY,
+    TrainingFeatureValues,
     categorical_vocabulary,
     evaluate_feature_quality,
     is_missing_token,
@@ -65,13 +66,13 @@ def test_midpoint_fraction_is_average() -> None:
 
 
 def test_duplicate_groups_assigned_chronologically(fedorbit_config: FedorbitConfig) -> None:
-    assignments = assign_duplicate_groups_chronologically(
+    assignment = assign_duplicate_groups_chronologically(
         fedorbit_config,
         (("g1", 0.1), ("g2", 0.9), ("g3", 0.75)),
     )
-    assert assignments["g1"] == Split.TRAIN
-    assert assignments["g2"] == Split.TEST
-    assert assignments["g3"] == Split.VALID
+    assert assignment.split_of("g1") == Split.TRAIN
+    assert assignment.split_of("g2") == Split.TEST
+    assert assignment.split_of("g3") == Split.VALID
 
 
 def test_source_eligibility_requires_train_and_meta(fedorbit_config: FedorbitConfig) -> None:
@@ -138,14 +139,16 @@ def test_feature_quality_drops_above_threshold(fedorbit_config: FedorbitConfig) 
         fedorbit_config,
         feature_names=("good", "bad", "finite", "extra1", "extra2", "extra3"),
         categorical_features=frozenset(),
-        train_values={
-            "good": np.array([1.0, 2.0, 3.0]),
-            "bad": np.array([np.nan, np.nan, 1.0]),
-            "finite": np.array([1.0, 1.0, 1.0]),
-            "extra1": np.array([1.0, 1.0, 1.0]),
-            "extra2": np.array([1.0, 1.0, 1.0]),
-            "extra3": np.array([1.0, 1.0, 1.0]),
-        },
+        train_values=TrainingFeatureValues(
+            {
+                "good": np.array([1.0, 2.0, 3.0]),
+                "bad": np.array([np.nan, np.nan, 1.0]),
+                "finite": np.array([1.0, 1.0, 1.0]),
+                "extra1": np.array([1.0, 1.0, 1.0]),
+                "extra2": np.array([1.0, 1.0, 1.0]),
+                "extra3": np.array([1.0, 1.0, 1.0]),
+            }
+        ),
     )
     good = next(f for f in report.candidate_features if f.name == "good")
     bad = next(f for f in report.candidate_features if f.name == "bad")
@@ -160,11 +163,13 @@ def test_client_invalid_when_dropped_fraction_exceeds(fedorbit_config: FedorbitC
         fedorbit_config,
         feature_names=("f1", "f2", "f3"),
         categorical_features=frozenset(),
-        train_values={
-            "f1": np.array([np.nan, np.nan]),
-            "f2": np.array([np.nan, np.nan]),
-            "f3": np.array([1.0, 1.0]),
-        },
+        train_values=TrainingFeatureValues(
+            {
+                "f1": np.array([np.nan, np.nan]),
+                "f2": np.array([np.nan, np.nan]),
+                "f3": np.array([1.0, 1.0]),
+            }
+        ),
     )
     assert report.client_invalid
     assert "dropped-feature fraction" in (report.client_invalid_reason or "")
@@ -177,7 +182,7 @@ def test_client_invalid_when_zero_candidate_features(
         fedorbit_config,
         feature_names=(),
         categorical_features=frozenset(),
-        train_values={},
+        train_values=TrainingFeatureValues({}),
     )
     assert report.client_invalid
     assert report.candidate_count_before_filtering == 0
@@ -188,10 +193,12 @@ def test_missing_indicator_threshold(fedorbit_config: FedorbitConfig) -> None:
         fedorbit_config,
         feature_names=("sparse", "dense"),
         categorical_features=frozenset(),
-        train_values={
-            "sparse": np.concatenate((np.array([np.nan, np.nan]), np.full(98, 1.0))),
-            "dense": np.full(100, 1.0),
-        },
+        train_values=TrainingFeatureValues(
+            {
+                "sparse": np.concatenate((np.array([np.nan, np.nan]), np.full(98, 1.0))),
+                "dense": np.full(100, 1.0),
+            }
+        ),
     )
     sparse = next(f for f in report.candidate_features if f.name == "sparse")
     dense = next(f for f in report.candidate_features if f.name == "dense")

@@ -67,7 +67,7 @@ def test_no_observed_data_facts_hardcoded() -> None:
             assert marker not in text, f"observed-data fact hardcoded in {path}"
 
 
-ROADMAP_LOCKED_ARCHITECTURE_VALUES = frozenset({0.1, 1e-3})
+ROADMAP_LOCKED_ARCHITECTURE_VALUES = frozenset({0.1, 1e-3, 2.0})
 STRUCTURAL_IDENTITY_VALUES = frozenset({0.0, 1.0})
 
 

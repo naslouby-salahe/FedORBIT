@@ -6,15 +6,24 @@ from fedorbit.datasets.adapters.contract import (
     edge_iiotset_adapter,
     ton_iot_adapter,
 )
-from fedorbit.datasets.adapters.registry import AdapterError, adapter_for, registered_adapters
+from fedorbit.datasets.adapters.registry import (
+    AdapterError,
+    DatasetAdapterRegistry,
+    adapter_for,
+    registered_adapters,
+)
 from fedorbit.datasets.adapters.schema import (
     AdapterSchema,
     SchemaError,
     role_for_field,
 )
 from fedorbit.datasets.duplicates import (
+    CanonicalFeatureVector,
     CanonicalRow,
     DuplicateError,
+    DuplicateGroupMembers,
+    DuplicateGroups,
+    PartitionedFeatureValues,
     canonical_row_bytes,
     deduplicate_rows,
     exact_duplicate_hash,
@@ -34,6 +43,7 @@ from fedorbit.datasets.feature_quality import (
     CandidateFeature,
     FeatureQualityError,
     FeatureQualityReport,
+    TrainingFeatureValues,
     categorical_vocabulary,
     evaluate_feature_quality,
     is_missing_token,
@@ -57,6 +67,7 @@ from fedorbit.datasets.ontology import (
     transfer_concept_for,
 )
 from fedorbit.datasets.splits import (
+    DuplicateGroupSplitAssignment,
     SplitError,
     assign_duplicate_groups_chronologically,
     duplicate_group_midpoint_fraction,
@@ -78,18 +89,25 @@ __all__ = [
     "AdapterError",
     "AdapterSchema",
     "CandidateFeature",
+    "CanonicalFeatureVector",
     "CanonicalRow",
     "DatasetAdapter",
+    "DatasetAdapterRegistry",
     "DatasetManifest",
     "DuplicateError",
+    "DuplicateGroupMembers",
+    "DuplicateGroupSplitAssignment",
+    "DuplicateGroups",
     "EligibilityCopyKind",
     "EligibilityError",
     "FeatureQualityError",
     "FeatureQualityReport",
     "OntologyError",
+    "PartitionedFeatureValues",
     "SchemaError",
     "SemanticCellManifest",
     "SplitError",
+    "TrainingFeatureValues",
     "TransferEligibility",
     "TransferEligibilityManifest",
     "adapter_for",

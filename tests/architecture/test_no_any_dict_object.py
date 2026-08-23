@@ -3,7 +3,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from tests.architecture.scan import iter_source_files, parse_module, relative_module
+from tests.architecture.scan import (
+    CANONICAL_SERIALIZER_BOUNDARY_MODULES,
+    iter_source_files,
+    parse_module,
+    relative_module,
+)
 
 
 def test_no_any_imports_in_production() -> None:
@@ -39,13 +44,7 @@ def test_no_object_annotations_in_production() -> None:
 
 
 def _canonical_boundary(path: Path) -> bool:
-    return (
-        "fedorbit/domain/canonical.py" in str(path)
-        or "fedorbit/runtime/seeds.py" in str(path)
-        or "fedorbit/artifacts/manifests.py" in str(path)
-        or "fedorbit/artifacts/serialization.py" in str(path)
-        or "fedorbit/artifacts/evidence.py" in str(path)
-    )
+    return relative_module(path) in CANONICAL_SERIALIZER_BOUNDARY_MODULES
 
 
 def test_no_typing_object_usage() -> None:

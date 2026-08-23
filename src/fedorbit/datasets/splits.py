@@ -1,11 +1,27 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import Split
 
 
 class SplitError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateGroupSplitAssignment:
+    assignments: tuple[tuple[str, Split], ...]
+
+    def split_of(self, group_id: str) -> Split | None:
+        for group, split in self.assignments:
+            if group == group_id:
+                return split
+        return None
+
+    def groups_in_split(self, split: Split) -> tuple[str, ...]:
+        return tuple(group for group, assigned in self.assignments if assigned == split)
 
 
 def interval_edges(config: FedorbitConfig) -> tuple[tuple[Split, float, float], ...]:
@@ -37,6 +53,11 @@ def duplicate_group_midpoint_fraction(
 def assign_duplicate_groups_chronologically(
     config: FedorbitConfig,
     duplicate_group_midpoints: tuple[tuple[str, float], ...],
-) -> dict[str, Split]:
+) -> DuplicateGroupSplitAssignment:
     ordered = sorted(duplicate_group_midpoints, key=lambda pair: pair[1])
-    return {group_id: split_for_duplicate_group(config, midpoint) for group_id, midpoint in ordered}
+    return DuplicateGroupSplitAssignment(
+        assignments=tuple(
+            (group_id, split_for_duplicate_group(config, midpoint))
+            for group_id, midpoint in ordered
+        )
+    )

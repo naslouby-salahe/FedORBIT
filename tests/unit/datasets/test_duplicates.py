@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import unicodedata
 
 import pytest
 
@@ -136,18 +137,24 @@ def test_numeric_zero_is_distinct_from_missing() -> None:
 def test_categorical_nfc_normalization_before_hashing() -> None:
     schema = _edge_schema()
     assert schema.role_of("http.request.method") == FORBIDDEN_PROVENANCE_ROLE
-    nfc_features: dict[str, str | int | float | None] = {
+    base_features: dict[str, str | int | float | None] = {
         "frame.time": "0",
         "ip.src_host": "x",
-        "http.request.method": "GET",
+        "http.request.method": "G",
         "tcp.ack": 1.0,
         "http.file_data": "d",
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    decomposed = canonical_row_bytes(CanonicalFeatureVector(nfc_features), schema)
-    composed = canonical_row_bytes(CanonicalFeatureVector(nfc_features), schema)
-    assert decomposed == composed
+    decomposed_form = unicodedata.normalize("NFD", "e\u0301")
+    composed_form = unicodedata.normalize("NFC", "e\u0301")
+    decomposed_features = dict(base_features)
+    decomposed_features["http.file_data"] = decomposed_form
+    composed_features = dict(base_features)
+    composed_features["http.file_data"] = composed_form
+    decomposed_bytes = canonical_row_bytes(CanonicalFeatureVector(decomposed_features), schema)
+    composed_bytes = canonical_row_bytes(CanonicalFeatureVector(composed_features), schema)
+    assert decomposed_bytes == composed_bytes
 
 
 def test_exact_duplicate_hash_deterministic() -> None:

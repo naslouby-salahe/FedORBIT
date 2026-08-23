@@ -121,6 +121,24 @@ def _support_block_counts(
     return tuple(counts)
 
 
+def _fixed_active_contribution(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    image_by_target: dict[int, int],
+) -> float:
+    active_targets = sorted(image_by_target.keys())
+    coordinates = alpha.coordinates
+    total_cost = 0.0
+    lower = problem.lower_response_matrix
+    for target in active_targets:
+        weight = float(problem.target_importance[target])
+        source_image = image_by_target[target]
+        for j in active_targets:
+            column_image = image_by_target[j]
+            total_cost += weight * float(coordinates[j]) * float(lower[source_image, column_image])
+    return total_cost
+
+
 def _evaluate_active_image_map(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -128,21 +146,26 @@ def _evaluate_active_image_map(
     lap_tie_tolerance: float,
 ) -> tuple[float, tuple[int, ...]]:
     blocks = problem.blocks
-    coordinates = alpha.coordinates
     image_by_target: dict[int, int] = dict(mapping.fixed_pairs())
+    fixed_cost = _fixed_active_contribution(problem, alpha, image_by_target)
+    completion_cost, images = _complete_with_blockwise_laps(
+        problem, alpha, image_by_target, lap_tie_tolerance
+    )
+    del blocks
+    return fixed_cost + completion_cost, images
+
+
+def _complete_with_blockwise_laps(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    image_by_target: dict[int, int],
+    lap_tie_tolerance: float,
+) -> tuple[float, tuple[int, ...]]:
+    blocks = problem.blocks
     used_sources = set(image_by_target.values())
     active_targets = sorted(image_by_target.keys())
-    total_cost = 0.0
-    for target in active_targets:
-        weight = float(problem.target_importance[target])
-        for j in active_targets:
-            source_image = image_by_target[target]
-            column_image = image_by_target[j]
-            total_cost += (
-                weight
-                * float(coordinates[j])
-                * float(problem.lower_response_matrix[source_image, column_image])
-            )
+    coordinates = alpha.coordinates
+    completion_cost = 0.0
     full_assignment = dict(image_by_target)
     for block_index in range(len(blocks.padded_size_tuple)):
         remaining_targets = [
@@ -161,17 +184,16 @@ def _evaluate_active_image_map(
             for column_index, source_node in enumerate(unused_sources):
                 accumulated = 0.0
                 for j in active_targets:
-                    column_image = image_by_target[j]
                     accumulated += float(coordinates[j]) * float(
-                        problem.lower_response_matrix[source_node, column_image]
+                        problem.lower_response_matrix[source_node, image_by_target[j]]
                     )
                 cost_matrix[row_index, column_index] = weight * accumulated
         assignment = solve_minimum_cost_assignment(cost_matrix, lap_tie_tolerance)
-        total_cost += assignment.objective_value
+        completion_cost += assignment.objective_value
         for local_row, local_column in enumerate(assignment.column_for_row):
             full_assignment[remaining_targets[local_row]] = unused_sources[local_column]
     images = tuple(full_assignment[node] for node in range(blocks.total_padded_nodes))
-    return total_cost, images
+    return completion_cost, images
 
 
 def scenario_cut_row(

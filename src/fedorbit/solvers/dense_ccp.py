@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 import highspy
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.models import ExactSparseSolverConfig, FedorbitConfig
 from fedorbit.domain.enums import RngNamespace, TerminalState
 from fedorbit.orbit.correspondence import (
     BlockCorrespondence,
@@ -116,30 +116,39 @@ def assignment_variable_keys(
     return AssignmentVariableLayout.build(blocks)
 
 
+def _collect_block_products_for_target_pair(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    target_k: int,
+    target_j: int,
+    block_index: int,
+    coefficients: dict[tuple[int, int, int, int], float],
+) -> None:
+    blocks = problem.blocks
+    weight = float(problem.target_importance[target_k])
+    action_value = float(alpha.coordinates[target_j])
+    lower = problem.lower_response_matrix
+    sources = list(blocks.block_index_range(block_index))
+    for source_a in sources:
+        for source_b in sources:
+            coefficient = weight * action_value * float(lower[source_a, source_b])
+            if coefficient:
+                coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+
+
 def _nonzero_product_coefficients(
     problem: RobustActionProblem, alpha: CurriculumAction
 ) -> dict[tuple[int, int, int, int], float]:
     coefficients: dict[tuple[int, int, int, int], float] = {}
     blocks = problem.blocks
-    lower = problem.lower_response_matrix
-    importance = problem.target_importance
-    coordinates = alpha.coordinates
     for target_k in range(blocks.total_padded_nodes):
-        weight = float(importance[target_k])
-        if weight == 0.0:
-            continue
         block_of_k = blocks.block_of_node(target_k)
         for target_j in range(blocks.total_padded_nodes):
             if blocks.block_of_node(target_j) != block_of_k:
                 continue
-            action_value = float(coordinates[target_j])
-            if action_value == 0.0:
-                continue
-            for source_a in blocks.block_index_range(block_of_k):
-                for source_b in blocks.block_index_range(block_of_k):
-                    coefficient = weight * action_value * float(lower[source_a, source_b])
-                    if coefficient != 0.0:
-                        coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+            _collect_block_products_for_target_pair(
+                problem, alpha, target_k, target_j, block_of_k, coefficients
+            )
     return coefficients
 
 
@@ -158,35 +167,20 @@ def integrality_residual(assignment_values: NDArray[np.float64]) -> float:
     return float(np.max(distances))
 
 
-def solve_lifted_lp(
-    problem: RobustActionProblem,
-    alpha: CurriculumAction,
-    config: FedorbitConfig,
+@dataclass(frozen=True, slots=True)
+class _LiftedConstraintMatrix:
+    row_lower: tuple[float, ...]
+    row_upper: tuple[float, ...]
+    start: tuple[int, ...]
+    index: tuple[int, ...]
+    value: tuple[float, ...]
+
+
+def _append_lifted_assignment_rows(
+    blocks: PaddedBlockStructure,
     layout: AssignmentVariableLayout,
-    penalty_coefficient: float,
-    linearization_point: NDArray[np.float64],
-) -> LiftedRelaxationSolution:
-    blocks = problem.blocks
-    product_map = _nonzero_product_coefficients(problem, alpha)
-    product_keys = sorted(product_map)
-    product_column = {key: layout.size + offset for offset, key in enumerate(product_keys)}
-    total_columns = layout.size + len(product_keys)
-
-    infinity = highspy.kHighsInf
-    rows_lower: list[float] = []
-    rows_upper: list[float] = []
-    starts = [0]
-    indices: list[int] = []
-    values: list[float] = []
-
-    def add_row(entries: dict[int, float], lower: float, upper: float) -> None:
-        for column in sorted(entries):
-            indices.append(column)
-            values.append(entries[column])
-        starts.append(len(indices))
-        rows_lower.append(lower)
-        rows_upper.append(upper)
-
+    add_row: Callable[[dict[int, float], float, float], None],
+) -> None:
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
         sources = list(blocks.block_index_range(block_index))
@@ -208,19 +202,49 @@ def solve_lifted_lp(
                 1.0,
                 1.0,
             )
+
+
+def _build_lifted_constraint_matrix(
+    blocks: PaddedBlockStructure,
+    layout: AssignmentVariableLayout,
+    product_keys: list[tuple[int, int, int, int]],
+    product_column: dict[tuple[int, int, int, int], int],
+) -> _LiftedConstraintMatrix:
+    infinity = highspy.kHighsInf
+    row_lower: list[float] = []
+    row_upper: list[float] = []
+    start: list[int] = [0]
+    index: list[int] = []
+    value: list[float] = []
+
+    def add_row(entries: dict[int, float], lower: float, upper: float) -> None:
+        for column in sorted(entries):
+            index.append(column)
+            value.append(entries[column])
+        start.append(len(index))
+        row_lower.append(lower)
+        row_upper.append(upper)
+
+    _append_lifted_assignment_rows(blocks, layout, add_row)
     for product_key in product_keys:
         source_a, source_b, target_k, target_j = product_key
         y_column = product_column[product_key]
-        upper_p_ak: dict[int, float] = {
-            y_column: 1.0,
-            layout.column_of(AssignmentVariableKey(source_a, target_k)): -1.0,
-        }
-        add_row(upper_p_ak, -infinity, 0.0)
-        upper_p_bj: dict[int, float] = {
-            y_column: 1.0,
-            layout.column_of(AssignmentVariableKey(source_b, target_j)): -1.0,
-        }
-        add_row(upper_p_bj, -infinity, 0.0)
+        add_row(
+            {
+                y_column: 1.0,
+                layout.column_of(AssignmentVariableKey(source_a, target_k)): -1.0,
+            },
+            -infinity,
+            0.0,
+        )
+        add_row(
+            {
+                y_column: 1.0,
+                layout.column_of(AssignmentVariableKey(source_b, target_j)): -1.0,
+            },
+            -infinity,
+            0.0,
+        )
         lower_combined: dict[int, float] = {}
         for node_pair in (
             AssignmentVariableKey(source_a, target_k),
@@ -230,27 +254,66 @@ def solve_lifted_lp(
             lower_combined[column] = lower_combined.get(column, 0.0) + 1.0
         lower_combined[y_column] = -1.0
         add_row(lower_combined, -infinity, 1.0)
+    return _LiftedConstraintMatrix(
+        row_lower=tuple(row_lower),
+        row_upper=tuple(row_upper),
+        start=tuple(start),
+        index=tuple(index),
+        value=tuple(value),
+    )
 
-    col_cost = [0.0] * total_columns
+
+def _lifted_objective_vector(
+    layout: AssignmentVariableLayout,
+    product_map: dict[tuple[int, int, int, int], float],
+    product_keys: list[tuple[int, int, int, int]],
+    penalty_coefficient: float,
+    linearization_point: NDArray[np.float64],
+) -> list[float]:
+    product_column = {key: layout.size + offset for offset, key in enumerate(product_keys)}
+    col_cost = [0.0] * (layout.size + len(product_keys))
     for key in product_keys:
         col_cost[product_column[key]] = product_map[key]
     if penalty_coefficient > 0.0:
-        for position, _key in enumerate(layout.columns):
+        for position in range(layout.size):
             point_value = float(linearization_point[position])
             col_cost[position] += penalty_coefficient * (1.0 - 2.0 * point_value)
+    return col_cost
 
+
+def solve_lifted_lp(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    config: FedorbitConfig,
+    layout: AssignmentVariableLayout,
+    penalty_coefficient: float,
+    linearization_point: NDArray[np.float64],
+) -> LiftedRelaxationSolution:
+    product_map = _nonzero_product_coefficients(problem, alpha)
+    product_keys = sorted(product_map)
+    product_column = {key: layout.size + offset for offset, key in enumerate(product_keys)}
+    matrix = _build_lifted_constraint_matrix(problem.blocks, layout, product_keys, product_column)
+    col_cost = _lifted_objective_vector(
+        layout,
+        product_map,
+        product_keys,
+        penalty_coefficient,
+        linearization_point,
+    )
+
+    infinity = highspy.kHighsInf
     lp = highspy.HighsLp()
-    lp.num_col_ = total_columns
-    lp.num_row_ = len(rows_lower)
+    lp.num_col_ = layout.size + len(product_keys)
+    lp.num_row_ = len(matrix.row_lower)
     lp.col_cost_ = col_cost
     lp.col_lower_ = [0.0] * layout.size + [-infinity] * len(product_keys)
     lp.col_upper_ = [1.0] * layout.size + [infinity] * len(product_keys)
-    lp.row_lower_ = rows_lower
-    lp.row_upper_ = rows_upper
+    lp.row_lower_ = list(matrix.row_lower)
+    lp.row_upper_ = list(matrix.row_upper)
     lp.a_matrix_.format_ = highspy.MatrixFormat.kRowwise
-    lp.a_matrix_.start_ = starts
-    lp.a_matrix_.index_ = indices
-    lp.a_matrix_.value_ = values
+    lp.a_matrix_.start_ = list(matrix.start)
+    lp.a_matrix_.index_ = list(matrix.index)
+    lp.a_matrix_.value_ = list(matrix.value)
 
     highs = highspy.Highs()
     highs.setOptionValue("output_flag", False)
@@ -432,6 +495,48 @@ def response_only_objective(
     return float(problem.target_importance @ permuted @ alpha.coordinates)
 
 
+def _evaluate_projected_candidates(
+    problem: RobustActionProblem,
+    config: FedorbitConfig,
+    layout: AssignmentVariableLayout,
+    alpha: CurriculumAction,
+    seed: int,
+    contrast_coordinates: str,
+    deadline: float,
+) -> tuple[list[ProjectedCandidate], bool]:
+    candidates: list[ProjectedCandidate] = []
+    for start in dense_starts(layout, seed, contrast_coordinates):
+        if time.monotonic() > deadline:
+            return candidates, True
+        trajectory = ccp_trajectory(problem, alpha, start, config, layout)
+        correspondence = project_to_permutation(config, layout, trajectory.final_assignment)
+        candidates.append(
+            ProjectedCandidate(
+                correspondence=correspondence,
+                response_objective=response_only_objective(problem, alpha, correspondence),
+                integrality_residual=trajectory.integrality_residual,
+            )
+        )
+    return candidates, False
+
+
+def _select_best_projected_candidate(
+    candidates: list[ProjectedCandidate],
+    exact_settings: ExactSparseSolverConfig,
+) -> ProjectedCandidate:
+    best_response = min(candidate.response_objective for candidate in candidates)
+    tied = [
+        candidate
+        for candidate in candidates
+        if actions_tied_within_tolerance(
+            candidate.response_objective,
+            best_response,
+            exact_settings.action_tie_tolerance,
+        )
+    ]
+    return min(tied, key=lambda entry: entry.correspondence.ordering_key())
+
+
 def solve_dense_ccp(
     problem: RobustActionProblem,
     config: FedorbitConfig,
@@ -464,33 +569,14 @@ def solve_dense_ccp(
         selected_action = alpha
         relaxation = relaxed_fixed_action_lower_bound(problem, alpha, config, layout)
         lower_bound = relaxation.objective_value
-        candidates: list[ProjectedCandidate] = []
-        for start in dense_starts(layout, seed, contrast_coordinates):
-            if time.monotonic() > deadline:
-                terminal_state = TerminalState.TIME_LIMIT
-                break
-            trajectory = ccp_trajectory(problem, alpha, start, config, layout)
-            correspondence = project_to_permutation(config, layout, trajectory.final_assignment)
-            candidates.append(
-                ProjectedCandidate(
-                    correspondence=correspondence,
-                    response_objective=response_only_objective(problem, alpha, correspondence),
-                    integrality_residual=trajectory.integrality_residual,
-                )
-            )
+        candidates, timed_out = _evaluate_projected_candidates(
+            problem, config, layout, alpha, seed, contrast_coordinates, deadline
+        )
+        if timed_out:
+            terminal_state = TerminalState.TIME_LIMIT
         if terminal_state is not None or not candidates:
             break
-        best_response = min(candidate.response_objective for candidate in candidates)
-        tied = [
-            candidate
-            for candidate in candidates
-            if actions_tied_within_tolerance(
-                candidate.response_objective,
-                best_response,
-                exact_settings.action_tie_tolerance,
-            )
-        ]
-        best_candidate = min(tied, key=lambda entry: entry.correspondence.ordering_key())
+        best_candidate = _select_best_projected_candidate(candidates, exact_settings)
         full_objective = evaluate_objective(alpha, best_candidate.correspondence)
         violation = master_objective - full_objective
         is_new = best_candidate.correspondence not in scenarios

@@ -122,7 +122,8 @@ def test_qap_robust_action_agrees_with_exact_sparse_solver() -> None:
     problem = _two_block_problem(33)
     sparse_solution = solve_robust_action(problem, config, support_limit=1)
     qap_outcome = solve_robust_action_qap(problem, config, support_limit=1)
-    assert qap_outcome.is_exact and qap_outcome.certified_solution is not None
+    assert qap_outcome.is_exact
+    assert qap_outcome.certified_solution is not None
     qap_solution = qap_outcome.certified_solution
     assert qap_solution.certified_robust_value == pytest.approx(
         sparse_solution.certified_robust_value, abs=1e-8

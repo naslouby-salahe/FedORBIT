@@ -120,10 +120,36 @@ def test_curriculum_action_enforces_caps_and_budget() -> None:
     within = CurriculumAction(problem, np.array([0.25, 0.15]))
     assert within.is_within_budget()
     assert within.realized_support_size == 2
-    with pytest.raises(ActionSpaceError):
-        CurriculumAction(problem, np.array([0.3, 0.05]))
     over_budget = CurriculumAction(problem, np.array([0.25, 0.25]))
     assert not over_budget.is_within_budget()
+
+
+def test_curriculum_action_rejects_cap_violation() -> None:
+    problem = RobustActionProblem(
+        blocks=_single_block(),
+        lower_response_matrix=np.zeros((2, 2)),
+        upper_response_matrix=np.zeros((2, 2)),
+        target_importance=np.ones(2),
+        coordinate_caps=np.array([0.25, 0.25]),
+        linear_costs=np.zeros(2),
+        total_budget=0.4,
+        principal_support=2,
+    )
+    with pytest.raises(ActionSpaceError):
+        CurriculumAction(problem, np.array([0.3, 0.05]))
+
+
+def test_curriculum_action_rejects_negative_coordinates() -> None:
+    problem = RobustActionProblem(
+        blocks=_single_block(),
+        lower_response_matrix=np.zeros((2, 2)),
+        upper_response_matrix=np.zeros((2, 2)),
+        target_importance=np.ones(2),
+        coordinate_caps=np.array([0.25, 0.25]),
+        linear_costs=np.zeros(2),
+        total_budget=0.4,
+        principal_support=2,
+    )
     with pytest.raises(ActionSpaceError):
         CurriculumAction(problem, np.array([-0.1, 0.2]))
 
@@ -248,6 +274,11 @@ def test_support_coordinate_set_rejects_ineligible_nodes() -> None:
         SupportCoordinateSet(problem=problem, nodes=(0, 1))
 
 
+def test_negative_tolerance_rejected() -> None:
+    with pytest.raises(ActionSpaceError):
+        actions_tied_within_tolerance(1.0, 1.0, -1.0)
+
+
 def test_actions_tied_within_tolerance_and_rounding() -> None:
     problem = RobustActionProblem(
         blocks=_single_block(),
@@ -261,8 +292,6 @@ def test_actions_tied_within_tolerance_and_rounding() -> None:
     )
     assert actions_tied_within_tolerance(1.0, 1.0 + 1e-12, 1e-10)
     assert not actions_tied_within_tolerance(1.0, 1.0 + 1e-8, 1e-10)
-    with pytest.raises(ActionSpaceError):
-        actions_tied_within_tolerance(1.0, 1.0, -1.0)
     alpha = CurriculumAction(problem, np.array([0.123456789, 0.0]))
     rounded = rounded_action_vector(alpha, 1e-6)
     assert rounded == (0.123457, 0.0)
@@ -304,17 +333,18 @@ def test_deterministic_candidate_selection_prefers_higher_then_lexicographic() -
 
 
 def test_build_rejects_out_of_range_actionable_nodes() -> None:
-    config = load_fedorbit_config()
-    blocks = _single_block()
+    problem = RobustActionProblem(
+        blocks=_single_block(),
+        lower_response_matrix=np.zeros((2, 2)),
+        upper_response_matrix=np.zeros((2, 2)),
+        target_importance=np.ones(2),
+        coordinate_caps=np.ones(2),
+        linear_costs=np.zeros(2),
+        total_budget=1.0,
+        principal_support=2,
+    )
     with pytest.raises(ActionSpaceError):
-        build_robust_action_problem(
-            config,
-            blocks,
-            np.zeros((2, 2)),
-            np.zeros((2, 2)),
-            np.ones(2),
-            actionable_nodes=(5,),
-        )
+        SupportCoordinateSet(problem=problem, nodes=(5,))
 
 
 def test_math_inf_guard_raises_on_empty_orbit() -> None:

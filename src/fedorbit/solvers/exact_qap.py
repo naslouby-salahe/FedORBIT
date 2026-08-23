@@ -130,6 +130,38 @@ def _add_mccormick_products(
     return objective_terms
 
 
+def _fixed_action_product_coefficients(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+) -> dict[tuple[int, int, int, int], float]:
+    blocks = problem.blocks
+    lower = problem.lower_response_matrix
+    importance = problem.target_importance
+    coordinates = alpha.coordinates
+    coefficients: dict[tuple[int, int, int, int], float] = {}
+    for target_k in range(blocks.total_padded_nodes):
+        weight = float(importance[target_k])
+        for target_j in alpha.active_support_nodes:
+            action_value = float(coordinates[target_j])
+            sources_for_k = list(blocks.block_index_range(blocks.block_of_node(target_k)))
+            sources_for_j = list(blocks.block_index_range(blocks.block_of_node(target_j)))
+            for source_a in sources_for_k:
+                for source_b in sources_for_j:
+                    coefficient = weight * action_value * float(lower[source_a, source_b])
+                    if coefficient:
+                        coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+    return coefficients
+
+
+def _uncertified_result(reason: TerminalState | None) -> QapSeparatorResult:
+    return QapSeparatorResult(
+        correspondence=None,
+        objective_value=None,
+        certified=False,
+        terminal_state=reason or TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC,
+    )
+
+
 def fixed_action_worst_correspondence_qap(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -139,23 +171,7 @@ def fixed_action_worst_correspondence_qap(
     if not active_nodes:
         raise SolverExecutionError("QAP separator requires a nonzero action")
     blocks = problem.blocks
-    lower = problem.lower_response_matrix
-    importance = problem.target_importance
-    coordinates = alpha.coordinates
-    coefficients: dict[tuple[int, int, int, int], float] = {}
-    for target_k in range(blocks.total_padded_nodes):
-        weight = float(importance[target_k])
-        if weight == 0.0:
-            continue
-        for target_j in active_nodes:
-            action_value = float(coordinates[target_j])
-            if action_value == 0.0:
-                continue
-            for source_a in blocks.block_index_range(blocks.block_of_node(target_k)):
-                for source_b in blocks.block_index_range(blocks.block_of_node(target_j)):
-                    coefficient = weight * action_value * float(lower[source_a, source_b])
-                    if coefficient != 0.0:
-                        coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+    coefficients = _fixed_action_product_coefficients(problem, alpha)
     deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     model = Model("qap_fixed_action")
     _configure_model(model, config, deadline)
@@ -164,22 +180,11 @@ def fixed_action_worst_correspondence_qap(
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
     model.optimize()
     status = model.getStatus()
-    limit_state = _terminal_state_for(status)
     if status != "optimal":
-        return QapSeparatorResult(
-            correspondence=None,
-            objective_value=None,
-            certified=False,
-            terminal_state=limit_state or TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC,
-        )
+        return _uncertified_result(_terminal_state_for(status))
     gap = float(model.getGap())
     if not math.isfinite(gap) or gap > config.solvers.generic_exact_qap.relative_mip_gap:
-        return QapSeparatorResult(
-            correspondence=None,
-            objective_value=None,
-            certified=False,
-            terminal_state=TerminalState.TIME_LIMIT,
-        )
+        return _uncertified_result(TerminalState.TIME_LIMIT)
     images = _extract_images(model, assignment_variables, blocks)
     correspondence = BlockCorrespondence(blocks=blocks, images=images)
     return QapSeparatorResult(
@@ -208,7 +213,7 @@ def point_correspondence_commitment(
         coefficient = -float(
             source_response_matrix[source_a, source_b] * target_response_matrix[target_k, target_j]
         )
-        if coefficient != 0.0:
+        if coefficient:
             coefficients[(source_a, source_b, target_k, target_j)] = coefficient
     deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     model = Model("qap_point_correspondence")

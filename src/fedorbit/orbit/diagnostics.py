@@ -36,6 +36,29 @@ def fixed_action_rectangularization_gap(
     return gap
 
 
+def _same_group_block_means(
+    block_entries: NDArray[np.float64],
+) -> tuple[float, float]:
+    diagonal_mean = float(np.mean(np.diag(block_entries)))
+    off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
+    off_diagonal_values = block_entries[off_diagonal_mask]
+    off_diagonal_mean = float(np.mean(off_diagonal_values)) if off_diagonal_values.size else 0.0
+    return diagonal_mean, off_diagonal_mean
+
+
+def _fill_target_block(
+    mean: NDArray[np.float64],
+    targets_rows: range,
+    targets_columns: range,
+    fill_diagonal: float,
+    fill_off_diagonal: float,
+) -> None:
+    for target_k in targets_rows:
+        for target_j in targets_columns:
+            value = fill_diagonal if target_k == target_j else fill_off_diagonal
+            mean[target_k, target_j] = value
+
+
 def analytic_orbit_mean(
     blocks: PaddedBlockStructure,
     response_matrix: NDArray[np.float64],
@@ -44,31 +67,18 @@ def analytic_orbit_mean(
     if response_matrix.shape != (size, size):
         raise ActionSpaceError("response matrix shape mismatch for analytic orbit mean")
     mean = np.zeros((size, size), dtype=np.float64)
-    block_count = len(blocks.padded_sizes.per_block)
-    for g in range(block_count):
-        source_range_g = blocks.block_index_range(g)
-        for h in range(block_count):
-            source_range_h = blocks.block_index_range(h)
-            block_entries = response_matrix[np.ix_(source_range_g, source_range_h)]
-            target_range_g = list(source_range_g)
-            target_range_h = list(source_range_h)
-            if g == h:
-                diagonal_mean = float(np.mean(np.diag(block_entries)))
-                off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
-                off_diagonal_values = block_entries[off_diagonal_mask]
-                off_diagonal_mean = (
-                    float(np.mean(off_diagonal_values)) if off_diagonal_values.size else 0.0
-                )
-                for target_k in target_range_g:
-                    for target_j in target_range_h:
-                        mean[target_k, target_j] = (
-                            diagonal_mean if target_k == target_j else off_diagonal_mean
-                        )
+    block_count = len(blocks.padded_size_tuple)
+    for group_source in range(block_count):
+        rows = blocks.block_index_range(group_source)
+        for group_target in range(block_count):
+            columns = blocks.block_index_range(group_target)
+            block_entries = response_matrix[np.ix_(rows, columns)]
+            if group_source == group_target:
+                diagonal_mean, off_diagonal_mean = _same_group_block_means(block_entries)
+                _fill_target_block(mean, rows, columns, diagonal_mean, off_diagonal_mean)
             else:
                 block_mean = float(np.mean(block_entries))
-                for target_k in target_range_g:
-                    for target_j in target_range_h:
-                        mean[target_k, target_j] = block_mean
+                _fill_target_block(mean, rows, columns, block_mean, block_mean)
     return mean
 
 

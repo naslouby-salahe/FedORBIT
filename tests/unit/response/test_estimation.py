@@ -54,7 +54,9 @@ def test_shadow_batch_schedule_retains_partial_batch_and_replays() -> None:
     second_pass = tuple(next(second) for _ in range(3))
     assert [int(batch.shape[0]) for batch in first_pass] == [4, 4, 2]
     assert tuple(sorted(int(value) for batch in first_pass for value in batch)) == tuple(range(10))
-    assert all(torch.equal(left, right) for left, right in zip(first_pass, second_pass, strict=True))
+    assert all(
+        torch.equal(left, right) for left, right in zip(first_pass, second_pass, strict=True)
+    )
 
 
 def test_shadow_batch_schedule_rejects_invalid_sizes() -> None:

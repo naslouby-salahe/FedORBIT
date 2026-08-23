@@ -76,7 +76,9 @@ def validate_anonymous_node_ids(node_ids: tuple[str, ...]) -> None:
         raise StrictResourceViolationError("anonymous node identifier list is empty")
     expected = tuple(f"node-{index:04d}" for index in range(1, len(node_ids) + 1))
     if node_ids != expected:
-        raise StrictResourceViolationError("anonymous node identifiers are not canonical sequential IDs")
+        raise StrictResourceViolationError(
+            "anonymous node identifiers are not canonical sequential IDs"
+        )
     if any(_ANONYMOUS_NODE_PATTERN.fullmatch(node_id) is None for node_id in node_ids):
         raise StrictResourceViolationError("invalid anonymous node identifier")
 

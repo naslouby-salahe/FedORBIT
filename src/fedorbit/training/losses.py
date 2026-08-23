@@ -19,7 +19,9 @@ class ClassWeights:
             raise LossContractError("TRAIN targets must be a non-empty one-dimensional tensor")
         if n_classes <= 0:
             raise LossContractError("class count must be positive")
-        counts = torch.bincount(targets.to(dtype=torch.long), minlength=n_classes).to(dtype=torch.float64)
+        counts = torch.bincount(targets.to(dtype=torch.long), minlength=n_classes).to(
+            dtype=torch.float64
+        )
         if bool((counts <= 0).any()):
             raise LossContractError("every local prediction class must have TRAIN support")
         total = float(counts.sum())

@@ -16,9 +16,7 @@ from fedorbit.training.trainer import SelectedHyperparameters, TrainingOutcome, 
 
 REFERENCE_LEARNING_RATE = 1.0e-3
 NETWORK_DATASETS = frozenset({DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK})
-HOST_DATASETS = frozenset(
-    {DatasetId.TON_IOT_WINDOWS10_HOST, DatasetId.TON_IOT_LINUX_PROCESS_HOST}
-)
+HOST_DATASETS = frozenset({DatasetId.TON_IOT_WINDOWS10_HOST, DatasetId.TON_IOT_LINUX_PROCESS_HOST})
 
 
 class PilotError(ValueError):
@@ -112,7 +110,9 @@ def run_base_model_pilot(
 def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSelection:
     grouped: dict[PilotConfiguration, list[float]] = {}
     for result in results:
-        grouped.setdefault(result.configuration, []).append(result.outcome.valid_macro_cross_entropy)
+        grouped.setdefault(result.configuration, []).append(
+            result.outcome.valid_macro_cross_entropy
+        )
     candidates: list[PilotSelection] = []
     for configuration, values in grouped.items():
         if len(values) != 3:

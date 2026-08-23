@@ -53,7 +53,9 @@ def max_t_critical_value(
 ) -> float:
     final = config.scientific.source_response_final
     resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
-    level = confidence_level if confidence_level is not None else final.simultaneous_confidence_level
+    level = (
+        confidence_level if confidence_level is not None else final.simultaneous_confidence_level
+    )
     se_floor = (
         standard_error_floor
         if standard_error_floor is not None
@@ -153,7 +155,9 @@ def estimate_response_bands(
     if outcome_count == 0 or intervention_count == 0:
         raise ResponseUncertaintyError("response matrix must have non-empty axes")
     if replicate_count < 2:
-        raise ResponseUncertaintyError("response estimation requires at least two paired replicates")
+        raise ResponseUncertaintyError(
+            "response estimation requires at least two paired replicates"
+        )
     accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
@@ -253,9 +257,8 @@ def _build_final_entries(
             se = standard_errors[entry_index]
             lower = a_hat - critical * se
             upper = a_hat + critical * se
-            useful = (
-                abs(a_hat) >= final.useful_response_magnitude_threshold
-                and (lower > 0.0 or upper < 0.0)
+            useful = abs(a_hat) >= final.useful_response_magnitude_threshold and (
+                lower > 0.0 or upper < 0.0
             )
             if useful:
                 useful_columns.add(intervention)

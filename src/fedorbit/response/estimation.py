@@ -45,7 +45,9 @@ def native_class_cross_entropy(
         return math.nan
     probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
     selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
-    per_example = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(dtype=torch.float64)
+    per_example = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(
+        dtype=torch.float64
+    )
     return float(per_example[class_examples].mean())
 
 
@@ -95,9 +97,7 @@ def paired_shadow_derivative(
         raise ResponseEstimationError("intervention magnitude must be positive")
     if denominator_floor <= 0.0:
         raise ResponseEstimationError("risk denominator floor must be positive")
-    return (negative_risk - positive_risk) / (
-        2.0 * epsilon * max(baseline_risk, denominator_floor)
-    )
+    return (negative_risk - positive_risk) / (2.0 * epsilon * max(baseline_risk, denominator_floor))
 
 
 def run_shadow_pair(

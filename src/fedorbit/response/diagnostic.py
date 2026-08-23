@@ -9,7 +9,7 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.bootstrap import max_t_critical_value
 from fedorbit.response.final import FinalResponseEntry, FinalResponseEstimate
-from fedorbit.response.pilot import DerivativeSeries, PilotData
+from fedorbit.response.pilot import PilotData
 from fedorbit.response.shadows import (
     ShadowData,
     ShadowSettings,
@@ -33,7 +33,7 @@ def estimate_target_response_diagnostic(
     diagnostic = config.scientific.target_response_diagnostic
     final = config.scientific.source_response_final
     outcome_count = len(data.outcome_native_class_sets)
-    series = [DerivativeSeries(outcome, 0, []) for outcome in range(outcome_count)]
+    accumulated: list[list[float]] = [[] for _ in range(outcome_count)]
     all_finite = True
     settings = ShadowSettings(
         diagnostic.intervention_magnitude,
@@ -74,10 +74,10 @@ def estimate_target_response_diagnostic(
                 math.isfinite(value) for value in (positive, negative, baseline, derivative)
             ):
                 all_finite = False
-            series[outcome_index].values.append(derivative)
+            accumulated[outcome_index].append(derivative)
     if not all_finite:
         raise DiagnosticError("non-finite shadow state or loss in target-local diagnostic")
-    entry_derivatives = tuple(tuple(entry.values) for entry in series)
+    entry_derivatives = tuple(tuple(values) for values in accumulated)
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     standard_errors = tuple(_standard_error(values) for values in entry_derivatives)
     critical = max_t_critical_value(

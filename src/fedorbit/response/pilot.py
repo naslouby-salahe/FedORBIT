@@ -38,7 +38,7 @@ class PilotData:
 class DerivativeSeries:
     outcome_index: int
     intervention_index: int
-    values: list[float]
+    values: tuple[float, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,16 +213,8 @@ def _evaluate_candidate(
     pilot = config.scientific.source_response_pilot
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    full_series = [
-        DerivativeSeries(outcome, intervention, [])
-        for outcome in range(outcome_count)
-        for intervention in range(intervention_count)
-    ]
-    half_series = [
-        DerivativeSeries(outcome, intervention, [])
-        for outcome in range(outcome_count)
-        for intervention in range(intervention_count)
-    ]
+    full_accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
+    half_accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
     all_finite = True
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
@@ -263,15 +255,15 @@ def _evaluate_candidate(
                 all_finite = False
             for outcome_index in range(outcome_count):
                 entry_index = outcome_index * intervention_count + intervention_index
-                full_series[entry_index].values.append(pair_derivatives.full_values[outcome_index])
-                half_series[entry_index].values.append(pair_derivatives.half_values[outcome_index])
+                full_accumulated[entry_index].append(pair_derivatives.full_values[outcome_index])
+                half_accumulated[entry_index].append(pair_derivatives.half_values[outcome_index])
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):
         for intervention_index in range(intervention_count):
             entry_index = outcome_index * intervention_count + intervention_index
-            full_values = tuple(full_series[entry_index].values)
-            half_values = tuple(half_series[entry_index].values)
+            full_values = tuple(full_accumulated[entry_index])
+            half_values = tuple(half_accumulated[entry_index])
             a_hat_full = statistics.fmean(full_values)
             se_full = standard_error(full_values)
             a_hat_half = statistics.fmean(half_values)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from fedorbit.domain.enums import DatasetId
@@ -46,7 +47,7 @@ class SchemaError(ValueError):
 class AdapterSchema:
     dataset_id: DatasetId
     canonical_feature_order: tuple[str, ...]
-    roles: dict[str, str] = field(default_factory=lambda: {})
+    roles: Mapping[str, str] = field(default_factory=lambda: {})
     timestamp_column: str | None = None
     multiclass_label_column: str | None = None
     binary_label_column: str | None = None
@@ -89,6 +90,17 @@ def resolve_timestamp_column(
             f"below minimum {minimum_fraction}"
         )
     return column
+
+
+RawCellValue = str | int | float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedColumnSamples:
+    samples_by_column: Mapping[str, tuple[RawCellValue, ...]]
+
+    def samples_of(self, column_name: str) -> tuple[RawCellValue, ...]:
+        return self.samples_by_column.get(column_name, ())
 
 
 @dataclass(frozen=True, slots=True)

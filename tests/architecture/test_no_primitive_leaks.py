@@ -6,7 +6,9 @@ import pytest
 
 from tests.architecture.scan import (
     CANONICAL_SERIALIZER_BOUNDARY_MODULES,
+    SRC_ROOT,
     iter_source_files,
+    parse_module,
     public_functions,
     relative_module,
 )
@@ -173,7 +175,159 @@ def test_detector_allows_numpy_numeric_payloads() -> None:
 
 @pytest.mark.parametrize("module", sorted(CANONICAL_SERIALIZER_BOUNDARY_MODULES))
 def test_exempt_modules_exist(module: str) -> None:
-    from tests.architecture.scan import SRC_ROOT
 
     path = SRC_ROOT.joinpath(*module.split(".")).with_suffix(".py")
     assert path.exists(), f"stale exemption entry: {module}"
+
+
+PRIMITIVE_CONTAINER_FIELD_ALLOWLIST = {
+    "models.training.ModelParameterState.tensors_by_name",
+    "transfer.optimizer_budget.TargetOptimizerStepLedger.reserved_steps",
+    "transfer.optimizer_budget.TargetOptimizerStepLedger.consumed_steps",
+}
+
+TYPE_ALIAS_ALLOWLIST = {
+    "models.training.OptimizerState",
+    "runtime.environment.LockfileEntry",
+}
+
+
+def _iter_class_field_annotations(tree: ast.Module) -> list[tuple[str, str, ast.expr]]:
+    findings: list[tuple[str, str, ast.expr]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                findings.append((node.name, item.target.id, item.annotation))
+    return findings
+
+
+def test_record_fields_do_not_use_mutable_primitive_containers() -> None:
+    violations: list[str] = []
+    for path in iter_source_files():
+        module = relative_module(path)
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for class_name, field_name, annotation in _iter_class_field_annotations(tree):
+            text = ast.unparse(annotation)
+            base = text.split("[")[0]
+            if base in {"dict", "list", "set"}:
+                qualified = f"{module}.{class_name}.{field_name}"
+                if qualified not in PRIMITIVE_CONTAINER_FIELD_ALLOWLIST:
+                    violations.append(f"{path}: {qualified}: {text}")
+    assert not violations, "\n".join(violations)
+
+
+def test_type_aliases_never_reintroduce_primitive_containers() -> None:
+    violations: list[str] = []
+    for path in iter_source_files():
+        module = relative_module(path)
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and isinstance(node.value, (ast.Subscript, ast.Name)):
+                target_text = ast.unparse(node.value)
+                base = target_text.split("[")[0]
+                if base in {"dict", "list", "set", "object"}:
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            qualified = f"{module}.{target.id}"
+                            if qualified not in TYPE_ALIAS_ALLOWLIST:
+                                violations.append(
+                                    f"{path}:{node.lineno}: {qualified} = {target_text[:60]}"
+                                )
+    assert not violations, "\n".join(violations)
+
+
+def test_public_methods_do_not_leak_primitives() -> None:
+    violations: list[str] = []
+    for path in iter_source_files():
+        module = relative_module(path)
+        if module.endswith("__init__") or module in CANONICAL_SERIALIZER_BOUNDARY_MODULES:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for item in node.body:
+                if not isinstance(item, ast.FunctionDef) or item.name.startswith("_"):
+                    continue
+                for violation in signature_violations(item):
+                    violations.append(f"{path}:{node.name}.{item.name}: {violation}")
+    assert not violations, "\n".join(violations)
+
+
+def test_allowlisted_fields_and_aliases_exist() -> None:
+
+    for qualified in sorted(PRIMITIVE_CONTAINER_FIELD_ALLOWLIST | TYPE_ALIAS_ALLOWLIST):
+        parts = qualified.split(".")
+        for depth in range(len(parts) - 1, 0, -1):
+            candidate = SRC_ROOT.joinpath(*parts[:depth]).with_suffix(".py")
+            if candidate.exists():
+                source = candidate.read_text(encoding="utf-8")
+                assert all(name in source for name in parts[depth:]), (
+                    f"stale allowlist entry: {qualified}"
+                )
+                break
+        else:
+            raise AssertionError(f"allowlisted symbol not found in repository: {qualified}")
+
+
+def test_production_never_imports_unscoped_randomness() -> None:
+    violations: list[str] = []
+    for path in iter_source_files():
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(alias.name == "random" for alias in node.names):
+                violations.append(f"{path}:{node.lineno}: import random")
+            if isinstance(node, ast.ImportFrom) and node.module == "random":
+                violations.append(f"{path}:{node.lineno}: from random import")
+            if isinstance(node, ast.Call):
+                target = ast.unparse(node.func)
+                if target in {"np.random.seed", "numpy.random.seed", "random.seed"}:
+                    violations.append(f"{path}:{node.lineno}: unscoped seeding {target}()")
+    assert not violations, "\n".join(violations)
+
+
+def test_production_never_reads_environment_variables() -> None:
+    violations: list[str] = []
+    for path in iter_source_files():
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                target = ast.unparse(node.func)
+                if target in {"os.getenv", "os.environ.get", "os.putenv", "os.unsetenv"}:
+                    violations.append(f"{path}:{node.lineno}: environment access {target}()")
+    assert not violations, "\n".join(violations)
+
+
+def test_detector_catches_container_typed_record_field() -> None:
+    source = (
+        "from dataclasses import dataclass\n"
+        "\n"
+        "\n"
+        "@dataclass(frozen=True)\n"
+        "class Payload:\n"
+        "    values_by_name: dict[str, float]\n"
+    )
+    tree = ast.parse(source)
+    fields = [
+        (class_node.name, field_name, annotation)
+        for class_node in ast.walk(tree)
+        if isinstance(class_node, ast.ClassDef)
+        for item in class_node.body
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)
+        for field_name, annotation in [(item.target.id, item.annotation)]
+    ]
+    assert fields[0][1] == "values_by_name"
+    assert ast.unparse(fields[0][2]).startswith("dict")
+
+
+def test_detector_catches_primitive_container_alias() -> None:
+    source = "Values = dict[str, float]\n"
+    tree = ast.parse(source)
+    aliases = [
+        ast.unparse(node.value).split("[")[0]
+        for node in tree.body
+        if isinstance(node, ast.Assign) and isinstance(node.value, (ast.Subscript, ast.Name))
+    ]
+    assert aliases == ["dict"]

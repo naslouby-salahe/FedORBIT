@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict
 
 from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
@@ -61,7 +63,7 @@ class DirectedPairSpec(FrozenModel):
 
 
 class DatasetsConfig(FrozenModel):
-    clients: dict[DatasetId, ClientConfig]
+    clients: Mapping[DatasetId, ClientConfig]
     timestamp_alias_acceptance: TimestampAliasAcceptance
     primary_directed_pairs: tuple[DirectedPairSpec, ...]
     secondary_directed_pairs: tuple[DirectedPairSpec, ...]

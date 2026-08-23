@@ -10,6 +10,7 @@ from fedorbit.datasets.adapters.schema import (
     MULTICLASS_LABEL_ROLE,
     TIMESTAMP_ROLE,
     AdapterSchema,
+    ObservedColumnSamples,
     infer_feature_type,
     resolve_label_columns,
     resolve_timestamp_column,
@@ -73,7 +74,7 @@ class DatasetAdapter:
         observed_columns: tuple[str, ...],
         timestamp_parse_success_fraction: float,
         timestamp_alias_minimum: float,
-        observed_value_samples: dict[str, tuple[str | int | float | None, ...]] | None = None,
+        observed_value_samples: ObservedColumnSamples | None = None,
     ) -> AdapterSchema:
         timestamp = resolve_timestamp_column(
             observed_columns,
@@ -105,7 +106,7 @@ class DatasetAdapter:
             else:
                 role = role_for_field(column)
                 if role == BEHAVIORAL_CATEGORICAL_ROLE and observed_value_samples is not None:
-                    role = infer_feature_type(observed_value_samples.get(column, ()))
+                    role = infer_feature_type(observed_value_samples.samples_of(column))
                 roles[column] = role
         order_source = (
             self._contract.official_feature_order

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
 
 from pydantic import BaseModel as PydanticModel
@@ -18,19 +19,19 @@ class DatasetManifest(FrozenModel):
     component: str
     raw_files: tuple[str, ...]
     raw_sha256: str
-    raw_counts: dict[str, int]
+    raw_counts: Mapping[str, int]
     schema_version: str = Field(serialization_alias="schema", validation_alias="schema")
     adapter_feature_order: tuple[str, ...]
-    adapter_feature_roles: dict[str, str]
+    adapter_feature_roles: Mapping[str, str]
     accepted_schema_aliases: tuple[str, ...]
     adapter_adaptations: tuple[str, ...]
     timestamp_field: str
     timestamp_range: tuple[str, str]
-    duplicate_counts: dict[str, int]
-    conflicting_duplicate_counts: dict[str, int]
-    local_class_counts: dict[str, int]
-    transfer_candidate_counts: dict[str, int]
-    feature_quality: dict[str, str | int | float | bool | None]
+    duplicate_counts: Mapping[str, int]
+    conflicting_duplicate_counts: Mapping[str, int]
+    local_class_counts: Mapping[str, int]
+    transfer_candidate_counts: Mapping[str, int]
+    feature_quality: Mapping[str, str | int | float | bool | None]
     preprocessing_state: str
     dependency_fingerprint_sha256: str
     producer_code_sha256: str

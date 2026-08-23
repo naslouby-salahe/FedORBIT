@@ -288,20 +288,26 @@ def actions_tied_within_tolerance(left: float, right: float, tolerance: float) -
     return abs(left - right) <= tolerance
 
 
+@dataclass(frozen=True, slots=True, order=True)
+class CertifiedActionOrderingKey:
+    negated_certified_value: float
+    realized_support_size: int
+    target_node_sequence: tuple[int, ...]
+    rounded_coordinates: tuple[float, ...]
+
+
 @dataclass(frozen=True, slots=True)
 class CertifiedActionCandidate:
     action: CurriculumAction
     certified_robust_value: float
     target_node_sequence: tuple[int, ...]
 
-    def deterministic_ordering_key(
-        self, rounding_precision: float
-    ) -> tuple[float, int, tuple[int, ...], tuple[float, ...]]:
-        return (
-            -self.certified_robust_value,
-            self.action.realized_support_size,
-            self.target_node_sequence,
-            rounded_action_vector(self.action, rounding_precision),
+    def deterministic_ordering_key(self, rounding_precision: float) -> CertifiedActionOrderingKey:
+        return CertifiedActionOrderingKey(
+            negated_certified_value=-self.certified_robust_value,
+            realized_support_size=self.action.realized_support_size,
+            target_node_sequence=self.target_node_sequence,
+            rounded_coordinates=rounded_action_vector(self.action, rounding_precision),
         )
 
 

@@ -16,6 +16,7 @@ from fedorbit.datasets.adapters.schema import (
     MULTICLASS_LABEL_ROLE,
     TIMESTAMP_ROLE,
     AdapterSchema,
+    ObservedColumnSamples,
     SchemaError,
     role_for_field,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "AdapterContract",
     "AdapterSchema",
     "DatasetAdapter",
+    "ObservedColumnSamples",
     "SchemaError",
     "edge_iiotset_adapter",
     "role_for_field",

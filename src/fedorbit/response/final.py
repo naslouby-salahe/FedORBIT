@@ -9,7 +9,7 @@ import torch
 from fedorbit.config.models import FedorbitConfig, SourceResponseFinalConfig
 from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.bootstrap import max_t_critical_value
-from fedorbit.response.pilot import DerivativeSeries, PilotData
+from fedorbit.response.pilot import PilotData
 from fedorbit.response.shadows import (
     ShadowData,
     ShadowSettings,
@@ -58,11 +58,7 @@ def estimate_final_response(
     replicate_count = final.paired_replicates_per_intervention
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    series = [
-        DerivativeSeries(outcome, intervention, [])
-        for outcome in range(outcome_count)
-        for intervention in range(intervention_count)
-    ]
+    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
     all_finite = _collect_final_derivatives(
         config,
         model,
@@ -75,11 +71,11 @@ def estimate_final_response(
         outcome_count,
         intervention_count,
         final,
-        series,
+        accumulated,
     )
     if not all_finite:
         raise FinalResponseError("non-finite shadow state or loss in final response estimation")
-    entry_derivatives = tuple(tuple(entry.values) for entry in series)
+    entry_derivatives = tuple(tuple(values) for values in accumulated)
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     standard_errors = tuple(_standard_error(values) for values in entry_derivatives)
     critical = max_t_critical_value(config, entry_derivatives, seed)
@@ -135,7 +131,7 @@ def _collect_final_derivatives(
     outcome_count: int,
     intervention_count: int,
     final: SourceResponseFinalConfig,
-    series: list[DerivativeSeries],
+    accumulated: list[list[float]],
 ) -> bool:
     all_finite = True
     for replicate in range(replicate_count):
@@ -173,7 +169,7 @@ def _collect_final_derivatives(
                 ):
                     all_finite = False
                 entry_index = outcome_index * intervention_count + intervention_index
-                series[entry_index].values.append(derivative)
+                accumulated[entry_index].append(derivative)
     return all_finite
 
 

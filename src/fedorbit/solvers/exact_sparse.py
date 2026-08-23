@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -173,7 +174,7 @@ def _evaluate_active_image_map(
     return total_cost, images
 
 
-def _scenario_cut_row(
+def scenario_cut_row(
     problem: RobustActionProblem, correspondence: BlockCorrespondence
 ) -> NDArray[np.float64]:
     permuted = correspondence.permute_response_matrix(problem.lower_response_matrix)
@@ -189,11 +190,11 @@ def solve_support_master(
     settings = config.solvers.exact_sparse
     cut_cap = maximum_cuts if maximum_cuts is not None else settings.maximum_cuts_per_support
     initial = BlockCorrespondence.lexicographically_smallest(problem.blocks)
-    scenario_rows: list[NDArray[np.float64]] = [_scenario_cut_row(problem, initial)]
+    scenario_rows: list[NDArray[np.float64]] = [scenario_cut_row(problem, initial)]
     scenarios: list[BlockCorrespondence] = [initial]
     iterations = 0
     while True:
-        z_value, alpha_values = _run_master_lp(problem, support, scenario_rows, settings)
+        z_value, alpha_values = run_support_master_lp(problem, support, scenario_rows, settings)
         iterations += 1
         alpha = CurriculumAction(problem, alpha_values)
         if not alpha.active_support_nodes:
@@ -232,13 +233,13 @@ def solve_support_master(
                 "robust master repeated a scenario without converging"
             )
         scenarios.append(outcome.worst_correspondence)
-        scenario_rows.append(_scenario_cut_row(problem, outcome.worst_correspondence))
+        scenario_rows.append(scenario_cut_row(problem, outcome.worst_correspondence))
 
 
-def _run_master_lp(
+def run_support_master_lp(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    scenario_rows: list[NDArray[np.float64]],
+    scenario_rows: Sequence[NDArray[np.float64]],
     settings: ExactSparseSolverConfig,
 ) -> tuple[float, NDArray[np.float64]]:
     columns = 1 + support.size

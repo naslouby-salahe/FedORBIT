@@ -43,10 +43,12 @@ def rank_source_proposals(
 ) -> tuple[RankedProposal, ...]:
     action = config.scientific.action
     multi_source = config.scientific.multi_source_selection
-    if multi_source.communication_cost_coefficient_in_principal_ranking != 0.0:
-        raise SelectionError("principal ranking requires a zero communication-cost coefficient")
-    if multi_source.confirmation_cost_coefficient_in_principal_ranking != 0.0:
-        raise SelectionError("principal ranking requires a zero confirmation-cost coefficient")
+    communication = abs(multi_source.communication_cost_coefficient_in_principal_ranking)
+    confirmation = abs(multi_source.confirmation_cost_coefficient_in_principal_ranking)
+    if communication > 0.0 or confirmation > 0.0:
+        raise SelectionError(
+            "principal ranking requires zero communication and confirmation cost coefficients"
+        )
     seen_clients: set[str] = set()
     positive: list[SourceProposal] = []
     for candidate in candidates:
@@ -55,7 +57,7 @@ def rank_source_proposals(
                 f"source client proposed more than once: {candidate.source_client_name}"
             )
         seen_clients.add(candidate.source_client_name)
-        if not candidate.certified_robust_value > action.positive_source_value_threshold:
+        if candidate.certified_robust_value <= action.positive_source_value_threshold:
             continue
         positive.append(candidate)
     ordered = sorted(

@@ -200,6 +200,61 @@ def select_response_configuration(
     return ordered[0].candidate
 
 
+class _AccumulatedDerivatives:
+    def __init__(self, outcome_count: int, intervention_count: int) -> None:
+        self._outcome_count = outcome_count
+        self._intervention_count = intervention_count
+        self._full: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
+        self._half: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
+
+    def append_pair(
+        self,
+        intervention_index: int,
+        outcome_count: int,
+        full_values: tuple[float, ...],
+        half_values: tuple[float, ...],
+    ) -> None:
+        for outcome_index in range(outcome_count):
+            entry_index = outcome_index * self._intervention_count + intervention_index
+            self._full[entry_index].append(full_values[outcome_index])
+            self._half[entry_index].append(half_values[outcome_index])
+
+    def tuple_at(
+        self, outcome_index: int, intervention_index: int, full: bool
+    ) -> tuple[float, ...]:
+        entry_index = outcome_index * self._intervention_count + intervention_index
+        source = self._full if full else self._half
+        return tuple(source[entry_index])
+
+
+def _build_pilot_entry(
+    pilot: SourceResponsePilotConfig,
+    outcome_index: int,
+    intervention_index: int,
+    full_values: tuple[float, ...],
+    half_values: tuple[float, ...],
+) -> PilotEntry:
+    a_hat_full = statistics.fmean(full_values)
+    se_full = standard_error(full_values)
+    a_hat_half = statistics.fmean(half_values)
+    se_half = standard_error(half_values)
+    discrepancy = abs(a_hat_full - a_hat_half) / max(
+        abs(a_hat_half), pilot.useful_response_magnitude_threshold
+    )
+    useful = max(abs(a_hat_full), abs(a_hat_half)) >= pilot.useful_response_magnitude_threshold
+    return PilotEntry(
+        outcome_index,
+        intervention_index,
+        a_hat_full,
+        se_full,
+        a_hat_half,
+        se_half,
+        discrepancy,
+        useful,
+        sign_agreement(full_values),
+    )
+
+
 def _evaluate_candidate(
     config: FedorbitConfig,
     model: torch.nn.Module,
@@ -213,8 +268,7 @@ def _evaluate_candidate(
     pilot = config.scientific.source_response_pilot
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    full_accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
-    half_accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
+    accumulated = _AccumulatedDerivatives(outcome_count, intervention_count)
     all_finite = True
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
@@ -253,43 +307,24 @@ def _evaluate_candidate(
             )
             if not pair_derivatives.derivatives_finite:
                 all_finite = False
-            for outcome_index in range(outcome_count):
-                entry_index = outcome_index * intervention_count + intervention_index
-                full_accumulated[entry_index].append(pair_derivatives.full_values[outcome_index])
-                half_accumulated[entry_index].append(pair_derivatives.half_values[outcome_index])
+            accumulated.append_pair(
+                intervention_index,
+                outcome_count,
+                pair_derivatives.full_values,
+                pair_derivatives.half_values,
+            )
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):
         for intervention_index in range(intervention_count):
-            entry_index = outcome_index * intervention_count + intervention_index
-            full_values = tuple(full_accumulated[entry_index])
-            half_values = tuple(half_accumulated[entry_index])
-            a_hat_full = statistics.fmean(full_values)
-            se_full = standard_error(full_values)
-            a_hat_half = statistics.fmean(half_values)
-            se_half = standard_error(half_values)
-            discrepancy = abs(a_hat_full - a_hat_half) / max(
-                abs(a_hat_half), pilot.useful_response_magnitude_threshold
+            full_values = accumulated.tuple_at(outcome_index, intervention_index, True)
+            half_values = accumulated.tuple_at(outcome_index, intervention_index, False)
+            entry = _build_pilot_entry(
+                pilot, outcome_index, intervention_index, full_values, half_values
             )
-            useful = (
-                max(abs(a_hat_full), abs(a_hat_half)) >= pilot.useful_response_magnitude_threshold
-            )
-            if useful:
+            if entry.useful:
                 useful_columns.add(intervention_index)
-            sign_agreement_value = sign_agreement(full_values)
-            entries.append(
-                PilotEntry(
-                    outcome_index,
-                    intervention_index,
-                    a_hat_full,
-                    se_full,
-                    a_hat_half,
-                    se_half,
-                    discrepancy,
-                    useful,
-                    sign_agreement_value,
-                )
-            )
+            entries.append(entry)
     reasons: list[str] = []
     if not all_finite:
         reasons.append("non-finite shadow state or loss")

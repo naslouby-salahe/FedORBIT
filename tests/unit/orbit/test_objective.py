@@ -79,32 +79,27 @@ def test_non_actionable_nodes_have_zero_cap_and_zero_cost() -> None:
 
 
 def test_rejects_negative_target_importance() -> None:
+    blocks = _single_block()
+    zeros = np.zeros((2, 2))
     bad_importance = np.array([1.0, -0.1])
+    ones = np.ones(2)
     with pytest.raises(ActionSpaceError):
-        RobustActionProblem(
-            blocks=_single_block(),
-            lower_response_matrix=np.zeros((2, 2)),
-            upper_response_matrix=np.zeros((2, 2)),
-            target_importance=bad_importance,
-            coordinate_caps=np.ones(2),
-            linear_costs=np.zeros(2),
-            total_budget=1.0,
-            principal_support=2,
-        )
+        RobustActionProblem(blocks, zeros, zeros, bad_importance, ones, zeros, 1.0, 2)
 
 
 def test_rejects_nan_response_matrices() -> None:
+    blocks = _single_block()
     nan_matrix = np.full((2, 2), np.nan)
     with pytest.raises(ActionSpaceError):
         RobustActionProblem(
-            blocks=_single_block(),
-            lower_response_matrix=nan_matrix,
-            upper_response_matrix=np.zeros((2, 2)),
-            target_importance=np.ones(2),
-            coordinate_caps=np.ones(2),
-            linear_costs=np.zeros(2),
-            total_budget=1.0,
-            principal_support=2,
+            blocks,
+            nan_matrix,
+            np.zeros((2, 2)),
+            np.ones(2),
+            np.ones(2),
+            np.zeros(2),
+            1.0,
+            2,
         )
 
 

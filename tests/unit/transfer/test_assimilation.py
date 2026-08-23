@@ -265,24 +265,23 @@ def test_extra_coordinate_key_rejected() -> None:
         action_artifact_sha256="d" * 64,
     )
     assert complete.action_artifact_sha256 == "d" * 64
+    extra_kwargs = {
+        **{
+            field: getattr(complete, field)
+            for field in (
+                "target_client",
+                "directed_pair",
+                "condition",
+                "seed",
+                "clean_pretransfer_checkpoint_artifact_id",
+                "source_packet_artifact_id",
+                "action_artifact_sha256",
+            )
+        },
+        "method_name": "forbidden-method-name",
+    }
     with pytest.raises(TypeError):
-        AssimilationCoordinates(
-            **{
-                **{
-                    field: getattr(complete, field)
-                    for field in (
-                        "target_client",
-                        "directed_pair",
-                        "condition",
-                        "seed",
-                        "clean_pretransfer_checkpoint_artifact_id",
-                        "source_packet_artifact_id",
-                    )
-                },
-                "action_artifact_sha256": "d" * 64,
-                "method_name": "forbidden-method-name",
-            }
-        )
+        AssimilationCoordinates(**extra_kwargs)
     with pytest.raises(AssimilationError):
         apply_accepted_assimilation(
             config,

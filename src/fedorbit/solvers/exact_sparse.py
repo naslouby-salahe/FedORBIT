@@ -63,6 +63,28 @@ class RobustActionSolution:
     zero_action_value: float
 
 
+def _worst_images_over_active_maps(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    active_nodes: tuple[int, ...],
+    lap_tie_tolerance: float,
+    action_tie_tolerance: float,
+) -> tuple[int, ...]:
+    blocks = problem.blocks
+    worst_value = math.inf
+    best_images: tuple[int, ...] | None = None
+    for mapping in enumerate_active_image_maps(blocks, active_nodes):
+        value, images = _evaluate_active_image_map(problem, alpha, mapping, lap_tie_tolerance)
+        strictly_better = value < worst_value - action_tie_tolerance
+        tied = abs(value - worst_value) <= action_tie_tolerance
+        if strictly_better or (tied and (best_images is None or images < best_images)):
+            worst_value = min(worst_value, value) if tied else value
+            best_images = images
+    if best_images is None:
+        raise SolverExecutionError("separator produced no admissible correspondence")
+    return best_images
+
+
 def fixed_action_worst_correspondence(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -80,18 +102,10 @@ def fixed_action_worst_correspondence(
         for block_index, size in enumerate(blocks.padded_size_tuple)
         if size - support_counts[block_index] > 0
     )
-    best_value = math.inf
-    best_images: tuple[int, ...] | None = None
-    for mapping in enumerate_active_image_maps(blocks, active_nodes):
-        value, images = _evaluate_active_image_map(problem, alpha, mapping, lap_tie_tolerance)
-        if value < best_value - action_tie_tolerance:
-            best_value = value
-            best_images = images
-        elif abs(value - best_value) <= action_tie_tolerance:
-            if best_images is None or images < best_images:
-                best_images = images
-                best_value = min(best_value, value)
-    if best_images is None or any(image < 0 for image in best_images):
+    best_images = _worst_images_over_active_maps(
+        problem, alpha, active_nodes, lap_tie_tolerance, action_tie_tolerance
+    )
+    if any(image < 0 for image in best_images):
         raise SolverExecutionError("separator produced no admissible correspondence")
     correspondence = BlockCorrespondence(blocks=blocks, images=best_images)
     return SeparatorOutcome(

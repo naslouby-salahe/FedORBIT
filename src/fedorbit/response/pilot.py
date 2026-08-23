@@ -255,6 +255,34 @@ def _build_pilot_entry(
     )
 
 
+def _eligibility_reasons(
+    pilot: SourceResponsePilotConfig,
+    all_finite: bool,
+    entries: list[PilotEntry],
+    useful_columns: set[int],
+) -> list[str]:
+    reasons: list[str] = []
+    if not all_finite:
+        reasons.append("non-finite shadow state or loss")
+    useful_entries = tuple(entry for entry in entries if entry.useful)
+    if not useful_entries:
+        reasons.append("no useful entries")
+        return reasons
+    median_discrepancy = statistics.median(
+        tuple(entry.derivative_discrepancy for entry in useful_entries)
+    )
+    if median_discrepancy > pilot.relative_derivative_discrepancy_ceiling:
+        reasons.append("median derivative discrepancy above ceiling")
+    median_sign_agreement = statistics.median(
+        tuple(entry.sign_agreement for entry in useful_entries)
+    )
+    if median_sign_agreement < pilot.sign_agreement_minimum:
+        reasons.append("median sign agreement below minimum")
+    if len(useful_columns) < pilot.minimum_useful_intervention_columns:
+        reasons.append("too few useful intervention columns")
+    return reasons
+
+
 def _evaluate_candidate(
     config: FedorbitConfig,
     model: torch.nn.Module,
@@ -325,25 +353,8 @@ def _evaluate_candidate(
             if entry.useful:
                 useful_columns.add(intervention_index)
             entries.append(entry)
-    reasons: list[str] = []
-    if not all_finite:
-        reasons.append("non-finite shadow state or loss")
+    reasons = _eligibility_reasons(pilot, all_finite, entries, useful_columns)
     useful_entries = tuple(entry for entry in entries if entry.useful)
-    if not useful_entries:
-        reasons.append("no useful entries")
-    else:
-        if (
-            statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
-            > pilot.relative_derivative_discrepancy_ceiling
-        ):
-            reasons.append("median derivative discrepancy above ceiling")
-        if (
-            statistics.median(tuple(entry.sign_agreement for entry in useful_entries))
-            < pilot.sign_agreement_minimum
-        ):
-            reasons.append("median sign agreement below minimum")
-        if len(useful_columns) < pilot.minimum_useful_intervention_columns:
-            reasons.append("too few useful intervention columns")
     if useful_entries:
         score = statistics.median(
             tuple(

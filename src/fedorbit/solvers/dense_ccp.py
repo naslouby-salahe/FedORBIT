@@ -537,6 +537,18 @@ def _select_best_projected_candidate(
     return min(tied, key=lambda entry: entry.correspondence.ordering_key())
 
 
+def _outer_loop_stop(
+    cut_cap: int,
+    cuts_so_far: int,
+    deadline: float,
+) -> TerminalState | None:
+    if cuts_so_far >= cut_cap:
+        return None
+    if time.monotonic() > deadline:
+        return TerminalState.TIME_LIMIT
+    return None
+
+
 def solve_dense_ccp(
     problem: RobustActionProblem,
     config: FedorbitConfig,
@@ -584,10 +596,14 @@ def solve_dense_ccp(
             scenarios.append(best_candidate.correspondence)
             scenario_rows.append(scenario_cut_row(problem, best_candidate.correspondence))
             outer_cut_count += 1
-            if outer_cut_count >= settings.outer_action_cuts:
-                break
-            if time.monotonic() > deadline:
-                terminal_state = TerminalState.TIME_LIMIT
+            stop_reason = _outer_loop_stop(
+                settings.outer_action_cuts,
+                outer_cut_count,
+                deadline,
+            )
+            if stop_reason is not None:
+                converged_heuristically = False
+                terminal_state = stop_reason
                 break
         else:
             converged_heuristically = True

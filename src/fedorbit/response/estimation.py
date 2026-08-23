@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import torch
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.models.training import ModelParameterState, OptimizerState
+from fedorbit.training.losses import ClassWeights
+from fedorbit.training.trainer import ModelParameterState, OptimizerState, RngState, make_adamw
 
 
 class ResponseEstimationError(ValueError):
@@ -22,7 +23,7 @@ class ShadowData:
     meta_targets: torch.Tensor
     intervention_classes: tuple[int, ...]
     outcome_native_class_sets: tuple[tuple[int, ...], ...]
-    base_class_weights: torch.Tensor
+    base_class_weights: ClassWeights
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,9 +43,9 @@ def native_class_cross_entropy(
     class_examples = targets == class_index
     if not bool(class_examples.any()):
         return math.nan
-    log_probabilities = torch.log_softmax(logits, dim=1)
-    per_example = -log_probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
-    per_example = torch.clamp(per_example, max=-math.log(probability_log_floor))
+    probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
+    selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
+    per_example = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(dtype=torch.float64)
     return float(per_example[class_examples].mean())
 
 
@@ -104,7 +105,7 @@ def run_shadow_pair(
     model: torch.nn.Module,
     base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
-    base_rng_state: torch.Tensor,
+    base_rng_state: RngState,
     data: ShadowData,
     settings: ShadowSettings,
     schedule_seed: int,
@@ -155,51 +156,51 @@ def _run_shadow(
     model: torch.nn.Module,
     base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
-    base_rng_state: torch.Tensor,
+    base_rng_state: RngState,
     data: ShadowData,
     settings: ShadowSettings,
     multiplier: float,
     batch_size: int,
     schedule_rng: torch.Generator,
 ) -> tuple[float, ...]:
+    if settings.horizon <= 0:
+        raise ResponseEstimationError("shadow optimizer horizon must be positive")
     base_state.load_into(model)
-    torch.set_rng_state(base_rng_state.clone())
-    training = config.scientific.training
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=settings.learning_rate,
-        betas=(training.adamw.beta1, training.adamw.beta2),
-        eps=training.adamw.epsilon,
-        weight_decay=settings.weight_decay,
-    )
-    optimizer.load_state_dict(base_optimizer_state)
+    base_rng_state.restore()
+    optimizer = make_adamw(config, model, settings.learning_rate, settings.weight_decay)
+    base_optimizer_state.load_into(optimizer)
     model.train()
     schedule = shadow_batch_schedule(data.train_features.shape[0], batch_size, schedule_rng)
+    device = next(model.parameters()).device
     for step in range(settings.horizon):
         batch = next(schedule)
-        optimizer.zero_grad()
-        logits = model(data.train_features[batch].float())
-        per_example_ce = _shadow_ce(logits, data.train_targets[batch], config)
+        targets = data.train_targets[batch].to(device=device, dtype=torch.long)
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(data.train_features[batch].to(device=device, dtype=torch.float32))
+        per_example_ce = _shadow_ce(logits, targets, config)
         weights = _shadow_weights(
             data.base_class_weights,
-            data.train_targets[batch],
+            targets,
             data.intervention_classes,
             multiplier,
         )
-        loss = (per_example_ce * weights).mean()
+        loss = (per_example_ce * weights).sum() / per_example_ce.numel()
         if not bool(torch.isfinite(loss)):
             raise ResponseEstimationError(f"non-finite shadow loss at optimizer step {step}")
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            max_norm=config.scientific.training.gradient_clip_global_l2_norm,
+            norm_type=2.0,
+        )
         optimizer.step()
-    if settings.horizon <= 0:
-        raise ResponseEstimationError("shadow optimizer horizon must be positive")
     model.eval()
     with torch.no_grad():
-        shadow_logits = model(data.meta_features.float())
+        shadow_logits = model(data.meta_features.to(device=device, dtype=torch.float32))
     return tuple(
         equal_native_class_risk(
             shadow_logits,
-            data.meta_targets,
+            data.meta_targets.to(device=device, dtype=torch.long),
             class_set,
             config.scientific.metrics.probability_log_floor,
         )
@@ -212,22 +213,22 @@ def _shadow_ce(
     targets: torch.Tensor,
     config: FedorbitConfig,
 ) -> torch.Tensor:
-    probability_log_floor = config.scientific.metrics.probability_log_floor
-    log_probabilities = torch.log_softmax(logits, dim=1)
-    per_example = -log_probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
-    return torch.clamp(per_example, max=-math.log(probability_log_floor))
+    floor = config.scientific.metrics.probability_log_floor
+    probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
+    selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
+    return -torch.log(torch.clamp(selected, min=floor))
 
 
 def _shadow_weights(
-    base_class_weights: torch.Tensor,
+    class_weights: ClassWeights,
     targets: torch.Tensor,
     intervention_classes: tuple[int, ...],
     multiplier: float,
 ) -> torch.Tensor:
-    weights = base_class_weights[targets]
+    multipliers = torch.ones_like(class_weights.values)
     for class_index in intervention_classes:
-        weights = torch.where(targets == class_index, weights * multiplier, weights)
-    return weights
+        multipliers[class_index] = multiplier
+    return class_weights.per_example(targets, multipliers)
 
 
 def _evaluate_risks(
@@ -237,13 +238,15 @@ def _evaluate_risks(
     meta_targets: torch.Tensor,
     outcome_native_class_sets: tuple[tuple[int, ...], ...],
 ) -> tuple[float, ...]:
+    device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
-        logits = model(meta_features.float())
+        logits = model(meta_features.to(device=device, dtype=torch.float32))
+    targets = meta_targets.to(device=device, dtype=torch.long)
     return tuple(
         equal_native_class_risk(
             logits,
-            meta_targets,
+            targets,
             class_set,
             config.scientific.metrics.probability_log_floor,
         )

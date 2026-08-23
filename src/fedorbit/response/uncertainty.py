@@ -8,7 +8,6 @@ import numpy as np
 import torch
 
 from fedorbit.config.models import FedorbitConfig, SourceResponseFinalConfig
-from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
@@ -17,6 +16,7 @@ from fedorbit.response.estimation import (
 )
 from fedorbit.response.pilot import PilotData
 from fedorbit.runtime.seeds import RngNamespace, derive_seed32
+from fedorbit.training.trainer import BaseCheckpoint
 
 
 class ResponseUncertaintyError(ValueError):
@@ -99,7 +99,13 @@ def max_t_critical_value(
                 abs(bootstrap_mean - means[entry_index]) / max(bootstrap_se, se_floor)
             )
         maxima.append(max(studentized))
-    return float(np.quantile(np.asarray(maxima, dtype=np.float64), level, method="higher"))
+    return float(
+        np.quantile(
+            np.asarray(maxima, dtype=np.float64),
+            level,
+            method="higher",
+        )
+    )
 
 
 def estimate_final_response(
@@ -254,7 +260,15 @@ def _build_final_entries(
             if useful:
                 useful_columns.add(intervention)
             entries.append(
-                FinalResponseEntry(outcome, intervention, a_hat, se, lower, upper, useful)
+                FinalResponseEntry(
+                    outcome,
+                    intervention,
+                    a_hat,
+                    se,
+                    lower,
+                    upper,
+                    useful,
+                )
             )
     return entries, useful_columns
 

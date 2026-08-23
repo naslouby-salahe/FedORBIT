@@ -37,7 +37,7 @@ PACKAGE_LAYERS: dict[str, int] = {
     "datasets": 3,
     "models": 3,
     "strict_interface": 3,
-    "oracle": 3,
+    "oracle": 4,
     "synthetic": 3,
     "training": 4,
     "response": 4,

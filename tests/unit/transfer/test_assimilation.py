@@ -249,12 +249,6 @@ def test_assimilation_coordinate_contract_is_typed_and_total() -> None:
 
 
 def test_extra_coordinate_key_rejected() -> None:
-    config = load_fedorbit_config()
-    torch.manual_seed(19)
-    model = TinyClassifier()
-    optimizer = _make_optimizer(model, 1e-2, 0.0, 0.9, 0.999, 1e-8)
-    pre_confirm = PreConfirmTargetState.capture(model, optimizer)
-    train_features, train_targets = _dataset(43, 32)
     complete = AssimilationCoordinates(
         target_client="edge_iiotset_network",
         directed_pair="edge_iiotset_network -> ton_iot_windows10_host",
@@ -283,26 +277,14 @@ def test_extra_coordinate_key_rejected() -> None:
     with pytest.raises(TypeError):
         AssimilationCoordinates(**extra_kwargs)
     with pytest.raises(AssimilationError):
-        apply_accepted_assimilation(
-            config,
-            model,
-            optimizer,
-            pre_confirm,
-            train_features,
-            train_targets,
-            base_class_weights=torch.ones(2),
-            curriculum_multipliers=torch.ones(2),
-            seed=4421,
-            assimilation_coordinates=AssimilationCoordinates(
-                target_client="edge_iiotset_network",
-                directed_pair="edge_iiotset_network -> ton_iot_windows10_host",
-                condition="principal",
-                seed="4421",
-                clean_pretransfer_checkpoint_artifact_id="checkpoint-1",
-                source_packet_artifact_id="packet-1",
-                action_artifact_sha256="",
-            ),
-            batch_size=8,
+        AssimilationCoordinates(
+            target_client="edge_iiotset_network",
+            directed_pair="edge_iiotset_network -> ton_iot_windows10_host",
+            condition="principal",
+            seed="4421",
+            clean_pretransfer_checkpoint_artifact_id="checkpoint-1",
+            source_packet_artifact_id="packet-1",
+            action_artifact_sha256="",
         )
 
 

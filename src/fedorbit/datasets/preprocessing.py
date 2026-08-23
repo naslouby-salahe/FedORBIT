@@ -121,8 +121,13 @@ def evaluate_feature_quality(
         )
     dropped_count = sum(candidate.dropped for candidate in candidates)
     if not candidates:
-        return FeatureQualityReport((), 0, True, "zero candidate features after mandatory semantic exclusions")
-    invalid = dropped_count / len(candidates) > settings.client_invalidity_dropped_feature_fraction_threshold
+        return FeatureQualityReport(
+            (), 0, True, "zero candidate features after mandatory semantic exclusions"
+        )
+    invalid = (
+        dropped_count / len(candidates)
+        > settings.client_invalidity_dropped_feature_fraction_threshold
+    )
     return FeatureQualityReport(
         tuple(candidates),
         dropped_count,

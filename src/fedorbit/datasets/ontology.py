@@ -9,7 +9,9 @@ from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
 
 NORMAL_LABEL = "normal"
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
-TRANSFER_ONTOLOGY: dict[OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]] = {
+TRANSFER_ONTOLOGY: dict[
+    OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]
+] = {
     OracleTransferConcept.DDOS: (
         CoarseGroup.DISRUPTION,
         ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"),
@@ -86,7 +88,9 @@ def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[
 
 
 def native_labels_for(client: DatasetId) -> frozenset[str]:
-    labels = {label for concept in OracleTransferConcept for label in _native_mapping(client, concept)}
+    labels = {
+        label for concept in OracleTransferConcept for label in _native_mapping(client, concept)
+    }
     if client == DatasetId.EDGE_IIOTSET_NETWORK:
         labels.update(EDGE_ELIGIBLE_LOCAL_CLASSES)
     else:
@@ -99,7 +103,9 @@ def transfer_concept_for(
     canonical_label: str,
 ) -> OracleTransferConcept | None:
     matches = tuple(
-        concept for concept in OracleTransferConcept if canonical_label in _native_mapping(client, concept)
+        concept
+        for concept in OracleTransferConcept
+        if canonical_label in _native_mapping(client, concept)
     )
     if len(matches) > 1:
         raise OntologyError(f"label maps to multiple transfer concepts: {canonical_label}")
@@ -119,13 +125,16 @@ def transfer_eligibility(
     target_confirm_support: int,
     target_test_support: int,
 ) -> TransferEligibility:
-    if min(
-        source_train_support,
-        source_meta_support,
-        target_meta_support,
-        target_confirm_support,
-        target_test_support,
-    ) < 0:
+    if (
+        min(
+            source_train_support,
+            source_meta_support,
+            target_meta_support,
+            target_confirm_support,
+            target_test_support,
+        )
+        < 0
+    ):
         raise OntologyError("transfer support counts must be nonnegative")
     support = config.scientific.transfer_support
     source_train_passes = source_train_support >= support.source_train_minimum

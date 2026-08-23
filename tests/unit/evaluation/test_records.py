@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from fedorbit.domain.enums import ExperimentName, MetricId, MultiplicityFamily, Split, TransferMethod
+from fedorbit.domain.enums import (
+    ExperimentName,
+    MetricId,
+    MultiplicityFamily,
+    Split,
+    TransferMethod,
+)
 from fedorbit.evaluation.records import (
     ComparisonDecision,
     MetricDirection,

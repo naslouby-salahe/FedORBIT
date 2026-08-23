@@ -57,7 +57,9 @@ def split_for_duplicate_group(config: FedorbitConfig, midpoint_fraction: float) 
                 return split
         elif lower <= midpoint_fraction < upper:
             return split
-    raise SplitError(f"midpoint fraction is not covered by configured intervals: {midpoint_fraction}")
+    raise SplitError(
+        f"midpoint fraction is not covered by configured intervals: {midpoint_fraction}"
+    )
 
 
 def duplicate_group_midpoint_fraction(
@@ -82,7 +84,9 @@ def assign_duplicate_groups_chronologically(
 ) -> DuplicateGroupSplitAssignment:
     if not duplicate_groups:
         return DuplicateGroupSplitAssignment(())
-    ordered = tuple(sorted(duplicate_groups, key=lambda item: (item.earliest_timestamp, item.group_id)))
+    ordered = tuple(
+        sorted(duplicate_groups, key=lambda item: (item.earliest_timestamp, item.group_id))
+    )
     retained_class_row_count = sum(item.row_count for item in ordered)
     rows_before = 0
     assignments: list[tuple[str, Split]] = []

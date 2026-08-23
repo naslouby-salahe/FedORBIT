@@ -9,6 +9,7 @@ from fedorbit.transfer import assimilation as assimilation_module
 from fedorbit.transfer.assimilation import (
     AssimilationCoordinates,
     AssimilationError,
+    ConfirmationRequest,
     PreConfirmTargetState,
     PreTestLifecycle,
     apply_accepted_assimilation,
@@ -85,10 +86,10 @@ def test_confirmation_accepts_helpful_and_rejects_harmful_curriculum() -> None:
     base_weights = torch.tensor([1.0, 1.0])
     learning_rate = 5e-3
     weight_decay = 0.0
-    helpful = run_proposal_confirmation(
-        config,
-        model,
-        optimizer_factory=_factory_for(model, learning_rate, weight_decay),
+    factory = _factory_for(model, learning_rate, weight_decay)
+    helpful_request = ConfirmationRequest(
+        model=model,
+        optimizer_factory=factory,
         pre_confirm_baseline=baseline_snapshot,
         pre_confirm_curriculum=curriculum_snapshot,
         train_features=train_features,
@@ -97,16 +98,15 @@ def test_confirmation_accepts_helpful_and_rejects_harmful_curriculum() -> None:
         confirm_targets=confirm_targets,
         base_class_weights=base_weights,
         curriculum_multipliers=torch.tensor([1.15, 1.0]),
-        learning_rate=5e-3,
-        weight_decay=0.0,
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
         seed=1103,
         contrast_coordinates="probe/helpful",
-        batch_size=32,
     )
-    harmful = run_proposal_confirmation(
-        config,
-        model,
-        optimizer_factory=_factory_for(model, learning_rate, weight_decay),
+    helpful = run_proposal_confirmation(config, helpful_request, batch_size=32)
+    harmful_request = ConfirmationRequest(
+        model=model,
+        optimizer_factory=factory,
         pre_confirm_baseline=baseline_snapshot,
         pre_confirm_curriculum=curriculum_snapshot,
         train_features=train_features,
@@ -116,12 +116,12 @@ def test_confirmation_accepts_helpful_and_rejects_harmful_curriculum() -> None:
         base_class_weights=base_weights,
         curriculum_multipliers=torch.tensor([0.6, 1.6]),
         learning_rate=5e-2,
-        weight_decay=0.0,
+        weight_decay=weight_decay,
         seed=2207,
         contrast_coordinates="probe/harmful",
-        batch_size=32,
     )
-    del helpful
+    harmful = run_proposal_confirmation(config, harmful_request, batch_size=32)
+    assert isinstance(helpful.accepted, bool)
     assert isinstance(harmful.accepted, bool)
 
 
@@ -136,9 +136,9 @@ def test_paired_shadows_share_schedule_and_start_from_clean_state() -> None:
         model_a.linear.bias.fill_(0.0)
     optimizer_a = _make_optimizer(model_a, 1e-3, 0.0, 0.9, 0.999, 1e-8)
     baseline, curriculum = capture_pre_confirm_pair(model_a, optimizer_a)
-    first = run_proposal_confirmation(
-        config,
-        model_a,
+    neutral_weights = torch.tensor([1.0, 1.0])
+    first_request = ConfirmationRequest(
+        model=model_a,
         optimizer_factory=_factory_for(model_a, 1e-3, 0.0),
         pre_confirm_baseline=baseline,
         pre_confirm_curriculum=curriculum,
@@ -146,17 +146,15 @@ def test_paired_shadows_share_schedule_and_start_from_clean_state() -> None:
         train_targets=train_targets,
         confirm_features=confirm_features,
         confirm_targets=confirm_targets,
-        base_class_weights=torch.tensor([1.0, 1.0]),
+        base_class_weights=neutral_weights,
         curriculum_multipliers=torch.tensor([1.0, 1.0]),
         learning_rate=1e-3,
         weight_decay=0.0,
         seed=3319,
         contrast_coordinates="replay",
-        batch_size=16,
     )
-    second = run_proposal_confirmation(
-        config,
-        model_a,
+    second_request = ConfirmationRequest(
+        model=model_a,
         optimizer_factory=_factory_for(model_a, 1e-3, 0.0),
         pre_confirm_baseline=baseline,
         pre_confirm_curriculum=curriculum,
@@ -164,14 +162,15 @@ def test_paired_shadows_share_schedule_and_start_from_clean_state() -> None:
         train_targets=train_targets,
         confirm_features=confirm_features,
         confirm_targets=confirm_targets,
-        base_class_weights=torch.tensor([1.0, 1.0]),
+        base_class_weights=neutral_weights,
         curriculum_multipliers=torch.tensor([1.0, 1.0]),
         learning_rate=1e-3,
         weight_decay=0.0,
         seed=3319,
         contrast_coordinates="replay",
-        batch_size=16,
     )
+    first = run_proposal_confirmation(config, first_request, batch_size=16)
+    second = run_proposal_confirmation(config, second_request, batch_size=16)
     assert first.lower_bound == pytest.approx(second.lower_bound, abs=1e-9)
     assert first.accepted == second.accepted
 

@@ -79,12 +79,13 @@ def test_non_actionable_nodes_have_zero_cap_and_zero_cost() -> None:
 
 
 def test_rejects_negative_target_importance() -> None:
+    bad_importance = np.array([1.0, -0.1])
     with pytest.raises(ActionSpaceError):
         RobustActionProblem(
             blocks=_single_block(),
             lower_response_matrix=np.zeros((2, 2)),
             upper_response_matrix=np.zeros((2, 2)),
-            target_importance=np.array([1.0, -0.1]),
+            target_importance=bad_importance,
             coordinate_caps=np.ones(2),
             linear_costs=np.zeros(2),
             total_budget=1.0,
@@ -93,10 +94,11 @@ def test_rejects_negative_target_importance() -> None:
 
 
 def test_rejects_nan_response_matrices() -> None:
+    nan_matrix = np.full((2, 2), np.nan)
     with pytest.raises(ActionSpaceError):
         RobustActionProblem(
             blocks=_single_block(),
-            lower_response_matrix=np.full((2, 2), np.nan),
+            lower_response_matrix=nan_matrix,
             upper_response_matrix=np.zeros((2, 2)),
             target_importance=np.ones(2),
             coordinate_caps=np.ones(2),
@@ -358,5 +360,7 @@ def test_math_inf_guard_raises_on_empty_orbit() -> None:
         total_budget=1.0,
         principal_support=2,
     )
+    empty_orbit: list[BlockCorrespondence] = []
+    alpha = zero_action(problem)
     with pytest.raises(ActionSpaceError):
-        h_orb(zero_action(problem), [])
+        h_orb(alpha, empty_orbit)

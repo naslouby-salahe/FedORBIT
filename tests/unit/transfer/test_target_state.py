@@ -57,25 +57,20 @@ def test_vector_expansion_places_zero_coordinates(config: FedorbitConfig) -> Non
 
 
 def test_duplicate_node_reports_rejected(config: FedorbitConfig) -> None:
+    duplicated = (*_risks(), TransferNodeRisk(0, True, 0.1))
     with pytest.raises(TargetImportanceError):
-        build_target_importance(
-            config,
-            (*_risks(), TransferNodeRisk(0, True, 0.1)),
-        )
+        build_target_importance(config, duplicated)
 
 
-def test_negative_risk_report_rejected() -> None:
+def test_negative_risk_report_rejected_at_construction() -> None:
     with pytest.raises(TargetImportanceError):
-        build_target_importance(
-            load_fedorbit_config(),
-            (TransferNodeRisk(0, True, -0.1),),
-        )
+        TransferNodeRisk(0, True, -0.1)
 
 
-def test_nonfinite_risk_report_rejected_at_construction() -> None:
-    for bad in (float("nan"), float("inf")):
-        with pytest.raises(TargetImportanceError):
-            TransferNodeRisk(0, True, bad)
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_nonfinite_risk_report_rejected_at_construction(bad: float) -> None:
+    with pytest.raises(TargetImportanceError):
+        TransferNodeRisk(0, True, bad)
 
 
 def test_negative_node_index_rejected_at_construction() -> None:

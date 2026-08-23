@@ -57,7 +57,7 @@ class TargetImportance:
 
     @property
     def actionable_total(self) -> float:
-        return sum(weight for weight in self.weights_by_node_index.values())
+        return sum(self.weights_by_node_index.values())
 
 
 def build_target_importance(

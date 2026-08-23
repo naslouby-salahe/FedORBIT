@@ -7,7 +7,6 @@ from dataclasses import dataclass
 import torch
 
 from fedorbit.config.models import FedorbitConfig, SourceResponsePilotConfig
-from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
@@ -15,6 +14,8 @@ from fedorbit.response.estimation import (
     run_shadow_pair,
 )
 from fedorbit.runtime.seeds import RngNamespace, derive_seed32
+from fedorbit.training.losses import ClassWeights
+from fedorbit.training.trainer import BaseCheckpoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,16 +31,9 @@ class PilotData:
     meta_features: torch.Tensor
     meta_targets: torch.Tensor
     outcome_native_class_sets: tuple[tuple[int, ...], ...]
-    base_class_weights: torch.Tensor
+    base_class_weights: ClassWeights
     learning_rate: float
     weight_decay: float
-
-
-@dataclass(frozen=True, slots=True)
-class DerivativeSeries:
-    outcome_index: int
-    intervention_index: int
-    values: tuple[float, ...]
 
 
 @dataclass(frozen=True, slots=True)

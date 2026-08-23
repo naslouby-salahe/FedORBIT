@@ -9,9 +9,7 @@ import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.canonical import canonical_json
-from fedorbit.domain.enums import ClientRole, CoarseGroup
-from fedorbit.models.architectures import classifier_for_modality
-from fedorbit.models.training import BaseCheckpoint
+from fedorbit.domain.enums import ClientRole, CoarseGroup, DatasetId
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData, ResponseCandidate
 from fedorbit.response.uncertainty import (
@@ -26,6 +24,9 @@ from fedorbit.strict_interface.validation import (
     validate_rfc3339_utc,
     validate_sha256,
 )
+from fedorbit.training.losses import ClassWeights
+from fedorbit.training.pilot import create_classifier
+from fedorbit.training.trainer import BaseCheckpoint
 
 RESPONSE_PACKET_SCHEMA = "source-response-packet/v1"
 PACKET_PERMITTED_FIELDS = frozenset(
@@ -68,10 +69,14 @@ class SourcePacket:
     technical_creation_timestamp: str
 
     def integrity_payload(self) -> str:
-        return canonical_json(self._serializable(include_integrity=False, include_timestamp=False))
+        return canonical_json(
+            self._serializable(include_integrity=False, include_timestamp=False)
+        )
 
     def serialized(self) -> str:
-        return canonical_json(self._serializable(include_integrity=True, include_timestamp=True))
+        return canonical_json(
+            self._serializable(include_integrity=True, include_timestamp=True)
+        )
 
     def compute_integrity_sha256(self) -> str:
         return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
@@ -87,7 +92,10 @@ class SourcePacket:
         validate_anonymous_node_ids(self.anonymous_fine_node_ids)
         validate_rfc3339_utc(self.technical_creation_timestamp)
         validate_sha256(self.source_checkpoint_sha256, "source checkpoint SHA-256")
-        validate_sha256(self.response_configuration_sha256, "response configuration SHA-256")
+        validate_sha256(
+            self.response_configuration_sha256,
+            "response configuration SHA-256",
+        )
         validate_sha256(self.packet_integrity_sha256, "packet integrity SHA-256")
         if self.packet_schema_metadata != RESPONSE_PACKET_SCHEMA:
             raise PacketError("unrecognized source-response packet schema")
@@ -105,7 +113,9 @@ class SourcePacket:
             raise PacketError("response interval arrays must be non-empty and equal length")
         if any(not math.isfinite(value) for value in (*self.L, *self.U)):
             raise PacketError("response interval contains a non-finite value")
-        if any(value < 0 for value in (*self.per_node_train_support, *self.per_node_meta_support)):
+        if any(
+            value < 0 for value in (*self.per_node_train_support, *self.per_node_meta_support)
+        ):
             raise PacketError("per-node support must be nonnegative")
         if any(value <= 0 for value in self.per_node_effective_replicate_count):
             raise PacketError("effective replicate counts must be positive")
@@ -114,7 +124,12 @@ class SourcePacket:
         if self.packet_integrity_sha256 != self.compute_integrity_sha256():
             raise PacketError("packet integrity SHA-256 mismatch")
 
-    def _serializable(self, *, include_integrity: bool, include_timestamp: bool) -> dict[str, object]:
+    def _serializable(
+        self,
+        *,
+        include_integrity: bool,
+        include_timestamp: bool,
+    ) -> dict[str, object]:
         values: dict[str, object] = {
             "anonymous_fine_node_ids": list(self.anonymous_fine_node_ids),
             "exposed_coarse_group_id": self.exposed_coarse_group_id,
@@ -139,7 +154,7 @@ class SourcePacket:
 
 @dataclass(frozen=True, slots=True)
 class PacketConstructionContext:
-    modality: str
+    dataset: DatasetId
     input_dimension: int
     n_classes: int
     coarse_group_id: CoarseGroup
@@ -149,9 +164,6 @@ class PacketConstructionContext:
     source_checkpoint_sha256: str
     response_configuration_sha256: str
     seed: int
-    learning_rate: float
-    weight_decay: float
-    dropout_probability: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,17 +187,19 @@ def construct_source_packet(
     meta_targets: torch.Tensor,
     intervention_classes: tuple[tuple[int, ...], ...],
     outcome_native_class_sets: tuple[tuple[int, ...], ...],
-    base_class_weights: torch.Tensor,
+    base_class_weights: ClassWeights,
     selected_configuration: ResponseCandidate,
     creation_timestamp: str,
 ) -> ConstructedPacket:
     _validate_context(context)
+    hyperparameters = checkpoint.selected_hyperparameters
     if model is None:
-        model = classifier_for_modality(
-            context.modality,
+        model = create_classifier(
+            context.dataset,
             context.input_dimension,
             context.n_classes,
-            context.dropout_probability,
+            hyperparameters.dropout_probability,
+            context.seed,
         )
     data = PilotData(
         train_features,
@@ -194,14 +208,14 @@ def construct_source_packet(
         meta_targets,
         outcome_native_class_sets,
         base_class_weights,
-        context.learning_rate,
-        context.weight_decay,
+        hyperparameters.learning_rate,
+        hyperparameters.weight_decay,
     )
     settings = ShadowSettings(
         selected_configuration.intervention_magnitude,
         selected_configuration.optimizer_step_horizon,
-        context.learning_rate,
-        context.weight_decay,
+        hyperparameters.learning_rate,
+        hyperparameters.weight_decay,
     )
     estimate = estimate_final_response(
         config,
@@ -288,7 +302,15 @@ def pad_absent_transfer_nodes(
         for intervention in range(intervention_count):
             if (outcome, intervention) not in present:
                 padded.append(
-                    FinalResponseEntry(outcome, intervention, 0.0, 0.0, 0.0, 0.0, False)
+                    FinalResponseEntry(
+                        outcome,
+                        intervention,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        False,
+                    )
                 )
     padded.sort(key=lambda entry: (entry.outcome_index, entry.intervention_index))
     return FinalResponseEstimate(

@@ -9,10 +9,10 @@ import torch
 from numpy.typing import NDArray
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.models.training import BaseCheckpoint
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData
 from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_response_bands
+from fedorbit.training.trainer import BaseCheckpoint
 
 
 class TargetImportanceError(ValueError):
@@ -51,7 +51,10 @@ class TargetImportance:
             if weight < 0.0:
                 raise TargetImportanceError(f"node {node_index} importance must be nonnegative")
         if self.weights_by_node_index and not math.isclose(
-            sum(self.weights_by_node_index.values()), 1.0, rel_tol=1e-12, abs_tol=1e-12
+            sum(self.weights_by_node_index.values()),
+            1.0,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
         ):
             raise TargetImportanceError("target importance weights must sum to one")
 
@@ -95,10 +98,8 @@ def build_target_importance(
         )
     total = sum(floored.values())
     weights = {node_index: value / total for node_index, value in sorted(floored.items())}
-    ordered = {
-        node_index: ({**zero_nodes, **weights})[node_index]
-        for node_index in sorted(seen)
-    }
+    combined = {**zero_nodes, **weights}
+    ordered = {node_index: combined[node_index] for node_index in sorted(seen)}
     return TargetImportance(weights_by_node_index=ordered)
 
 

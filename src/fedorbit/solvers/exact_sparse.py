@@ -169,6 +169,24 @@ def _evaluate_active_image_map(
     return fixed_cost + completion_cost, images
 
 
+def _lap_cost_entry(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    active_targets: list[int],
+    image_by_target: dict[int, int],
+    target_node: int,
+    source_node: int,
+) -> float:
+    weight = float(problem.target_importance[target_node])
+    accumulated = 0.0
+    for j in active_targets:
+        column_image = image_by_target[j]
+        accumulated += float(alpha.coordinates[j]) * float(
+            problem.lower_response_matrix[source_node, column_image]
+        )
+    return weight * accumulated
+
+
 def _complete_with_blockwise_laps(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -178,7 +196,6 @@ def _complete_with_blockwise_laps(
     blocks = problem.blocks
     used_sources = set(image_by_target.values())
     active_targets = sorted(image_by_target.keys())
-    coordinates = alpha.coordinates
     completion_cost = 0.0
     full_assignment = dict(image_by_target)
     for block_index in range(len(blocks.padded_size_tuple)):
@@ -192,22 +209,38 @@ def _complete_with_blockwise_laps(
             continue
         if len(remaining_targets) != len(unused_sources):
             raise SolverExecutionError("block completion sizes differ")
-        cost_matrix = np.zeros((len(remaining_targets), len(unused_sources)), dtype=np.float64)
-        for row_index, target_node in enumerate(remaining_targets):
-            weight = float(problem.target_importance[target_node])
-            for column_index, source_node in enumerate(unused_sources):
-                accumulated = 0.0
-                for j in active_targets:
-                    accumulated += float(coordinates[j]) * float(
-                        problem.lower_response_matrix[source_node, image_by_target[j]]
-                    )
-                cost_matrix[row_index, column_index] = weight * accumulated
-        assignment = solve_minimum_cost_assignment(cost_matrix, lap_tie_tolerance)
+        assignment = _solve_block_completion(
+            problem,
+            alpha,
+            active_targets,
+            image_by_target,
+            remaining_targets,
+            unused_sources,
+            lap_tie_tolerance,
+        )
         completion_cost += assignment.objective_value
         for local_row, local_column in enumerate(assignment.column_for_row):
             full_assignment[remaining_targets[local_row]] = unused_sources[local_column]
     images = tuple(full_assignment[node] for node in range(blocks.total_padded_nodes))
     return completion_cost, images
+
+
+def _solve_block_completion(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    active_targets: list[int],
+    image_by_target: dict[int, int],
+    remaining_targets: list[int],
+    unused_sources: list[int],
+    lap_tie_tolerance: float,
+):
+    cost_matrix = np.zeros((len(remaining_targets), len(unused_sources)), dtype=np.float64)
+    for row_index, target_node in enumerate(remaining_targets):
+        for column_index, source_node in enumerate(unused_sources):
+            cost_matrix[row_index, column_index] = _lap_cost_entry(
+                problem, alpha, active_targets, image_by_target, target_node, source_node
+            )
+    return solve_minimum_cost_assignment(cost_matrix, lap_tie_tolerance)
 
 
 def scenario_cut_row(

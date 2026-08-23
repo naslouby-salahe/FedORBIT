@@ -15,6 +15,7 @@ from fedorbit.datasets.adapters import (
     FORBIDDEN_PROVENANCE_ROLE,
     MULTICLASS_LABEL_ROLE,
     TIMESTAMP_ROLE,
+    ObservedColumnSamples,
     SchemaError,
     edge_iiotset_adapter,
     role_for_field,
@@ -110,11 +111,14 @@ def test_edge_adapter_resolves_real_schema() -> None:
         observed_columns=EDGE_COLUMNS,
         timestamp_parse_success_fraction=1.0,
         timestamp_alias_minimum=0.999,
-        observed_value_samples={
-            "tcp.ack": ("1", "2", "3.5"),
-            "http.request.method": ("GET", "POST", "PUT"),
-        },
+        observed_value_samples=ObservedColumnSamples(
+            {
+                "tcp.ack": ("1", "2", "3.5"),
+                "http.request.method": ("GET", "POST", "PUT"),
+            }
+        ),
     )
+
     assert schema.role_of("tcp.ack") == BEHAVIORAL_NUMERIC_ROLE
     assert schema.timestamp_column == "frame.time"
     assert schema.multiclass_label_column == "Attack_type"

@@ -11,6 +11,7 @@ from fedorbit.datasets.adapters import (
     FORBIDDEN_PAYLOAD_ROLE,
     FORBIDDEN_PROVENANCE_ROLE,
     AdapterSchema,
+    ObservedColumnSamples,
     edge_iiotset_adapter,
 )
 from fedorbit.datasets.duplicates import (
@@ -44,9 +45,11 @@ def _edge_schema() -> AdapterSchema:
         observed_columns=EDGE_COLUMNS,
         timestamp_parse_success_fraction=1.0,
         timestamp_alias_minimum=0.999,
-        observed_value_samples={
-            "tcp.ack": ("1", "2", "3.5"),
-        },
+        observed_value_samples=ObservedColumnSamples(
+            {
+                "tcp.ack": ("1", "2", "3.5"),
+            }
+        ),
     )
 
 

@@ -61,6 +61,47 @@ class AdapterContract:
     official_feature_order: tuple[str, ...] = ()
 
 
+def _dedicated_column_role(column: str, timestamp: str, multiclass: str, binary: str) -> str | None:
+    if column == timestamp:
+        return TIMESTAMP_ROLE
+    if column == multiclass:
+        return MULTICLASS_LABEL_ROLE
+    if column == binary:
+        return BINARY_LABEL_ROLE
+    return None
+
+
+def _behavioral_role(column: str, observed_value_samples: ObservedColumnSamples | None) -> str:
+    role = role_for_field(column)
+    if role == BEHAVIORAL_CATEGORICAL_ROLE and observed_value_samples is not None:
+        return infer_feature_type(observed_value_samples.samples_of(column))
+    return role
+
+
+def _assign_column_roles(
+    contract: AdapterContract,
+    observed_columns: tuple[str, ...],
+    timestamp: str,
+    multiclass: str,
+    binary: str,
+    observed_value_samples: ObservedColumnSamples | None,
+) -> dict[str, str]:
+    excluded = contract.additional_exclusions
+    roles: dict[str, str] = {}
+    for column in observed_columns:
+        dedicated_role = _dedicated_column_role(column, timestamp, multiclass, binary)
+        if dedicated_role is not None:
+            roles[column] = dedicated_role
+        elif column in excluded:
+            role = role_for_field(column)
+            roles[column] = (
+                role if role != BEHAVIORAL_CATEGORICAL_ROLE else FORBIDDEN_PROVENANCE_ROLE
+            )
+        else:
+            roles[column] = _behavioral_role(column, observed_value_samples)
+    return roles
+
+
 class DatasetAdapter:
     def __init__(self, contract: AdapterContract) -> None:
         self._contract = contract
@@ -90,24 +131,14 @@ class DatasetAdapter:
         multiclass = labels.multiclass_label_field
         binary = labels.binary_label_field
         excluded = self._contract.additional_exclusions
-        roles: dict[str, str] = {}
-        for column in observed_columns:
-            if column == timestamp:
-                roles[column] = TIMESTAMP_ROLE
-            elif column == multiclass:
-                roles[column] = MULTICLASS_LABEL_ROLE
-            elif column == binary:
-                roles[column] = BINARY_LABEL_ROLE
-            elif column in excluded:
-                role = role_for_field(column)
-                roles[column] = (
-                    role if role != BEHAVIORAL_CATEGORICAL_ROLE else FORBIDDEN_PROVENANCE_ROLE
-                )
-            else:
-                role = role_for_field(column)
-                if role == BEHAVIORAL_CATEGORICAL_ROLE and observed_value_samples is not None:
-                    role = infer_feature_type(observed_value_samples.samples_of(column))
-                roles[column] = role
+        roles = _assign_column_roles(
+            self._contract,
+            observed_columns,
+            timestamp,
+            multiclass,
+            binary,
+            observed_value_samples,
+        )
         order_source = (
             self._contract.official_feature_order
             if self._contract.official_feature_order

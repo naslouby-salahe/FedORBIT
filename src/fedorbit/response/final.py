@@ -45,6 +45,33 @@ class FinalResponseError(ValueError):
     pass
 
 
+def _build_final_entries(
+    final: SourceResponseFinalConfig,
+    outcome_count: int,
+    intervention_count: int,
+    means: tuple[float, ...],
+    standard_errors: tuple[float, ...],
+    critical: float,
+) -> tuple[list[FinalResponseEntry], set[int]]:
+    entries: list[FinalResponseEntry] = []
+    useful_columns: set[int] = set()
+    for outcome in range(outcome_count):
+        for intervention in range(intervention_count):
+            entry_index = outcome * intervention_count + intervention
+            a_hat = means[entry_index]
+            se = standard_errors[entry_index]
+            lower = a_hat - critical * se
+            upper = a_hat + critical * se
+            excludes_zero = lower > 0 or upper < 0
+            useful = abs(a_hat) >= final.useful_response_magnitude_threshold and excludes_zero
+            if useful:
+                useful_columns.add(intervention)
+            entries.append(
+                FinalResponseEntry(outcome, intervention, a_hat, se, lower, upper, useful)
+            )
+    return entries, useful_columns
+
+
 def estimate_final_response(
     config: FedorbitConfig,
     model: torch.nn.Module,
@@ -79,31 +106,9 @@ def estimate_final_response(
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     standard_errors = tuple(_standard_error(values) for values in entry_derivatives)
     critical = max_t_critical_value(config, entry_derivatives, seed)
-    entries: list[FinalResponseEntry] = []
-    useful_columns: set[int] = set()
-    for outcome in range(outcome_count):
-        for intervention in range(intervention_count):
-            entry_index = outcome * intervention_count + intervention
-            a_hat = means[entry_index]
-            se = standard_errors[entry_index]
-            lower = a_hat - critical * se
-            upper = a_hat + critical * se
-            useful = abs(a_hat) >= final.useful_response_magnitude_threshold and (
-                lower > 0 or upper < 0
-            )
-            if useful:
-                useful_columns.add(intervention)
-            entries.append(
-                FinalResponseEntry(
-                    outcome,
-                    intervention,
-                    a_hat,
-                    se,
-                    lower,
-                    upper,
-                    useful,
-                )
-            )
+    entries, useful_columns = _build_final_entries(
+        final, outcome_count, intervention_count, means, standard_errors, critical
+    )
     useful_entries = tuple(entry for entry in entries if entry.useful)
     if not useful_entries:
         return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), math.nan, False)

@@ -64,6 +64,22 @@ def _numeric_bytes(value: RawFeatureValue) -> bytes:
     return struct.pack("<d", float(str(value)))
 
 
+def _column_bytes_and_validity(value: RawFeatureValue, role: str) -> tuple[int, bytes]:
+    if role == BEHAVIORAL_NUMERIC_ROLE:
+        missing = value is None or (isinstance(value, float) and math.isnan(value))
+        return (0 if missing else 1), _numeric_bytes(value)
+    text = unicodedata.normalize("NFC", str(value)).encode("utf-8")
+    return 1, struct.pack("<2i", 0, len(text)) + text
+
+
+def _validity_mask_bits(validity: list[int]) -> bytes:
+    mask = bytearray((len(validity) + 7) // 8)
+    for index, bit in enumerate(validity):
+        if bit:
+            mask[index // 8] |= 1 << (index % 8)
+    return bytes(mask)
+
+
 def canonical_row_bytes(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> bytes:
     validity: list[int] = []
     data_buffers: list[bytes] = []
@@ -71,20 +87,10 @@ def canonical_row_bytes(row_features: CanonicalFeatureVector, schema: AdapterSch
         role = schema.role_of(column)
         if role not in (BEHAVIORAL_NUMERIC_ROLE, BEHAVIORAL_CATEGORICAL_ROLE):
             continue
-        value = row_features.value_of(column)
-        if role == BEHAVIORAL_NUMERIC_ROLE:
-            missing = value is None or (isinstance(value, float) and math.isnan(value))
-            validity.append(0 if missing else 1)
-            data_buffers.append(_numeric_bytes(value))
-        else:
-            text = unicodedata.normalize("NFC", str(value)).encode("utf-8")
-            validity.append(1)
-            data_buffers.append(struct.pack("<2i", 0, len(text)) + text)
-    validity_bytes = bytearray((len(validity) + 7) // 8)
-    for index, bit in enumerate(validity):
-        if bit:
-            validity_bytes[index // 8] |= 1 << (index % 8)
-    return bytes(validity_bytes) + b"".join(data_buffers)
+        bit, payload = _column_bytes_and_validity(row_features.value_of(column), role)
+        validity.append(bit)
+        data_buffers.append(payload)
+    return _validity_mask_bits(validity) + b"".join(data_buffers)
 
 
 def exact_duplicate_hash(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> str:

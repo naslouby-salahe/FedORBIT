@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, fields
+from typing import Mapping
 
 from fedorbit.domain.canonical import canonical_json
 from fedorbit.strict_interface.resources import StrictResourceViolationError
@@ -55,21 +56,14 @@ class SourcePacket:
     response_configuration_sha256: str
     packet_integrity_sha256: str
     packet_validity_state: str
-    preprocessing_state_sha256: str = ""
-    transfer_node_manifest_sha256: str = ""
-    response_seed: int = 0
     technical_creation_timestamp: str = ""
-    forbidden_content: tuple[str, ...] = field(default_factory=tuple)
 
     def integrity_payload(self) -> str:
-        values: dict[
-            str,
-            str | int | float | tuple[float, ...] | list[str] | list[float] | list[int] | None,
-        ] = {
+        values: dict[str, object] = {
             "anonymous_fine_node_ids": list(self.anonymous_fine_node_ids),
             "exposed_coarse_group_id": self.exposed_coarse_group_id,
-            "L": self.L,
-            "U": self.U,
+            "L": list(self.L),
+            "U": list(self.U),
             "per_node_train_support": list(self.per_node_train_support),
             "per_node_meta_support": list(self.per_node_meta_support),
             "per_node_effective_replicate_count": list(self.per_node_effective_replicate_count),
@@ -77,23 +71,33 @@ class SourcePacket:
             "source_checkpoint_sha256": self.source_checkpoint_sha256,
             "response_configuration_sha256": self.response_configuration_sha256,
             "packet_validity_state": self.packet_validity_state,
-            "preprocessing_state_sha256": self.preprocessing_state_sha256,
-            "transfer_node_manifest_sha256": self.transfer_node_manifest_sha256,
-            "response_seed": self.response_seed,
         }
         return canonical_json(values)
 
     def compute_integrity_sha256(self) -> str:
-        payload = self.integrity_payload()
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
 
     def validate(self) -> None:
-        for field_name in PACKET_PERMITTED_FIELDS:
-            if not hasattr(self, field_name):
-                raise PacketError(f"missing permitted packet field: {field_name}")
+        actual_fields = frozenset(field.name for field in fields(self))
+        if actual_fields != PACKET_PERMITTED_FIELDS:
+            unexpected = sorted(actual_fields - PACKET_PERMITTED_FIELDS)
+            missing = sorted(PACKET_PERMITTED_FIELDS - actual_fields)
+            raise PacketError(f"invalid packet schema; unexpected={unexpected}, missing={missing}")
+        validate_packet_mapping({field.name: getattr(self, field.name) for field in fields(self)})
         if self.packet_integrity_sha256 != self.compute_integrity_sha256():
             raise PacketError("packet integrity sha256 mismatch")
-        if self.forbidden_content:
-            raise StrictResourceViolationError(
-                f"forbidden packet content present: {', '.join(self.forbidden_content)}"
-            )
+
+
+def validate_packet_mapping(payload: Mapping[str, object]) -> None:
+    keys = frozenset(payload)
+    unexpected = keys - PACKET_PERMITTED_FIELDS
+    missing = PACKET_PERMITTED_FIELDS - keys
+    if unexpected or missing:
+        raise StrictResourceViolationError(
+            f"packet fields violate strict interface; unexpected={sorted(unexpected)}, missing={sorted(missing)}"
+        )
+
+    lowered_keys = {key.casefold().replace("_", " ") for key in keys}
+    forbidden = sorted(FORBIDDEN_PACKET_CONTENT & lowered_keys)
+    if forbidden:
+        raise StrictResourceViolationError(f"forbidden packet content present: {', '.join(forbidden)}")

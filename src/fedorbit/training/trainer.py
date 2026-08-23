@@ -38,7 +38,9 @@ class ModelParameterState:
         )
 
     def load_into(self, model: nn.Module) -> None:
-        model.load_state_dict({entry.name: entry.value.clone() for entry in self.tensors}, strict=True)
+        model.load_state_dict(
+            {entry.name: entry.value.clone() for entry in self.tensors}, strict=True
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +67,11 @@ class RngState:
 
     @classmethod
     def capture(cls) -> RngState:
-        cuda_states = tuple(state.cpu().clone() for state in torch.cuda.get_rng_state_all()) if torch.cuda.is_available() else ()
+        cuda_states = (
+            tuple(state.cpu().clone() for state in torch.cuda.get_rng_state_all())
+            if torch.cuda.is_available()
+            else ()
+        )
         return cls(torch.get_rng_state().cpu().clone(), cuda_states)
 
     def restore(self) -> None:
@@ -166,7 +172,10 @@ def train_base_model(
         raise TrainingError("TRAIN must contain at least one example")
     if valid_features.ndim != 2 or valid_targets.ndim != 1 or valid_features.shape[0] == 0:
         raise TrainingError("VALID must contain at least one example")
-    if train_features.shape[0] != train_targets.shape[0] or valid_features.shape[0] != valid_targets.shape[0]:
+    if (
+        train_features.shape[0] != train_targets.shape[0]
+        or valid_features.shape[0] != valid_targets.shape[0]
+    ):
         raise TrainingError("feature and target counts differ")
     training = config.scientific.training
     if training.dataloader_workers != 0:
@@ -210,7 +219,9 @@ def train_base_model(
                 torch.cuda.manual_seed_all(epoch_seed)
             model.train()
             for batch_features, batch_targets in loader:
-                batch_features = batch_features.to(device=device, dtype=torch.float32, non_blocking=True)
+                batch_features = batch_features.to(
+                    device=device, dtype=torch.float32, non_blocking=True
+                )
                 batch_targets = batch_targets.to(device=device, dtype=torch.long, non_blocking=True)
                 optimizer.zero_grad(set_to_none=True)
                 logits = model(batch_features)

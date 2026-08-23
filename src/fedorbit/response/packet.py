@@ -69,14 +69,10 @@ class SourcePacket:
     technical_creation_timestamp: str
 
     def integrity_payload(self) -> str:
-        return canonical_json(
-            self._serializable(include_integrity=False, include_timestamp=False)
-        )
+        return canonical_json(self._serializable(include_integrity=False, include_timestamp=False))
 
     def serialized(self) -> str:
-        return canonical_json(
-            self._serializable(include_integrity=True, include_timestamp=True)
-        )
+        return canonical_json(self._serializable(include_integrity=True, include_timestamp=True))
 
     def compute_integrity_sha256(self) -> str:
         return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
@@ -113,9 +109,7 @@ class SourcePacket:
             raise PacketError("response interval arrays must be non-empty and equal length")
         if any(not math.isfinite(value) for value in (*self.L, *self.U)):
             raise PacketError("response interval contains a non-finite value")
-        if any(
-            value < 0 for value in (*self.per_node_train_support, *self.per_node_meta_support)
-        ):
+        if any(value < 0 for value in (*self.per_node_train_support, *self.per_node_meta_support)):
             raise PacketError("per-node support must be nonnegative")
         if any(value <= 0 for value in self.per_node_effective_replicate_count):
             raise PacketError("effective replicate counts must be positive")

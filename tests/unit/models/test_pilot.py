@@ -35,7 +35,9 @@ def _outcome(configuration: PilotConfiguration, metric: float) -> TrainingOutcom
     return TrainingOutcome(checkpoint, 1)
 
 
-def _fits(configuration: PilotConfiguration, values: tuple[float, float, float]) -> tuple[PilotFitResult, ...]:
+def _fits(
+    configuration: PilotConfiguration, values: tuple[float, float, float]
+) -> tuple[PilotFitResult, ...]:
     return tuple(
         PilotFitResult(configuration, seed, _outcome(configuration, value))
         for seed, value in zip((101, 202, 303), values, strict=True)

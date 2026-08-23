@@ -57,9 +57,7 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
                 "sign_flip_superiority",
             )
         )
-        superiority_name = (
-            f"{solver} vs Local-SIR — TEST relative macro-CE gain superiority"
-        )
+        superiority_name = f"{solver} vs Local-SIR — TEST relative macro-CE gain superiority"
         families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
             _pair_contrast(
                 MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
@@ -68,9 +66,7 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
                 "sign_flip_superiority",
             )
         )
-        equivalence_name = (
-            f"{solver} vs Local-SIR — TEST relative macro-CE gain TOST equivalence"
-        )
+        equivalence_name = f"{solver} vs Local-SIR — TEST relative macro-CE gain TOST equivalence"
         families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
             _pair_contrast(
                 MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
@@ -80,8 +76,7 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
             )
         )
         coupling_name = (
-            "Exact correspondence orbit vs Matched-Resource Rectangular"
-            " — robust coupling value gap"
+            "Exact correspondence orbit vs Matched-Resource Rectangular — robust coupling value gap"
         )
         families[MultiplicityFamily.COUPLING_MECHANISM].append(
             _pair_contrast(
@@ -94,8 +89,7 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
         for suffix in ("difference", "TOST equivalence"):
             statistic = "tost_equivalence" if "TOST" in suffix else "sign_flip_superiority"
             point_name = (
-                f"{solver} vs Point-Correspondence Commitment"
-                f" — TEST relative macro-CE {suffix}"
+                f"{solver} vs Point-Correspondence Commitment — TEST relative macro-CE {suffix}"
             )
             families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
                 _pair_contrast(
@@ -106,8 +100,7 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
                 )
             )
             ablation_name = (
-                f"{solver} vs Coupling-Destroyed FedORBIT"
-                f" — TEST relative macro-CE {suffix}"
+                f"{solver} vs Coupling-Destroyed FedORBIT — TEST relative macro-CE {suffix}"
             )
             families[MultiplicityFamily.MECHANISM_ABLATIONS].append(
                 _pair_contrast(

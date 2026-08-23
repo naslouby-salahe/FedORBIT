@@ -263,13 +263,15 @@ def _eligibility_reasons(
     if not useful_entries:
         reasons.append("no useful entries")
         return reasons
-    if statistics.median(
-        tuple(entry.derivative_discrepancy for entry in useful_entries)
-    ) > pilot.relative_derivative_discrepancy_ceiling:
+    if (
+        statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
+        > pilot.relative_derivative_discrepancy_ceiling
+    ):
         reasons.append("median derivative discrepancy above ceiling")
-    if statistics.median(
-        tuple(entry.sign_agreement for entry in useful_entries)
-    ) < pilot.sign_agreement_minimum:
+    if (
+        statistics.median(tuple(entry.sign_agreement for entry in useful_entries))
+        < pilot.sign_agreement_minimum
+    ):
         reasons.append("median sign agreement below minimum")
     if len(useful_columns) < pilot.minimum_useful_intervention_columns:
         reasons.append("too few useful intervention columns")
@@ -288,9 +290,7 @@ def _pilot_score(
             for entry in useful_entries
         )
     )
-    curvature = statistics.median(
-        tuple(entry.derivative_discrepancy for entry in useful_entries)
-    )
+    curvature = statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
     return signal - pilot.curvature_penalty_coefficient * curvature
 
 

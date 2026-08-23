@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+from fedorbit.transfer.confirmation import (
+    ConfirmationError,
+    ConfirmReplicateOutcomes,
+    confirmation_decision,
+    confirmation_schedule,
+    hierarchical_bootstrap_lower_bound,
+    hierarchical_bootstrap_relative_gains,
+)
+from fedorbit.transfer.optimizer_budget import (
+    BudgetCategory,
+    OptimizerBudgetError,
+    TargetOptimizerStepLedger,
+)
 from fedorbit.transfer.target_state import (
     TargetImportance,
     TargetImportanceError,
@@ -8,8 +21,17 @@ from fedorbit.transfer.target_state import (
 )
 
 __all__ = [
+    "BudgetCategory",
+    "ConfirmReplicateOutcomes",
+    "ConfirmationError",
+    "OptimizerBudgetError",
     "TargetImportance",
     "TargetImportanceError",
+    "TargetOptimizerStepLedger",
     "TransferNodeRisk",
     "build_target_importance",
+    "confirmation_decision",
+    "confirmation_schedule",
+    "hierarchical_bootstrap_lower_bound",
+    "hierarchical_bootstrap_relative_gains",
 ]

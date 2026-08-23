@@ -13,6 +13,14 @@ from fedorbit.solvers.certificates import (
     verify_correspondence_certificate,
     verify_exactness_certificate,
 )
+from fedorbit.solvers.exact_qap import (
+    QapRobustOutcome,
+    QapSeparatorResult,
+    QapUncertifiedError,
+    fixed_action_worst_correspondence_qap,
+    point_correspondence_commitment,
+    solve_robust_action_qap,
+)
 from fedorbit.solvers.exact_sparse import (
     RobustActionSolution,
     SeparatorOutcome,
@@ -28,6 +36,9 @@ __all__ = [
     "AssignmentError",
     "BlockwiseAssignmentResult",
     "CertificateError",
+    "QapRobustOutcome",
+    "QapSeparatorResult",
+    "QapUncertifiedError",
     "RobustActionSolution",
     "SeparatorOutcome",
     "SeparatorWorkCertificate",
@@ -36,9 +47,12 @@ __all__ = [
     "SupportMasterSolution",
     "certificate_residual",
     "fixed_action_worst_correspondence",
+    "fixed_action_worst_correspondence_qap",
+    "point_correspondence_commitment",
     "require_valid_images",
     "solve_minimum_cost_assignment",
     "solve_robust_action",
+    "solve_robust_action_qap",
     "solve_support_master",
     "verify_correspondence_certificate",
     "verify_exactness_certificate",

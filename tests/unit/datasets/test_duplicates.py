@@ -169,8 +169,10 @@ def test_exact_duplicate_hash_deterministic() -> None:
         "Attack_type": "ddos",
     }
     vector = CanonicalFeatureVector(features)
-    assert exact_duplicate_hash(vector, schema) == exact_duplicate_hash(vector, schema)
-    assert len(exact_duplicate_hash(vector, schema)) == 64
+    first_digest = exact_duplicate_hash(vector, schema)
+    second_vector = CanonicalFeatureVector(dict(features))
+    assert first_digest == exact_duplicate_hash(second_vector, schema)
+    assert len(first_digest) == 64
 
 
 def test_duplicate_hashing_ignores_forbidden_identity() -> None:

@@ -186,22 +186,27 @@ class ConfirmationVerdict:
     acceptance_threshold: float
 
 
+@dataclass(frozen=True, slots=True)
+class ConfirmationRequest:
+    model: torch.nn.Module
+    optimizer_factory: Callable[[object], torch.optim.AdamW]
+    pre_confirm_baseline: PreConfirmTargetState
+    pre_confirm_curriculum: PreConfirmTargetState
+    train_features: torch.Tensor
+    train_targets: torch.Tensor
+    confirm_features: torch.Tensor
+    confirm_targets: torch.Tensor
+    base_class_weights: torch.Tensor
+    curriculum_multipliers: torch.Tensor
+    learning_rate: float
+    weight_decay: float
+    seed: int
+    contrast_coordinates: str
+
+
 def run_proposal_confirmation(
     config: FedorbitConfig,
-    model: torch.nn.Module,
-    optimizer_factory: Callable[[object], torch.optim.AdamW],
-    pre_confirm_baseline: PreConfirmTargetState,
-    pre_confirm_curriculum: PreConfirmTargetState,
-    train_features: torch.Tensor,
-    train_targets: torch.Tensor,
-    confirm_features: torch.Tensor,
-    confirm_targets: torch.Tensor,
-    base_class_weights: torch.Tensor,
-    curriculum_multipliers: torch.Tensor,
-    learning_rate: float,
-    weight_decay: float,
-    seed: int,
-    contrast_coordinates: str,
+    request: ConfirmationRequest,
     batch_size: int | None = None,
 ) -> ConfirmationVerdict:
     confirmation = config.scientific.confirmation
@@ -209,25 +214,24 @@ def run_proposal_confirmation(
     effective_batch = batch_size if batch_size is not None else training.batch_size
     if effective_batch <= 0:
         raise AssimilationError("confirmation batch size must be positive")
-    if confirm_features.shape[0] == 0 or confirm_targets.shape[0] == 0:
+    model = request.model
+    if request.confirm_features.shape[0] == 0 or request.confirm_targets.shape[0] == 0:
         raise AssimilationError("CONFIRM split is empty")
 
-    del learning_rate, weight_decay
-
     def make_optimizer() -> torch.optim.AdamW:
-        return optimizer_factory(model.parameters())
+        return request.optimizer_factory(model.parameters())
 
-    curriculum_weight_vector = base_class_weights * curriculum_multipliers
+    curriculum_weight_vector = request.base_class_weights * request.curriculum_multipliers
     log_floor = config.scientific.metrics.probability_log_floor
-    class_count = int(base_class_weights.shape[0])
+    class_count = int(request.base_class_weights.shape[0])
     replicated: list[ConfirmReplicateOutcomes] = []
     for replicate_index in range(confirmation.paired_replicates):
         batches = _confirmation_batches_for_replicate(
-            train_features,
-            train_targets,
+            request.train_features,
+            request.train_targets,
             effective_batch,
-            seed,
-            contrast_coordinates,
+            request.seed,
+            request.contrast_coordinates,
             replicate_index,
             confirmation.optimizer_steps_per_shadow,
         )
@@ -235,29 +239,37 @@ def run_proposal_confirmation(
         _step_shadow(
             model,
             baseline_optimizer,
-            pre_confirm_baseline,
+            request.pre_confirm_baseline,
             batches,
-            base_class_weights,
+            request.base_class_weights,
             training,
         )
         baseline_losses = _confirm_class_losses(
-            model, confirm_features, confirm_targets, class_count, log_floor
+            model,
+            request.confirm_features,
+            request.confirm_targets,
+            class_count,
+            log_floor,
         )
         curriculum_optimizer = make_optimizer()
         _step_shadow(
             model,
             curriculum_optimizer,
-            pre_confirm_curriculum,
+            request.pre_confirm_curriculum,
             batches,
             curriculum_weight_vector,
             training,
         )
         curriculum_losses = _confirm_class_losses(
-            model, confirm_features, confirm_targets, class_count, log_floor
+            model,
+            request.confirm_features,
+            request.confirm_targets,
+            class_count,
+            log_floor,
         )
         replicated.append(ConfirmReplicateOutcomes(baseline_losses, curriculum_losses))
     lower_bound = hierarchical_bootstrap_lower_bound(
-        config, tuple(replicated), seed, contrast_coordinates
+        config, tuple(replicated), request.seed, request.contrast_coordinates
     )
     threshold = confirmation.lower_bound_acceptance_threshold_relative_macro_ce
     return ConfirmationVerdict(

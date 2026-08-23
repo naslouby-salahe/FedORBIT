@@ -182,8 +182,8 @@ def test_missing_label_field_rejected() -> None:
 
 def test_registry_covers_all_clients() -> None:
     config = _fedorbit_config()
-    adapters = registered_adapters(config)
-    assert set(adapters) == set(DatasetId)
+    registry = registered_adapters(config)
+    assert set(registry.registered_datasets()) == set(DatasetId)
     assert (
         adapter_for(DatasetId.EDGE_IIOTSET_NETWORK, _fedorbit_config()).dataset_id
         == DatasetId.EDGE_IIOTSET_NETWORK

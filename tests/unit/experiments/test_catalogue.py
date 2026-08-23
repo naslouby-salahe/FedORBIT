@@ -4,35 +4,36 @@ import pytest
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import ExperimentName, TransferMethod
-from fedorbit.experiments.catalogue import ExperimentDefinition, build_catalogue
+from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
 
 
 @pytest.fixture(scope="module")
-def catalogue(fedorbit_config: FedorbitConfig) -> dict[ExperimentName, ExperimentDefinition]:
+def catalogue(fedorbit_config: FedorbitConfig) -> ExperimentCatalogue:
     return build_catalogue(fedorbit_config)
 
 
 def test_every_registered_experiment_has_a_catalogue_entry(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
     expected = set(ExperimentName)
-    actual = set(catalogue.keys())
+    actual = set(catalogue.registered_names())
     assert actual == expected
 
 
 def test_every_entry_has_classification(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    for name, definition in catalogue.items():
-        assert definition.classification.value, name
+    for name in catalogue.registered_names():
+        assert catalogue.definition(name).classification.value, name
 
 
 def test_confirmatory_experiments_use_confirmatory_seeds(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
     seeds = fedorbit_config.scientific.randomness.confirmatory_seeds
-    for name, definition in catalogue.items():
+    for name in catalogue.registered_names():
+        definition = catalogue.definition(name)
         if (
             definition.classification.value.startswith("Confirmatory")
             and definition.derived_planned_cells > 0
@@ -41,10 +42,10 @@ def test_confirmatory_experiments_use_confirmatory_seeds(
 
 
 def test_primary_transfer_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    definition = catalogue[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER]
+    definition = catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     expected = (
         4 * 10 * len(fedorbit_config.experiments.primary_strict_cross_telemetry_transfer.methods)
     )
@@ -53,24 +54,24 @@ def test_primary_transfer_derived_cells(
 
 
 def test_theorem_validation_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION]
+    definition = catalogue.definition(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION)
     assert definition.derived_planned_cells == 17000
 
 
 def test_coupling_validation_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION]
+    definition = catalogue.definition(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION)
     assert definition.derived_planned_cells == 4860
 
 
 def test_mechanism_ablations_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    definition = catalogue[ExperimentName.MECHANISM_ABLATIONS]
+    definition = catalogue.definition(ExperimentName.MECHANISM_ABLATIONS)
     assert definition.derived_planned_cells == 4 * 10 * len(
         fedorbit_config.experiments.mechanism_ablations.methods
     )
@@ -78,87 +79,92 @@ def test_mechanism_ablations_derived_cells(
 
 
 def test_sparsity_and_dense_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.SPARSITY_AND_DENSE_FALLBACK]
+    definition = catalogue.definition(ExperimentName.SPARSITY_AND_DENSE_FALLBACK)
     assert definition.derived_planned_cells == 160
 
 
 def test_confirmation_portability_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY]
+    definition = catalogue.definition(ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY)
     assert definition.derived_planned_cells == 160
 
 
 def test_secondary_generalization_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION]
+    definition = catalogue.definition(ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION)
     assert definition.derived_planned_cells == 200
 
 
 def test_semantic_frontier_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER]
+    definition = catalogue.definition(ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER)
     assert definition.derived_planned_cells == 480
 
 
 def test_weak_signal_boundaries_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES]
+    definition = catalogue.definition(
+        ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES
+    )
     assert definition.derived_planned_cells == 1800
 
 
 def test_scalability_derived_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.SCALABILITY_AND_EFFICIENCY]
+    definition = catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY)
     assert definition.derived_planned_cells == 1120 + 120
 
 
 def test_map_audit_recovery_attempts(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT]
+    definition = catalogue.definition(ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT)
     assert definition.derived_planned_cells == 80
 
 
 def test_multi_source_target_decisions(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION]
+    definition = catalogue.definition(ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION)
     assert definition.derived_planned_cells == 30
 
 
 def test_diagnostic_fixture_counts(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
     for name in (
         ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP,
         ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP,
         ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY,
     ):
-        assert catalogue[name].derived_planned_cells == 500, name
-    assert catalogue[ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION].derived_planned_cells == 500
+        assert catalogue.definition(name).derived_planned_cells == 500, name
+    assert (
+        catalogue.definition(ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION).derived_planned_cells
+        == 500
+    )
 
 
 def test_benchmark_methods_include_all_solvers(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    methods = set(catalogue[ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK].methods)
+    methods = set(catalogue.definition(ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK).methods)
     assert TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value in methods
     assert TransferMethod.GENERIC_EXACT_QAP.value in methods
     assert TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK.value in methods
 
 
 def test_primary_transfer_method_membership(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    methods = catalogue[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER].methods
+    methods = catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER).methods
     assert (
         tuple(methods)
         == fedorbit_config.experiments.primary_strict_cross_telemetry_transfer.methods
@@ -169,76 +175,76 @@ def test_primary_transfer_method_membership(
 
 
 def test_pilot_uses_pilot_seeds(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    pilot = catalogue[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT]
+    pilot = catalogue.definition(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
     assert fedorbit_config.scientific.randomness.pilot_seeds == (101, 202, 303)
     assert pilot.derived_planned_cells == 144 + 40
 
 
 def test_source_response_pilot_candidate_cells(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT]
+    definition = catalogue.definition(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
     assert definition.derived_planned_cells == 108
 
 
 def test_final_packets_planned(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION]
+    definition = catalogue.definition(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
     assert definition.derived_planned_cells == 40
 
 
 def test_baseline_validation_seeds(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    definition = catalogue[ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION]
+    definition = catalogue.definition(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION)
     assert definition.seeds == (1103, 5531)
     assert definition.derived_planned_cells == 8
 
 
 def test_claims_are_assigned_to_governing_experiments(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
-    assert catalogue[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER].claims
-    assert catalogue[ExperimentName.SCALABILITY_AND_EFFICIENCY].claims
-    assert catalogue[ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY].claims
-    adjudication = catalogue[ExperimentName.CLAIM_EVIDENCE_ADJUDICATION]
+    assert catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER).claims
+    assert catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY).claims
+    assert catalogue.definition(ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY).claims
+    adjudication = catalogue.definition(ExperimentName.CLAIM_EVIDENCE_ADJUDICATION)
     assert len(adjudication.claims) == 8
 
 
 def test_semantic_frontier_partitions_registered(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    definition = catalogue[ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER]
+    definition = catalogue.definition(ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER)
     partitions = fedorbit_config.experiments.semantic_sufficiency_frontier.partitions
     assert len(definition.conditions) == len(partitions)
     assert len(partitions) == 4
 
 
 def test_classifications_match_roadmap(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
+    catalogue: ExperimentCatalogue,
 ) -> None:
     assert (
-        catalogue[ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION].classification.value
+        catalogue.definition(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION).classification.value
         == "Validation"
     )
     assert (
-        catalogue[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT].classification.value
+        catalogue.definition(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT).classification.value
         == "Exploratory"
     )
     assert (
-        catalogue[ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY].classification.value
+        catalogue.definition(ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY).classification.value
         == "Failure Boundary"
     )
     assert (
-        catalogue[ExperimentName.CLAIM_EVIDENCE_ADJUDICATION].classification.value
+        catalogue.definition(ExperimentName.CLAIM_EVIDENCE_ADJUDICATION).classification.value
         == "FINAL EVIDENCE"
     )
     assert (
-        catalogue[ExperimentName.STATISTICAL_SYNTHESIS].classification.value
+        catalogue.definition(ExperimentName.STATISTICAL_SYNTHESIS).classification.value
         == "Confirmatory ANALYSIS"
     )

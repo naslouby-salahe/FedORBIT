@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import torch
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.models.training import OptimizerState
+from fedorbit.models.training import ModelParameterState, OptimizerState
 from fedorbit.response.risk import equal_native_class_risk
 from fedorbit.runtime.seeds import RngNamespace, derive_seed32
 
@@ -70,7 +70,7 @@ def paired_shadow_derivative(
 def run_shadow_pair(
     config: FedorbitConfig,
     model: torch.nn.Module,
-    base_state_dict: dict[str, torch.Tensor],
+    base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
     base_rng_state: torch.Tensor,
     data: ShadowData,
@@ -85,7 +85,7 @@ def run_shadow_pair(
     positive = _run_shadow(
         config,
         model,
-        base_state_dict,
+        base_state,
         base_optimizer_state,
         base_rng_state,
         data,
@@ -97,7 +97,7 @@ def run_shadow_pair(
     negative = _run_shadow(
         config,
         model,
-        base_state_dict,
+        base_state,
         base_optimizer_state,
         base_rng_state,
         data,
@@ -106,7 +106,7 @@ def run_shadow_pair(
         batch_size,
         schedule_rng,
     )
-    model.load_state_dict(base_state_dict)
+    base_state.load_into(model)
     baseline = _evaluate_risks(
         config,
         model,
@@ -123,7 +123,7 @@ def run_shadow_pair(
 def _run_shadow(
     config: FedorbitConfig,
     model: torch.nn.Module,
-    base_state_dict: dict[str, torch.Tensor],
+    base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
     base_rng_state: torch.Tensor,
     data: ShadowData,
@@ -132,7 +132,7 @@ def _run_shadow(
     batch_size: int,
     schedule_rng: torch.Generator,
 ) -> tuple[float, ...]:
-    model.load_state_dict(base_state_dict)
+    base_state.load_into(model)
     torch.set_rng_state(base_rng_state)
     training = config.scientific.training
     optimizer = torch.optim.AdamW(

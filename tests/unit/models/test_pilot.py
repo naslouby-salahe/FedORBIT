@@ -54,7 +54,7 @@ def test_selection_orders_by_median_then_std_then_lr_then_decay_then_dropout() -
         _fit(higher_median, 0.5),
         _fit(higher_median, 0.5),
     )
-    selection = select_pilot_configuration(GRID, list(fits))
+    selection = select_pilot_configuration(GRID, fits)
     assert selection.configuration == higher_median
 
 
@@ -69,7 +69,7 @@ def test_std_dev_breaks_median_ties() -> None:
         _fit(narrow, 1.0),
         _fit(narrow, 1.1),
     )
-    selection = select_pilot_configuration(GRID, list(fits))
+    selection = select_pilot_configuration(GRID, fits)
     assert selection.configuration == narrow
 
 
@@ -84,7 +84,7 @@ def test_learning_rate_tie_break_third() -> None:
         _fit(far_lr, 1.0),
         _fit(far_lr, 1.0),
     )
-    selection = select_pilot_configuration(GRID, list(fits))
+    selection = select_pilot_configuration(GRID, fits)
     assert selection.configuration == close_lr
 
 
@@ -103,7 +103,7 @@ def test_std_dev_value() -> None:
 
 def test_selection_raises_without_fits() -> None:
     with pytest.raises(PilotError):
-        select_pilot_configuration(GRID, [])
+        select_pilot_configuration(GRID, ())
 
 
 def test_class_weights_inverse_frequency_formula() -> None:

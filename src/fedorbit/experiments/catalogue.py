@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
@@ -31,7 +32,28 @@ class ExperimentDefinition:
     claims: tuple[ClaimId, ...]
 
 
-def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDefinition]:
+@dataclass(frozen=True, slots=True)
+class ExperimentCatalogue:
+    definitions_by_name: Mapping[ExperimentName, ExperimentDefinition]
+
+    def definition(self, name: ExperimentName) -> ExperimentDefinition:
+        definition = self.definitions_by_name.get(name)
+        if definition is None:
+            raise CatalogueError(f"unregistered experiment: {name.value}")
+        return definition
+
+    def registered_names(self) -> tuple[ExperimentName, ...]:
+        return tuple(self.definitions_by_name.keys())
+
+    def __len__(self) -> int:
+        return len(self.definitions_by_name)
+
+
+class CatalogueError(KeyError):
+    pass
+
+
+def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
     confirmatory_seeds = config.scientific.randomness.confirmatory_seeds
     pilot_seeds = config.scientific.randomness.pilot_seeds
     primary_pair_count = len(config.scientific.datasets.primary_directed_pairs)
@@ -490,10 +512,4 @@ def build_catalogue(config: FedorbitConfig) -> dict[ExperimentName, ExperimentDe
         tuple(ClaimId),
     )
 
-    return catalogue
-
-
-def registered_experiment_names(
-    catalogue: dict[ExperimentName, ExperimentDefinition],
-) -> tuple[ExperimentName, ...]:
-    return tuple(catalogue.keys())
+    return ExperimentCatalogue(catalogue)

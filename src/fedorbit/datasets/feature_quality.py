@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -59,11 +60,19 @@ def _nonfinite_fraction(values: np.ndarray) -> float:
     return float(np.logical_not(np.isfinite(values.astype(float))).mean())
 
 
+@dataclass(frozen=True, slots=True)
+class TrainingFeatureValues:
+    arrays_by_feature: Mapping[str, np.ndarray]
+
+    def array_of(self, feature_name: str) -> np.ndarray:
+        return self.arrays_by_feature[feature_name]
+
+
 def evaluate_feature_quality(
     config: FedorbitConfig,
     feature_names: tuple[str, ...],
     categorical_features: frozenset[str],
-    train_values: dict[str, np.ndarray],
+    train_values: TrainingFeatureValues,
     excluded_features: frozenset[str] = frozenset(),
 ) -> FeatureQualityReport:
     preprocessing = config.scientific.preprocessing
@@ -75,7 +84,7 @@ def evaluate_feature_quality(
     for name in feature_names:
         if name in excluded_features:
             continue
-        values = train_values[name]
+        values = train_values.array_of(name)
         missing = _missing_fraction(values)
         nonfinite = _nonfinite_fraction(values)
         combined = missing + (nonfinite if values.dtype.kind in "f" else 0.0)

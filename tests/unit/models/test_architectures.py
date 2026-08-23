@@ -185,7 +185,7 @@ def test_train_base_model_smoke() -> None:
     assert math.isfinite(outcome.valid_macro_cross_entropy)
     assert outcome.checkpoint.epoch == outcome.epoch
     assert outcome.checkpoint.valid_macro_cross_entropy == outcome.valid_macro_cross_entropy
-    assert set(outcome.checkpoint.state_dict) == set(model.state_dict())
+    assert set(outcome.checkpoint.state_dict.tensors_by_name) == set(model.state_dict())
 
 
 def test_train_base_model_rejects_empty_train() -> None:

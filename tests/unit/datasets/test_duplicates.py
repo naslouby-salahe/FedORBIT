@@ -14,6 +14,7 @@ from fedorbit.datasets.adapters import (
     edge_iiotset_adapter,
 )
 from fedorbit.datasets.duplicates import (
+    CanonicalFeatureVector,
     CanonicalRow,
     DuplicateError,
     canonical_row_bytes,
@@ -72,7 +73,7 @@ def test_canonical_bytes_numeric_float64_little_endian() -> None:
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    payload = canonical_row_bytes(features, schema.canonical_feature_order, schema.roles)
+    payload = canonical_row_bytes(CanonicalFeatureVector(features), schema)
     assert b"\x00\x00\x00\x00\x00\x00\x0c@" in payload
     assert len(payload) >= 8
 
@@ -97,8 +98,8 @@ def test_missing_numeric_is_canonical_quiet_nan() -> None:
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    first = canonical_row_bytes(missing_nan, schema.canonical_feature_order, schema.roles)
-    second = canonical_row_bytes(missing_none, schema.canonical_feature_order, schema.roles)
+    first = canonical_row_bytes(CanonicalFeatureVector(missing_nan), schema)
+    second = canonical_row_bytes(CanonicalFeatureVector(missing_none), schema)
     assert first == second
     assert b"\x00\x00\x00\x00\x00\x00\xf8\x7f" in first
     assert len(first) >= 9
@@ -124,8 +125,8 @@ def test_numeric_zero_is_distinct_from_missing() -> None:
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    zero = canonical_row_bytes(zero_features, schema.canonical_feature_order, schema.roles)
-    missing = canonical_row_bytes(missing_features, schema.canonical_feature_order, schema.roles)
+    zero = canonical_row_bytes(CanonicalFeatureVector(zero_features), schema)
+    missing = canonical_row_bytes(CanonicalFeatureVector(missing_features), schema)
     assert zero != missing
 
 
@@ -141,8 +142,8 @@ def test_categorical_nfc_normalization_before_hashing() -> None:
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    decomposed = canonical_row_bytes(nfc_features, schema.canonical_feature_order, schema.roles)
-    composed = canonical_row_bytes(nfc_features, schema.canonical_feature_order, schema.roles)
+    decomposed = canonical_row_bytes(CanonicalFeatureVector(nfc_features), schema)
+    composed = canonical_row_bytes(CanonicalFeatureVector(nfc_features), schema)
     assert decomposed == composed
 
 
@@ -157,10 +158,9 @@ def test_exact_duplicate_hash_deterministic() -> None:
         "Attack_label": 1,
         "Attack_type": "ddos",
     }
-    assert exact_duplicate_hash(features, schema.canonical_feature_order, schema.roles) == (
-        exact_duplicate_hash(features, schema.canonical_feature_order, schema.roles)
-    )
-    assert len(exact_duplicate_hash(features, schema.canonical_feature_order, schema.roles)) == 64
+    vector = CanonicalFeatureVector(features)
+    assert exact_duplicate_hash(vector, schema) == exact_duplicate_hash(vector, schema)
+    assert len(exact_duplicate_hash(vector, schema)) == 64
 
 
 def test_duplicate_hashing_ignores_forbidden_identity() -> None:
@@ -176,8 +176,8 @@ def test_duplicate_hashing_ignores_forbidden_identity() -> None:
     }
     different_identity: dict[str, str | int | float | None] = dict(base)
     different_identity["ip.src_host"] = "different-host"
-    assert exact_duplicate_hash(base, schema.canonical_feature_order, schema.roles) == (
-        exact_duplicate_hash(different_identity, schema.canonical_feature_order, schema.roles)
+    assert exact_duplicate_hash(CanonicalFeatureVector(base), schema) == (
+        exact_duplicate_hash(CanonicalFeatureVector(different_identity), schema)
     )
 
 
@@ -192,7 +192,7 @@ def _row(tcp_ack: float, label: str, fraction: float) -> CanonicalRow:
         "Attack_type": label,
     }
     return CanonicalRow(
-        features=features,
+        features=CanonicalFeatureVector(features),
         label=label,
         timestamp_fraction=fraction,
         group_id="",
@@ -207,7 +207,7 @@ def test_deduplicate_groups_exact_duplicates() -> None:
         _row(2.0, "normal", 0.9),
     )
     groups = deduplicate_rows(schema, rows)
-    assert len(groups) == 2
+    assert groups.group_count == 2
     validate_duplicate_groups(groups)
 
 

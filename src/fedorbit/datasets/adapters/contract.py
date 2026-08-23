@@ -81,11 +81,13 @@ class DatasetAdapter:
             timestamp_parse_success_fraction,
             timestamp_alias_minimum,
         )
-        multiclass, binary = resolve_label_columns(
+        labels = resolve_label_columns(
             observed_columns,
             self._contract.multiclass_label_candidates,
             self._contract.binary_label_candidates,
         )
+        multiclass = labels.multiclass_label_field
+        binary = labels.binary_label_field
         excluded = self._contract.additional_exclusions
         roles: dict[str, str] = {}
         for column in observed_columns:

@@ -79,7 +79,8 @@ def plan() -> None:
     config = load_fedorbit_config()
     catalogue = build_catalogue(config)
     typer.echo(f"registered experiments: {len(catalogue)}")
-    for name, definition in catalogue.items():
+    for name in catalogue.registered_names():
+        definition = catalogue.definition(name)
         typer.echo(
             f"{name.value} | {definition.classification.value} | "
             f"planned cells: {definition.derived_planned_cells}"
@@ -107,7 +108,7 @@ def run(
         experiment = experiment_identifier(experiment_name)
         config = load_fedorbit_config()
         catalogue = build_catalogue(config)
-        definition = catalogue[experiment]
+        definition = catalogue.definition(experiment)
         from fedorbit.execution.pipeline import run_pipeline
 
         run_pipeline(experiment, definition, overwrite=overwrite)
@@ -120,17 +121,19 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
     try:
         config = load_fedorbit_config()
         catalogue = build_catalogue(config)
+        selected_names = set(catalogue.registered_names())
         selected = (
             {experiment_identifier(experiment_name)}
             if experiment_name is not None
-            else set(catalogue)
+            else selected_names
         )
         typer.echo(
             f"{'#':>2} {'experiment':<50} {'role':<22} {'status':<10} {'est-run':<8} {'est-end':<8}"
         )
-        for index, (name, definition) in enumerate(
-            (name, definition) for name, definition in catalogue.items() if name in selected
+        for index, name in enumerate(
+            name for name in catalogue.registered_names() if name in selected
         ):
+            definition = catalogue.definition(name)
             typer.echo(
                 f"{index:>2} {name.value:<50} {definition.classification.value:<22} "
                 f"{'pending':<10} {'-':<8} {'-':<8}"

@@ -104,12 +104,12 @@ def run_base_model_pilot(
                     outcome.valid_macro_cross_entropy,
                 )
             )
-    return select_pilot_configuration(grid, fits)
+    return select_pilot_configuration(grid, tuple(fits))
 
 
 def select_pilot_configuration(
     grid: tuple[PilotConfiguration, ...],
-    fits: list[PilotFitResult],
+    fits: tuple[PilotFitResult, ...],
 ) -> PilotSelection:
     by_configuration: dict[PilotConfiguration, tuple[float, float]] = {}
     for configuration in grid:

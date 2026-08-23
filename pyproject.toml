@@ -60,7 +60,7 @@ ignore = ["N802", "N803", "N806", "N999"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --import-mode=importlib"
 filterwarnings = ["error"]
 
 [tool.pyright]

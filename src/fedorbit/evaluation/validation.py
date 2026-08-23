@@ -14,7 +14,9 @@ class EvaluationValidationError(ValueError):
     pass
 
 
-def validate_prediction_records(records: Iterable[PredictionRecord]) -> tuple[PredictionRecord, ...]:
+def validate_prediction_records(
+    records: Iterable[PredictionRecord],
+) -> tuple[PredictionRecord, ...]:
     materialized = tuple(records)
     identities: set[tuple[str, str, str, int, str]] = set()
     for record in materialized:

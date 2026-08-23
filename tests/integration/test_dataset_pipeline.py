@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.ontology import transfer_eligibility
-from fedorbit.datasets.splitting import DuplicateGroupChronology, assign_duplicate_groups_chronologically
+from fedorbit.datasets.splitting import (
+    DuplicateGroupChronology,
+    assign_duplicate_groups_chronologically,
+)
 from fedorbit.domain.enums import Split
 
 

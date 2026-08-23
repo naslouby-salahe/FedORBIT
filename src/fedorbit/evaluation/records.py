@@ -6,7 +6,13 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from fedorbit.domain.enums import ExperimentName, MetricId, MultiplicityFamily, Split, TransferMethod
+from fedorbit.domain.enums import (
+    ExperimentName,
+    MetricId,
+    MultiplicityFamily,
+    Split,
+    TransferMethod,
+)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -64,7 +70,9 @@ class PredictionRecord(FrozenRecord):
             raise ValueError("prediction identity fields must be non-empty")
         if not self.probabilities:
             raise ValueError("prediction probability vector must be non-empty")
-        if any(not math.isfinite(value) or value < 0.0 or value > 1.0 for value in self.probabilities):
+        if any(
+            not math.isfinite(value) or value < 0.0 or value > 1.0 for value in self.probabilities
+        ):
             raise ValueError("prediction probabilities must be finite values in [0,1]")
         if abs(sum(self.probabilities) - 1.0) > 1e-6:
             raise ValueError("prediction probabilities must sum to one")

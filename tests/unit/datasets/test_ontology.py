@@ -20,7 +20,10 @@ def test_label_canonicalization_is_fixed() -> None:
 
 
 def test_transfer_ontology_uses_ton_mapping_for_all_ton_clients() -> None:
-    assert transfer_concept_for(DatasetId.EDGE_IIOTSET_NETWORK, "ddos_tcp") == OracleTransferConcept.DDOS
+    assert (
+        transfer_concept_for(DatasetId.EDGE_IIOTSET_NETWORK, "ddos_tcp")
+        == OracleTransferConcept.DDOS
+    )
     for client in (
         DatasetId.TON_IOT_WINDOWS10_HOST,
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
@@ -35,8 +38,13 @@ def test_transfer_ontology_uses_ton_mapping_for_all_ton_clients() -> None:
 def test_transfer_concepts_and_coarse_groups_are_exact() -> None:
     assert TRANSFER_CONCEPTS == tuple(item.value for item in OracleTransferConcept)
     assert coarse_group_for(DatasetId.EDGE_IIOTSET_NETWORK, "ransomware") == CoarseGroup.DISRUPTION
-    assert coarse_group_for(DatasetId.TON_IOT_WINDOWS10_HOST, "injection") == CoarseGroup.EXPLOITATION
-    assert coarse_group_for(DatasetId.TON_IOT_LINUX_PROCESS_HOST, "scanning") == CoarseGroup.ACCESS_AND_DISCOVERY
+    assert (
+        coarse_group_for(DatasetId.TON_IOT_WINDOWS10_HOST, "injection") == CoarseGroup.EXPLOITATION
+    )
+    assert (
+        coarse_group_for(DatasetId.TON_IOT_LINUX_PROCESS_HOST, "scanning")
+        == CoarseGroup.ACCESS_AND_DISCOVERY
+    )
 
 
 def test_transfer_eligibility_uses_registered_count_thresholds(

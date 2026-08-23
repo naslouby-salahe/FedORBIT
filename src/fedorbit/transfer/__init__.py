@@ -13,6 +13,15 @@ from fedorbit.transfer.optimizer_budget import (
     OptimizerBudgetError,
     TargetOptimizerStepLedger,
 )
+from fedorbit.transfer.selection import (
+    RankedProposal,
+    SelectionAttempt,
+    SelectionDecision,
+    SelectionError,
+    SourceProposal,
+    rank_source_proposals,
+    select_source_sequentially,
+)
 from fedorbit.transfer.target_state import (
     TargetImportance,
     TargetImportanceError,
@@ -25,6 +34,11 @@ __all__ = [
     "ConfirmReplicateOutcomes",
     "ConfirmationError",
     "OptimizerBudgetError",
+    "RankedProposal",
+    "SelectionAttempt",
+    "SelectionDecision",
+    "SelectionError",
+    "SourceProposal",
     "TargetImportance",
     "TargetImportanceError",
     "TargetOptimizerStepLedger",
@@ -34,4 +48,6 @@ __all__ = [
     "confirmation_schedule",
     "hierarchical_bootstrap_lower_bound",
     "hierarchical_bootstrap_relative_gains",
+    "rank_source_proposals",
+    "select_source_sequentially",
 ]

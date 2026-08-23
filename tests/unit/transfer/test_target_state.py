@@ -79,14 +79,12 @@ def test_negative_node_index_rejected_at_construction() -> None:
 
 
 def test_no_actionable_nodes_is_insufficient_evidence(config: FedorbitConfig) -> None:
+    non_actionable_reports = (
+        TransferNodeRisk(0, is_actionable=False, meta_class_risk=0.4),
+        TransferNodeRisk(1, is_actionable=False, meta_class_risk=0.1),
+    )
     with pytest.raises(TargetImportanceError):
-        build_target_importance(
-            config,
-            (
-                TransferNodeRisk(0, is_actionable=False, meta_class_risk=0.4),
-                TransferNodeRisk(1, is_actionable=False, meta_class_risk=0.1),
-            ),
-        )
+        build_target_importance(config, non_actionable_reports)
 
 
 def test_construction_is_deterministic_and_sorted(config: FedorbitConfig) -> None:

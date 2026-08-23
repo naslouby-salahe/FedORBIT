@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -71,18 +70,17 @@ def _worst_images_over_active_maps(
     action_tie_tolerance: float,
 ) -> tuple[int, ...]:
     blocks = problem.blocks
-    worst_value = math.inf
-    best_images: tuple[int, ...] | None = None
-    for mapping in enumerate_active_image_maps(blocks, active_nodes):
-        value, images = _evaluate_active_image_map(problem, alpha, mapping, lap_tie_tolerance)
-        strictly_better = value < worst_value - action_tie_tolerance
-        tied = abs(value - worst_value) <= action_tie_tolerance
-        if strictly_better or (tied and (best_images is None or images < best_images)):
-            worst_value = min(worst_value, value) if tied else value
-            best_images = images
-    if best_images is None:
+    evaluations = [
+        _evaluate_active_image_map(problem, alpha, mapping, lap_tie_tolerance)
+        for mapping in enumerate_active_image_maps(blocks, active_nodes)
+    ]
+    worst_value = min(value for value, _ in evaluations)
+    tied_images = [
+        images for value, images in evaluations if abs(value - worst_value) <= action_tie_tolerance
+    ]
+    if not tied_images:
         raise SolverExecutionError("separator produced no admissible correspondence")
-    return best_images
+    return min(tied_images)
 
 
 def fixed_action_worst_correspondence(

@@ -226,18 +226,9 @@ def _package_has_hash(package: LockfileEntry) -> bool:
     return False
 
 
-def validate_lockfile(
-    config: FedorbitConfig, allow_deviations: frozenset[str] = frozenset()
-) -> LockfileSummary:
-    lock_path = repository_root() / "uv.lock"
-    if not lock_path.is_file():
-        raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
-    with lock_path.open("rb") as handle:
-        lock = tomllib.load(handle)
-    raw_packages = lock.get("package", [])
-    if not isinstance(raw_packages, list) or not raw_packages:
-        raise ValueError("uv.lock contains no package entries")
-    packages = cast(list[LockfileEntry], raw_packages)
+def _collect_locked_packages(
+    packages: list[LockfileEntry],
+) -> tuple[list[str], dict[str, str]]:
     package_names: list[str] = []
     locked_versions: dict[str, str] = {}
     for package in packages:
@@ -250,6 +241,22 @@ def validate_lockfile(
         version = package.get("version")
         if isinstance(version, str):
             locked_versions[name] = version
+    return package_names, locked_versions
+
+
+def validate_lockfile(
+    config: FedorbitConfig, allow_deviations: frozenset[str] = frozenset()
+) -> LockfileSummary:
+    lock_path = repository_root() / "uv.lock"
+    if not lock_path.is_file():
+        raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
+    with lock_path.open("rb") as handle:
+        lock = tomllib.load(handle)
+    raw_packages = lock.get("package", [])
+    if not isinstance(raw_packages, list) or not raw_packages:
+        raise ValueError("uv.lock contains no package entries")
+    packages = cast(list[LockfileEntry], raw_packages)
+    package_names, locked_versions = _collect_locked_packages(packages)
     environment = config.environment
     expected = {
         "torch": environment.pytorch,

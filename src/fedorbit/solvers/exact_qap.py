@@ -130,26 +130,35 @@ def _add_mccormick_products(
     return objective_terms
 
 
+def _append_products_for_target_pair(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    target_k: int,
+    target_j: int,
+    coefficients: dict[tuple[int, int, int, int], float],
+) -> None:
+    blocks = problem.blocks
+    lower = problem.lower_response_matrix
+    weight = float(problem.target_importance[target_k])
+    action_value = float(alpha.coordinates[target_j])
+    sources_for_k = list(blocks.block_index_range(blocks.block_of_node(target_k)))
+    sources_for_j = list(blocks.block_index_range(blocks.block_of_node(target_j)))
+    for source_a in sources_for_k:
+        for source_b in sources_for_j:
+            coefficient = weight * action_value * float(lower[source_a, source_b])
+            if coefficient:
+                coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+
+
 def _fixed_action_product_coefficients(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
 ) -> dict[tuple[int, int, int, int], float]:
     blocks = problem.blocks
-    lower = problem.lower_response_matrix
-    importance = problem.target_importance
-    coordinates = alpha.coordinates
     coefficients: dict[tuple[int, int, int, int], float] = {}
     for target_k in range(blocks.total_padded_nodes):
-        weight = float(importance[target_k])
         for target_j in alpha.active_support_nodes:
-            action_value = float(coordinates[target_j])
-            sources_for_k = list(blocks.block_index_range(blocks.block_of_node(target_k)))
-            sources_for_j = list(blocks.block_index_range(blocks.block_of_node(target_j)))
-            for source_a in sources_for_k:
-                for source_b in sources_for_j:
-                    coefficient = weight * action_value * float(lower[source_a, source_b])
-                    if coefficient:
-                        coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+            _append_products_for_target_pair(problem, alpha, target_k, target_j, coefficients)
     return coefficients
 
 

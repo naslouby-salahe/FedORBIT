@@ -8,7 +8,11 @@ import highspy
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import ExactSparseSolverConfig, FedorbitConfig
+from fedorbit.config.models import (
+    DenseCcpSolverConfig,
+    ExactSparseSolverConfig,
+    FedorbitConfig,
+)
 from fedorbit.domain.enums import RngNamespace, TerminalState
 from fedorbit.orbit.correspondence import (
     BlockCorrespondence,
@@ -362,6 +366,40 @@ def unpenalized_fixed_action_objective(
     return total
 
 
+def _run_penalty_level(
+    problem: RobustActionProblem,
+    alpha: CurriculumAction,
+    config: FedorbitConfig,
+    layout: AssignmentVariableLayout,
+    penalty: float,
+    start_assignment: NDArray[np.float64],
+    start_residual: float,
+    start_iterations: int,
+) -> tuple[NDArray[np.float64], float, int, bool]:
+    settings = config.solvers.dense_ccp
+    current = start_assignment.copy()
+    previous_objective: float | None = None
+    residual = start_residual
+    iterations = start_iterations
+    for _ in range(settings.maximum_iterations_per_penalty_level):
+        step = solve_lifted_lp(problem, alpha, config, layout, penalty, current)
+        current = step.assignment_values
+        objective = step.objective_value
+        residual = integrality_residual(current)
+        iterations += 1
+        if previous_objective is not None:
+            relative_change = abs(objective - previous_objective) / max(
+                1.0, abs(previous_objective)
+            )
+            if (
+                relative_change <= settings.relative_objective_convergence_tolerance
+                and residual <= settings.assignment_integrality_residual
+            ):
+                return current, residual, iterations, True
+        previous_objective = objective
+    return current, residual, iterations, False
+
+
 def ccp_trajectory(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -372,29 +410,21 @@ def ccp_trajectory(
     settings = config.solvers.dense_ccp
     scale = penalty_scale(problem, alpha)
     current = start_assignment.copy()
-    previous_objective: float | None = None
     residual = integrality_residual(current)
     iterations = 0
     converged_final_level = False
     for multiplier in settings.penalty_multipliers_relative_to_scale:
-        converged_final_level = False
-        for _ in range(settings.maximum_iterations_per_penalty_level):
-            step = solve_lifted_lp(problem, alpha, config, layout, multiplier * scale, current)
-            current = step.assignment_values
-            objective = step.objective_value
-            residual = integrality_residual(current)
-            iterations += 1
-            if previous_objective is not None:
-                relative_change = abs(objective - previous_objective) / max(
-                    1.0, abs(previous_objective)
-                )
-                if (
-                    relative_change <= settings.relative_objective_convergence_tolerance
-                    and residual <= settings.assignment_integrality_residual
-                ):
-                    converged_final_level = True
-                    break
-            previous_objective = objective
+        current, residual, iterations, level_converged = _run_penalty_level(
+            problem,
+            alpha,
+            config,
+            layout,
+            multiplier * scale,
+            current,
+            residual,
+            iterations,
+        )
+        converged_final_level = level_converged
     final_objective = unpenalized_fixed_action_objective(problem, alpha, layout, current)
     return CcpTrajectoryOutcome(
         final_assignment=current,
@@ -537,28 +567,93 @@ def _select_best_projected_candidate(
     return min(tied, key=lambda entry: entry.correspondence.ordering_key())
 
 
-def _outer_loop_stop(
-    cut_cap: int,
-    cuts_so_far: int,
+@dataclass(frozen=True, slots=True)
+class OuterIterationOutcome:
+    cut_added: bool
+    converged: bool
+    terminal_state: TerminalState | None
+
+
+def _classify_outer_iteration(
+    problem: RobustActionProblem,
+    dense_settings: DenseCcpSolverConfig,
+    exact_settings: ExactSparseSolverConfig,
+    scenarios: list[BlockCorrespondence],
+    scenario_rows: list[NDArray[np.float64]],
+    alpha: CurriculumAction,
+    correspondence: BlockCorrespondence,
+    master_objective: float,
     deadline: float,
-) -> TerminalState | None:
-    if cuts_so_far >= cut_cap:
-        return None
+) -> OuterIterationOutcome:
+    full_objective = evaluate_objective(alpha, correspondence)
+    violation = master_objective - full_objective
+    is_new = correspondence not in scenarios
+    violated = violation > exact_settings.separator_cut_stopping_tolerance
+    if not (is_new and violated):
+        return OuterIterationOutcome(cut_added=False, converged=True, terminal_state=None)
+    scenarios.append(correspondence)
+    scenario_rows.append(scenario_cut_row(problem, correspondence))
+    cap_reached = len(scenarios) - 1 >= dense_settings.outer_action_cuts
+    if cap_reached:
+        return OuterIterationOutcome(cut_added=True, converged=False, terminal_state=None)
     if time.monotonic() > deadline:
-        return TerminalState.TIME_LIMIT
-    return None
+        return OuterIterationOutcome(
+            cut_added=True, converged=False, terminal_state=TerminalState.TIME_LIMIT
+        )
+    return OuterIterationOutcome(cut_added=True, converged=False, terminal_state=None)
 
 
-def solve_dense_ccp(
+@dataclass(frozen=True, slots=True)
+class DenseOuterLoopResult:
+    selected_action: CurriculumAction
+    master_objective: float
+    best_candidate: ProjectedCandidate | None
+    lower_bound: float
+    outer_cut_count: int
+    converged_heuristically: bool
+    terminal_state: TerminalState | None
+
+
+def _outer_iteration_timed_out(timed_out: bool) -> bool:
+    return timed_out
+
+
+def _action_relaxation_bound(
+    problem: RobustActionProblem,
+    config: FedorbitConfig,
+    layout: AssignmentVariableLayout,
+    alpha: CurriculumAction,
+) -> float:
+    return relaxed_fixed_action_lower_bound(problem, alpha, config, layout).objective_value
+
+
+@dataclass(frozen=True, slots=True)
+class _LoopAccounting:
+    outer_cut_count: int
+    converged_heuristically: bool
+    should_stop: bool
+
+
+def _apply_outer_outcome(
+    outcome: OuterIterationOutcome,
+    cuts_so_far: int,
+    previously_converged: bool,
+) -> _LoopAccounting:
+    cut_count = cuts_so_far + (1 if outcome.cut_added else 0)
+    converged = previously_converged or outcome.converged
+    should_stop = not outcome.cut_added or outcome.converged or outcome.terminal_state is not None
+    return _LoopAccounting(cut_count, converged, should_stop)
+
+
+def _run_dense_outer_loop(
     problem: RobustActionProblem,
     config: FedorbitConfig,
     seed: int,
     contrast_coordinates: str,
-) -> DenseCcpOutcome:
-    started = time.monotonic()
+) -> DenseOuterLoopResult:
     settings = config.solvers.dense_ccp
     exact_settings = config.solvers.exact_sparse
-    deadline = started + settings.wall_time_seconds
+    deadline = time.monotonic() + settings.wall_time_seconds
     layout = AssignmentVariableLayout.build(problem.blocks)
     actionable = tuple(problem.actionable_nodes())
     full_support = SupportCoordinateSet(problem=problem, nodes=actionable)
@@ -576,52 +671,69 @@ def solve_dense_ccp(
         z_value, alpha_values = run_support_master_lp(
             problem, full_support, scenario_rows, exact_settings
         )
-        alpha = CurriculumAction(problem, alpha_values)
+        selected_action = CurriculumAction(problem, alpha_values)
         master_objective = z_value
-        selected_action = alpha
-        relaxation = relaxed_fixed_action_lower_bound(problem, alpha, config, layout)
-        lower_bound = relaxation.objective_value
+        lower_bound = _action_relaxation_bound(problem, config, layout, selected_action)
         candidates, timed_out = _evaluate_projected_candidates(
-            problem, config, layout, alpha, seed, contrast_coordinates, deadline
+            problem, config, layout, selected_action, seed, contrast_coordinates, deadline
         )
-        if timed_out:
+        if _outer_iteration_timed_out(timed_out):
             terminal_state = TerminalState.TIME_LIMIT
         if terminal_state is not None or not candidates:
             break
         best_candidate = _select_best_projected_candidate(candidates, exact_settings)
-        full_objective = evaluate_objective(alpha, best_candidate.correspondence)
-        violation = master_objective - full_objective
-        is_new = best_candidate.correspondence not in scenarios
-        if is_new and violation > exact_settings.separator_cut_stopping_tolerance:
-            scenarios.append(best_candidate.correspondence)
-            scenario_rows.append(scenario_cut_row(problem, best_candidate.correspondence))
-            outer_cut_count += 1
-            stop_reason = _outer_loop_stop(
-                settings.outer_action_cuts,
-                outer_cut_count,
-                deadline,
-            )
-            if stop_reason is not None:
-                converged_heuristically = False
-                terminal_state = stop_reason
-                break
-        else:
-            converged_heuristically = True
+        outcome = _classify_outer_iteration(
+            problem,
+            settings,
+            exact_settings,
+            scenarios,
+            scenario_rows,
+            selected_action,
+            best_candidate.correspondence,
+            master_objective,
+            deadline,
+        )
+        loop = _apply_outer_outcome(outcome, outer_cut_count, converged_heuristically)
+        outer_cut_count, converged_heuristically = (
+            loop.outer_cut_count,
+            loop.converged_heuristically,
+        )
+        terminal_state = outcome.terminal_state or terminal_state
+        if loop.should_stop:
             break
-    if best_candidate is None:
-        raise DenseCcpError("dense CCP terminated without a projected correspondence")
-    projected_response = response_only_objective(
-        problem, selected_action, best_candidate.correspondence
-    )
-    return DenseCcpOutcome(
+    return DenseOuterLoopResult(
         selected_action=selected_action,
         master_objective=master_objective,
-        best_projected_response_objective=projected_response,
-        relaxation_lower_bound=lower_bound,
-        dense_bound_gap=projected_response - lower_bound,
-        integrality_residual=best_candidate.integrality_residual,
+        best_candidate=best_candidate,
+        lower_bound=lower_bound,
         outer_cut_count=outer_cut_count,
         converged_heuristically=converged_heuristically,
         terminal_state=terminal_state,
+    )
+
+
+def solve_dense_ccp(
+    problem: RobustActionProblem,
+    config: FedorbitConfig,
+    seed: int,
+    contrast_coordinates: str,
+) -> DenseCcpOutcome:
+    result = _run_dense_outer_loop(problem, config, seed, contrast_coordinates)
+    best_candidate = result.best_candidate
+    if best_candidate is None:
+        raise DenseCcpError("dense CCP terminated without a projected correspondence")
+    projected_response = response_only_objective(
+        problem, result.selected_action, best_candidate.correspondence
+    )
+    return DenseCcpOutcome(
+        selected_action=result.selected_action,
+        master_objective=result.master_objective,
+        best_projected_response_objective=projected_response,
+        relaxation_lower_bound=result.lower_bound,
+        dense_bound_gap=projected_response - result.lower_bound,
+        integrality_residual=best_candidate.integrality_residual,
+        outer_cut_count=result.outer_cut_count,
+        converged_heuristically=result.converged_heuristically,
+        terminal_state=result.terminal_state,
         worst_projected_correspondence=best_candidate.correspondence,
     )

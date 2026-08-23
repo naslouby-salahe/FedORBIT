@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +27,14 @@ class WorkspaceLayout:
     project_summary: Path
 
 
+def canonical_slug(value: str) -> str:
+    normalized = unicodedata.normalize("NFC", value).casefold()
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+    if not slug:
+        raise WorkspaceError("descriptive name does not produce a filesystem slug")
+    return slug
+
+
 def build_layout(config: FedorbitConfig, root: Path | None = None) -> WorkspaceLayout:
     layout = config.runtime.artifact_layout
     base = root if root is not None else repository_root()
@@ -44,11 +54,11 @@ def build_layout(config: FedorbitConfig, root: Path | None = None) -> WorkspaceL
 
 
 def experiment_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Path:
-    return layout.experiments / experiment.value
+    return layout.experiments / canonical_slug(experiment.value)
 
 
 def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Path:
-    return layout.results_experiments / experiment.value
+    return layout.results_experiments / canonical_slug(experiment.value)
 
 
 def leaf_path(
@@ -60,7 +70,8 @@ def leaf_path(
 ) -> Path:
     if not workspace.is_absolute():
         workspace = layout.execution_root / workspace
-    return workspace / f"{semantic_coordinates}.{fingerprint_sha256[:16]}{suffix}"
+    semantic_slug = canonical_slug(semantic_coordinates)
+    return workspace / f"{semantic_slug}.{fingerprint_sha256[:16]}{suffix}"
 
 
 def enforce_workspace_boundary(layout: WorkspaceLayout, path: Path) -> None:

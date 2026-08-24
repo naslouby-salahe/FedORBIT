@@ -95,7 +95,9 @@ def test_holm_is_applied_within_family_only(config: FedorbitConfig) -> None:
     assert primary[0].family_size == 1
 
 
-def test_inputs_with_insufficient_paired_seeds_are_not_in_holm_family(config: FedorbitConfig) -> None:
+def test_inputs_with_insufficient_paired_seeds_are_not_in_holm_family(
+    config: FedorbitConfig,
+) -> None:
     states = build_family_states(
         config,
         ContrastPValueSet(
@@ -146,6 +148,8 @@ def test_pairing_engine_accepts_only_identical_registered_lineage() -> None:
 
 def test_pairing_engine_rejects_source_packet_mismatch() -> None:
     method = (PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.2, _lineage()),)
-    reference = (PairedObservation(TransferMethod.LOCAL_ONLY, 0.1, _lineage(source_packet="packet-2")),)
+    reference = (
+        PairedObservation(TransferMethod.LOCAL_ONLY, 0.1, _lineage(source_packet="packet-2")),
+    )
     with pytest.raises(PairingError, match="lineage mismatch"):
         validate_paired_observations(method, reference)

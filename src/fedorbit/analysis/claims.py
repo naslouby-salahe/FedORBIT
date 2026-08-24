@@ -312,9 +312,15 @@ def evaluate_coupling_mechanism(
         and item.retention is not None
         and item.retention >= criteria.destruction_positive_gain_retention_minimum
     )
-    if evidence.theorem_classification_accuracy < criteria.theorem_zero_strict_classification_accuracy_required:
+    if (
+        evidence.theorem_classification_accuracy
+        < criteria.theorem_zero_strict_classification_accuracy_required
+    ):
         reasons.append("designed-family theorem classification criterion failed")
-    if material_fraction is None or material_fraction < criteria.real_packet_fraction_with_material_gap_minimum:
+    if (
+        material_fraction is None
+        or material_fraction < criteria.real_packet_fraction_with_material_gap_minimum
+    ):
         reasons.append("real-packet coupling materiality fraction criterion failed")
     if len(material_pairs) < criteria.primary_pairs_with_material_mean_gap_required:
         reasons.append("too few primary pairs have material significant coupling gaps")
@@ -368,7 +374,10 @@ def evaluate_sparse_operational_relevance(
         >= criteria.primary_pairs_with_useful_gain_required
     )
     reasons: list[str] = []
-    if dense_closeness_fraction is None or dense_closeness_fraction < criteria.valid_unit_fraction_required:
+    if (
+        dense_closeness_fraction is None
+        or dense_closeness_fraction < criteria.valid_unit_fraction_required
+    ):
         reasons.append("sparse utility is not sufficiently close to dense")
     if not useful_supports:
         reasons.append("no registered sparse support has enough materially useful primary pairs")
@@ -426,11 +435,9 @@ def evaluate_confirmation_safety(
     if any(item.coverage_loss > criteria.pair_coverage_loss_maximum for item in analyzable):
         reasons.append("a primary pair exceeds the coverage-loss ceiling")
     equal_summary_passes = (
-        equal_arr is not None
-        and equal_arr >= criteria.equal_pair_absolute_risk_reduction_minimum
+        equal_arr is not None and equal_arr >= criteria.equal_pair_absolute_risk_reduction_minimum
     ) or (
-        equal_rrr is not None
-        and equal_rrr >= criteria.equal_pair_relative_risk_reduction_minimum
+        equal_rrr is not None and equal_rrr >= criteria.equal_pair_relative_risk_reduction_minimum
     )
     if not equal_summary_passes:
         reasons.append("equal-pair harm-reduction summary does not meet its threshold")

@@ -200,8 +200,7 @@ def test_sparse_operational_relevance_requires_dense_closeness_useful_gain_and_e
     config: FedorbitConfig,
 ) -> None:
     units = tuple(
-        SparseUnitEvidence(f"p{index}", index, 3, 0.03, 0.035, True)
-        for index in range(1, 5)
+        SparseUnitEvidence(f"p{index}", index, 3, 0.03, 0.035, True) for index in range(1, 5)
     )
     pair_gains = (
         SparsePairGainEvidence("p1", 2, 0.03, 10),
@@ -216,8 +215,7 @@ def test_sparse_operational_relevance_requires_dense_closeness_useful_gain_and_e
 
 def test_confirmation_safety_applies_pair_and_equal_pair_criteria(config: FedorbitConfig) -> None:
     evidence = tuple(
-        ConfirmationPairEvidence(f"p{index}", 0.10, 0.05, 0.05, 10)
-        for index in range(1, 5)
+        ConfirmationPairEvidence(f"p{index}", 0.10, 0.05, 0.05, 10) for index in range(1, 5)
     )
     decision = evaluate_confirmation_safety(config, evidence)
     assert decision.supported

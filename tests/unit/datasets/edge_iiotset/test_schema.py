@@ -76,7 +76,9 @@ def test_edge_timestamp_parse_failure_is_data_invalid() -> None:
 def test_duplicate_or_missing_semantic_columns_fail_closed() -> None:
     config = load_fedorbit_config()
     adapter = edge_iiotset_adapter(config)
-    threshold = config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
+    threshold = (
+        config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
+    )
     with pytest.raises(DatasetSchemaError):
         adapter.resolve_schema(EDGE_COLUMNS + ("frame.time",), 1.0, threshold)
     with pytest.raises(DatasetSchemaError):

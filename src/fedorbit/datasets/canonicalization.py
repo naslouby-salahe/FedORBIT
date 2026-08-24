@@ -79,8 +79,7 @@ class DuplicateGroups:
 
     def as_member_records(self) -> tuple[DuplicateGroupMembers, ...]:
         return tuple(
-            DuplicateGroupMembers(group_sha256, members)
-            for group_sha256, members in self.groups
+            DuplicateGroupMembers(group_sha256, members) for group_sha256, members in self.groups
         )
 
 

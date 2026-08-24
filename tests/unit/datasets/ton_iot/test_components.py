@@ -34,7 +34,9 @@ def test_ton_windows_adapter_resolves_timestamp_labels_and_identity_exclusion() 
 
 def test_ton_adapter_requires_exact_label_semantics() -> None:
     config = load_fedorbit_config()
-    threshold = config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
+    threshold = (
+        config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
+    )
     with pytest.raises(DatasetSchemaError):
         ton_iot_adapter(DatasetId.TON_IOT_NETWORK, config).resolve_schema(
             ("ts", "label", "attack_type"), 1.0, threshold

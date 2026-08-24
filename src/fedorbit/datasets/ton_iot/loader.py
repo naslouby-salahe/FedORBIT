@@ -48,7 +48,9 @@ def discover_ton_iot_component_files(
     )
     if not candidates:
         raise TonIotLoaderError(f"no files found for ToN-IoT component {component.component_name}")
-    return tuple(sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode()))
+    return tuple(
+        sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode())
+    )
 
 
 def inspect_ton_iot_component_files(

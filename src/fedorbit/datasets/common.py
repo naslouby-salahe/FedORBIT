@@ -219,7 +219,10 @@ class DatasetAdapter:
                 )
             else:
                 inferred = role_for_field(column)
-                if inferred == FieldRole.BEHAVIORAL_CATEGORICAL and observed_value_samples is not None:
+                if (
+                    inferred == FieldRole.BEHAVIORAL_CATEGORICAL
+                    and observed_value_samples is not None
+                ):
                     inferred = infer_feature_type(observed_value_samples.samples_of(column))
                 roles[column] = inferred
         feature_order = (
@@ -228,7 +231,8 @@ class DatasetAdapter:
             else tuple(
                 column
                 for column in observed_columns
-                if column not in (timestamp, labels.multiclass_label_field, labels.binary_label_field)
+                if column
+                not in (timestamp, labels.multiclass_label_field, labels.binary_label_field)
             )
         )
         return AdapterSchema(

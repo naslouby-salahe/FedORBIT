@@ -177,7 +177,10 @@ def test_completion_manifest_self_hash_excludes_own_field() -> None:
     manifest = CompletionManifest.model_validate(_completion_payload())
     self_hash = completion_manifest_self_hash(manifest)
     assert len(self_hash) == 64
-    assert completion_manifest_self_hash(manifest.model_copy(update={"producer_stage": "training"})) != self_hash
+    assert (
+        completion_manifest_self_hash(manifest.model_copy(update={"producer_stage": "training"}))
+        != self_hash
+    )
 
 
 DATASET_FIELDS = {
@@ -259,7 +262,9 @@ def test_eligibility_copies_enforce_method_oracle_separation() -> None:
 
 
 def test_oracle_eligibility_copy_requires_fine_concept() -> None:
-    manifest = TransferEligibilityManifest.model_validate({**ELIGIBILITY_FIELDS, "fine_concept": None})
+    manifest = TransferEligibilityManifest.model_validate(
+        {**ELIGIBILITY_FIELDS, "fine_concept": None}
+    )
     with pytest.raises(ValueError):
         eligibility_copy(manifest, EligibilityCopyKind.ORACLE)
 

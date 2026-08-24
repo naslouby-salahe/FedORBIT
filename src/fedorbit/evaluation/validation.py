@@ -60,7 +60,9 @@ def validate_comparison_metadata(
     if comparison.holm_p is not None and metadata.holm_rank is None:
         raise EvaluationValidationError("Holm-adjusted comparison requires Holm rank metadata")
     if comparison.holm_p is None and metadata.holm_rank is not None:
-        raise EvaluationValidationError("Holm rank metadata requires an adjusted comparison p-value")
+        raise EvaluationValidationError(
+            "Holm rank metadata requires an adjusted comparison p-value"
+        )
     if metadata.bootstrap_resamples > 0 and metadata.bootstrap_seed is None:
         raise EvaluationValidationError("bootstrap procedure requires a derived bootstrap seed")
     if metadata.bootstrap_resamples == 0 and metadata.bootstrap_seed is not None:

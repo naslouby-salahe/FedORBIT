@@ -216,7 +216,9 @@ def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:
 
 def test_comparison_metadata_rejects_missing_holm_rank() -> None:
     with pytest.raises(EvaluationValidationError, match="Holm rank"):
-        validate_comparison_metadata(_comparison(), _metadata().model_copy(update={"holm_rank": None}))
+        validate_comparison_metadata(
+            _comparison(), _metadata().model_copy(update={"holm_rank": None})
+        )
 
 
 def test_comparison_rejects_partial_bca_interval() -> None:

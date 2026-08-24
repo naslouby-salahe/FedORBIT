@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fedorbit.artifacts.invalidation import (
+from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
+from fedorbit.artifacts.storage import ArtifactStore
+from fedorbit.domain.enums import ArtifactState
+from fedorbit.execution.recovery import RecoveryBoundary
+from fedorbit.execution.reuse import (
     SelectiveInvalidation,
     changed_stage_affects,
     descendants_of_stage,
 )
-from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
-from fedorbit.artifacts.reuse import ArtifactStore
-from fedorbit.domain.enums import ArtifactState
-from fedorbit.execution.recovery import RecoveryBoundary
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}
 
@@ -77,12 +77,11 @@ def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
     store.write_reusable(
         _manifest(train_payload, "checkpoint", "training", "fp-train", ("pre-up",))
     )
-    store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",)))
-    invalidator = SelectiveInvalidation(store)
-
-    invalidated = invalidator.invalidate_stage("training")
+    store.write_reusable(
+        _manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",))
+    )
+    invalidated = SelectiveInvalidation(store).invalidate_stage("training")
     assert len(invalidated) == 2
-    assert store.manifest_dir().is_dir()
     remaining = {path.stem for path in store.manifest_dir().glob("*.json")}
     assert len(remaining) == 1
 
@@ -91,16 +90,13 @@ def test_invalidation_keeps_siblings_and_unrelated(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     training_a = _payload(tmp_path, "a.pt")
     training_b = _payload(tmp_path, "b.pt")
-    store.write_reusable(_manifest(training_a, "checkpoint", "training", "fp-a", ("pre-a",)))
-    store.write_reusable(_manifest(training_b, "checkpoint", "training", "fp-b", ("pre-b",)))
-    first_manifest = store.read_reusable(
-        _manifest(training_a, "checkpoint", "training", "fp-a", ("pre-a",)).artifact_id
-    )
-    invalidator = SelectiveInvalidation(store)
-    invalidated = invalidator.invalidate_descendants("pre-a")
-    assert tuple(invalidated) == (first_manifest.artifact_id,)
-    remaining = {path.stem for path in store.manifest_dir().glob("*.json")}
-    assert len(remaining) == 1
+    first = _manifest(training_a, "checkpoint", "training", "fp-a", ("pre-a",))
+    second = _manifest(training_b, "checkpoint", "training", "fp-b", ("pre-b",))
+    store.write_reusable(first)
+    store.write_reusable(second)
+    invalidated = SelectiveInvalidation(store).invalidate_descendants("pre-a")
+    assert invalidated == (first.artifact_id,)
+    assert {path.stem for path in store.manifest_dir().glob("*.json")} == {second.artifact_id}
 
 
 def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
@@ -113,10 +109,9 @@ def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
     )
     store.write_reusable(mid_manifest)
     store.write_reusable(leaf_manifest)
-    invalidator = SelectiveInvalidation(store)
-    invalidated = invalidator.invalidate_descendants("target-up")
+    invalidated = SelectiveInvalidation(store).invalidate_descendants("target-up")
     assert set(invalidated) == {mid_manifest.artifact_id, leaf_manifest.artifact_id}
-    assert len(list(store.manifest_dir().glob("*.json"))) == 0
+    assert not list(store.manifest_dir().glob("*.json"))
 
 
 def test_recovery_boundary_finds_first_incomplete_cell(tmp_path: Path) -> None:
@@ -124,13 +119,13 @@ def test_recovery_boundary_finds_first_incomplete_cell(tmp_path: Path) -> None:
     payload = _payload(tmp_path, "ok.pt")
     manifest = _manifest(payload, "checkpoint", "training", "fp-ok")
     store.write_reusable(manifest)
-    recovery = RecoveryBoundary(store)
-    ordered = (
-        ("cell-1", manifest.artifact_id),
-        ("cell-2", "fp-missing"),
-        ("cell-3", "fp-missing"),
+    record = RecoveryBoundary(store).next_resume(
+        (
+            ("cell-1", manifest.artifact_id),
+            ("cell-2", "fp-missing"),
+            ("cell-3", "fp-missing"),
+        )
     )
-    record = recovery.next_resume(ordered)
     assert record.next_resume_coordinates == "cell-2"
     assert "fp-missing" not in set(record.valid_artifact_ids)
 
@@ -140,6 +135,14 @@ def test_recovery_boundary_all_valid(tmp_path: Path) -> None:
     payload = _payload(tmp_path, "ok.pt")
     manifest = _manifest(payload, "checkpoint", "training", "fp-ok")
     store.write_reusable(manifest)
-    recovery = RecoveryBoundary(store)
-    record = recovery.next_resume((("cell-1", manifest.artifact_id),))
+    record = RecoveryBoundary(store).next_resume((("cell-1", manifest.artifact_id),))
     assert record.next_resume_coordinates is None
+
+
+def test_recovery_discards_interrupted_staging(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    staging = store.staging_dir()
+    staging.mkdir(parents=True)
+    (staging / "partial.bin").write_bytes(b"partial")
+    RecoveryBoundary(store).discard_interrupted_staging()
+    assert not staging.exists()

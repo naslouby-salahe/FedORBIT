@@ -5,10 +5,14 @@ from pathlib import Path
 import pytest
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
-from fedorbit.artifacts.reuse import ArtifactStore
+from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.domain.enums import ArtifactState, ExperimentName
-from fedorbit.execution.layers import EXECUTION_LAYERS, PROGRAMME_PREREQUISITES, layer_index
-from fedorbit.execution.readiness import ExecutionReadiness
+from fedorbit.execution.planner import (
+    EXECUTION_LAYERS,
+    PROGRAMME_PREREQUISITES,
+    ExecutionReadiness,
+    layer_index,
+)
 
 COORDINATES = {"experiment": "Mathematical Primitive Validation"}
 
@@ -46,9 +50,9 @@ def test_programme_prerequisites_in_roadmap_order() -> None:
     assert len(PROGRAMME_PREREQUISITES) == 29
 
 
-def test_readiness_empty_store_blocks_at_environment() -> None:
-    store = ArtifactStore(Path("/tmp/readiness-empty"))
-    readiness = ExecutionReadiness(store)
+def test_readiness_empty_store_blocks_before_preprocessing(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "outputs")
+    readiness = ExecutionReadiness(store, raw_root=tmp_path / "raw")
     states = readiness.prerequisite_states()
     assert len(states) == 29
     assert not readiness.programme_ready()
@@ -87,7 +91,9 @@ def test_readiness_satisfies_gates_from_completed_evidence(tmp_path: Path) -> No
     coordinates = '{"experiment":"Mathematical Primitive Validation","seed":101}'
     manifest = _manifest(payload, "fp-math", coordinates)
     store.write_reusable(manifest)
-    readiness = ExecutionReadiness(store)
+    raw_root = tmp_path / "raw"
+    raw_root.mkdir()
+    readiness = ExecutionReadiness(store, raw_root=raw_root)
 
     states = {state.name: state for state in readiness.prerequisite_states()}
     assert states["mathematical primitive validation"].satisfied
@@ -102,7 +108,9 @@ def test_readiness_prefix_property(tmp_path: Path) -> None:
     payload.write_bytes(b"evidence")
     coordinates = '{"experiment":"Primary Strict Cross-Telemetry Transfer","seed":1103}'
     store.write_reusable(_manifest(payload, "fp-transfer", coordinates))
-    readiness = ExecutionReadiness(store)
+    raw_root = tmp_path / "raw"
+    raw_root.mkdir()
+    readiness = ExecutionReadiness(store, raw_root=raw_root)
     states = {state.name: state for state in readiness.prerequisite_states()}
     assert states["principal strict transfer"].satisfied
     blocked = readiness.first_blocked()
@@ -118,6 +126,8 @@ def test_readiness_incomplete_evidence_not_satisfied(tmp_path: Path) -> None:
     manifest = _manifest(missing, "fp-math", coordinates)
     missing.unlink()
     store.write_reusable(manifest)
-    readiness = ExecutionReadiness(store)
+    raw_root = tmp_path / "raw"
+    raw_root.mkdir()
+    readiness = ExecutionReadiness(store, raw_root=raw_root)
     states = {state.name: state for state in readiness.prerequisite_states()}
     assert not states["mathematical primitive validation"].satisfied

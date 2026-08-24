@@ -5,12 +5,16 @@ from pathlib import Path
 import typer
 from typer import Exit
 
+from fedorbit.artifacts.manifests import ReusableArtifactManifest
+from fedorbit.artifacts.paths import build_layout
+from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.cli.errors import CliUsageError, NotReadyError
 from fedorbit.cli.parsing import dataset_identifier, experiment_identifier
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.testing import load_smoke_config, load_tests_config
-from fedorbit.domain.enums import DatasetId
+from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
 from fedorbit.experiments.catalogue import build_catalogue
+from fedorbit.reporting.export import VerifiedEvidenceWriter
 from fedorbit.runtime.environment import (
     EnvironmentMismatchError,
     environment_snapshot,
@@ -34,6 +38,30 @@ def _translate(error: BaseException) -> None:
         raise Exit(EXIT_NOT_READY) from error
     typer.echo(f"error: {error}", err=True)
     raise Exit(EXIT_RUNTIME) from error
+
+
+def _store() -> ArtifactStore:
+    config = load_fedorbit_config()
+    return ArtifactStore(build_layout(config).execution_root)
+
+
+def _verified_manifest(
+    store: ArtifactStore,
+    experiment: ExperimentName,
+) -> ReusableArtifactManifest | None:
+    candidates = tuple(
+        manifest
+        for manifest in store.all_manifests()
+        if experiment.value in manifest.semantic_producer_coordinates
+    )
+    for manifest in candidates:
+        try:
+            resolved = store.resolve(manifest.artifact_id)
+        except ValueError:
+            continue
+        if resolved.state == ArtifactState.COMPLETED:
+            return resolved
+    return None
 
 
 @app.command()
@@ -107,8 +135,7 @@ def run(
     try:
         experiment = experiment_identifier(experiment_name)
         config = load_fedorbit_config()
-        catalogue = build_catalogue(config)
-        definition = catalogue.definition(experiment)
+        definition = build_catalogue(config).definition(experiment)
         from fedorbit.execution.pipeline import run_pipeline
 
         run_pipeline(experiment, definition, overwrite=overwrite)
@@ -121,12 +148,12 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
     try:
         config = load_fedorbit_config()
         catalogue = build_catalogue(config)
-        selected_names = set(catalogue.registered_names())
         selected = (
             {experiment_identifier(experiment_name)}
             if experiment_name is not None
-            else selected_names
+            else set(catalogue.registered_names())
         )
+        store = _store()
         typer.echo(
             f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} {'Est-run':<8} {'Est-end':<8}"
         )
@@ -134,9 +161,10 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
             name for name in catalogue.registered_names() if name in selected
         ):
             definition = catalogue.definition(name)
+            status_value = "completed" if _verified_manifest(store, name) is not None else "pending"
             typer.echo(
                 f"{index:>2} {name.value:<50} {definition.classification.value:<22} "
-                f"{'pending':<10} {'-':<8} {'-':<8}"
+                f"{status_value:<10} {'-':<8} {'-':<8}"
             )
     except CliUsageError as error:
         _translate(error)
@@ -145,19 +173,45 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
 @app.command()
 def report(
     experiment_name: str | None = typer.Argument(None),
-    _overwrite: bool = typer.Option(False, "--overwrite"),
+    overwrite: bool = typer.Option(False, "--overwrite"),
 ) -> None:
+    del overwrite
     try:
-        if experiment_name is not None:
-            experiment_identifier(experiment_name)
-        typer.echo("no verified persisted evidence available for report generation")
+        config = load_fedorbit_config()
+        catalogue = build_catalogue(config)
+        selected = (
+            (experiment_identifier(experiment_name),)
+            if experiment_name is not None
+            else catalogue.registered_names()
+        )
+        layout = build_layout(config)
+        store = ArtifactStore(layout.execution_root)
+        writer = VerifiedEvidenceWriter(store, layout)
+        exported = 0
+        for experiment in selected:
+            manifest = _verified_manifest(store, experiment)
+            if manifest is None:
+                continue
+            destination = writer.write(
+                experiment,
+                manifest.artifact_id,
+                {
+                    "experiment": experiment.value,
+                    "artifact_id": manifest.artifact_id,
+                    "state": manifest.state.value,
+                    "dependency_fingerprint_sha256": manifest.dependency_fingerprint_sha256,
+                },
+            )
+            typer.echo(str(destination))
+            exported += 1
+        if exported == 0:
+            typer.echo("no verified persisted evidence available for report generation")
     except CliUsageError as error:
         _translate(error)
 
 
 def _registered_datasets() -> tuple[DatasetId, ...]:
-    config = load_fedorbit_config()
-    return tuple(config.scientific.datasets.clients.keys())
+    return tuple(load_fedorbit_config().scientific.datasets.clients.keys())
 
 
 def main() -> None:

@@ -8,9 +8,9 @@ from fedorbit.artifacts.manifests import (
     dependency_fingerprint,
     file_sha256,
 )
-from fedorbit.artifacts.reuse import ArtifactStore
+from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.domain.enums import ArtifactState
-from fedorbit.execution.semantics import ExecutionSemantics
+from fedorbit.execution.reuse import ExecutionReuse
 
 COORDINATES = {"experiment": "Preprocessing", "dataset": "edge_iiotset_network"}
 
@@ -51,9 +51,9 @@ def test_identical_fingerprint_is_reused_without_overwrite(tmp_path: Path) -> No
     payload = _payload(tmp_path, "split.parquet", b"payload-v1")
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     store.write_reusable(_manifest(payload, fingerprint))
-    semantics = ExecutionSemantics(store)
+    reuse = ExecutionReuse(store)
 
-    decisions = semantics.decide((("split-cell", fingerprint),), overwrite=False)
+    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
     assert len(decisions) == 1
     assert decisions[0].reuse
     assert decisions[0].manifest is not None
@@ -61,9 +61,9 @@ def test_identical_fingerprint_is_reused_without_overwrite(tmp_path: Path) -> No
 
 def test_missing_artifact_is_executed(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
-    semantics = ExecutionSemantics(store)
+    reuse = ExecutionReuse(store)
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    decisions = semantics.decide((("split-cell", fingerprint),), overwrite=False)
+    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
     assert decisions[0].execute
 
 
@@ -72,8 +72,8 @@ def test_overwrite_flag_forces_recompute(tmp_path: Path) -> None:
     payload = _payload(tmp_path, "split.parquet", b"payload-v1")
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     store.write_reusable(_manifest(payload, fingerprint))
-    semantics = ExecutionSemantics(store)
-    decisions = semantics.decide((("split-cell", fingerprint),), overwrite=True)
+    reuse = ExecutionReuse(store)
+    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=True)
     assert decisions[0].overwrite
 
 
@@ -83,24 +83,24 @@ def test_stale_descendant_is_overwritten(tmp_path: Path) -> None:
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     manifest = _manifest(payload, fingerprint, artifact_type="checkpoint")
     store.write_reusable(manifest)
-    semantics = ExecutionSemantics(store)
-    decisions = semantics.decide(
+    reuse = ExecutionReuse(store)
+    decisions = reuse.decide(
         (("derived-cell", fingerprint),),
         overwrite=False,
-        stale_upstreams=frozenset({manifest.artifact_id}),
+        stale_artifact_ids=frozenset({manifest.artifact_id}),
     )
     assert decisions[0].overwrite
 
 
-def test_validate_existing_rejects_corrupted_payload(tmp_path: Path) -> None:
+def test_corrupted_payload_is_not_reused(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     payload = _payload(tmp_path, "split.parquet", b"payload-v1")
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     manifest = _manifest(payload, fingerprint)
     store.write_reusable(manifest)
     payload.write_bytes(b"corrupted")
-    semantics = ExecutionSemantics(store)
-    decisions = semantics.decide((("split-cell", fingerprint),), overwrite=False)
+    reuse = ExecutionReuse(store)
+    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
     assert decisions[0].execute
 
 
@@ -115,16 +115,16 @@ def test_stale_descendants_detected_via_upstream_ids(tmp_path: Path) -> None:
         }
     )
     store.write_reusable(manifest)
-    semantics = ExecutionSemantics(store)
-    stale = semantics.stale_descendants("upstream-artifact-1")
+    reuse = ExecutionReuse(store)
+    stale = reuse.stale_descendants("upstream-artifact-1")
     assert manifest.artifact_id in stale
 
 
-def test_promote_completed_manifests(tmp_path: Path) -> None:
+def test_promote_completed_manifests_validates_before_reuse(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     payload = _payload(tmp_path, "packet.pt", b"payload-v1")
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     manifest = _manifest(payload, fingerprint, artifact_type="response_packet")
-    semantics = ExecutionSemantics(store)
-    semantics.promote_completed((manifest,))
+    reuse = ExecutionReuse(store)
+    reuse.promote_completed((manifest,))
     assert store.resolve(manifest.artifact_id).artifact_id == manifest.artifact_id

@@ -18,7 +18,8 @@ from fedorbit.artifacts.manifests import (
     eligibility_copy,
     file_sha256,
 )
-from fedorbit.artifacts.reuse import ArtifactStore, ReuseError
+from fedorbit.artifacts.storage import ArtifactStore
+from fedorbit.artifacts.validation import ArtifactValidationError
 from fedorbit.domain.enums import ArtifactState, TerminalState
 
 COORDINATES = {
@@ -152,7 +153,7 @@ def test_file_sha256_is_deterministic(tmp_path: Path) -> None:
     assert len(file_sha256(payload)) == 64
 
 
-def test_reuse_validates_payload_checksum_and_terminal_state(tmp_path: Path) -> None:
+def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "split.parquet"
     payload.write_bytes(b"payload-v1")
@@ -169,7 +170,7 @@ def test_reuse_validates_payload_checksum_and_terminal_state(tmp_path: Path) -> 
     store.write_reusable(manifest)
     assert store.resolve(manifest.artifact_id) == manifest
     payload.write_bytes(b"corrupted")
-    with pytest.raises(ReuseError):
+    with pytest.raises(ArtifactValidationError):
         store.resolve(manifest.artifact_id)
 
 

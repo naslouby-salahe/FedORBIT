@@ -195,6 +195,8 @@ CANONICAL_SERIALIZER_BOUNDARY_MODULES = frozenset(
         "artifacts.manifests",
         "artifacts.serialization",
         "artifacts.evidence",
+        "artifacts.storage",
+        "reporting.export",
     }
 )
 

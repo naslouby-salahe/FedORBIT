@@ -142,9 +142,12 @@ class PairedComparisonRecord(FrozenRecord):
         for name, value in (("raw_p", self.raw_p), ("holm_p", self.holm_p)):
             if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} must be in [0,1]")
-        if self.bca_ci_low is not None and self.bca_ci_high is not None:
-            if self.bca_ci_low > self.bca_ci_high:
-                raise ValueError("BCa interval endpoints are reversed")
+        if (
+            self.bca_ci_low is not None
+            and self.bca_ci_high is not None
+            and self.bca_ci_low > self.bca_ci_high
+        ):
+            raise ValueError("BCa interval endpoints are reversed")
         _require_sha256(self.dependency_fingerprint_sha256, "comparison dependency fingerprint")
         return self
 

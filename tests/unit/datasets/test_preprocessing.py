@@ -22,7 +22,7 @@ from fedorbit.datasets.preprocessing import (
 
 
 def test_missing_token_contract_is_type_scoped() -> None:
-    assert MISSING_TOKEN_VOCABULARY == frozenset({"", "0", "0.0", "nan", "none", "null"})
+    assert frozenset({"", "0", "0.0", "nan", "none", "null"}) == MISSING_TOKEN_VOCABULARY
     assert is_missing_token("0", True)
     assert not is_missing_token("0", False)
     assert numeric_zero_is_not_missing(0.0)

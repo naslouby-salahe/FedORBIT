@@ -17,7 +17,6 @@ from fedorbit.training.trainer import (
     ModelParameterState,
     OptimizerState,
     RngState,
-    SelectedHyperparameters,
     TrainingOutcome,
 )
 

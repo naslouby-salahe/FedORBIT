@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from fedorbit.analysis.claims import evaluate_transfer_style_criteria
 from fedorbit.analysis.comparisons import PairContrastEvidence, PairContrastEvidenceSet
-from fedorbit.analysis.statistics import NamedPValue, PValueSet, exact_sign_flip_test, holm_step_down
+from fedorbit.analysis.statistics import (
+    NamedPValue,
+    PValueSet,
+    exact_sign_flip_test,
+    holm_step_down,
+)
 from fedorbit.config.loading import load_fedorbit_config
 
 

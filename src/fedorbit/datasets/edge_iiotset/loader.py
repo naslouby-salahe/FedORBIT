@@ -36,7 +36,9 @@ def discover_edge_tabular_files(raw_root: Path) -> tuple[Path, ...]:
     )
     if not candidates:
         raise EdgeLoaderError("no Edge-IIoTset tabular traffic CSV files found")
-    return tuple(sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode()))
+    return tuple(
+        sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode())
+    )
 
 
 def inspect_edge_tabular_files(raw_root: Path) -> tuple[EdgeTabularFile, ...]:

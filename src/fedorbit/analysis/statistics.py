@@ -4,6 +4,7 @@ import itertools
 import math
 import statistics
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, cast
@@ -72,37 +73,14 @@ class _BootstrapResultLike(Protocol):
     confidence_interval: _ConfidenceIntervalLike
 
 
-class _BootstrapStatistic(Protocol):
-    def __call__(
-        self,
-        x: FloatArray,
-        y: FloatArray,
-        axis: int = -1,
-    ) -> FloatArray: ...
-
-
-class _BootstrapProcedure(Protocol):
-    def __call__(
-        self,
-        data: tuple[FloatArray, FloatArray],
-        statistic: _BootstrapStatistic,
-        *,
-        paired: bool,
-        vectorized: bool,
-        method: str,
-        alternative: str,
-        confidence_level: float,
-        n_resamples: int,
-        rng: Generator,
-    ) -> _BootstrapResultLike: ...
-
-
-class _ChiSquareCdf(Protocol):
-    def __call__(self, value: float, *, df: int) -> float: ...
-
-
-_BOOTSTRAP = cast(_BootstrapProcedure, scipy_stats.bootstrap)
-_CHI_SQUARE_CDF = cast(_ChiSquareCdf, scipy_stats.chi2.cdf)
+_BOOTSTRAP = cast(
+    Callable[..., _BootstrapResultLike],
+    getattr(scipy_stats, "bootstrap"),
+)
+_CHI_SQUARE_CDF = cast(
+    Callable[..., float],
+    getattr(getattr(scipy_stats, "chi2"), "cdf"),
+)
 
 
 def nominal_alpha(config: FedorbitConfig) -> float:
@@ -332,7 +310,7 @@ def mcnemar_asymptotic_continuity_corrected_p(b01: int, b10: int) -> float:
     if discordant == 0:
         return 1.0
     chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
-    survival = 1.0 - float(_CHI_SQUARE_CDF(chi_square, df=1))
+    survival = 1.0 - _CHI_SQUARE_CDF(chi_square, df=1)
     return max(0.0, min(1.0, survival))
 
 

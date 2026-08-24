@@ -14,7 +14,8 @@ from fedorbit.training.losses import (
 def test_class_weights_follow_train_frequency_contract() -> None:
     targets = torch.tensor([0, 0, 0, 1])
     weights = ClassWeights.from_targets(targets, 2)
-    assert weights.values.tolist() == pytest.approx([2.0 / 3.0, 2.0])
+    assert float(weights.values[0]) == pytest.approx(2.0 / 3.0)
+    assert float(weights.values[1]) == pytest.approx(2.0)
     mean_example_weight = float(weights.values[targets].mean())
     assert mean_example_weight == pytest.approx(1.0)
 

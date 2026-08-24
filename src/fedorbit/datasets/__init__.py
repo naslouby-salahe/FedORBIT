@@ -1,22 +1,13 @@
-from fedorbit.datasets.adapters.contract import (
-    EDGE_EXCLUSIONS,
-    EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
-    AdapterContract,
-    DatasetAdapter,
-    edge_iiotset_adapter,
-    ton_iot_adapter,
-)
-from fedorbit.datasets.adapters.registry import (
-    AdapterError,
-    DatasetAdapterRegistry,
-    adapter_for,
-    registered_adapters,
-)
-from fedorbit.datasets.adapters.schema import AdapterSchema, SchemaError, role_for_field
-from fedorbit.datasets.duplicates import (
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from fedorbit.config.models import FedorbitConfig
+from fedorbit.datasets.canonicalization import (
     CanonicalFeatureVector,
     CanonicalRow,
-    DuplicateError,
+    CanonicalizationError,
     DuplicateGroupMembers,
     DuplicateGroups,
     PartitionedFeatureValues,
@@ -24,122 +15,79 @@ from fedorbit.datasets.duplicates import (
     deduplicate_rows,
     exact_duplicate_hash,
     normalize_value,
+    partition_features,
     validate_duplicate_groups,
 )
-from fedorbit.datasets.manifests import (
-    DatasetManifest,
-    EligibilityCopyKind,
-    SemanticCellManifest,
-    TransferEligibilityManifest,
-    eligibility_copy,
+from fedorbit.datasets.common import (
+    AdapterSchema,
+    DatasetAdapter,
+    DatasetSchemaError,
+    FieldRole,
+    ObservedColumnSamples,
+    role_for_field,
 )
-from fedorbit.datasets.ontology import (
-    NORMAL_LABEL,
-    TRANSFER_CONCEPTS,
-    TRANSFER_ONTOLOGY,
-    OntologyError,
-    TransferEligibility,
-    canonicalize_label,
-    coarse_group_for,
-    native_labels_for,
-    transfer_concept_for,
-    transfer_eligibility,
-)
-from fedorbit.datasets.preprocessing import (
-    ABSENT_TOKEN,
-    MISSING_TOKEN_VOCABULARY,
-    RARE_TOKEN,
-    UNK_TOKEN,
-    CandidateFeature,
-    CategoricalPreprocessor,
-    FeatureQualityReport,
-    NumericPreprocessor,
-    PreprocessingError,
-    TrainingFeatureValues,
-    categorical_vocabulary,
-    evaluate_feature_quality,
-    fit_categorical_preprocessor,
-    fit_numeric_preprocessor,
-    is_missing_token,
-    numeric_zero_is_not_missing,
-    one_hot,
-    transform_categorical,
-    transform_numeric,
-)
-from fedorbit.datasets.splitting import (
-    DuplicateGroupChronology,
-    DuplicateGroupSplitAssignment,
-    SplitError,
-    assign_duplicate_groups_chronologically,
-    duplicate_group_midpoint_fraction,
-    interval_edges,
-    split_for_duplicate_group,
-)
+from fedorbit.datasets.edge_iiotset.schema import edge_iiotset_adapter
+from fedorbit.datasets.ton_iot.components import ton_iot_adapter
+from fedorbit.domain.enums import DatasetId
+
+
+class DatasetRegistryError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetAdapterRegistry:
+    adapters_by_dataset: Mapping[DatasetId, DatasetAdapter]
+
+    def adapter_for(self, dataset_id: DatasetId) -> DatasetAdapter:
+        adapter = self.adapters_by_dataset.get(dataset_id)
+        if adapter is None:
+            raise DatasetRegistryError(f"no adapter registered for dataset {dataset_id.value}")
+        return adapter
+
+    def registered_datasets(self) -> tuple[DatasetId, ...]:
+        return tuple(self.adapters_by_dataset)
+
+
+def adapter_for(dataset_id: DatasetId, config: FedorbitConfig) -> DatasetAdapter:
+    if dataset_id == DatasetId.EDGE_IIOTSET_NETWORK:
+        return edge_iiotset_adapter(config)
+    if dataset_id in (
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_NETWORK,
+    ):
+        return ton_iot_adapter(dataset_id, config)
+    raise DatasetRegistryError(f"no adapter registered for dataset {dataset_id.value}")
+
+
+def registered_adapters(config: FedorbitConfig) -> DatasetAdapterRegistry:
+    return DatasetAdapterRegistry(
+        {dataset_id: adapter_for(dataset_id, config) for dataset_id in DatasetId}
+    )
+
 
 __all__ = [
-    "ABSENT_TOKEN",
-    "EDGE_EXCLUSIONS",
-    "EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS",
-    "MISSING_TOKEN_VOCABULARY",
-    "NORMAL_LABEL",
-    "RARE_TOKEN",
-    "TRANSFER_CONCEPTS",
-    "TRANSFER_ONTOLOGY",
-    "UNK_TOKEN",
-    "AdapterContract",
-    "AdapterError",
     "AdapterSchema",
-    "CandidateFeature",
     "CanonicalFeatureVector",
     "CanonicalRow",
-    "CategoricalPreprocessor",
+    "CanonicalizationError",
     "DatasetAdapter",
     "DatasetAdapterRegistry",
-    "DatasetManifest",
-    "DuplicateError",
-    "DuplicateGroupChronology",
+    "DatasetRegistryError",
+    "DatasetSchemaError",
     "DuplicateGroupMembers",
-    "DuplicateGroupSplitAssignment",
     "DuplicateGroups",
-    "EligibilityCopyKind",
-    "FeatureQualityReport",
-    "NumericPreprocessor",
-    "OntologyError",
+    "FieldRole",
+    "ObservedColumnSamples",
     "PartitionedFeatureValues",
-    "PreprocessingError",
-    "SchemaError",
-    "SemanticCellManifest",
-    "SplitError",
-    "TrainingFeatureValues",
-    "TransferEligibility",
-    "TransferEligibilityManifest",
     "adapter_for",
-    "assign_duplicate_groups_chronologically",
     "canonical_row_bytes",
-    "canonicalize_label",
-    "categorical_vocabulary",
-    "coarse_group_for",
     "deduplicate_rows",
-    "duplicate_group_midpoint_fraction",
-    "edge_iiotset_adapter",
-    "eligibility_copy",
-    "evaluate_feature_quality",
     "exact_duplicate_hash",
-    "fit_categorical_preprocessor",
-    "fit_numeric_preprocessor",
-    "interval_edges",
-    "is_missing_token",
-    "native_labels_for",
     "normalize_value",
-    "numeric_zero_is_not_missing",
-    "one_hot",
+    "partition_features",
     "registered_adapters",
     "role_for_field",
-    "split_for_duplicate_group",
-    "ton_iot_adapter",
-    "transfer_concept_for",
-    "transfer_eligibility",
-    "transform_categorical",
-    "transform_numeric",
     "validate_duplicate_groups",
 ]

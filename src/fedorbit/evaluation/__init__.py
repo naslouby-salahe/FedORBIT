@@ -44,6 +44,12 @@ from fedorbit.evaluation.spearman import (
     SpearmanReport,
     descriptive_spearman,
 )
+from fedorbit.evaluation.validation import (
+    EvaluationValidationError,
+    validate_comparison_metadata,
+    validate_metric_records,
+    validate_prediction_records,
+)
 
 __all__ = [
     "METRIC_NAMES",
@@ -51,6 +57,7 @@ __all__ = [
     "ConfusionCounts",
     "EfficiencyError",
     "EfficiencyRecord",
+    "EvaluationValidationError",
     "MetricComputationError",
     "ProposalOutcomeTally",
     "ProposalRates",
@@ -87,4 +94,7 @@ __all__ = [
     "relative_risk_reduction",
     "robust_coupling_value_gap_metric",
     "seed_harm_rate",
+    "validate_comparison_metadata",
+    "validate_metric_records",
+    "validate_prediction_records",
 ]

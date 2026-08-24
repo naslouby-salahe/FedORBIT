@@ -18,13 +18,15 @@ def validate_prediction_records(
     records: Iterable[PredictionRecord],
 ) -> tuple[PredictionRecord, ...]:
     materialized = tuple(records)
-    identities: set[tuple[str, str, str, int, str]] = set()
+    identities: set[tuple[str, str, str, str, int, str, str]] = set()
     for record in materialized:
         identity = (
             record.experiment.value,
             record.pair,
             record.method.value,
+            record.condition,
             record.seed,
+            record.split.value,
             record.row_hash,
         )
         if identity in identities:
@@ -55,9 +57,13 @@ def validate_comparison_metadata(
     comparison: PairedComparisonRecord,
     metadata: StatisticalMetadataRecord,
 ) -> None:
-    if metadata.family_size <= 0:
-        raise EvaluationValidationError("statistical family size must be positive")
     if comparison.holm_p is not None and metadata.holm_rank is None:
         raise EvaluationValidationError("Holm-adjusted comparison requires Holm rank metadata")
+    if comparison.holm_p is None and metadata.holm_rank is not None:
+        raise EvaluationValidationError("Holm rank metadata requires an adjusted comparison p-value")
     if metadata.bootstrap_resamples > 0 and metadata.bootstrap_seed is None:
         raise EvaluationValidationError("bootstrap procedure requires a derived bootstrap seed")
+    if metadata.bootstrap_resamples == 0 and metadata.bootstrap_seed is not None:
+        raise EvaluationValidationError("bootstrap seed is invalid when no bootstrap was performed")
+    if comparison.raw_p is None and comparison.holm_p is not None:
+        raise EvaluationValidationError("Holm adjustment requires a raw p-value")

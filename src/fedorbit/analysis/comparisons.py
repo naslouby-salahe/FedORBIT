@@ -126,7 +126,10 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
         families[MultiplicityFamily.COUPLING_MECHANISM].append(
             _pair_contrast(
                 MultiplicityFamily.COUPLING_MECHANISM,
-                "Exact correspondence orbit vs Matched-Resource Rectangular — robust coupling value gap",
+                (
+                    "Exact correspondence orbit vs Matched-Resource Rectangular — "
+                    "robust coupling value gap"
+                ),
                 pair,
                 "sign_flip_against_zero",
             )
@@ -138,7 +141,10 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
             families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
                 _pair_contrast(
                     MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
-                    f"{solver} vs Point-Correspondence Commitment — TEST relative macro-CE {suffix}",
+                    (
+                        f"{solver} vs Point-Correspondence Commitment — "
+                        f"TEST relative macro-CE {suffix}"
+                    ),
                     pair,
                     statistic,
                 )
@@ -167,7 +173,10 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
         families[MultiplicityFamily.CONFIRMATION_SAFETY].append(
             _pair_contrast(
                 MultiplicityFamily.CONFIRMATION_SAFETY,
-                "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with confirmation — harmful-transfer rate difference",
+                (
+                    "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with "
+                    "confirmation — harmful-transfer rate difference"
+                ),
                 pair,
                 "seed_level_rate_difference_sign_flip",
             )

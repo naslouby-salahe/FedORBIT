@@ -75,7 +75,7 @@ def duplicate_group_midpoint_fraction(
         raise SplitError("retained class row count must be positive")
     if rows_before + group_row_count > retained_class_row_count:
         raise SplitError("duplicate group exceeds retained class row count")
-    return (rows_before + 0.5 * group_row_count) / retained_class_row_count
+    return (rows_before + group_row_count / 2) / retained_class_row_count
 
 
 def assign_duplicate_groups_chronologically(

@@ -21,6 +21,13 @@ class FigureSeries:
 
 
 @dataclass(frozen=True, slots=True)
+class EvidenceFigurePayload:
+    x_label: str
+    y_label: str
+    series: tuple[FigureSeries, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class EvidenceFigure:
     x_label: str
     y_label: str
@@ -32,11 +39,5 @@ class EvidenceFigure:
         if not self.series:
             raise FigureError("evidence figure requires at least one series")
 
-    def payload(self) -> dict[str, object]:
-        return {
-            "x_label": self.x_label,
-            "y_label": self.y_label,
-            "series": tuple(
-                {"name": entry.name, "x": entry.x, "y": entry.y} for entry in self.series
-            ),
-        }
+    def payload(self) -> EvidenceFigurePayload:
+        return EvidenceFigurePayload(self.x_label, self.y_label, self.series)

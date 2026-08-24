@@ -9,6 +9,11 @@ import numpy as np
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.common import AdapterSchema
+from fedorbit.datasets.splitting import (
+    DuplicateGroupChronology,
+    DuplicateGroupSplitAssignment,
+    assign_duplicate_groups_chronologically,
+)
 
 if TYPE_CHECKING:
     from fedorbit.datasets.canonicalization import CanonicalRow, DuplicateGroups
@@ -150,6 +155,30 @@ def canonicalize_training_rows(
     groups = deduplicate_rows(schema, rows)
     validate_duplicate_groups(groups)
     return groups
+
+
+def assign_canonical_duplicate_groups(
+    config: FedorbitConfig,
+    groups: DuplicateGroups,
+) -> DuplicateGroupSplitAssignment:
+    chronology = tuple(
+        DuplicateGroupChronology(
+            group_sha256,
+            min(member.timestamp_fraction for member in members),
+            len(members),
+        )
+        for group_sha256, members in groups.groups
+    )
+    return assign_duplicate_groups_chronologically(config, chronology)
+
+
+def canonicalize_and_split_training_rows(
+    config: FedorbitConfig,
+    schema: AdapterSchema,
+    rows: tuple[CanonicalRow, ...],
+) -> tuple[DuplicateGroups, DuplicateGroupSplitAssignment]:
+    groups = canonicalize_training_rows(schema, rows)
+    return groups, assign_canonical_duplicate_groups(config, groups)
 
 
 def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:

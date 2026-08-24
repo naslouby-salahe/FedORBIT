@@ -50,13 +50,11 @@ class TargetImportance:
                 raise TargetImportanceError(f"node {node_index} importance is not finite")
             if weight < 0.0:
                 raise TargetImportanceError(f"node {node_index} importance must be nonnegative")
-        if self.weights_by_node_index and not math.isclose(
-            sum(self.weights_by_node_index.values()),
-            1.0,
-            rel_tol=1e-12,
-            abs_tol=1e-12,
-        ):
-            raise TargetImportanceError("target importance weights must sum to one")
+        if self.weights_by_node_index:
+            total = math.fsum(self.weights_by_node_index.values())
+            absolute_tolerance = math.ulp(1.0) * max(1, len(self.weights_by_node_index))
+            if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=absolute_tolerance):
+                raise TargetImportanceError("target importance weights must sum to one")
 
     def weight_of(self, node_index: int) -> float:
         return self.weights_by_node_index[node_index]

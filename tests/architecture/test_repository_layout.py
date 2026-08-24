@@ -122,9 +122,9 @@ def test_required_config_files_exist() -> None:
 def test_data_raw_is_symlink_to_immutable_external_tree() -> None:
     link = REPOSITORY_ROOT / "data" / "raw"
     assert link.is_symlink(), "data/raw must be a symlink to the immutable raw-data tree"
-    target = link.resolve()
-    assert target.is_dir()
-    assert "datp-shared-data" in str(target)
+    target = link.readlink()
+    assert not target.is_absolute(), "data/raw must use a repository-relative external-data link"
+    assert target.as_posix().endswith("datp-shared-data/raw")
 
 
 def test_no_markdown_planning_documents_in_repo_root() -> None:

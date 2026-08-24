@@ -8,8 +8,8 @@ import pytest
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.canonicalization import (
     CanonicalFeatureVector,
-    CanonicalRow,
     CanonicalizationError,
+    CanonicalRow,
     canonical_row_bytes,
     deduplicate_rows,
     exact_duplicate_hash,

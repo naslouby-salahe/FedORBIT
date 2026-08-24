@@ -14,7 +14,9 @@ from fedorbit.training.trainer import (
     OptimizerState,
     RngState,
     SelectedHyperparameters,
+    backward_value,
     make_adamw,
+    optimizer_step,
 )
 from fedorbit.transfer.confirmation import (
     ConfirmReplicateOutcomes,
@@ -97,8 +99,10 @@ def capture_pre_confirm_pair(
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
 ) -> tuple[PreConfirmTargetState, PreConfirmTargetState]:
-    snapshot = PreConfirmTargetState.capture(model, optimizer)
-    return snapshot, snapshot
+    return (
+        PreConfirmTargetState.capture(model, optimizer),
+        PreConfirmTargetState.capture(model, optimizer),
+    )
 
 
 def _confirmation_batches_for_replicate(
@@ -157,13 +161,13 @@ def _step_shadow(
         )
         if not bool(torch.isfinite(loss)):
             raise AssimilationError("non-finite confirmation shadow loss")
-        loss.backward()
+        backward_value(loss)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(),
             config.scientific.training.gradient_clip_global_l2_norm,
             norm_type=2.0,
         )
-        optimizer.step()
+        optimizer_step(optimizer)
 
 
 def _confirm_class_losses(
@@ -374,13 +378,13 @@ def apply_accepted_assimilation(
         )
         if not bool(torch.isfinite(loss)):
             raise AssimilationError("non-finite live assimilation loss")
-        loss.backward()
+        backward_value(loss)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(),
             config.scientific.training.gradient_clip_global_l2_norm,
             norm_type=2.0,
         )
-        optimizer.step()
+        optimizer_step(optimizer)
         steps_executed += 1
     if steps_executed != total_steps:
         raise AssimilationError(

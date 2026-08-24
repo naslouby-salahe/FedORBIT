@@ -8,7 +8,14 @@ import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import ModelParameterState, OptimizerState, RngState, make_adamw
+from fedorbit.training.trainer import (
+    ModelParameterState,
+    OptimizerState,
+    RngState,
+    backward_value,
+    make_adamw,
+    optimizer_step,
+)
 
 
 class ResponseEstimationError(ValueError):
@@ -187,13 +194,13 @@ def _run_shadow(
         loss = (per_example_ce * weights).sum() / per_example_ce.numel()
         if not bool(torch.isfinite(loss)):
             raise ResponseEstimationError(f"non-finite shadow loss at optimizer step {step}")
-        loss.backward()
+        backward_value(loss)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(),
             max_norm=config.scientific.training.gradient_clip_global_l2_norm,
             norm_type=2.0,
         )
-        optimizer.step()
+        optimizer_step(optimizer)
     model.eval()
     with torch.no_grad():
         shadow_logits = model(data.meta_features.to(device=device, dtype=torch.float32))

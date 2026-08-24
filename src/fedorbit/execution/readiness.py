@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.reuse import ArtifactStore
@@ -36,7 +37,10 @@ class ExecutionReadiness:
         return tuple(states)
 
     def _state(
-        self, index: int, name: str, owning_experiment: ExperimentName | None
+        self,
+        index: int,
+        name: str,
+        owning_experiment: ExperimentName | None,
     ) -> PrerequisiteState:
         if name == "environment diagnosis":
             try:
@@ -44,6 +48,11 @@ class ExecutionReadiness:
                 return PrerequisiteState(index, name, True, None)
             except EnvironmentMismatchError as error:
                 return PrerequisiteState(index, name, False, None, str(error))
+        if name == "raw-data identity":
+            raw_root = Path("data/raw")
+            if not raw_root.is_dir():
+                return PrerequisiteState(index, name, False, None, "raw-data root is unavailable")
+            return PrerequisiteState(index, name, True, None)
         if owning_experiment is None:
             return PrerequisiteState(index, name, True, None)
         evidence = self._experiment_evidence(owning_experiment)

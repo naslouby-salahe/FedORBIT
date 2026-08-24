@@ -78,7 +78,9 @@ def inspect_ton_iot_component_files(
     canonical_columns = set(inspected[0].columns)
     for file in inspected[1:]:
         if set(file.columns) != canonical_columns:
-            raise TonIotLoaderError(
-                f"feature-name set differs within component {component.component_name}: {file.relative_path}"
+            message = (
+                f"feature-name set differs within component {component.component_name}: "
+                f"{file.relative_path}"
             )
+            raise TonIotLoaderError(message)
     return tuple(inspected)

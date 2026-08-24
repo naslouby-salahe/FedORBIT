@@ -73,14 +73,18 @@ class _BootstrapResultLike(Protocol):
     confidence_interval: _ConfidenceIntervalLike
 
 
-_BOOTSTRAP = cast(
-    Callable[..., _BootstrapResultLike],
-    getattr(scipy_stats, "bootstrap"),
-)
-_CHI_SQUARE_CDF = cast(
-    Callable[..., float],
-    getattr(getattr(scipy_stats, "chi2"), "cdf"),
-)
+class _ChiSquareDistribution(Protocol):
+    cdf: Callable[..., float]
+
+
+class _ScipyStats(Protocol):
+    bootstrap: Callable[..., _BootstrapResultLike]
+    chi2: _ChiSquareDistribution
+
+
+_TYPED_SCIPY_STATS = cast(_ScipyStats, scipy_stats)
+_BOOTSTRAP = _TYPED_SCIPY_STATS.bootstrap
+_CHI_SQUARE_CDF = _TYPED_SCIPY_STATS.chi2.cdf
 
 
 def nominal_alpha(config: FedorbitConfig) -> float:

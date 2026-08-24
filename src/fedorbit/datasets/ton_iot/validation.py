@@ -24,11 +24,13 @@ def validate_ton_iot_schema(schema: AdapterSchema, component: TonIotComponent) -
         raise TonIotValidationError("ToN-IoT schema has no resolved timestamp")
     if schema.multiclass_label_column != "type" or schema.binary_label_column != "label":
         raise TonIotValidationError("ToN-IoT label semantics are unresolved")
+    identity_markers = ("src_ip", "dst_ip", "pid", "process_id")
     for column in schema.observed_columns:
         lowered = column.casefold()
-        if any(marker in lowered for marker in ("src_ip", "dst_ip", "pid", "process_id")):
-            if schema.role_of(column) != FieldRole.FORBIDDEN_IDENTITY:
-                raise TonIotValidationError(f"ToN-IoT identity field retained: {column}")
+        if any(marker in lowered for marker in identity_markers) and (
+            schema.role_of(column) != FieldRole.FORBIDDEN_IDENTITY
+        ):
+            raise TonIotValidationError(f"ToN-IoT identity field retained: {column}")
 
 
 def validate_ton_iot_label_consistency(rows: tuple[TonIotLabelObservation, ...]) -> None:

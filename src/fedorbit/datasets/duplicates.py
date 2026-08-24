@@ -14,7 +14,7 @@ from fedorbit.datasets.adapters.schema import (
     BEHAVIORAL_NUMERIC_ROLE,
     AdapterSchema,
 )
-from fedorbit.datasets.feature_quality import is_missing_token
+from fedorbit.datasets.preprocessing import is_missing_token
 
 
 class DuplicateError(ValueError):

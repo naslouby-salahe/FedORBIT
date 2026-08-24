@@ -92,7 +92,12 @@ def test_no_environment_yml_or_toml_scientific_override() -> None:
     allowed_root_configs = {"pyproject.toml", "uv.lock"}
     for path in REPOSITORY_ROOT.rglob("*"):
         if path.is_file() and path.suffix in {".yml", ".yaml", ".toml"}:
-            if "configs" in path.parts or ".venv" in path.parts or ".git" in path.parts:
+            if (
+                "configs" in path.parts
+                or ".github" in path.parts
+                or ".venv" in path.parts
+                or ".git" in path.parts
+            ):
                 continue
             if (
                 path.name in allowed_root_configs

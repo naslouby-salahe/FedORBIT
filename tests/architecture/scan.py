@@ -11,6 +11,7 @@ TESTS_ROOT = REPOSITORY_ROOT / "tests"
 ALLOWED_ROOT_ENTRIES = {
     ".env",
     ".git",
+    ".github",
     "CLAUDE.md",
     ".gitignore",
     ".vscode",

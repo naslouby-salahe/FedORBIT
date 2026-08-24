@@ -10,6 +10,7 @@ from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
+from fedorbit.execution.recovery import RecoveryBoundary
 from fedorbit.execution.reuse import CellDecision, ExecutionAction, ExecutionReuse
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.response.packet import build_source_packet
@@ -54,8 +55,15 @@ def execution_store() -> ArtifactStore:
     return ArtifactStore(build_layout(load_fedorbit_config()).execution_root)
 
 
+def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:
+    recovery = RecoveryBoundary(store)
+    recovery.discard_interrupted_staging()
+    recovery.next_resume(cells)
+
+
 def preprocess_datasets(datasets: tuple[DatasetId, ...], overwrite: bool) -> None:
-    reuse = ExecutionReuse(execution_store())
+    store = execution_store()
+    reuse = ExecutionReuse(store)
     cells = tuple(
         cell
         for dataset in datasets
@@ -64,6 +72,7 @@ def preprocess_datasets(datasets: tuple[DatasetId, ...], overwrite: bool) -> Non
             (f"prepared:{dataset.value}", f"prepared-{dataset.value}"),
         )
     )
+    _recover(store, cells)
     decisions = reuse.decide(cells, overwrite)
     reuse.validate_existing(decisions)
     if any(decision.execute or decision.overwrite for decision in decisions):
@@ -98,11 +107,13 @@ def run_experiment(
     definition: ExperimentDefinition,
     overwrite: bool,
 ) -> None:
-    reuse = ExecutionReuse(execution_store())
+    store = execution_store()
+    reuse = ExecutionReuse(store)
     cells = tuple(
         (f"{experiment.value}:{seed}", f"cell-{experiment.value}-{seed}")
         for seed in definition.seeds
     )
+    _recover(store, cells)
     decisions = reuse.decide(cells, overwrite)
     reuse.validate_existing(decisions)
     if any(decision.execute or decision.overwrite for decision in decisions):

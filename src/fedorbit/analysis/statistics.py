@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.random import Generator, PCG64
+from numpy.random import PCG64, Generator
 from scipy import stats as scipy_stats
 
 from fedorbit.config.models import FedorbitConfig
@@ -100,7 +100,8 @@ def exact_sign_flip_test(
     maximum = config.scientific.statistics.exact_sign_flip_max_nonzero_differences_for_enumeration
     if nonzero_count > maximum:
         raise StatisticsError(
-            f"exact sign-flip enumeration has {nonzero_count} nonzero differences; maximum is {maximum}"
+            f"exact sign-flip enumeration has {nonzero_count} nonzero differences; "
+            f"maximum is {maximum}"
         )
     tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
     return SignFlipResult(

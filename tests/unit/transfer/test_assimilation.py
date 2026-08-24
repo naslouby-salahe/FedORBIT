@@ -12,11 +12,11 @@ from fedorbit.transfer.assimilation import (
     AssimilationError,
     PreConfirmTargetState,
     PreTestLifecycle,
-    TestOpeningRuleError as OpeningRuleError,
     apply_accepted_assimilation,
     capture_pre_confirm_pair,
     settle_rejected_proposal,
 )
+from fedorbit.transfer.assimilation import TestOpeningRuleError as OpeningRuleError
 
 
 def _model_and_optimizer() -> tuple[NetworkFlowClassifier, torch.optim.AdamW]:

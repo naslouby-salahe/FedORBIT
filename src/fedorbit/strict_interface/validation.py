@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from fedorbit.domain.enums import ClientRole
 from fedorbit.strict_interface.resources import (
@@ -97,5 +97,5 @@ def validate_rfc3339_utc(value: str) -> None:
         raise StrictResourceViolationError(
             "technical creation timestamp must be RFC 3339 UTC"
         ) from error
-    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         raise StrictResourceViolationError("technical creation timestamp must be UTC")

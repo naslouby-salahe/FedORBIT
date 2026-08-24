@@ -36,7 +36,7 @@ def test_transfer_ontology_uses_ton_mapping_for_all_ton_clients() -> None:
 
 
 def test_transfer_concepts_and_coarse_groups_are_exact() -> None:
-    assert TRANSFER_CONCEPTS == tuple(item.value for item in OracleTransferConcept)
+    assert tuple(item.value for item in OracleTransferConcept) == TRANSFER_CONCEPTS
     assert coarse_group_for(DatasetId.EDGE_IIOTSET_NETWORK, "ransomware") == CoarseGroup.DISRUPTION
     assert (
         coarse_group_for(DatasetId.TON_IOT_WINDOWS10_HOST, "injection") == CoarseGroup.EXPLOITATION

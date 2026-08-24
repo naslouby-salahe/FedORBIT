@@ -50,17 +50,20 @@ def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:
         "udp.port",
         "mqtt.msg",
     } <= EDGE_EXCLUSIONS
-    assert frozenset(
-        {
-            "http.request.method",
-            "http.referer",
-            "http.request.version",
-            "dns.qry.name.len",
-            "mqtt.conack.flags",
-            "mqtt.protoname",
-            "mqtt.topic",
-        }
-    ) == EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS
+    assert (
+        frozenset(
+            {
+                "http.request.method",
+                "http.referer",
+                "http.request.version",
+                "dns.qry.name.len",
+                "mqtt.conack.flags",
+                "mqtt.protoname",
+                "mqtt.topic",
+            }
+        )
+        == EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS
+    )
 
 
 def test_edge_timestamp_parse_failure_is_data_invalid() -> None:

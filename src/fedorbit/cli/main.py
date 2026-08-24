@@ -128,8 +128,7 @@ def status(experiment_name: str | None = typer.Argument(None)) -> None:
             else selected_names
         )
         typer.echo(
-            f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} "
-            f"{'Est-run':<8} {'Est-end':<8}"
+            f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} {'Est-run':<8} {'Est-end':<8}"
         )
         for index, name in enumerate(
             name for name in catalogue.registered_names() if name in selected

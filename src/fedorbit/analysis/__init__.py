@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+from fedorbit.analysis.claims import TransferCriteriaDecision, evaluate_transfer_style_criteria
 from fedorbit.analysis.comparisons import (
-    PairContrastEvidence,
-    TransferCriteriaDecision,
-    evaluate_transfer_style_criteria,
-)
-from fedorbit.analysis.families import (
     ContrastRegistryError,
     FamilyInputState,
+    FamilyStates,
+    PairContrastEvidence,
+    PairContrastEvidenceSet,
     RegisteredContrast,
+    RegisteredFamilyInputs,
     build_family_states,
     registered_family_inputs,
 )
 from fedorbit.analysis.statistics import (
     BcaInterval,
+    McNemarResult,
+    PValueSet,
     SignFlipResult,
     StatisticsError,
     TostResult,
@@ -35,8 +37,13 @@ __all__ = [
     "BcaInterval",
     "ContrastRegistryError",
     "FamilyInputState",
+    "FamilyStates",
+    "McNemarResult",
+    "PValueSet",
     "PairContrastEvidence",
+    "PairContrastEvidenceSet",
     "RegisteredContrast",
+    "RegisteredFamilyInputs",
     "SignFlipResult",
     "StatisticsError",
     "TostResult",

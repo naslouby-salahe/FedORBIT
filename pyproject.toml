@@ -16,7 +16,7 @@ dependencies = [
     "highspy==1.15.1",
     "pyscipopt==6.2.1",
     "pydantic==2.13.4",
-    "typer==0.20.1",
+    "typer==0.27.1",
     "psutil==7.2.2",
     "pyyaml>=6.0.2",
 ]
@@ -60,7 +60,7 @@ ignore = ["N802", "N803", "N806", "N999"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --import-mode=importlib"
 filterwarnings = ["error"]
 
 [tool.pyright]

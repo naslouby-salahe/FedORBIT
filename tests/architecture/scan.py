@@ -11,6 +11,7 @@ TESTS_ROOT = REPOSITORY_ROOT / "tests"
 ALLOWED_ROOT_ENTRIES = {
     ".env",
     ".git",
+    ".github",
     "CLAUDE.md",
     ".gitignore",
     ".vscode",
@@ -192,8 +193,8 @@ CANONICAL_SERIALIZER_BOUNDARY_MODULES = frozenset(
         "domain.canonical",
         "runtime.seeds",
         "artifacts.manifests",
-        "artifacts.serialization",
-        "artifacts.evidence",
+        "artifacts.storage",
+        "reporting.export",
     }
 )
 

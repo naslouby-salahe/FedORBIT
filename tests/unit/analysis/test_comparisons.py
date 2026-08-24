@@ -3,157 +3,153 @@ from __future__ import annotations
 import pytest
 
 from fedorbit.analysis.comparisons import (
+    ContrastPValue,
+    ContrastPValueSet,
     PairContrastEvidence,
-    evaluate_transfer_style_criteria,
+    PairContrastEvidenceSet,
+    PairedObservation,
+    PairingError,
+    PairingLineage,
+    build_family_states,
+    registered_family_inputs,
+    validate_paired_observations,
 )
-from fedorbit.analysis.families import build_family_states, registered_family_inputs
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import MultiplicityFamily
+from fedorbit.config.models import FedorbitConfig
+from fedorbit.domain.enums import MultiplicityFamily, Split, TransferMethod
 
 
 @pytest.fixture
-def config():
+def config() -> FedorbitConfig:
     return load_fedorbit_config()
 
 
-def _evidence(
-    pair: str,
-    mean_gain: float,
-    holm_p: float = 0.01,
-    bca_lower: float = 0.005,
-    valid_seed_count: int = 10,
-    strict_valid: bool = True,
-) -> PairContrastEvidence:
-    return PairContrastEvidence(
-        directed_pair=pair,
-        mean_gain=mean_gain,
-        holm_p=holm_p,
-        bca_lower=bca_lower,
-        strict_resource_valid=strict_valid,
-        valid_seed_count=valid_seed_count,
-    )
-
-
-def test_full_scope_supported_when_three_pairs_pass(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.05),
-        "p2": _evidence("p2", mean_gain=0.04),
-        "p3": _evidence("p3", mean_gain=0.06),
-        "p4": _evidence("p4", mean_gain=-0.001),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=False
-    )
-    assert decision.supported
-    assert not decision.conditional
-    assert set(decision.successful_pairs) == {"p1", "p2", "p3"}
-    assert decision.not_supported is False
-
-
-def test_harmful_pair_makes_not_supported(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.05),
-        "p2": _evidence("p2", mean_gain=0.04),
-        "p3": _evidence("p3", mean_gain=-0.02),
-        "p4": _evidence("p4", mean_gain=0.03),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=False
-    )
-    assert decision.not_supported
-    assert "p3" in decision.harmful_pairs
-
-
-def test_reduced_scope_conditional_with_one_pre_outcome_removal(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.05, valid_seed_count=0),
-        "p2": _evidence("p2", mean_gain=0.04),
-        "p3": _evidence("p3", mean_gain=0.06),
-        "p4": _evidence("p4", mean_gain=0.03),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=True
-    )
-    assert decision.conditional
-    assert not decision.supported
-    assert len(decision.successful_pairs) == 3
-
-
-def test_two_positive_pairs_is_partially_supported(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.05),
-        "p2": _evidence("p2", mean_gain=0.04),
-        "p3": _evidence("p3", mean_gain=0.001),
-        "p4": _evidence("p4", mean_gain=0.002),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=False
-    )
-    assert decision.partially_supported
-    assert len(decision.successful_pairs) == 2
-
-
-def test_no_benefit_no_harm_is_null_result(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.001),
-        "p2": _evidence("p2", mean_gain=0.0005),
-        "p3": _evidence("p3", mean_gain=0.002),
-        "p4": _evidence("p4", mean_gain=-0.001),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=False
-    )
-    assert decision.null_result or decision.partially_supported
-    assert not decision.not_supported
-    assert not decision.supported
-
-
-def test_strict_resource_failure_blocks_support(config) -> None:
-    evidence = {
-        "p1": _evidence("p1", mean_gain=0.05),
-        "p2": _evidence("p2", mean_gain=0.04),
-        "p3": _evidence("p3", mean_gain=0.06, strict_valid=False),
-        "p4": _evidence("p4", mean_gain=0.03),
-    }
-    decision = evaluate_transfer_style_criteria(
-        config, evidence, removed_before_outcome_inspection=False
-    )
-    assert not decision.supported
-    assert "p3" not in decision.successful_pairs
+def test_pair_evidence_set_rejects_duplicate_directed_pairs() -> None:
+    evidence = PairContrastEvidence("pair", 0.1, 0.01, 0.01, True, 10)
+    with pytest.raises(ValueError):
+        PairContrastEvidenceSet((evidence, evidence))
 
 
 def test_family_registry_counts_match_roadmap() -> None:
     registry = registered_family_inputs()
-    assert len(registry[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY]) == 4
-    assert len(registry[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR]) == 8
-    assert len(registry[MultiplicityFamily.COUPLING_MECHANISM]) == 4
-    assert len(registry[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY]) == 8
-    assert len(registry[MultiplicityFamily.MECHANISM_ABLATIONS]) == 8
-    assert len(registry[MultiplicityFamily.SPARSITY_SENSITIVITY]) == 12
-    assert len(registry[MultiplicityFamily.CONFIRMATION_SAFETY]) == 4
-    total = sum(len(contrasts) for contrasts in registry.values())
-    assert total == 48
+    assert len(registry.contrasts_for(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY)) == 4
+    assert len(registry.contrasts_for(MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR)) == 8
+    assert len(registry.contrasts_for(MultiplicityFamily.COUPLING_MECHANISM)) == 4
+    assert len(registry.contrasts_for(MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY)) == 8
+    assert len(registry.contrasts_for(MultiplicityFamily.MECHANISM_ABLATIONS)) == 8
+    assert len(registry.contrasts_for(MultiplicityFamily.SPARSITY_SENSITIVITY)) == 12
+    assert len(registry.contrasts_for(MultiplicityFamily.CONFIRMATION_SAFETY)) == 4
+    assert sum(len(entry.contrasts) for entry in registry.entries) == 48
 
 
-def test_missing_family_inputs_recorded_without_p_values(config) -> None:
-    registry = registered_family_inputs()
+def _pvalue(
+    family: MultiplicityFamily,
+    index: int,
+    p_value: float,
+    valid_seed_count: int = 10,
+) -> ContrastPValue:
+    contrast = registered_family_inputs().contrasts_for(family)[index]
+    return ContrastPValue(
+        family,
+        contrast.name,
+        contrast.directed_pair,
+        p_value,
+        valid_seed_count,
+    )
+
+
+def test_pair_specific_p_value_does_not_populate_other_pairs(config: FedorbitConfig) -> None:
     states = build_family_states(
         config,
-        {registry[MultiplicityFamily.COUPLING_MECHANISM][0].name: 0.02},
+        ContrastPValueSet((_pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.02),)),
     )
-    unavailable = [
-        state for family_states in states.values() for state in family_states if not state.available
-    ]
-    assert unavailable
-    assert all(state.raw_p_value is None for state in unavailable)
-    assert all(state.unavailable_reason for state in unavailable)
-
-
-def test_available_family_inputs_carry_raw_p_values(config) -> None:
-    registry = registered_family_inputs()
-    name = registry[MultiplicityFamily.COUPLING_MECHANISM][0].name
-    states = build_family_states(config, {name: 0.02})
-    coupling_states = states[MultiplicityFamily.COUPLING_MECHANISM]
+    coupling_states = states.states_for(MultiplicityFamily.COUPLING_MECHANISM)
     available = [state for state in coupling_states if state.available]
-    assert len(available) == 4
-    assert all(state.raw_p_value == pytest.approx(0.02) for state in available)
+    assert len(available) == 1
+    assert available[0].raw_p_value == pytest.approx(0.02)
+    assert available[0].holm_p_value == pytest.approx(0.02)
+    assert available[0].family_size == 1
+
+
+def test_holm_is_applied_within_family_only(config: FedorbitConfig) -> None:
+    values = ContrastPValueSet(
+        (
+            _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.01),
+            _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 1, 0.03),
+            _pvalue(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY, 0, 0.02),
+        )
+    )
+    states = build_family_states(config, values)
+    coupling = [
+        state
+        for state in states.states_for(MultiplicityFamily.COUPLING_MECHANISM)
+        if state.available
+    ]
+    primary = [
+        state
+        for state in states.states_for(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY)
+        if state.available
+    ]
+    assert [state.holm_p_value for state in coupling] == pytest.approx([0.02, 0.03])
+    assert primary[0].holm_p_value == pytest.approx(0.02)
+    assert primary[0].family_size == 1
+
+
+def test_inputs_with_insufficient_paired_seeds_are_not_in_holm_family(
+    config: FedorbitConfig,
+) -> None:
+    states = build_family_states(
+        config,
+        ContrastPValueSet(
+            (
+                _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.01),
+                _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 1, 0.001, valid_seed_count=7),
+            )
+        ),
+    )
+    coupling = states.states_for(MultiplicityFamily.COUPLING_MECHANISM)
+    assert coupling[0].family_size == 1
+    assert coupling[0].holm_p_value == pytest.approx(0.01)
+    assert coupling[1].available is False
+    assert coupling[1].unavailable_reason == "insufficient valid paired seeds"
+
+
+def _lineage(seed: int = 1103, source_packet: str | None = "packet-1") -> PairingLineage:
+    return PairingLineage(
+        raw_dataset_lineage_sha256="a" * 64,
+        directed_pair="Edge→Windows",
+        seed=seed,
+        split=Split.TEST,
+        target_pre_transfer_checkpoint_artifact_id="checkpoint-1",
+        target_importance_artifact_id="importance-1",
+        source_packet_artifact_id=source_packet,
+        action_budget=0.5,
+        support_budget=2,
+        confirmation_budget=200,
+        environment_lineage_sha256="b" * 64,
+    )
+
+
+def test_pairing_engine_accepts_only_identical_registered_lineage() -> None:
+    method = (
+        PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.2, _lineage(1103)),
+        PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.3, _lineage(2089)),
+    )
+    reference = (
+        PairedObservation(TransferMethod.LOCAL_ONLY, 0.1, _lineage(2089)),
+        PairedObservation(TransferMethod.LOCAL_ONLY, 0.15, _lineage(1103)),
+    )
+    paired = validate_paired_observations(method, reference)
+    assert paired.directed_pair == "Edge→Windows"
+    assert paired.seeds == (1103, 2089)
+    assert paired.method_values == pytest.approx((0.2, 0.3))
+    assert paired.reference_values == pytest.approx((0.15, 0.1))
+
+
+def test_pairing_engine_rejects_source_packet_mismatch() -> None:
+    method = (PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.2, _lineage()),)
+    reference = (
+        PairedObservation(TransferMethod.LOCAL_ONLY, 0.1, _lineage(source_packet="packet-2")),
+    )
+    with pytest.raises(PairingError, match="lineage mismatch"):
+        validate_paired_observations(method, reference)

@@ -75,10 +75,16 @@ class StrictResourcePolicy:
                 f"target-local resource outside the whitelist: {resource.value}"
             )
 
-    def assert_role_allowed(self, role: ClientRole, resource: ResourceKind) -> None:
+    def assert_role_allowed(
+        self,
+        role: ClientRole,
+        resource: ResourceKind,
+        transfer_finalized: bool = False,
+    ) -> None:
         if role == ClientRole.SOURCE:
             self.assert_source_allowed(resource)
-        elif role == ClientRole.TARGET:
-            self.assert_target_allowed(resource, transfer_finalized=True)
-        else:
-            raise StrictResourceViolationError(f"unknown client role: {role.value}")
+            return
+        if role == ClientRole.TARGET:
+            self.assert_target_allowed(resource, transfer_finalized)
+            return
+        raise StrictResourceViolationError(f"unknown client role: {role.value}")

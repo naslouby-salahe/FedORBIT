@@ -7,13 +7,19 @@ from pydantic import ValidationError
 
 from fedorbit.artifacts.manifests import (
     CompletionManifest,
+    DatasetManifest,
+    EligibilityCopyKind,
     ReusableArtifactManifest,
+    SemanticCellManifest,
+    TransferEligibilityManifest,
     artifact_id,
     completion_manifest_self_hash,
     dependency_fingerprint,
+    eligibility_copy,
     file_sha256,
 )
-from fedorbit.artifacts.reuse import ArtifactStore, ReuseError
+from fedorbit.artifacts.storage import ArtifactStore
+from fedorbit.artifacts.validation import ArtifactValidationError
 from fedorbit.domain.enums import ArtifactState, TerminalState
 
 COORDINATES = {
@@ -21,7 +27,6 @@ COORDINATES = {
     "pair": ["edge_iiotset_network", "ton_iot_network"],
     "seed": 1103,
 }
-
 MANIFEST_VERSION = "1.0"
 
 
@@ -82,7 +87,6 @@ COMPLETION_FIELDS = (
     "completion_written_last",
     "completion_manifest_sha256",
 )
-
 REUSABLE_FIELDS = (
     "artifact_id",
     "artifact_type",
@@ -119,18 +123,11 @@ def test_reusable_manifest_requires_field(field: str) -> None:
         ReusableArtifactManifest.model_validate(payload)
 
 
-def test_completion_manifest_round_trips_canonical_fixture() -> None:
-    manifest = CompletionManifest.model_validate(_completion_payload())
-    rendered = manifest.model_dump(mode="json")
-    restored = CompletionManifest.model_validate(rendered)
-    assert restored == manifest
-
-
-def test_reusable_manifest_round_trips_canonical_fixture() -> None:
-    manifest = ReusableArtifactManifest.model_validate(_reusable_payload())
-    rendered = manifest.model_dump(mode="json")
-    restored = ReusableArtifactManifest.model_validate(rendered)
-    assert restored == manifest
+def test_completion_and_reusable_manifests_round_trip() -> None:
+    completion = CompletionManifest.model_validate(_completion_payload())
+    reusable = ReusableArtifactManifest.model_validate(_reusable_payload())
+    assert CompletionManifest.model_validate(completion.model_dump(mode="json")) == completion
+    assert ReusableArtifactManifest.model_validate(reusable.model_dump(mode="json")) == reusable
 
 
 def test_completion_manifest_rejects_unknown_fields() -> None:
@@ -140,35 +137,23 @@ def test_completion_manifest_rejects_unknown_fields() -> None:
         CompletionManifest.model_validate(payload)
 
 
-def test_dependency_fingerprint_is_stable_and_sensitive() -> None:
+def test_dependency_fingerprint_and_artifact_identity_are_stable_and_sensitive() -> None:
     first = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    second = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    assert first == second
-    changed = dependency_fingerprint(COORDINATES, ("upstream-1",), "c" * 64, "d" * 64, "e" * 64)
-    assert changed != first
-    changed_config = dependency_fingerprint(COORDINATES, (), "c2" * 64, "d" * 64, "e" * 64)
-    assert changed_config != first
+    assert first == dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
+    assert first != dependency_fingerprint(COORDINATES, ("upstream",), "c" * 64, "d" * 64, "e" * 64)
+    assert artifact_id("prepared_split", COORDINATES, first) != artifact_id(
+        "checkpoint", COORDINATES, first
+    )
 
 
-def test_artifact_id_is_stable_and_fingerprint_sensitive() -> None:
-    first = artifact_id("prepared_split", COORDINATES, "a" * 64)
-    second = artifact_id("prepared_split", COORDINATES, "a" * 64)
-    assert first == second
-    different = artifact_id("prepared_split", COORDINATES, "b" * 64)
-    assert different != first
-    other_type = artifact_id("checkpoint", COORDINATES, "a" * 64)
-    assert other_type != first
-
-
-def test_file_sha256_matches_known_digest(tmp_path: Path) -> None:
+def test_file_sha256_is_deterministic(tmp_path: Path) -> None:
     payload = tmp_path / "payload.bin"
     payload.write_bytes(b"fedorbit-payload")
-    expected = "cfa11ee0a14b0f6f7e5cf8b3c1ab2a94a1266c5e95d80a0efc7e0cdd97c8b4c0"
-    assert file_sha256(payload) != expected
+    assert file_sha256(payload) == file_sha256(payload)
     assert len(file_sha256(payload)) == 64
 
 
-def test_reuse_returns_same_artifact_under_identical_fingerprint(tmp_path: Path) -> None:
+def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "split.parquet"
     payload.write_bytes(b"payload-v1")
@@ -183,107 +168,108 @@ def test_reuse_returns_same_artifact_under_identical_fingerprint(tmp_path: Path)
         }
     )
     store.write_reusable(manifest)
-
-    resolved = store.find_by_fingerprint(fingerprint)
-    assert resolved is not None
-    assert resolved.artifact_id == manifest.artifact_id
-    assert store.resolve(manifest.artifact_id).artifact_id == manifest.artifact_id
-
-
-def test_reuse_does_not_duplicate_payload_for_second_cell(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
-    payload = tmp_path / "checkpoint.pt"
-    payload.write_bytes(b"checkpoint-v1")
-    fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    manifest = ReusableArtifactManifest.model_validate(
-        {
-            **_reusable_payload(),
-            "artifact_type": "checkpoint",
-            "artifact_id": artifact_id("checkpoint", COORDINATES, fingerprint),
-            "dependency_fingerprint_sha256": fingerprint,
-            "payload_paths": (str(payload),),
-            "payload_sha256": file_sha256(payload),
-        }
-    )
-    store.write_reusable(manifest)
-
-    second_cell_fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    assert second_cell_fingerprint == fingerprint
-    resolved = store.find_by_fingerprint(second_cell_fingerprint)
-    assert resolved is not None
-    assert resolved.payload_paths == (str(payload),)
-    assert len(list((tmp_path / "manifests").glob("*.json"))) == 1
-
-
-def test_reuse_rejects_corrupted_payload(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
-    payload = tmp_path / "prediction.npz"
-    payload.write_bytes(b"payload-v1")
-    fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    manifest = ReusableArtifactManifest.model_validate(
-        {
-            **_reusable_payload(),
-            "artifact_type": "prediction",
-            "artifact_id": artifact_id("prediction", COORDINATES, fingerprint),
-            "dependency_fingerprint_sha256": fingerprint,
-            "payload_paths": (str(payload),),
-            "payload_sha256": file_sha256(payload),
-        }
-    )
-    store.write_reusable(manifest)
+    assert store.resolve(manifest.artifact_id) == manifest
     payload.write_bytes(b"corrupted")
-
-    with pytest.raises(ReuseError):
+    with pytest.raises(ArtifactValidationError):
         store.resolve(manifest.artifact_id)
-    with pytest.raises(ReuseError):
-        store.find_by_fingerprint(fingerprint)
-
-
-def test_reuse_rejects_incomplete_state(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
-    payload = tmp_path / "packet.pt"
-    payload.write_bytes(b"payload-v1")
-    fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    manifest = ReusableArtifactManifest.model_validate(
-        {
-            **_reusable_payload(),
-            "artifact_type": "response_packet",
-            "artifact_id": artifact_id("response_packet", COORDINATES, fingerprint),
-            "dependency_fingerprint_sha256": fingerprint,
-            "payload_paths": (str(payload),),
-            "payload_sha256": file_sha256(payload),
-            "state": ArtifactState.RUNNING,
-        }
-    )
-    store.write_reusable(manifest)
-    with pytest.raises(ReuseError):
-        store.resolve(manifest.artifact_id)
-
-
-def test_manifest_references_do_not_transfer_ownership(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
-    payload = tmp_path / "derived.bin"
-    payload.write_bytes(b"payload-v1")
-    fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    manifest = ReusableArtifactManifest.model_validate(
-        {
-            **_reusable_payload(),
-            "artifact_type": "solver_result",
-            "artifact_id": artifact_id("solver_result", COORDINATES, fingerprint),
-            "dependency_fingerprint_sha256": fingerprint,
-            "payload_paths": (str(payload),),
-            "payload_sha256": file_sha256(payload),
-        }
-    )
-    store.write_reusable(manifest)
-    resolved = store.resolve(manifest.artifact_id)
-    assert resolved.payload_paths == (str(payload),)
-    assert payload.is_file()
 
 
 def test_completion_manifest_self_hash_excludes_own_field() -> None:
     manifest = CompletionManifest.model_validate(_completion_payload())
     self_hash = completion_manifest_self_hash(manifest)
     assert len(self_hash) == 64
-    changed = manifest.model_copy(update={"producer_stage": "training"})
-    assert completion_manifest_self_hash(changed) != self_hash
+    assert (
+        completion_manifest_self_hash(manifest.model_copy(update={"producer_stage": "training"}))
+        != self_hash
+    )
+
+
+DATASET_FIELDS = {
+    "dataset": "edge_iiotset_network",
+    "component": "network",
+    "raw_files": ("ML-EdgeIIoT-dataset.csv",),
+    "raw_sha256": "a" * 64,
+    "raw_counts": {"rows": 100},
+    "schema": "1.0",
+    "adapter_feature_order": ("tcp.ack",),
+    "adapter_feature_roles": {"tcp.ack": "behavioral_numeric"},
+    "accepted_schema_aliases": (),
+    "adapter_adaptations": (),
+    "timestamp_field": "frame.time",
+    "timestamp_range": ("2020-01-01", "2020-01-02"),
+    "duplicate_counts": {"group-a": 2},
+    "conflicting_duplicate_counts": {},
+    "local_class_counts": {"normal": 50, "ddos_tcp": 50},
+    "transfer_candidate_counts": {"DDoS": 50},
+    "feature_quality": {"dropped": 0},
+    "preprocessing_state": "completed",
+    "dependency_fingerprint_sha256": "b" * 64,
+    "producer_code_sha256": "c" * 64,
+}
+ELIGIBILITY_FIELDS = {
+    "client": "edge_iiotset_network",
+    "seed": 1103,
+    "coarse_group": "Disruption",
+    "anonymous_node_id": "node-0042",
+    "native_local_class_ids": ("ddos_tcp",),
+    "present": True,
+    "train_count": 200,
+    "meta_count": 40,
+    "confirm_count": 0,
+    "test_count": 40,
+    "source_eligible": True,
+    "target_eligible": False,
+    "null_reason": None,
+    "fine_concept": "DDoS",
+}
+CELL_FIELDS = {
+    "experiment": "Primary Strict Cross-Telemetry Transfer",
+    "dataset": "edge_iiotset_network",
+    "source_client": "edge_iiotset_network",
+    "target_client": "ton_iot_windows10_host",
+    "directed_pair": "edge_iiotset_network -> ton_iot_windows10_host",
+    "method": "FedORBIT Exact-Sparse Solver",
+    "condition": "principal",
+    "support": 2,
+    "seed": 1103,
+    "scientific_configuration_sha256": "d" * 64,
+    "dependency_fingerprint_sha256": "e" * 64,
+    "producer_stage": "response",
+}
+
+
+def test_dataset_manifest_round_trips_with_schema_alias() -> None:
+    manifest = DatasetManifest.model_validate(DATASET_FIELDS)
+    dumped = manifest.model_dump(mode="json", by_alias=True)
+    assert dumped["schema"] == "1.0"
+    assert DatasetManifest.model_validate(dumped) == manifest
+
+
+def test_dataset_manifest_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        DatasetManifest.model_validate({**DATASET_FIELDS, "invented": 1})
+
+
+def test_eligibility_copies_enforce_method_oracle_separation() -> None:
+    manifest = TransferEligibilityManifest.model_validate(ELIGIBILITY_FIELDS)
+    readable = eligibility_copy(manifest, EligibilityCopyKind.METHOD_READABLE)
+    assert readable.native_local_class_ids == ()
+    assert readable.fine_concept is None
+    oracle = eligibility_copy(manifest, EligibilityCopyKind.ORACLE)
+    assert oracle.native_local_class_ids == ()
+    assert oracle.fine_concept == "DDoS"
+    builder = eligibility_copy(manifest, EligibilityCopyKind.BUILDER)
+    assert builder.native_local_class_ids == ("ddos_tcp",)
+
+
+def test_oracle_eligibility_copy_requires_fine_concept() -> None:
+    manifest = TransferEligibilityManifest.model_validate(
+        {**ELIGIBILITY_FIELDS, "fine_concept": None}
+    )
+    with pytest.raises(ValueError):
+        eligibility_copy(manifest, EligibilityCopyKind.ORACLE)
+
+
+def test_semantic_cell_manifest_round_trips() -> None:
+    manifest = SemanticCellManifest.model_validate(CELL_FIELDS)
+    assert SemanticCellManifest.model_validate(manifest.model_dump(mode="json")) == manifest

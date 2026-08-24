@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
 
-from fedorbit.cli.errors import CliUsageError
-from fedorbit.cli.main import EXIT_NOT_READY, EXIT_USAGE, app
+from fedorbit.cli.errors import EXIT_NOT_READY, EXIT_USAGE, CliUsageError
+from fedorbit.cli.main import app
 from fedorbit.cli.parsing import dataset_identifier, experiment_identifier
 from fedorbit.domain.enums import ExperimentName
 
@@ -85,7 +85,7 @@ def test_plan_is_read_only_and_derives_catalogue() -> None:
 def test_status_renders_wide_table_per_item() -> None:
     result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
-    assert "experiment" in result.output
+    assert "Experiment" in result.output
     assert "Primary Strict Cross-Telemetry Transfer" in result.output
 
 
@@ -126,4 +126,4 @@ def test_run_accepts_registered_experiment() -> None:
 
 def test_smoke_accepts_overwrite_flag() -> None:
     result = runner.invoke(app, ["smoke", "--overwrite"])
-    assert result.exit_code in (EXIT_NOT_READY, 0)
+    assert result.exit_code == 0

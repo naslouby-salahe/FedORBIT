@@ -77,9 +77,7 @@ def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
     store.write_reusable(
         _manifest(train_payload, "checkpoint", "training", "fp-train", ("pre-up",))
     )
-    store.write_reusable(
-        _manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",))
-    )
+    store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",)))
     invalidated = SelectiveInvalidation(store).invalidate_stage("training")
     assert len(invalidated) == 2
     remaining = {path.stem for path in store.manifest_dir().glob("*.json")}

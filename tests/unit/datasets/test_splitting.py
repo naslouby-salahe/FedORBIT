@@ -54,7 +54,7 @@ def test_chronological_assignment_uses_timestamp_then_hash_and_indivisible_group
     assert assignment.assignments[2][0] == "c"
     assert assignment.split_of("a") == Split.TRAIN
     assert assignment.split_of("b") == Split.META
-    assert assignment.split_of("c") == Split.TEST
+    assert assignment.split_of("c") == Split.CONFIRM
 
 
 def test_invalid_midpoint_inputs_fail_closed(fedorbit_config: FedorbitConfig) -> None:

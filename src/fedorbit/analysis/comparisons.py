@@ -16,6 +16,16 @@ class PairContrastEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class PairContrastEvidenceSet:
+    entries: tuple[PairContrastEvidence, ...]
+
+    def __post_init__(self) -> None:
+        names = tuple(entry.directed_pair for entry in self.entries)
+        if len(set(names)) != len(names):
+            raise ValueError("pair-contrast evidence contains duplicate directed pairs")
+
+
+@dataclass(frozen=True, slots=True)
 class TransferCriteriaDecision:
     supported: bool
     conditional: bool
@@ -36,7 +46,6 @@ def _successful_pair(
     materiality = config.scientific.materiality.realized_relative_macro_ce
     if evidence.mean_gain is None or evidence.holm_p is None or evidence.bca_lower is None:
         return False
-    assert evidence.mean_gain is not None
     return (
         evidence.mean_gain >= materiality
         and evidence.holm_p < criteria.holm_adjusted_p_maximum
@@ -47,14 +56,14 @@ def _successful_pair(
 
 def evaluate_transfer_style_criteria(
     config: FedorbitConfig,
-    evidence_by_pair: dict[str, PairContrastEvidence],
+    evidence_set: PairContrastEvidenceSet,
     removed_before_outcome_inspection: bool,
 ) -> TransferCriteriaDecision:
     claim = config.scientific.claim_criteria.strict_cross_telemetry_utility
     materiality = config.scientific.materiality.realized_relative_macro_ce
     harm_threshold = config.scientific.materiality.harmful_transfer_relative_macro_ce_gain
     required = claim.successful_primary_pairs_required
-
+    evidence_by_pair = {entry.directed_pair: entry for entry in evidence_set.entries}
     all_pairs = sorted(evidence_by_pair)
     analyzable = {
         pair: evidence
@@ -67,7 +76,7 @@ def evaluate_transfer_style_criteria(
     harmful = tuple(
         pair
         for pair in analyzable
-        if analyzable[pair].mean_gain is not None and analyzable[pair].mean_gain <= harm_threshold
+        if (gain := analyzable[pair].mean_gain) is not None and gain <= harm_threshold
     )
 
     scope_removed = len(all_pairs) - len(analyzable)
@@ -81,14 +90,14 @@ def evaluate_transfer_style_criteria(
     full_scope = not removed_before_outcome_inspection and len(analyzable) == 4
 
     equal_pair_values = tuple(analyzable[pair].mean_gain for pair in sorted(analyzable))
-    all_present = all(value is not None for value in equal_pair_values)
-    if all_present:
-        numeric_values = [value for value in equal_pair_values if value is not None]
-        equal_pair_mean_value: float | None = sum(numeric_values) / len(numeric_values)
-    else:
-        equal_pair_mean_value = None
+    numeric_values = tuple(value for value in equal_pair_values if value is not None)
+    equal_pair_mean_value = (
+        sum(numeric_values) / len(numeric_values)
+        if len(numeric_values) == len(equal_pair_values) and numeric_values
+        else None
+    )
 
-    if any(not e.strict_resource_valid for e in evidence_by_pair.values()):
+    if any(not evidence.strict_resource_valid for evidence in evidence_set.entries):
         reasons.append("strict-resource validation failed for a contributing run")
         return TransferCriteriaDecision(
             False, False, False, False, True, (), (), None, tuple(reasons)
@@ -126,12 +135,11 @@ def evaluate_transfer_style_criteria(
     positive_pairs = [
         pair
         for pair in analyzable
-        if analyzable[pair].mean_gain is not None
-        and analyzable[pair].mean_gain >= materiality
+        if (gain := analyzable[pair].mean_gain) is not None
+        and gain >= materiality
         and _holm_and_bca_pass(config, analyzable[pair])
         and analyzable[pair].strict_resource_valid
     ]
-    no_material_benefit = not positive_pairs
     if harmful:
         return TransferCriteriaDecision(
             False,
@@ -156,7 +164,7 @@ def evaluate_transfer_style_criteria(
             equal_pair_mean_value,
             tuple(reasons),
         )
-    if no_material_benefit and not harmful:
+    if not positive_pairs:
         return TransferCriteriaDecision(
             False,
             False,

@@ -66,9 +66,9 @@ def test_experiment_workspaces(tmp_path: Path) -> None:
     config = load_fedorbit_config()
     layout = build_layout(config, root=tmp_path)
     workspace = experiment_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
-    assert workspace == layout.experiments / "Primary Strict Cross-Telemetry Transfer"
+    assert workspace == layout.experiments / "primary-strict-cross-telemetry-transfer"
     results = results_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
-    assert results == layout.results_experiments / "Primary Strict Cross-Telemetry Transfer"
+    assert results == layout.results_experiments / "primary-strict-cross-telemetry-transfer"
 
 
 def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
@@ -81,7 +81,7 @@ def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
         "a" * 64,
         ".parquet",
     )
-    assert path.name.startswith("primary-transfer.support=2.")
+    assert path.name.startswith("primary-transfer-support-2.")
     assert "aaaaaaaaaaaaaaaa" in path.name
     assert path.parent == layout.artifacts
 
@@ -136,7 +136,7 @@ def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) ->
         {"evidence": 1},
     )
     assert destination.exists()
-    assert "Primary Strict Cross-Telemetry Transfer" in str(destination)
+    assert "primary-strict-cross-telemetry-transfer" in str(destination)
 
 
 def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:

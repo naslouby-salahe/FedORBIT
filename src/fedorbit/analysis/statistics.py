@@ -5,18 +5,104 @@ import math
 import statistics
 import warnings
 from dataclasses import dataclass
+from enum import StrEnum
+from typing import Protocol, cast
 
 import numpy as np
 from numpy.random import PCG64, Generator
+from numpy.typing import NDArray
 from scipy import stats as scipy_stats
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.runtime.seeds import derive_seed32
 
+FloatArray = NDArray[np.float64]
+
 
 class StatisticsError(ValueError):
     pass
+
+
+class McNemarMode(StrEnum):
+    EXACT = "exact"
+    ASYMPTOTIC = "asymptotic"
+
+
+@dataclass(frozen=True, slots=True)
+class NamedPValue:
+    name: str
+    p_value: float
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise StatisticsError("p-value name must be non-empty")
+        if not math.isfinite(self.p_value) or not 0.0 <= self.p_value <= 1.0:
+            raise StatisticsError("p-value must be finite and lie in [0,1]")
+
+
+@dataclass(frozen=True, slots=True)
+class PValueSet:
+    entries: tuple[NamedPValue, ...]
+
+    def __post_init__(self) -> None:
+        names = tuple(entry.name for entry in self.entries)
+        if len(set(names)) != len(names):
+            raise StatisticsError("p-value set contains duplicate names")
+
+    def value_of(self, name: str) -> float | None:
+        for entry in self.entries:
+            if entry.name == name:
+                return entry.p_value
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class McNemarResult:
+    mode: McNemarMode
+    p_value: float
+
+
+class _ConfidenceIntervalLike(Protocol):
+    low: float
+    high: float
+
+
+class _BootstrapResultLike(Protocol):
+    confidence_interval: _ConfidenceIntervalLike
+
+
+class _BootstrapStatistic(Protocol):
+    def __call__(
+        self,
+        x: FloatArray,
+        y: FloatArray,
+        axis: int = -1,
+    ) -> FloatArray: ...
+
+
+class _BootstrapProcedure(Protocol):
+    def __call__(
+        self,
+        data: tuple[FloatArray, FloatArray],
+        statistic: _BootstrapStatistic,
+        *,
+        paired: bool,
+        vectorized: bool,
+        method: str,
+        alternative: str,
+        confidence_level: float,
+        n_resamples: int,
+        rng: Generator,
+    ) -> _BootstrapResultLike: ...
+
+
+class _ChiSquareCdf(Protocol):
+    def __call__(self, value: float, *, df: int) -> float: ...
+
+
+_BOOTSTRAP = cast(_BootstrapProcedure, scipy_stats.bootstrap)
+_CHI_SQUARE_CDF = cast(_ChiSquareCdf, scipy_stats.chi2.cdf)
 
 
 def nominal_alpha(config: FedorbitConfig) -> float:
@@ -165,13 +251,13 @@ def paired_bca_interval(
     method_array = np.asarray(method_values, dtype=np.float64)
     reference_array = np.asarray(reference_values, dtype=np.float64)
 
-    def statistic(x: np.ndarray, y: np.ndarray, axis: int = -1) -> np.ndarray:
-        return np.mean(x - y, axis=axis)
+    def statistic(x: FloatArray, y: FloatArray, axis: int = -1) -> FloatArray:
+        return np.asarray(np.mean(x - y, axis=axis), dtype=np.float64)
 
     rng = Generator(PCG64(bootstrap_seed))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        result = scipy_stats.bootstrap(
+        result = _BOOTSTRAP(
             (method_array, reference_array),
             statistic,
             paired=True,
@@ -216,18 +302,16 @@ def tost_equivalence(
     return TostResult(p_lower, p_upper, max(p_lower, p_upper))
 
 
-def holm_step_down(raw_p_values: dict[str, float]) -> dict[str, float]:
-    if any(not 0.0 <= value <= 1.0 for value in raw_p_values.values()):
-        raise StatisticsError("Holm input p-values must lie in [0,1]")
-    ordered = sorted(raw_p_values.items(), key=lambda item: (item[1], item[0]))
-    adjusted: dict[str, float] = {}
+def holm_step_down(raw_p_values: PValueSet) -> PValueSet:
+    ordered = sorted(raw_p_values.entries, key=lambda entry: (entry.p_value, entry.name))
+    adjusted: list[NamedPValue] = []
     running_max = 0.0
     family_size = len(ordered)
-    for index, (name, raw_p) in enumerate(ordered):
-        scaled = min(1.0, raw_p * (family_size - index))
+    for index, entry in enumerate(ordered):
+        scaled = min(1.0, entry.p_value * (family_size - index))
         running_max = max(running_max, scaled)
-        adjusted[name] = running_max
-    return adjusted
+        adjusted.append(NamedPValue(entry.name, running_max))
+    return PValueSet(tuple(adjusted))
 
 
 def mcnemar_exact_p(b01: int, b10: int) -> float:
@@ -248,7 +332,7 @@ def mcnemar_asymptotic_continuity_corrected_p(b01: int, b10: int) -> float:
     if discordant == 0:
         return 1.0
     chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
-    survival = 1.0 - float(scipy_stats.chi2.cdf(chi_square, df=1))
+    survival = 1.0 - float(_CHI_SQUARE_CDF(chi_square, df=1))
     return max(0.0, min(1.0, survival))
 
 
@@ -256,11 +340,14 @@ def mcnemar_test(
     config: FedorbitConfig,
     b01: int,
     b10: int,
-) -> tuple[str, float]:
+) -> McNemarResult:
     switch = config.scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
     if b01 + b10 <= switch:
-        return "exact", mcnemar_exact_p(b01, b10)
-    return "asymptotic", mcnemar_asymptotic_continuity_corrected_p(b01, b10)
+        return McNemarResult(McNemarMode.EXACT, mcnemar_exact_p(b01, b10))
+    return McNemarResult(
+        McNemarMode.ASYMPTOTIC,
+        mcnemar_asymptotic_continuity_corrected_p(b01, b10),
+    )
 
 
 def minimum_valid_seeds_met(config: FedorbitConfig, seed_count: int) -> bool:

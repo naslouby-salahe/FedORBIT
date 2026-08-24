@@ -17,7 +17,11 @@ from fedorbit.response.uncertainty import (
     FinalResponseEstimate,
     estimate_final_response,
 )
-from fedorbit.strict_interface.anonymity import anonymous_node_order
+from fedorbit.strict_interface.anonymity import (
+    AnonymityCoordinate,
+    AnonymityCoordinateEntry,
+    anonymous_node_order,
+)
 from fedorbit.strict_interface.validation import (
     validate_anonymous_node_ids,
     validate_exact_fields,
@@ -53,6 +57,46 @@ class PacketError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class Float64ArrayPayload:
+    dtype: str
+    order: str
+    shape: tuple[int, ...]
+    data: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PacketIntegrityPayload:
+    anonymous_fine_node_ids: tuple[str, ...]
+    exposed_coarse_group_id: str
+    L: Float64ArrayPayload
+    U: Float64ArrayPayload
+    per_node_train_support: Float64ArrayPayload
+    per_node_meta_support: Float64ArrayPayload
+    per_node_effective_replicate_count: Float64ArrayPayload
+    packet_schema_metadata: str
+    source_checkpoint_sha256: str
+    response_configuration_sha256: str
+    packet_validity_state: str
+
+
+@dataclass(frozen=True, slots=True)
+class PacketWirePayload:
+    anonymous_fine_node_ids: tuple[str, ...]
+    exposed_coarse_group_id: str
+    L: Float64ArrayPayload
+    U: Float64ArrayPayload
+    per_node_train_support: Float64ArrayPayload
+    per_node_meta_support: Float64ArrayPayload
+    per_node_effective_replicate_count: Float64ArrayPayload
+    packet_schema_metadata: str
+    source_checkpoint_sha256: str
+    response_configuration_sha256: str
+    packet_integrity_sha256: str
+    packet_validity_state: str
+    technical_creation_timestamp: str
+
+
+@dataclass(frozen=True, slots=True)
 class SourcePacket:
     anonymous_fine_node_ids: tuple[str, ...]
     exposed_coarse_group_id: str
@@ -69,10 +113,10 @@ class SourcePacket:
     technical_creation_timestamp: str
 
     def integrity_payload(self) -> str:
-        return canonical_json(self._serializable(include_integrity=False, include_timestamp=False))
+        return canonical_json(self._integrity_payload())
 
     def serialized(self) -> str:
-        return canonical_json(self._serializable(include_integrity=True, include_timestamp=True))
+        return canonical_json(self._wire_payload())
 
     def compute_integrity_sha256(self) -> str:
         return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
@@ -82,7 +126,7 @@ class SourcePacket:
 
     def validate(self) -> None:
         validate_exact_fields(
-            {field.name: getattr(self, field.name) for field in fields(self)},
+            frozenset(field.name for field in fields(self)),
             PACKET_PERMITTED_FIELDS,
         )
         validate_anonymous_node_ids(self.anonymous_fine_node_ids)
@@ -118,32 +162,40 @@ class SourcePacket:
         if self.packet_integrity_sha256 != self.compute_integrity_sha256():
             raise PacketError("packet integrity SHA-256 mismatch")
 
-    def _serializable(
-        self,
-        *,
-        include_integrity: bool,
-        include_timestamp: bool,
-    ) -> dict[str, object]:
-        values: dict[str, object] = {
-            "anonymous_fine_node_ids": list(self.anonymous_fine_node_ids),
-            "exposed_coarse_group_id": self.exposed_coarse_group_id,
-            "L": _float64_array(self.L),
-            "U": _float64_array(self.U),
-            "per_node_train_support": _float64_array(self.per_node_train_support),
-            "per_node_meta_support": _float64_array(self.per_node_meta_support),
-            "per_node_effective_replicate_count": _float64_array(
+    def _integrity_payload(self) -> PacketIntegrityPayload:
+        return PacketIntegrityPayload(
+            anonymous_fine_node_ids=self.anonymous_fine_node_ids,
+            exposed_coarse_group_id=self.exposed_coarse_group_id,
+            L=_float64_array(self.L),
+            U=_float64_array(self.U),
+            per_node_train_support=_float64_array(self.per_node_train_support),
+            per_node_meta_support=_float64_array(self.per_node_meta_support),
+            per_node_effective_replicate_count=_float64_array(
                 self.per_node_effective_replicate_count
             ),
-            "packet_schema_metadata": self.packet_schema_metadata,
-            "source_checkpoint_sha256": self.source_checkpoint_sha256,
-            "response_configuration_sha256": self.response_configuration_sha256,
-            "packet_validity_state": self.packet_validity_state,
-        }
-        if include_integrity:
-            values["packet_integrity_sha256"] = self.packet_integrity_sha256
-        if include_timestamp:
-            values["technical_creation_timestamp"] = self.technical_creation_timestamp
-        return values
+            packet_schema_metadata=self.packet_schema_metadata,
+            source_checkpoint_sha256=self.source_checkpoint_sha256,
+            response_configuration_sha256=self.response_configuration_sha256,
+            packet_validity_state=self.packet_validity_state,
+        )
+
+    def _wire_payload(self) -> PacketWirePayload:
+        scientific = self._integrity_payload()
+        return PacketWirePayload(
+            anonymous_fine_node_ids=scientific.anonymous_fine_node_ids,
+            exposed_coarse_group_id=scientific.exposed_coarse_group_id,
+            L=scientific.L,
+            U=scientific.U,
+            per_node_train_support=scientific.per_node_train_support,
+            per_node_meta_support=scientific.per_node_meta_support,
+            per_node_effective_replicate_count=scientific.per_node_effective_replicate_count,
+            packet_schema_metadata=scientific.packet_schema_metadata,
+            source_checkpoint_sha256=scientific.source_checkpoint_sha256,
+            response_configuration_sha256=scientific.response_configuration_sha256,
+            packet_integrity_sha256=self.packet_integrity_sha256,
+            packet_validity_state=scientific.packet_validity_state,
+            technical_creation_timestamp=self.technical_creation_timestamp,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,10 +282,18 @@ def construct_source_packet(
         context.seed,
         ClientRole.SOURCE,
         context.coarse_group_id,
-        {
-            "source_checkpoint_sha256": context.source_checkpoint_sha256,
-            "response_configuration_sha256": context.response_configuration_sha256,
-        },
+        AnonymityCoordinate(
+            (
+                AnonymityCoordinateEntry(
+                    "source_checkpoint_sha256",
+                    context.source_checkpoint_sha256,
+                ),
+                AnonymityCoordinateEntry(
+                    "response_configuration_sha256",
+                    context.response_configuration_sha256,
+                ),
+            )
+        ),
     )
     replicate_count = config.scientific.source_response_final.paired_replicates_per_intervention
     packet = build_source_packet(
@@ -328,11 +388,11 @@ def _validate_context(context: PacketConstructionContext) -> None:
         raise PacketConstructionError("META support count differs from source fine-node count")
 
 
-def _float64_array(values: tuple[int | float, ...]) -> dict[str, object]:
+def _float64_array(values: tuple[int | float, ...]) -> Float64ArrayPayload:
     array = np.asarray(values, dtype=np.float64, order="C")
-    return {
-        "dtype": "float64",
-        "order": "C",
-        "shape": [int(size) for size in array.shape],
-        "data": [float(value) for value in array.ravel(order="C")],
-    }
+    return Float64ArrayPayload(
+        dtype="float64",
+        order="C",
+        shape=tuple(int(size) for size in array.shape),
+        data=tuple(float(value) for value in array.ravel(order="C")),
+    )

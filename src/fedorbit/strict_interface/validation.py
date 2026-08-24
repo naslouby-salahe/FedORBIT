@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -58,12 +57,11 @@ class AccessLogger:
 
 
 def validate_exact_fields(
-    payload: Mapping[str, object],
+    field_names: frozenset[str],
     permitted_fields: frozenset[str],
 ) -> None:
-    keys = frozenset(payload)
-    unexpected = keys - permitted_fields
-    missing = permitted_fields - keys
+    unexpected = field_names - permitted_fields
+    missing = permitted_fields - field_names
     if unexpected or missing:
         raise StrictResourceViolationError(
             f"strict interface fields differ from contract; unexpected={sorted(unexpected)}, "

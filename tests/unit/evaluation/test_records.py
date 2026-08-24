@@ -50,10 +50,9 @@ def _prediction(row_hash: str = "row-1") -> PredictionRecord:
 
 
 def test_prediction_record_rejects_non_probability_vector() -> None:
+    invalid = _prediction().model_copy(update={"probabilities": (0.8, 0.8)})
     with pytest.raises(ValidationError):
-        _prediction().model_copy(update={"probabilities": (0.8, 0.8)}).model_validate(
-            _prediction().model_copy(update={"probabilities": (0.8, 0.8)}).model_dump()
-        )
+        PredictionRecord.model_validate(invalid.model_dump())
 
 
 def test_prediction_semantic_identity_is_unique() -> None:
@@ -64,26 +63,30 @@ def test_prediction_semantic_identity_is_unique() -> None:
         validate_prediction_records((first, first))
 
 
-def test_metric_validity_contract() -> None:
-    metric = MetricRecord(
+def _metric(metric_value: float | None, valid: bool, invalid_reason: str | None) -> MetricRecord:
+    return MetricRecord(
         experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         pair="source -> target",
         method=TransferMethod.LOCAL_ONLY,
         condition="principal",
         seed=1103,
         metric_name=MetricId.MACRO_CROSS_ENTROPY,
-        metric_value=0.4,
+        metric_value=metric_value,
         metric_unit="cross-entropy",
         direction=MetricDirection.LOWER_IS_BETTER,
         evaluation_class_set_sha256=SHA,
         input_artifact_ids=("prediction-1",),
         dependency_fingerprint_sha256=SHA,
-        valid=True,
-        invalid_reason=None,
+        valid=valid,
+        invalid_reason=invalid_reason,
     )
+
+
+def test_metric_validity_contract() -> None:
+    metric = _metric(0.4, True, None)
     assert validate_metric_records((metric,)) == (metric,)
     with pytest.raises(ValidationError):
-        MetricRecord(**{**metric.model_dump(), "metric_value": None})
+        _metric(None, True, None)
 
 
 def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:

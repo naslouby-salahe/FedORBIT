@@ -175,19 +175,16 @@ def test_detector_allows_numpy_numeric_payloads() -> None:
 
 @pytest.mark.parametrize("module", sorted(CANONICAL_SERIALIZER_BOUNDARY_MODULES))
 def test_exempt_modules_exist(module: str) -> None:
-
     path = SRC_ROOT.joinpath(*module.split(".")).with_suffix(".py")
     assert path.exists(), f"stale exemption entry: {module}"
 
 
 PRIMITIVE_CONTAINER_FIELD_ALLOWLIST = {
-    "models.training.ModelParameterState.tensors_by_name",
     "transfer.optimizer_budget.TargetOptimizerStepLedger.reserved_steps",
     "transfer.optimizer_budget.TargetOptimizerStepLedger.consumed_steps",
 }
 
 TYPE_ALIAS_ALLOWLIST = {
-    "models.training.OptimizerState",
     "runtime.environment.LockfileEntry",
 }
 
@@ -257,7 +254,6 @@ def test_public_methods_do_not_leak_primitives() -> None:
 
 
 def test_allowlisted_fields_and_aliases_exist() -> None:
-
     for qualified in sorted(PRIMITIVE_CONTAINER_FIELD_ALLOWLIST | TYPE_ALIAS_ALLOWLIST):
         parts = qualified.split(".")
         for depth in range(len(parts) - 1, 0, -1):

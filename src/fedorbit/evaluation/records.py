@@ -74,7 +74,7 @@ class PredictionRecord(FrozenRecord):
             not math.isfinite(value) or value < 0.0 or value > 1.0 for value in self.probabilities
         ):
             raise ValueError("prediction probabilities must be finite values in [0,1]")
-        if abs(sum(self.probabilities) - 1.0) > 1e-6:
+        if not math.isclose(sum(self.probabilities), 1.0):
             raise ValueError("prediction probabilities must sum to one")
         if not math.isfinite(self.loss) or self.loss < 0.0:
             raise ValueError("prediction loss must be finite and nonnegative")

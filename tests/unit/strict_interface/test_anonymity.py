@@ -1,23 +1,32 @@
 from __future__ import annotations
 
 from fedorbit.domain.enums import ClientRole, CoarseGroup
-from fedorbit.strict_interface.anonymity import anonymous_node_order
+from fedorbit.strict_interface.anonymity import (
+    AnonymityCoordinate,
+    AnonymityCoordinateEntry,
+    anonymous_node_order,
+)
+
+
+def _coordinate(name: str, value: str) -> AnonymityCoordinate:
+    return AnonymityCoordinate((AnonymityCoordinateEntry(name, value),))
 
 
 def test_anonymous_node_order_is_deterministic_bijection() -> None:
+    coordinate = _coordinate("packet", "a")
     first = anonymous_node_order(
         5,
         17,
         ClientRole.SOURCE,
         CoarseGroup.DISRUPTION,
-        {"packet": "a"},
+        coordinate,
     )
     second = anonymous_node_order(
         5,
         17,
         ClientRole.SOURCE,
         CoarseGroup.DISRUPTION,
-        {"packet": "a"},
+        coordinate,
     )
     assert first == second
     assert tuple(sorted(first.permutation)) == tuple(range(5))
@@ -25,19 +34,20 @@ def test_anonymous_node_order_is_deterministic_bijection() -> None:
 
 
 def test_source_and_target_orders_use_independent_streams() -> None:
+    coordinate = _coordinate("cell", "x")
     source = anonymous_node_order(
         12,
         17,
         ClientRole.SOURCE,
         CoarseGroup.EXPLOITATION,
-        {"cell": "x"},
+        coordinate,
     )
     target = anonymous_node_order(
         12,
         17,
         ClientRole.TARGET,
         CoarseGroup.EXPLOITATION,
-        {"cell": "x"},
+        coordinate,
     )
     assert source.permutation != target.permutation
     assert source.display_ids == target.display_ids
@@ -50,7 +60,7 @@ def test_reorder_never_emits_semantic_names_as_ids() -> None:
         7,
         ClientRole.SOURCE,
         CoarseGroup.DISRUPTION,
-        "fixture",
+        _coordinate("fixture", "reorder"),
     )
     reordered = order.reorder(semantic_names)
     assert set(reordered) == set(semantic_names)

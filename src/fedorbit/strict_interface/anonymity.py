@@ -13,6 +13,26 @@ class AnonymityError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class AnonymityCoordinateEntry:
+    name: str
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.name or not self.value:
+            raise AnonymityError("anonymity coordinate entries must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class AnonymityCoordinate:
+    entries: tuple[AnonymityCoordinateEntry, ...]
+
+    def __post_init__(self) -> None:
+        names = tuple(entry.name for entry in self.entries)
+        if not names or len(set(names)) != len(names):
+            raise AnonymityError("anonymity coordinates must have unique non-empty names")
+
+
+@dataclass(frozen=True, slots=True)
 class AnonymousNodeOrder:
     permutation: tuple[int, ...]
     display_ids: tuple[str, ...]
@@ -36,7 +56,7 @@ def anonymous_node_order(
     base_seed: int,
     endpoint: ClientRole,
     coarse_group: CoarseGroup,
-    coordinate: object,
+    coordinate: AnonymityCoordinate,
 ) -> AnonymousNodeOrder:
     if node_count <= 0:
         raise AnonymityError("anonymous node order requires at least one node")

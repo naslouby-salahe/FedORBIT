@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fedorbit.analysis.statistics import PValueSet
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import MultiplicityFamily, TransferMethod
 
@@ -19,11 +20,45 @@ class RegisteredContrast:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisteredFamily:
+    family: MultiplicityFamily
+    contrasts: tuple[RegisteredContrast, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredFamilyInputs:
+    entries: tuple[RegisteredFamily, ...]
+
+    def contrasts_for(self, family: MultiplicityFamily) -> tuple[RegisteredContrast, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.contrasts
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
+
+
+@dataclass(frozen=True, slots=True)
 class FamilyInputState:
     contrast: RegisteredContrast
     available: bool
     unavailable_reason: str | None = None
     raw_p_value: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStateGroup:
+    family: MultiplicityFamily
+    states: tuple[FamilyInputState, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStates:
+    entries: tuple[FamilyStateGroup, ...]
+
+    def states_for(self, family: MultiplicityFamily) -> tuple[FamilyInputState, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.states
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
 
 
 PRIMARY_PAIR_NAMES = ("Edge→Windows", "Windows→Edge", "Edge→Linux", "Linux→Edge")
@@ -43,7 +78,7 @@ def _pair_contrast(
     )
 
 
-def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContrast, ...]]:
+def registered_family_inputs() -> RegisteredFamilyInputs:
     families: dict[MultiplicityFamily, list[RegisteredContrast]] = {
         family: [] for family in MultiplicityFamily
     }
@@ -135,38 +170,42 @@ def registered_family_inputs() -> dict[MultiplicityFamily, tuple[RegisteredContr
                 "seed_level_rate_difference_sign_flip",
             )
         )
-    registry: dict[MultiplicityFamily, tuple[RegisteredContrast, ...]] = {
-        family: tuple(contrasts) for family, contrasts in families.items()
-    }
-    return registry
+    return RegisteredFamilyInputs(
+        tuple(
+            RegisteredFamily(family, tuple(families[family]))
+            for family in MultiplicityFamily
+        )
+    )
 
 
 def build_family_states(
     config: FedorbitConfig,
-    available_p_values: dict[str, float],
-) -> dict[MultiplicityFamily, tuple[FamilyInputState, ...]]:
+    available_p_values: PValueSet,
+) -> FamilyStates:
     del config
-    states: dict[MultiplicityFamily, list[FamilyInputState]] = {}
-    for family, contrasts in registered_family_inputs().items():
-        entries: list[FamilyInputState] = []
-        for contrast in contrasts:
-            if contrast.name in available_p_values:
-                entries.append(
+    groups: list[FamilyStateGroup] = []
+    for family_entry in registered_family_inputs().entries:
+        states: list[FamilyInputState] = []
+        for contrast in family_entry.contrasts:
+            raw_p_value = available_p_values.value_of(contrast.name)
+            if raw_p_value is not None:
+                states.append(
                     FamilyInputState(
                         contrast=contrast,
                         available=True,
-                        raw_p_value=available_p_values[contrast.name],
+                        raw_p_value=raw_p_value,
                     )
                 )
             else:
-                entries.append(
+                states.append(
                     FamilyInputState(
                         contrast=contrast,
                         available=False,
                         unavailable_reason="insufficient valid paired seeds",
                     )
                 )
-        states[family] = tuple(entries)
-    if not any(state.available for entry_states in states.values() for state in entry_states):
+        groups.append(FamilyStateGroup(family_entry.family, tuple(states)))
+    result = FamilyStates(tuple(groups))
+    if not any(state.available for group in result.entries for state in group.states):
         raise ContrastRegistryError("no registered family input has a computable p-value")
-    return states
+    return result

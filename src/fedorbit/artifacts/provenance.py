@@ -167,7 +167,9 @@ def _section_extractors(config: FedorbitConfig) -> dict[str, Callable[[], JsonVa
         "response": lambda: {
             "source_response_pilot": scientific.source_response_pilot.model_dump(mode="json"),
             "source_response_final": scientific.source_response_final.model_dump(mode="json"),
-            "target_response_diagnostic": scientific.target_response_diagnostic.model_dump(mode="json"),
+            "target_response_diagnostic": scientific.target_response_diagnostic.model_dump(
+                mode="json"
+            ),
         },
         "confirmation": lambda: scientific.confirmation.model_dump(mode="json"),
         "evaluation": lambda: {

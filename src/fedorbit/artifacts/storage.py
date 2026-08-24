@@ -52,7 +52,9 @@ class ArtifactStore:
         return self._staging
 
     def write_reusable(self, manifest: ReusableArtifactManifest) -> None:
-        atomic_write_json(self.manifest_path(manifest.artifact_id), manifest.model_dump(mode="json"))
+        atomic_write_json(
+            self.manifest_path(manifest.artifact_id), manifest.model_dump(mode="json")
+        )
 
     def read_reusable(self, artifact_id: str) -> ReusableArtifactManifest:
         path = self.manifest_path(artifact_id)
@@ -71,7 +73,9 @@ class ArtifactStore:
         if not self._manifests.is_dir():
             return None
         for path in sorted(self._manifests.glob("*.json")):
-            manifest = ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
+            manifest = ReusableArtifactManifest.model_validate_json(
+                path.read_text(encoding="utf-8")
+            )
             if manifest.dependency_fingerprint_sha256 != fingerprint_sha256:
                 continue
             try:

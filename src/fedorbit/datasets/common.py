@@ -37,7 +37,15 @@ IDENTITY_MARKERS = (
     "uid",
     "gid",
 )
-PAYLOAD_MARKERS = ("payload", "file_data", "full_uri", "uri.query", "msg", "options", "referer")
+PAYLOAD_MARKERS = (
+    "payload",
+    "file_data",
+    "full_uri",
+    "uri.query",
+    "msg",
+    "options",
+    "referer",
+)
 PROVENANCE_MARKERS = ("source_file", "capture", "acquisition", "provenance", "file_name")
 
 
@@ -102,9 +110,11 @@ def exactly_one_candidate(
 ) -> str:
     observed = tuple(column for column in columns if column in candidates)
     if len(observed) != 1:
-        raise DatasetSchemaError(
-            f"{semantic_role}: expected exactly one observed column among {candidates}, found {observed}"
+        message = (
+            f"{semantic_role}: expected exactly one observed column among {candidates}, "
+            f"found {observed}"
         )
+        raise DatasetSchemaError(message)
     return observed[0]
 
 
@@ -116,9 +126,11 @@ def resolve_timestamp_column(
 ) -> str:
     column = exactly_one_candidate(columns, candidates, "timestamp")
     if parse_success_fraction < minimum_fraction:
-        raise DatasetSchemaError(
-            f"timestamp alias {column!r} parse success {parse_success_fraction} below minimum {minimum_fraction}"
+        message = (
+            f"timestamp alias {column!r} parse success {parse_success_fraction} "
+            f"below minimum {minimum_fraction}"
         )
+        raise DatasetSchemaError(message)
     return column
 
 

@@ -141,7 +141,7 @@ def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:
     finite = numeric[np.isfinite(numeric)]
     if finite.size == 0:
         raise PreprocessingError("numeric TRAIN feature has no finite value")
-    median = float(np.quantile(finite, 0.5, method="linear"))
+    median = float(np.median(finite))
     q1 = float(np.quantile(finite, 0.25, method="linear"))
     q3 = float(np.quantile(finite, 0.75, method="linear"))
     iqr = q3 - q1

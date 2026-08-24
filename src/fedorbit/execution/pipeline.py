@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fedorbit.artifacts.paths import build_layout
@@ -9,6 +10,8 @@ from fedorbit.domain.enums import DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.semantics import ExecutionSemantics
 from fedorbit.experiments.catalogue import ExperimentDefinition
+from fedorbit.response.packet import build_source_packet
+from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
 
 
 def _execution_root() -> Path:
@@ -31,17 +34,31 @@ def preprocess_pipeline(datasets: tuple[DatasetId, ...], overwrite: bool) -> Non
     semantics.validate_existing(decisions)
     for decision in decisions:
         if decision.execute or decision.overwrite:
-            raise NotReadyError("preprocessing compute backend is delivered by the M03 milestone")
+            raise NotReadyError("preprocessing compute backend is not implemented")
 
 
 def smoke_pipeline(overwrite: bool) -> None:
-    store = ArtifactStore(_execution_root())
-    semantics = ExecutionSemantics(store)
-    decisions = semantics.decide((("smoke-nonclaim", "smoke-fixture"),), overwrite)
-    semantics.validate_existing(decisions)
-    for decision in decisions:
-        if decision.execute or decision.overwrite:
-            raise NotReadyError("extended smoke check registry is delivered by the M07 milestone")
+    del overwrite
+    estimate = FinalResponseEstimate(
+        entries=(FinalResponseEntry(0, 0, 1.0, 0.0, 1.0, 1.0, True),),
+        critical_value=1.0,
+        useful_intervention_columns=1,
+        median_band_width_ratio=0.0,
+        stability_rule_passed=True,
+    )
+    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    packet = build_source_packet(
+        estimate,
+        anonymous_fine_node_ids=("node-0001",),
+        exposed_coarse_group_id="smoke",
+        per_node_train_support=(1,),
+        per_node_meta_support=(1,),
+        per_node_effective_replicate_count=(1,),
+        source_checkpoint_sha256="0" * 64,
+        response_configuration_sha256="1" * 64,
+        creation_timestamp=timestamp,
+    )
+    packet.validate()
 
 
 def run_pipeline(
@@ -59,4 +76,4 @@ def run_pipeline(
     semantics.validate_existing(decisions)
     for decision in decisions:
         if decision.execute or decision.overwrite:
-            raise NotReadyError("confirmatory experiment compute backends are delivered by M07-M08")
+            raise NotReadyError("confirmatory experiment compute backend is not implemented")

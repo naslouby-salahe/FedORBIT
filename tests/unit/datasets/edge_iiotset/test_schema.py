@@ -50,7 +50,7 @@ def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:
         "udp.port",
         "mqtt.msg",
     } <= EDGE_EXCLUSIONS
-    assert EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS == frozenset(
+    assert frozenset(
         {
             "http.request.method",
             "http.referer",
@@ -60,7 +60,7 @@ def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:
             "mqtt.protoname",
             "mqtt.topic",
         }
-    )
+    ) == EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS
 
 
 def test_edge_timestamp_parse_failure_is_data_invalid() -> None:
@@ -80,6 +80,7 @@ def test_duplicate_or_missing_semantic_columns_fail_closed() -> None:
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
     )
     with pytest.raises(DatasetSchemaError):
-        adapter.resolve_schema(EDGE_COLUMNS + ("frame.time",), 1.0, threshold)
+        adapter.resolve_schema((*EDGE_COLUMNS, "frame.time"), 1.0, threshold)
+    missing_multiclass = tuple(column for column in EDGE_COLUMNS if column != "Attack_type")
     with pytest.raises(DatasetSchemaError):
-        adapter.resolve_schema(tuple(c for c in EDGE_COLUMNS if c != "Attack_type"), 1.0, threshold)
+        adapter.resolve_schema(missing_multiclass, 1.0, threshold)

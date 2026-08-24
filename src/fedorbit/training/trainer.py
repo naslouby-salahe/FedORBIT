@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import math
 from dataclasses import dataclass
+from typing import Protocol, cast
 
 import torch
 from torch import nn
@@ -16,6 +17,22 @@ from fedorbit.training.losses import ClassWeights, minibatch_objective
 
 class TrainingError(ValueError):
     pass
+
+
+class _BackwardValue(Protocol):
+    def backward(self) -> None: ...
+
+
+class _OptimizerStep(Protocol):
+    def step(self) -> object: ...
+
+
+def backward_value(loss: torch.Tensor) -> None:
+    cast(_BackwardValue, loss).backward()
+
+
+def optimizer_step(optimizer: torch.optim.Optimizer) -> None:
+    cast(_OptimizerStep, optimizer).step()
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,10 +71,14 @@ class OptimizerState:
         return cls(buffer.getvalue())
 
     def load_into(self, optimizer: torch.optim.Optimizer) -> None:
-        state = torch.load(io.BytesIO(self.payload), map_location="cpu", weights_only=True)
-        if not isinstance(state, dict):
+        loaded: object = torch.load(
+            io.BytesIO(self.payload),
+            map_location="cpu",
+            weights_only=True,
+        )
+        if not isinstance(loaded, dict):
             raise TrainingError("optimizer snapshot is not a state dictionary")
-        optimizer.load_state_dict(state)
+        optimizer.load_state_dict(cast(dict[str, object], loaded))
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,8 +152,10 @@ def macro_cross_entropy(
     selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
     losses = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(dtype=torch.float64)
     class_losses: list[torch.Tensor] = []
-    for class_index in torch.unique(targets, sorted=True):
+    for class_index in range(int(logits.shape[1])):
         mask = targets == class_index
+        if not bool(mask.any()):
+            raise TrainingError("VALID split is missing a local class")
         class_losses.append(losses[mask].mean())
     return float(torch.stack(class_losses).mean())
 
@@ -155,6 +178,18 @@ def make_adamw(
         foreach=False,
         fused=False,
     )
+
+
+def _seed_training_rng(epoch_seed: int, device: torch.device) -> None:
+    cpu_state = torch.Generator().manual_seed(epoch_seed).get_state()
+    torch.set_rng_state(cpu_state)
+    if device.type != "cuda":
+        return
+    states = [
+        torch.Generator(device=torch.device("cuda", index)).manual_seed(epoch_seed).get_state()
+        for index in range(torch.cuda.device_count())
+    ]
+    torch.cuda.set_rng_state_all(states)
 
 
 def train_base_model(
@@ -213,16 +248,21 @@ def train_base_model(
             persistent_workers=False,
             drop_last=False,
         )
-        with torch.random.fork_rng(devices=[device] if device.type == "cuda" else []):
-            torch.manual_seed(epoch_seed)
-            if device.type == "cuda":
-                torch.cuda.manual_seed_all(epoch_seed)
+        caller_rng = RngState.capture()
+        try:
+            _seed_training_rng(epoch_seed, device)
             model.train()
             for batch_features, batch_targets in loader:
                 batch_features = batch_features.to(
-                    device=device, dtype=torch.float32, non_blocking=True
+                    device=device,
+                    dtype=torch.float32,
+                    non_blocking=True,
                 )
-                batch_targets = batch_targets.to(device=device, dtype=torch.long, non_blocking=True)
+                batch_targets = batch_targets.to(
+                    device=device,
+                    dtype=torch.long,
+                    non_blocking=True,
+                )
                 optimizer.zero_grad(set_to_none=True)
                 logits = model(batch_features)
                 loss = minibatch_objective(
@@ -233,13 +273,13 @@ def train_base_model(
                 )
                 if not bool(torch.isfinite(loss)):
                     raise TrainingError("non-finite TRAIN loss")
-                loss.backward()
+                backward_value(loss)
                 torch.nn.utils.clip_grad_norm_(
                     model.parameters(),
                     max_norm=training.gradient_clip_global_l2_norm,
                     norm_type=2.0,
                 )
-                optimizer.step()
+                optimizer_step(optimizer)
 
             model.eval()
             with torch.no_grad():
@@ -269,6 +309,8 @@ def train_base_model(
                 epochs_without_improvement += 1
             if epochs_without_improvement >= training.early_stopping.patience_completed_epochs:
                 break
+        finally:
+            caller_rng.restore()
 
     if best is None:
         raise TrainingError("training completed without a finite VALID checkpoint")

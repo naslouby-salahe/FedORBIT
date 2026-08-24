@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fedorbit.artifacts.fingerprints import (
-    FingerprintError,
+from fedorbit.artifacts.provenance import (
+    ProvenanceError,
     implementation_fingerprint,
     runtime_fingerprint,
     stage_dependency_fingerprint,
@@ -14,7 +14,6 @@ from fedorbit.domain.records import DirectedPair, SemanticCell
 from fedorbit.experiments.cells import experiment_relevance
 
 PAIR = DirectedPair(DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK)
-
 PRIMARY_CELL = SemanticCell(
     experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
     directed_pair=PAIR,
@@ -27,8 +26,7 @@ PRIMARY_CELL = SemanticCell(
 def test_semantic_identity_is_stable_and_seed_sensitive() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     first = PRIMARY_CELL.identity_json(relevance)
-    second = PRIMARY_CELL.identity_json(relevance)
-    assert first == second
+    assert PRIMARY_CELL.identity_json(relevance) == first
     changed_seed = SemanticCell(
         experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         directed_pair=PAIR,
@@ -64,20 +62,18 @@ def test_relevance_covers_registered_experiments() -> None:
 
 def test_implementation_fingerprint_is_stage_local() -> None:
     baseline = implementation_fingerprint("fedorbit.artifacts.manifests")
-    again = implementation_fingerprint("fedorbit.artifacts.manifests")
-    assert baseline == again
-    unrelated = implementation_fingerprint("fedorbit.config.loading")
-    assert unrelated != baseline
+    assert implementation_fingerprint("fedorbit.artifacts.manifests") == baseline
+    assert implementation_fingerprint("fedorbit.config.loading") != baseline
 
 
 def test_implementation_fingerprint_follows_transitive_imports() -> None:
     producer = implementation_fingerprint("fedorbit.artifacts.manifests")
-    consumer = implementation_fingerprint("fedorbit.artifacts.reuse")
+    consumer = implementation_fingerprint("fedorbit.execution.reuse")
     assert producer != consumer
 
 
 def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
-    with pytest.raises(FingerprintError):
+    with pytest.raises(ProvenanceError):
         implementation_fingerprint("os.path")
 
 
@@ -92,19 +88,18 @@ def test_runtime_fingerprint_is_stage_local() -> None:
 
 def test_runtime_fingerprint_excludes_plotting_dependencies() -> None:
     for stage in ("evaluation", "reporting", "statistics"):
-        components = runtime_fingerprint(stage).components
-        assert "matplotlib" not in components
+        assert "matplotlib" not in runtime_fingerprint(stage).components
 
 
 def test_runtime_fingerprint_unknown_stage_rejected() -> None:
-    with pytest.raises(FingerprintError):
+    with pytest.raises(ProvenanceError):
         runtime_fingerprint("invented_stage")
 
 
 def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
     config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
-    first = stage_dependency_fingerprint(
+    arguments = (
         "training",
         PRIMARY_CELL,
         relevance,
@@ -113,37 +108,18 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         frozenset({"models", "generators"}),
         "fedorbit.artifacts.manifests",
     )
-    second = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        ("upstream-1",),
-        config,
-        frozenset({"models", "generators"}),
-        "fedorbit.artifacts.manifests",
-    )
-    assert first == second
+    assert stage_dependency_fingerprint(*arguments) == stage_dependency_fingerprint(*arguments)
 
 
 def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
     config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        ("upstream-1",),
-        config,
-        frozenset({"models"}),
+        "training", PRIMARY_CELL, relevance, ("upstream-1",), config, frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        ("upstream-2",),
-        config,
-        frozenset({"models"}),
+        "training", PRIMARY_CELL, relevance, ("upstream-2",), config, frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
     assert changed != base
@@ -153,21 +129,11 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
     config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        (),
-        config,
-        frozenset({"models"}),
+        "training", PRIMARY_CELL, relevance, (), config, frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        (),
-        config,
-        frozenset({"models", "generators"}),
+        "training", PRIMARY_CELL, relevance, (), config, frozenset({"models", "generators"}),
         "fedorbit.artifacts.manifests",
     )
     assert changed != base
@@ -177,21 +143,11 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
     config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        (),
-        config,
-        frozenset({"models"}),
+        "training", PRIMARY_CELL, relevance, (), config, frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
-        PRIMARY_CELL,
-        relevance,
-        (),
-        config,
-        frozenset({"models"}),
-        "fedorbit.artifacts.reuse",
+        "training", PRIMARY_CELL, relevance, (), config, frozenset({"models"}),
+        "fedorbit.execution.reuse",
     )
     assert changed != base

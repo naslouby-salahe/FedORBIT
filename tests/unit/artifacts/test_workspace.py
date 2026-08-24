@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.artifacts.evidence import EvidenceError, VerifiedEvidenceWriter
 from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
 from fedorbit.artifacts.paths import (
     WorkspaceError,
@@ -15,10 +14,10 @@ from fedorbit.artifacts.paths import (
     results_workspace,
 )
 from fedorbit.artifacts.provenance import provenance_record
-from fedorbit.artifacts.reuse import ArtifactStore
-from fedorbit.artifacts.serialization import atomic_write_bytes, atomic_write_json
+from fedorbit.artifacts.storage import ArtifactStore, atomic_write_bytes, atomic_write_json
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import ArtifactState, ExperimentName
+from fedorbit.reporting.export import EvidenceExportError, VerifiedEvidenceWriter
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}
 
@@ -48,9 +47,8 @@ def _manifest(
     )
 
 
-def test_layout_matches_roadmap_roots(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+def test_layout_matches_workspace_roots(tmp_path: Path) -> None:
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     assert layout.execution_root.name == "outputs"
     assert layout.manuscript_root.name == "results"
     assert layout.preprocessing == layout.execution_root / "preprocessing"
@@ -63,8 +61,7 @@ def test_layout_matches_roadmap_roots(tmp_path: Path) -> None:
 
 
 def test_experiment_workspaces(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     workspace = experiment_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     assert workspace == layout.experiments / "primary-strict-cross-telemetry-transfer"
     results = results_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
@@ -72,8 +69,7 @@ def test_experiment_workspaces(tmp_path: Path) -> None:
 
 
 def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     path = leaf_path(
         layout,
         layout.artifacts,
@@ -87,8 +83,7 @@ def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
 
 
 def test_workspace_boundary_rejects_outside_paths(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     with pytest.raises(WorkspaceError):
         enforce_workspace_boundary(layout, tmp_path / "outside.bin")
     with pytest.raises(WorkspaceError):
@@ -99,19 +94,17 @@ def test_workspace_boundary_rejects_outside_paths(tmp_path: Path) -> None:
 def test_atomic_write_is_deterministic_and_complete(tmp_path: Path) -> None:
     target = tmp_path / "nested" / "manifest.json"
     atomic_write_json(target, {"z": 1, "a": [2, 3]})
-    content = target.read_text(encoding="utf-8")
-    assert content == '{"a":[2,3],"z":1}\n'
+    assert target.read_text(encoding="utf-8") == '{"a":[2,3],"z":1}\n'
     assert not list((tmp_path / "nested").glob(".tmp-*"))
     atomic_write_bytes(tmp_path / "payload.bin", b"bytes")
     assert (tmp_path / "payload.bin").read_bytes() == b"bytes"
 
 
-def test_provenance_record_captures_all_components() -> None:
-    config = load_fedorbit_config()
-    payload = Path("/tmp/probe-payload.bin")
+def test_provenance_record_captures_all_components(tmp_path: Path) -> None:
+    payload = tmp_path / "probe-payload.bin"
     payload.write_bytes(b"x")
     manifest = _manifest(payload, "fp-probe")
-    record = provenance_record(config, manifest)
+    record = provenance_record(load_fedorbit_config(), manifest)
     assert record.artifact_id == manifest.artifact_id
     assert len(record.created_git_commit) == 40
     assert record.operating_system
@@ -121,16 +114,13 @@ def test_provenance_record_captures_all_components() -> None:
 
 
 def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "packet.pt"
     payload.write_bytes(b"payload")
     manifest = _manifest(payload, "fp-evidence")
     store.write_reusable(manifest)
-    writer = VerifiedEvidenceWriter(store, layout)
-
-    destination = writer.write(
+    destination = VerifiedEvidenceWriter(store, layout).write(
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         manifest.artifact_id,
         {"evidence": 1},
@@ -140,16 +130,14 @@ def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) ->
 
 
 def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "packet.pt"
     payload.write_bytes(b"payload")
     manifest = _manifest(payload, "fp-bad", state=ArtifactState.FAILED)
     store.write_reusable(manifest)
-    writer = VerifiedEvidenceWriter(store, layout)
-    with pytest.raises(EvidenceError):
-        writer.write(
+    with pytest.raises(EvidenceExportError):
+        VerifiedEvidenceWriter(store, layout).write(
             ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
             manifest.artifact_id,
             {"evidence": 1},
@@ -157,17 +145,15 @@ def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
 
 
 def test_evidence_writer_rejects_missing_payload(tmp_path: Path) -> None:
-    config = load_fedorbit_config()
-    layout = build_layout(config, root=tmp_path)
+    layout = build_layout(load_fedorbit_config(), root=tmp_path)
     store = ArtifactStore(tmp_path)
     missing = tmp_path / "missing.pt"
     missing.write_bytes(b"payload")
     manifest = _manifest(missing, "fp-missing")
     missing.unlink()
     store.write_reusable(manifest)
-    writer = VerifiedEvidenceWriter(store, layout)
-    with pytest.raises(EvidenceError):
-        writer.write(
+    with pytest.raises(EvidenceExportError):
+        VerifiedEvidenceWriter(store, layout).write(
             ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
             manifest.artifact_id,
             {"evidence": 1},

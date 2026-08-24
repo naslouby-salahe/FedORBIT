@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig, TrainingConfig
+from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
-from fedorbit.models.training import ModelParameterState, OptimizerState
 from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.training.losses import ClassWeights, minibatch_objective
+from fedorbit.training.trainer import (
+    ModelParameterState,
+    OptimizerState,
+    RngState,
+    SelectedHyperparameters,
+    backward_value,
+    make_adamw,
+    optimizer_step,
+)
 from fedorbit.transfer.confirmation import (
     ConfirmReplicateOutcomes,
     hierarchical_bootstrap_lower_bound,
@@ -45,19 +54,8 @@ class AssimilationCoordinates:
     action_artifact_sha256: str
 
     def __post_init__(self) -> None:
-        values = {
-            "target_client": self.target_client,
-            "directed_pair": self.directed_pair,
-            "condition": self.condition,
-            "seed": self.seed,
-            "clean_pretransfer_checkpoint_artifact_id": (
-                self.clean_pretransfer_checkpoint_artifact_id
-            ),
-            "source_packet_artifact_id": self.source_packet_artifact_id,
-            "action_artifact_sha256": self.action_artifact_sha256,
-        }
-        for name, value in values.items():
-            if not value:
+        for name in ASSIMILATION_COORDINATE_KEYS:
+            if not getattr(self, name):
                 raise AssimilationError(
                     f"assimilation coordinate {name} must be a non-empty string"
                 )
@@ -73,31 +71,38 @@ class ShadowBatch:
 class PreConfirmTargetState:
     model_state: ModelParameterState
     optimizer_state: OptimizerState
-    rng_state: torch.Tensor
+    rng_state: RngState
 
     @classmethod
-    def capture(cls, model: torch.nn.Module, optimizer: torch.optim.AdamW) -> PreConfirmTargetState:
+    def capture(
+        cls,
+        model: torch.nn.Module,
+        optimizer: torch.optim.AdamW,
+    ) -> PreConfirmTargetState:
         return cls(
-            model_state=ModelParameterState(
-                {key: value.detach().clone() for key, value in model.state_dict().items()}
-            ),
-            optimizer_state=optimizer.state_dict(),
-            rng_state=torch.get_rng_state(),
+            model_state=ModelParameterState.capture(model),
+            optimizer_state=OptimizerState.capture(optimizer),
+            rng_state=RngState.capture(),
         )
 
-    def restore_into(self, model: torch.nn.Module, optimizer: torch.optim.AdamW) -> None:
+    def restore_into(
+        self,
+        model: torch.nn.Module,
+        optimizer: torch.optim.AdamW,
+    ) -> None:
         self.model_state.load_into(model)
-        optimizer.load_state_dict(self.optimizer_state)
-        torch.set_rng_state(self.rng_state)
+        self.optimizer_state.load_into(optimizer)
+        self.rng_state.restore()
 
 
 def capture_pre_confirm_pair(
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
 ) -> tuple[PreConfirmTargetState, PreConfirmTargetState]:
-    baseline = PreConfirmTargetState.capture(model, optimizer)
-    curriculum = PreConfirmTargetState.capture(model, optimizer)
-    return baseline, curriculum
+    return (
+        PreConfirmTargetState.capture(model, optimizer),
+        PreConfirmTargetState.capture(model, optimizer),
+    )
 
 
 def _confirmation_batches_for_replicate(
@@ -108,7 +113,7 @@ def _confirmation_batches_for_replicate(
     contrast_coordinates: str,
     replicate_index: int,
     horizon: int,
-) -> list[ShadowBatch]:
+) -> tuple[ShadowBatch, ...]:
     rng_seed = derive_seed32(
         seed,
         RngNamespace.CONFIRMATION_SCHEDULE,
@@ -116,6 +121,8 @@ def _confirmation_batches_for_replicate(
     )
     generator = torch.Generator().manual_seed(rng_seed)
     train_size = int(features.shape[0])
+    if train_size <= 0:
+        raise AssimilationError("confirmation TRAIN split is empty")
     batches: list[ShadowBatch] = []
     permutation = torch.randperm(train_size, generator=generator)
     position = 0
@@ -124,35 +131,43 @@ def _confirmation_batches_for_replicate(
             permutation = torch.randperm(train_size, generator=generator)
             position = 0
         indices = permutation[position : position + batch_size]
-        batches.append(ShadowBatch(features=features[indices], targets=targets[indices]))
+        batches.append(ShadowBatch(features[indices], targets[indices]))
         position += int(indices.shape[0])
-    return batches
+    return tuple(batches)
 
 
 def _step_shadow(
+    config: FedorbitConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
     state: PreConfirmTargetState,
-    batches: list[ShadowBatch],
-    class_weight_vector: torch.Tensor,
-    training_settings: TrainingConfig,
+    batches: tuple[ShadowBatch, ...],
+    class_weights: ClassWeights,
+    multipliers: torch.Tensor,
 ) -> None:
     state.restore_into(model, optimizer)
-    criterion = torch.nn.CrossEntropyLoss(
-        reduction="none", label_smoothing=training_settings.label_smoothing
-    )
     model.train()
+    device = next(model.parameters()).device
     for batch in batches:
-        model.zero_grad()
-        logits = model(batch.features.float())
-        loss_per_example = criterion(logits, batch.targets)
-        weights = class_weight_vector[batch.targets]
-        loss = (loss_per_example * weights).mean()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(), training_settings.gradient_clip_global_l2_norm
+        targets = batch.targets.to(device=device, dtype=torch.long)
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(batch.features.to(device=device, dtype=torch.float32))
+        loss = minibatch_objective(
+            logits,
+            targets,
+            class_weights,
+            config.scientific.metrics.probability_log_floor,
+            multipliers,
         )
-        optimizer.step()
+        if not bool(torch.isfinite(loss)):
+            raise AssimilationError("non-finite confirmation shadow loss")
+        backward_value(loss)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            config.scientific.training.gradient_clip_global_l2_norm,
+            norm_type=2.0,
+        )
+        optimizer_step(optimizer)
 
 
 def _confirm_class_losses(
@@ -162,20 +177,21 @@ def _confirm_class_losses(
     class_count: int,
     log_floor: float,
 ) -> tuple[torch.Tensor, ...]:
+    device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
-        logits = model(confirm_features.float())
-        probabilities = torch.softmax(logits, dim=1)
-        picked = probabilities.gather(1, confirm_targets.unsqueeze(1)).squeeze(1)
-        losses = -torch.log(torch.clamp(picked, min=log_floor))
-    classes: list[list[float]] = [[] for _ in range(class_count)]
-    for index in range(int(confirm_targets.shape[0])):
-        classes[int(confirm_targets[index])].append(float(losses[index]))
+        logits = model(confirm_features.to(device=device, dtype=torch.float32))
+        probabilities = torch.softmax(logits, dim=1).to(dtype=torch.float64)
+        targets = confirm_targets.to(device=device, dtype=torch.long)
+        picked = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
+        losses = -torch.log(torch.clamp(picked, min=log_floor)).cpu()
+    target_values = confirm_targets.to(dtype=torch.long).cpu()
     tensors: list[torch.Tensor] = []
-    for examples in classes:
-        if not examples:
+    for class_index in range(class_count):
+        class_losses = losses[target_values == class_index]
+        if class_losses.numel() == 0:
             raise AssimilationError("CONFIRM evaluation class has zero examples")
-        tensors.append(torch.tensor(examples, dtype=torch.float64))
+        tensors.append(class_losses.to(dtype=torch.float64))
     return tuple(tensors)
 
 
@@ -189,17 +205,15 @@ class ConfirmationVerdict:
 @dataclass(frozen=True, slots=True)
 class ConfirmationRequest:
     model: torch.nn.Module
-    optimizer_factory: Callable[[object], torch.optim.AdamW]
     pre_confirm_baseline: PreConfirmTargetState
     pre_confirm_curriculum: PreConfirmTargetState
     train_features: torch.Tensor
     train_targets: torch.Tensor
     confirm_features: torch.Tensor
     confirm_targets: torch.Tensor
-    base_class_weights: torch.Tensor
+    base_class_weights: ClassWeights
     curriculum_multipliers: torch.Tensor
-    learning_rate: float
-    weight_decay: float
+    selected_hyperparameters: SelectedHyperparameters
     seed: int
     contrast_coordinates: str
 
@@ -210,20 +224,14 @@ def run_proposal_confirmation(
     batch_size: int | None = None,
 ) -> ConfirmationVerdict:
     confirmation = config.scientific.confirmation
-    training = config.scientific.training
-    effective_batch = batch_size if batch_size is not None else training.batch_size
+    effective_batch = batch_size or config.scientific.training.batch_size
     if effective_batch <= 0:
         raise AssimilationError("confirmation batch size must be positive")
-    model = request.model
     if request.confirm_features.shape[0] == 0 or request.confirm_targets.shape[0] == 0:
         raise AssimilationError("CONFIRM split is empty")
-
-    def make_optimizer() -> torch.optim.AdamW:
-        return request.optimizer_factory(model.parameters())
-
-    curriculum_weight_vector = request.base_class_weights * request.curriculum_multipliers
-    log_floor = config.scientific.metrics.probability_log_floor
-    class_count = int(request.base_class_weights.shape[0])
+    model = request.model
+    class_count = int(request.base_class_weights.values.shape[0])
+    neutral = torch.ones_like(request.base_class_weights.values)
     replicated: list[ConfirmReplicateOutcomes] = []
     for replicate_index in range(confirmation.paired_replicates):
         batches = _confirmation_batches_for_replicate(
@@ -235,48 +243,59 @@ def run_proposal_confirmation(
             replicate_index,
             confirmation.optimizer_steps_per_shadow,
         )
-        baseline_optimizer = make_optimizer()
+        baseline_optimizer = make_adamw(
+            config,
+            model,
+            request.selected_hyperparameters.learning_rate,
+            request.selected_hyperparameters.weight_decay,
+        )
         _step_shadow(
+            config,
             model,
             baseline_optimizer,
             request.pre_confirm_baseline,
             batches,
             request.base_class_weights,
-            training,
+            neutral,
         )
         baseline_losses = _confirm_class_losses(
             model,
             request.confirm_features,
             request.confirm_targets,
             class_count,
-            log_floor,
+            config.scientific.metrics.probability_log_floor,
         )
-        curriculum_optimizer = make_optimizer()
+        curriculum_optimizer = make_adamw(
+            config,
+            model,
+            request.selected_hyperparameters.learning_rate,
+            request.selected_hyperparameters.weight_decay,
+        )
         _step_shadow(
+            config,
             model,
             curriculum_optimizer,
             request.pre_confirm_curriculum,
             batches,
-            curriculum_weight_vector,
-            training,
+            request.base_class_weights,
+            request.curriculum_multipliers,
         )
         curriculum_losses = _confirm_class_losses(
             model,
             request.confirm_features,
             request.confirm_targets,
             class_count,
-            log_floor,
+            config.scientific.metrics.probability_log_floor,
         )
         replicated.append(ConfirmReplicateOutcomes(baseline_losses, curriculum_losses))
     lower_bound = hierarchical_bootstrap_lower_bound(
-        config, tuple(replicated), request.seed, request.contrast_coordinates
+        config,
+        tuple(replicated),
+        request.seed,
+        request.contrast_coordinates,
     )
     threshold = confirmation.lower_bound_acceptance_threshold_relative_macro_ce
-    return ConfirmationVerdict(
-        accepted=lower_bound >= threshold,
-        lower_bound=lower_bound,
-        acceptance_threshold=threshold,
-    )
+    return ConfirmationVerdict(lower_bound >= threshold, lower_bound, threshold)
 
 
 def settle_rejected_proposal(
@@ -295,6 +314,8 @@ def _assimilation_batches(
     total_steps: int,
 ) -> Iterator[ShadowBatch]:
     train_size = int(features.shape[0])
+    if train_size <= 0:
+        raise AssimilationError("assimilation TRAIN split is empty")
     produced = 0
     permutation = torch.randperm(train_size, generator=generator)
     position = 0
@@ -303,7 +324,7 @@ def _assimilation_batches(
             permutation = torch.randperm(train_size, generator=generator)
             position = 0
         indices = permutation[position : position + batch_size]
-        yield ShadowBatch(features=features[indices], targets=targets[indices])
+        yield ShadowBatch(features[indices], targets[indices])
         position += int(indices.shape[0])
         produced += 1
 
@@ -315,41 +336,55 @@ def apply_accepted_assimilation(
     pre_confirm: PreConfirmTargetState,
     train_features: torch.Tensor,
     train_targets: torch.Tensor,
-    base_class_weights: torch.Tensor,
+    base_class_weights: ClassWeights,
     curriculum_multipliers: torch.Tensor,
     seed: int,
     assimilation_coordinates: AssimilationCoordinates,
     batch_size: int | None = None,
 ) -> int:
-    training = config.scientific.training
-    confirmation = config.scientific.confirmation
-    effective_batch = batch_size if batch_size is not None else training.batch_size
+    effective_batch = batch_size or config.scientific.training.batch_size
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")
-    total_steps = confirmation.accepted_live_assimilation_steps
+    total_steps = config.scientific.confirmation.accepted_live_assimilation_steps
     coordinates_payload = {
         name: getattr(assimilation_coordinates, name) for name in ASSIMILATION_COORDINATE_KEYS
     }
-    rng_seed = derive_seed32(seed, RngNamespace.ASSIMILATION_SCHEDULE, coordinates_payload)
+    rng_seed = derive_seed32(
+        seed,
+        RngNamespace.ASSIMILATION_SCHEDULE,
+        coordinates_payload,
+    )
     generator = torch.Generator().manual_seed(rng_seed)
     pre_confirm.restore_into(model, optimizer)
-    curriculum_weight_vector = base_class_weights * curriculum_multipliers
-    criterion = torch.nn.CrossEntropyLoss(
-        reduction="none", label_smoothing=training.label_smoothing
-    )
     model.train()
+    device = next(model.parameters()).device
     steps_executed = 0
     for batch in _assimilation_batches(
-        train_features, train_targets, effective_batch, generator, total_steps
+        train_features,
+        train_targets,
+        effective_batch,
+        generator,
+        total_steps,
     ):
-        model.zero_grad()
-        logits = model(batch.features.float())
-        loss_per_example = criterion(logits, batch.targets)
-        weights = curriculum_weight_vector[batch.targets]
-        loss = (loss_per_example * weights).mean()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), training.gradient_clip_global_l2_norm)
-        optimizer.step()
+        targets = batch.targets.to(device=device, dtype=torch.long)
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(batch.features.to(device=device, dtype=torch.float32))
+        loss = minibatch_objective(
+            logits,
+            targets,
+            base_class_weights,
+            config.scientific.metrics.probability_log_floor,
+            curriculum_multipliers,
+        )
+        if not bool(torch.isfinite(loss)):
+            raise AssimilationError("non-finite live assimilation loss")
+        backward_value(loss)
+        torch.nn.utils.clip_grad_norm_(
+            model.parameters(),
+            config.scientific.training.gradient_clip_global_l2_norm,
+            norm_type=2.0,
+        )
+        optimizer_step(optimizer)
         steps_executed += 1
     if steps_executed != total_steps:
         raise AssimilationError(
@@ -401,7 +436,7 @@ class PreTestLifecycle:
         if missing:
             raise TestOpeningRuleError(f"TEST opened early; missing phases: {missing}")
         self._opened = True
-        return TestAccessGrant(completed_phases=tuple(_PRE_TEST_PHASES))
+        return TestAccessGrant(tuple(_PRE_TEST_PHASES))
 
     def assert_opened(self) -> None:
         if not self._opened:

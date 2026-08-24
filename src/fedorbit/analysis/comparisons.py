@@ -1,8 +1,129 @@
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.domain.enums import MultiplicityFamily, Split, TransferMethod
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+class ContrastRegistryError(ValueError):
+    pass
+
+
+class PairingError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PairingLineage:
+    raw_dataset_lineage_sha256: str
+    directed_pair: str
+    seed: int
+    split: Split
+    target_pre_transfer_checkpoint_artifact_id: str
+    target_importance_artifact_id: str
+    source_packet_artifact_id: str | None
+    action_budget: float
+    support_budget: int
+    confirmation_budget: int
+    environment_lineage_sha256: str
+
+    def __post_init__(self) -> None:
+        if _SHA256.fullmatch(self.raw_dataset_lineage_sha256) is None:
+            raise PairingError("raw dataset lineage must be lowercase SHA-256 hex")
+        if _SHA256.fullmatch(self.environment_lineage_sha256) is None:
+            raise PairingError("environment lineage must be lowercase SHA-256 hex")
+        if not self.directed_pair:
+            raise PairingError("directed pair must be non-empty")
+        if not self.target_pre_transfer_checkpoint_artifact_id:
+            raise PairingError("target checkpoint identity must be non-empty")
+        if not self.target_importance_artifact_id:
+            raise PairingError("target importance identity must be non-empty")
+        if not math.isfinite(self.action_budget) or self.action_budget < 0.0:
+            raise PairingError("action budget must be finite and nonnegative")
+        if self.support_budget < 0 or self.confirmation_budget < 0:
+            raise PairingError("support and confirmation budgets must be nonnegative")
+
+
+@dataclass(frozen=True, slots=True)
+class PairedObservation:
+    method: TransferMethod
+    value: float
+    lineage: PairingLineage
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.value):
+            raise PairingError("paired observation value must be finite")
+
+
+@dataclass(frozen=True, slots=True)
+class PairedValues:
+    directed_pair: str
+    seeds: tuple[int, ...]
+    method_values: tuple[float, ...]
+    reference_values: tuple[float, ...]
+
+
+def validate_paired_observations(
+    method_observations: tuple[PairedObservation, ...],
+    reference_observations: tuple[PairedObservation, ...],
+) -> PairedValues:
+    if not method_observations or not reference_observations:
+        raise PairingError("paired comparison requires observations from both methods")
+    if len(method_observations) != len(reference_observations):
+        raise PairingError("paired comparison sample counts differ")
+    method_index = _index_observations(method_observations)
+    reference_index = _index_observations(reference_observations)
+    if tuple(key for key, _ in method_index) != tuple(key for key, _ in reference_index):
+        raise PairingError("paired comparison pair/seed identities differ")
+    method_values: list[float] = []
+    reference_values: list[float] = []
+    seeds: list[int] = []
+    directed_pair: str | None = None
+    for (method_key, method_observation), (reference_key, reference_observation) in zip(
+        method_index, reference_index, strict=True
+    ):
+        if method_key != reference_key:
+            raise PairingError("paired comparison pair/seed identities differ")
+        if method_observation.lineage != reference_observation.lineage:
+            raise PairingError("paired comparison lineage mismatch")
+        if directed_pair is None:
+            directed_pair = method_observation.lineage.directed_pair
+        elif directed_pair != method_observation.lineage.directed_pair:
+            raise PairingError("one contrast cannot pool directed pairs")
+        seeds.append(method_observation.lineage.seed)
+        method_values.append(method_observation.value)
+        reference_values.append(reference_observation.value)
+    if directed_pair is None:
+        raise PairingError("paired comparison has no directed pair")
+    return PairedValues(
+        directed_pair,
+        tuple(seeds),
+        tuple(method_values),
+        tuple(reference_values),
+    )
+
+
+def _index_observations(
+    observations: tuple[PairedObservation, ...],
+) -> tuple[tuple[tuple[str, int], PairedObservation], ...]:
+    indexed = tuple(
+        sorted(
+            (
+                ((observation.lineage.directed_pair, observation.lineage.seed), observation)
+                for observation in observations
+            ),
+            key=lambda item: item[0],
+        )
+    )
+    keys = tuple(key for key, _ in indexed)
+    if len(set(keys)) != len(keys):
+        raise PairingError("paired comparison contains duplicate pair/seed cells")
+    return indexed
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,177 +137,296 @@ class PairContrastEvidence:
 
 
 @dataclass(frozen=True, slots=True)
-class TransferCriteriaDecision:
-    supported: bool
-    conditional: bool
-    partially_supported: bool
-    null_result: bool
-    not_supported: bool
-    successful_pairs: tuple[str, ...]
-    harmful_pairs: tuple[str, ...]
-    equal_pair_mean_gain: float | None
-    reasons: tuple[str, ...]
+class PairContrastEvidenceSet:
+    entries: tuple[PairContrastEvidence, ...]
+
+    def __post_init__(self) -> None:
+        names = tuple(entry.directed_pair for entry in self.entries)
+        if len(set(names)) != len(names):
+            raise ValueError("pair-contrast evidence contains duplicate directed pairs")
 
 
-def _successful_pair(
-    config: FedorbitConfig,
-    evidence: PairContrastEvidence,
-) -> bool:
-    criteria = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    materiality = config.scientific.materiality.realized_relative_macro_ce
-    if evidence.mean_gain is None or evidence.holm_p is None or evidence.bca_lower is None:
-        return False
-    assert evidence.mean_gain is not None
-    return (
-        evidence.mean_gain >= materiality
-        and evidence.holm_p < criteria.holm_adjusted_p_maximum
-        and evidence.bca_lower > criteria.bca_lower_bound_strictly_greater_than
-        and evidence.strict_resource_valid
-    )
+@dataclass(frozen=True, slots=True)
+class RegisteredContrast:
+    family: MultiplicityFamily
+    name: str
+    directed_pair: str
+    statistic: str
+
+    @property
+    def key(self) -> tuple[MultiplicityFamily, str, str]:
+        return self.family, self.name, self.directed_pair
 
 
-def evaluate_transfer_style_criteria(
-    config: FedorbitConfig,
-    evidence_by_pair: dict[str, PairContrastEvidence],
-    removed_before_outcome_inspection: bool,
-) -> TransferCriteriaDecision:
-    claim = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    materiality = config.scientific.materiality.realized_relative_macro_ce
-    harm_threshold = config.scientific.materiality.harmful_transfer_relative_macro_ce_gain
-    required = claim.successful_primary_pairs_required
+@dataclass(frozen=True, slots=True)
+class RegisteredFamily:
+    family: MultiplicityFamily
+    contrasts: tuple[RegisteredContrast, ...]
 
-    all_pairs = sorted(evidence_by_pair)
-    analyzable = {
-        pair: evidence
-        for pair, evidence in evidence_by_pair.items()
-        if evidence.valid_seed_count > 0
+
+@dataclass(frozen=True, slots=True)
+class RegisteredFamilyInputs:
+    entries: tuple[RegisteredFamily, ...]
+
+    def contrasts_for(self, family: MultiplicityFamily) -> tuple[RegisteredContrast, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.contrasts
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
+
+    def registered_keys(self) -> frozenset[tuple[MultiplicityFamily, str, str]]:
+        return frozenset(contrast.key for entry in self.entries for contrast in entry.contrasts)
+
+
+@dataclass(frozen=True, slots=True)
+class ContrastPValue:
+    family: MultiplicityFamily
+    contrast_name: str
+    directed_pair: str
+    raw_p_value: float
+    valid_seed_count: int
+
+    def __post_init__(self) -> None:
+        if not self.contrast_name or not self.directed_pair:
+            raise ContrastRegistryError("contrast p-value identity must be non-empty")
+        if not math.isfinite(self.raw_p_value) or not 0.0 <= self.raw_p_value <= 1.0:
+            raise ContrastRegistryError("raw p-value must be finite and lie in [0,1]")
+        if self.valid_seed_count < 0:
+            raise ContrastRegistryError("valid seed count must be nonnegative")
+
+    @property
+    def key(self) -> tuple[MultiplicityFamily, str, str]:
+        return self.family, self.contrast_name, self.directed_pair
+
+
+@dataclass(frozen=True, slots=True)
+class ContrastPValueSet:
+    entries: tuple[ContrastPValue, ...]
+
+    def __post_init__(self) -> None:
+        keys = tuple(entry.key for entry in self.entries)
+        if len(set(keys)) != len(keys):
+            raise ContrastRegistryError("duplicate pair-specific multiplicity input")
+
+    def value_for(self, contrast: RegisteredContrast) -> ContrastPValue | None:
+        for entry in self.entries:
+            if entry.key == contrast.key:
+                return entry
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyInputState:
+    contrast: RegisteredContrast
+    available: bool
+    unavailable_reason: str | None = None
+    raw_p_value: float | None = None
+    holm_p_value: float | None = None
+    holm_rank: int | None = None
+    family_size: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStateGroup:
+    family: MultiplicityFamily
+    states: tuple[FamilyInputState, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStates:
+    entries: tuple[FamilyStateGroup, ...]
+
+    def states_for(self, family: MultiplicityFamily) -> tuple[FamilyInputState, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.states
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
+
+
+PRIMARY_PAIR_NAMES = ("Edge→Windows", "Windows→Edge", "Edge→Linux", "Linux→Edge")
+
+
+def _pair_contrast(
+    family: MultiplicityFamily,
+    name: str,
+    pair: str,
+    statistic: str,
+) -> RegisteredContrast:
+    return RegisteredContrast(family, name, pair, statistic)
+
+
+def registered_family_inputs() -> RegisteredFamilyInputs:
+    families: dict[MultiplicityFamily, list[RegisteredContrast]] = {
+        family: [] for family in MultiplicityFamily
     }
-    reasons: list[str] = []
-
-    successful = tuple(pair for pair in analyzable if _successful_pair(config, analyzable[pair]))
-    harmful = tuple(
-        pair
-        for pair in analyzable
-        if analyzable[pair].mean_gain is not None and analyzable[pair].mean_gain <= harm_threshold
-    )
-
-    scope_removed = len(all_pairs) - len(analyzable)
-    if scope_removed > 1:
-        reasons.append("more than one pair removed from claim scope")
-        return TransferCriteriaDecision(
-            False, False, False, False, True, (), (), None, tuple(reasons)
-        )
-
-    reduced_scope = removed_before_outcome_inspection and len(analyzable) == 3
-    full_scope = not removed_before_outcome_inspection and len(analyzable) == 4
-
-    equal_pair_values = tuple(analyzable[pair].mean_gain for pair in sorted(analyzable))
-    all_present = all(value is not None for value in equal_pair_values)
-    if all_present:
-        numeric_values = [value for value in equal_pair_values if value is not None]
-        equal_pair_mean_value: float | None = sum(numeric_values) / len(numeric_values)
-    else:
-        equal_pair_mean_value = None
-
-    if any(not e.strict_resource_valid for e in evidence_by_pair.values()):
-        reasons.append("strict-resource validation failed for a contributing run")
-        return TransferCriteriaDecision(
-            False, False, False, False, True, (), (), None, tuple(reasons)
-        )
-
-    if full_scope and len(successful) >= required and not harmful:
-        if equal_pair_mean_value is not None and equal_pair_mean_value >= materiality:
-            return TransferCriteriaDecision(
-                True,
-                False,
-                False,
-                False,
-                False,
-                successful,
-                harmful,
-                equal_pair_mean_value,
-                tuple(reasons),
+    solver = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value
+    for pair in PRIMARY_PAIR_NAMES:
+        families[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY].append(
+            _pair_contrast(
+                MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+                f"{solver} vs Local-Only — TEST relative macro-CE gain",
+                pair,
+                "sign_flip_superiority",
             )
-        reasons.append("equal-pair mean below materiality")
-    elif reduced_scope and len(successful) == 3 and not harmful:
-        if equal_pair_mean_value is not None and equal_pair_mean_value >= materiality:
-            return TransferCriteriaDecision(
-                False,
-                True,
-                False,
-                False,
-                False,
-                successful,
-                harmful,
-                equal_pair_mean_value,
-                tuple(reasons),
+        )
+        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
+            _pair_contrast(
+                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+                f"{solver} vs Local-SIR — TEST relative macro-CE gain superiority",
+                pair,
+                "sign_flip_superiority",
             )
-        reasons.append("reduced-scope equal-pair mean below materiality")
-
-    positive_pairs = [
-        pair
-        for pair in analyzable
-        if analyzable[pair].mean_gain is not None
-        and analyzable[pair].mean_gain >= materiality
-        and _holm_and_bca_pass(config, analyzable[pair])
-        and analyzable[pair].strict_resource_valid
-    ]
-    no_material_benefit = not positive_pairs
-    if harmful:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            False,
-            False,
-            True,
-            tuple(positive_pairs),
-            harmful,
-            equal_pair_mean_value,
-            tuple(reasons),
         )
-    if 0 < len(positive_pairs) <= 2:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            True,
-            False,
-            False,
-            tuple(positive_pairs),
-            harmful,
-            equal_pair_mean_value,
-            tuple(reasons),
+        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
+            _pair_contrast(
+                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+                f"{solver} vs Local-SIR — TEST relative macro-CE gain TOST equivalence",
+                pair,
+                "tost_equivalence",
+            )
         )
-    if no_material_benefit and not harmful:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            False,
-            True,
-            False,
-            (),
-            harmful,
-            equal_pair_mean_value,
-            (*tuple(reasons), "no materially beneficial pair"),
+        families[MultiplicityFamily.COUPLING_MECHANISM].append(
+            _pair_contrast(
+                MultiplicityFamily.COUPLING_MECHANISM,
+                (
+                    "Exact correspondence orbit vs Matched-Resource Rectangular — "
+                    "robust coupling value gap"
+                ),
+                pair,
+                "sign_flip_against_zero",
+            )
         )
-    reasons.append("criteria not met")
-    return TransferCriteriaDecision(
-        False,
-        False,
-        False,
-        False,
-        False,
-        tuple(positive_pairs),
-        harmful,
-        equal_pair_mean_value,
-        tuple(reasons),
+        for suffix in ("difference", "TOST equivalence"):
+            statistic = (
+                "tost_equivalence" if suffix == "TOST equivalence" else "sign_flip_superiority"
+            )
+            families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
+                _pair_contrast(
+                    MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
+                    (
+                        f"{solver} vs Point-Correspondence Commitment — "
+                        f"TEST relative macro-CE {suffix}"
+                    ),
+                    pair,
+                    statistic,
+                )
+            )
+            families[MultiplicityFamily.MECHANISM_ABLATIONS].append(
+                _pair_contrast(
+                    MultiplicityFamily.MECHANISM_ABLATIONS,
+                    f"{solver} vs Coupling-Destroyed FedORBIT — TEST relative macro-CE {suffix}",
+                    pair,
+                    statistic,
+                )
+            )
+        for sparsity_name in (
+            "exact sparse s=1 vs exact sparse s=2",
+            "exact sparse s=3 vs exact sparse s=2",
+            "dense CCP vs exact sparse s=2",
+        ):
+            families[MultiplicityFamily.SPARSITY_SENSITIVITY].append(
+                _pair_contrast(
+                    MultiplicityFamily.SPARSITY_SENSITIVITY,
+                    sparsity_name,
+                    pair,
+                    "sign_flip_difference_common_reference",
+                )
+            )
+        families[MultiplicityFamily.CONFIRMATION_SAFETY].append(
+            _pair_contrast(
+                MultiplicityFamily.CONFIRMATION_SAFETY,
+                (
+                    "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with "
+                    "confirmation — harmful-transfer rate difference"
+                ),
+                pair,
+                "seed_level_rate_difference_sign_flip",
+            )
+        )
+    return RegisteredFamilyInputs(
+        tuple(RegisteredFamily(family, tuple(families[family])) for family in MultiplicityFamily)
     )
 
 
-def _holm_and_bca_pass(config: FedorbitConfig, evidence: PairContrastEvidence) -> bool:
-    claim = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    if evidence.holm_p is None or evidence.bca_lower is None:
-        return False
-    return (
-        evidence.holm_p < claim.holm_adjusted_p_maximum
-        and evidence.bca_lower > claim.bca_lower_bound_strictly_greater_than
+def build_family_states(
+    config: FedorbitConfig,
+    available_p_values: ContrastPValueSet,
+) -> FamilyStates:
+    registry = registered_family_inputs()
+    registered_keys = registry.registered_keys()
+    unknown = tuple(
+        entry.key for entry in available_p_values.entries if entry.key not in registered_keys
     )
+    if unknown:
+        raise ContrastRegistryError("unregistered confirmatory multiplicity input")
+    groups = tuple(
+        FamilyStateGroup(
+            family_entry.family,
+            _family_states(config, family_entry, available_p_values),
+        )
+        for family_entry in registry.entries
+    )
+    if not any(state.available for group in groups for state in group.states):
+        raise ContrastRegistryError("no registered family input has enough valid paired seeds")
+    return FamilyStates(groups)
+
+
+def _family_states(
+    config: FedorbitConfig,
+    family_entry: RegisteredFamily,
+    available_p_values: ContrastPValueSet,
+) -> tuple[FamilyInputState, ...]:
+    minimum = config.scientific.statistics.minimum_valid_paired_seeds
+    present = tuple(
+        entry
+        for contrast in family_entry.contrasts
+        if (entry := available_p_values.value_for(contrast)) is not None
+        and entry.valid_seed_count >= minimum
+    )
+    ordered = sorted(
+        present,
+        key=lambda entry: (entry.raw_p_value, entry.contrast_name, entry.directed_pair),
+    )
+    family_size = len(ordered)
+    adjusted_by_key: dict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = {}
+    running_max = 0.0
+    for index, entry in enumerate(ordered):
+        scaled = min(1.0, entry.raw_p_value * (family_size - index))
+        running_max = max(running_max, scaled)
+        adjusted_by_key[entry.key] = (running_max, index + 1)
+    states: list[FamilyInputState] = []
+    for contrast in family_entry.contrasts:
+        entry = available_p_values.value_for(contrast)
+        if entry is None:
+            states.append(
+                FamilyInputState(
+                    contrast,
+                    False,
+                    unavailable_reason="registered input missing",
+                    family_size=family_size,
+                )
+            )
+            continue
+        if entry.valid_seed_count < minimum:
+            states.append(
+                FamilyInputState(
+                    contrast,
+                    False,
+                    unavailable_reason="insufficient valid paired seeds",
+                    raw_p_value=entry.raw_p_value,
+                    family_size=family_size,
+                )
+            )
+            continue
+        holm_p, rank = adjusted_by_key[entry.key]
+        states.append(
+            FamilyInputState(
+                contrast,
+                True,
+                raw_p_value=entry.raw_p_value,
+                holm_p_value=holm_p,
+                holm_rank=rank,
+                family_size=family_size,
+            )
+        )
+    return tuple(states)

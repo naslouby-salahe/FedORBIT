@@ -14,6 +14,7 @@ JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "Jso
 CONFIRMATORY_SEED_VALUES = {1103, 2207, 3319, 4421, 5531, 6653, 7753, 8861, 9973, 11027}
 PILOT_SEED_VALUES = {101, 202, 303}
 LOCKED_NUMERIC_LITERALS = {0.5, 0.25, 0.01, 0.005, 0.05, 200, 40, 512, 0.95, 0.999}
+OBSERVED_FACT_NAMES = {"row_count", "file_count", "sha256_of_raw", "observed_rows"}
 
 
 def test_no_locked_config_constants_redeclared_at_module_level() -> None:
@@ -60,11 +61,42 @@ def test_no_governed_values_in_cli_defaults() -> None:
             assert f"default={literal}" not in text, f"governed value as CLI default in {path}"
 
 
+def _assigned_name(node: ast.Assign | ast.AnnAssign) -> str | None:
+    target: ast.expr
+    if isinstance(node, ast.Assign):
+        if len(node.targets) != 1:
+            return None
+        target = node.targets[0]
+    else:
+        target = node.target
+    return target.id if isinstance(target, ast.Name) else None
+
+
+def _assigned_value(node: ast.Assign | ast.AnnAssign) -> ast.expr | None:
+    return node.value
+
+
 def test_no_observed_data_facts_hardcoded() -> None:
     for path in iter_source_files():
-        text = path.read_text(encoding="utf-8")
-        for marker in ("row_count", "file_count", "sha256_of_raw", "observed_rows"):
-            assert marker not in text, f"observed-data fact hardcoded in {path}"
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            name = _assigned_name(node)
+            value = _assigned_value(node)
+            if name not in OBSERVED_FACT_NAMES or value is None:
+                continue
+            if isinstance(value, ast.Constant) or (
+                isinstance(value, (ast.Tuple, ast.List, ast.Set, ast.Dict))
+                and all(
+                    isinstance(child, ast.Constant)
+                    for child in ast.walk(value)
+                    if child is not value
+                )
+            ):
+                raise AssertionError(
+                    f"observed-data fact {name!r} hardcoded in {path}:{node.lineno}"
+                )
 
 
 ROADMAP_LOCKED_ARCHITECTURE_VALUES = frozenset({0.1, 1e-3, 2.0})

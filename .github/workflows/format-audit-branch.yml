@@ -1,0 +1,33 @@
+name: normalize-audit-branch
+
+on:
+  push:
+    branches:
+      - audit/roadmap-completion
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/roadmap-completion
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v6
+      - run: uv lock
+      - run: uv sync --frozen --extra dev
+      - run: uv run ruff format src tests
+      - run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add uv.lock src tests
+            git commit -m "Refresh lock and normalize formatting"
+            git push origin HEAD:audit/roadmap-completion
+          fi

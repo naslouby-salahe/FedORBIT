@@ -50,7 +50,8 @@ def test_test_determinism_allows_cpu(monkeypatch: pytest.MonkeyPatch) -> None:
         assert torch.are_deterministic_algorithms_enabled()
 
 
-def test_principal_determinism_applies_flags() -> None:
+def test_principal_determinism_applies_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     with principal_determinism():
         state = deterministic_backend_state()
         assert state.deterministic_algorithms

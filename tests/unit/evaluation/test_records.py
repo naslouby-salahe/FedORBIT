@@ -28,9 +28,10 @@ from fedorbit.evaluation.validation import (
 )
 
 SHA = "a" * 64
+ROW_SHA = "b" * 64
 
 
-def _prediction(row_hash: str = "row-1") -> PredictionRecord:
+def _prediction(row_hash: str = ROW_SHA) -> PredictionRecord:
     return PredictionRecord(
         experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         pair="source -> target",
@@ -49,16 +50,41 @@ def _prediction(row_hash: str = "row-1") -> PredictionRecord:
     )
 
 
+def test_prediction_schema_has_exact_registered_fields() -> None:
+    assert tuple(PredictionRecord.model_fields) == (
+        "experiment",
+        "pair",
+        "method",
+        "condition",
+        "seed",
+        "row_hash",
+        "split",
+        "true_local_class_id",
+        "predicted_local_class_id",
+        "probabilities",
+        "loss",
+        "checkpoint_artifact_id",
+        "processed_split_artifact_id",
+        "dependency_fingerprint_sha256",
+    )
+
+
 def test_prediction_record_rejects_non_probability_vector() -> None:
     invalid = _prediction().model_copy(update={"probabilities": (0.8, 0.8)})
     with pytest.raises(ValidationError):
         PredictionRecord.model_validate(invalid.model_dump())
 
 
-def test_prediction_semantic_identity_is_unique() -> None:
+def test_prediction_record_requires_sha256_row_identity() -> None:
+    with pytest.raises(ValidationError):
+        _prediction("row-1")
+
+
+def test_prediction_semantic_identity_is_unique_per_condition_split_and_row() -> None:
     first = _prediction()
-    second = _prediction("row-2")
-    assert validate_prediction_records((first, second)) == (first, second)
+    second = first.model_copy(update={"condition": "alternate"})
+    third = first.model_copy(update={"split": Split.VALID})
+    assert validate_prediction_records((first, second, third)) == (first, second, third)
     with pytest.raises(EvaluationValidationError):
         validate_prediction_records((first, first))
 
@@ -82,6 +108,25 @@ def _metric(metric_value: float | None, valid: bool, invalid_reason: str | None)
     )
 
 
+def test_metric_schema_has_exact_registered_fields() -> None:
+    assert tuple(MetricRecord.model_fields) == (
+        "experiment",
+        "pair",
+        "method",
+        "condition",
+        "seed",
+        "metric_name",
+        "metric_value",
+        "metric_unit",
+        "direction",
+        "evaluation_class_set_sha256",
+        "input_artifact_ids",
+        "dependency_fingerprint_sha256",
+        "valid",
+        "invalid_reason",
+    )
+
+
 def test_metric_validity_contract() -> None:
     metric = _metric(0.4, True, None)
     assert validate_metric_records((metric,)) == (metric,)
@@ -89,8 +134,8 @@ def test_metric_validity_contract() -> None:
         _metric(None, True, None)
 
 
-def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:
-    comparison = PairedComparisonRecord(
+def _comparison() -> PairedComparisonRecord:
+    return PairedComparisonRecord(
         contrast_name="principal vs local-only",
         family=MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
         pair="source -> target",
@@ -111,7 +156,34 @@ def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:
         dependency_fingerprint_sha256=SHA,
         decision=ComparisonDecision.SUPERIOR,
     )
-    metadata = StatisticalMetadataRecord(
+
+
+def test_paired_comparison_schema_has_exact_registered_fields() -> None:
+    assert tuple(PairedComparisonRecord.model_fields) == (
+        "contrast_name",
+        "family",
+        "pair",
+        "method_a",
+        "method_b",
+        "metric",
+        "paired_seed_count",
+        "mean_difference",
+        "median_difference",
+        "bca_ci_low",
+        "bca_ci_high",
+        "raw_p",
+        "holm_p",
+        "materiality_threshold",
+        "equivalence_margin_low",
+        "equivalence_margin_high",
+        "input_metric_artifact_ids",
+        "dependency_fingerprint_sha256",
+        "decision",
+    )
+
+
+def _metadata() -> StatisticalMetadataRecord:
+    return StatisticalMetadataRecord(
         test_name="exact paired sign-flip",
         exact_or_asymptotic=StatisticalExactness.EXACT,
         alternative=StatisticalAlternative.TWO_SIDED,
@@ -122,4 +194,33 @@ def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:
         family_size=4,
         statistical_code_sha256=SHA,
     )
-    validate_comparison_metadata(comparison, metadata)
+
+
+def test_statistical_metadata_schema_has_exact_registered_fields() -> None:
+    assert tuple(StatisticalMetadataRecord.model_fields) == (
+        "test_name",
+        "exact_or_asymptotic",
+        "alternative",
+        "zero_difference_count",
+        "bootstrap_resamples",
+        "bootstrap_seed",
+        "holm_rank",
+        "family_size",
+        "statistical_code_sha256",
+    )
+
+
+def test_comparison_and_statistical_metadata_are_jointly_validated() -> None:
+    validate_comparison_metadata(_comparison(), _metadata())
+
+
+def test_comparison_metadata_rejects_missing_holm_rank() -> None:
+    with pytest.raises(EvaluationValidationError, match="Holm rank"):
+        validate_comparison_metadata(_comparison(), _metadata().model_copy(update={"holm_rank": None}))
+
+
+def test_comparison_rejects_partial_bca_interval() -> None:
+    with pytest.raises(ValidationError):
+        PairedComparisonRecord.model_validate(
+            _comparison().model_copy(update={"bca_ci_high": None}).model_dump()
+        )

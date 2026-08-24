@@ -66,15 +66,22 @@ class PredictionRecord(FrozenRecord):
 
     @model_validator(mode="after")
     def validate_record(self) -> PredictionRecord:
-        if not self.pair or not self.condition or not self.row_hash:
-            raise ValueError("prediction identity fields must be non-empty")
+        if not self.pair or not self.condition:
+            raise ValueError("prediction pair and condition must be non-empty")
+        _require_sha256(self.row_hash, "prediction row hash")
+        if not self.true_local_class_id or not self.predicted_local_class_id:
+            raise ValueError("prediction class identities must be non-empty")
+        if not self.checkpoint_artifact_id or not self.processed_split_artifact_id:
+            raise ValueError("prediction artifact identities must be non-empty")
         if not self.probabilities:
             raise ValueError("prediction probability vector must be non-empty")
         if any(
             not math.isfinite(value) or value < 0.0 or value > 1.0 for value in self.probabilities
         ):
             raise ValueError("prediction probabilities must be finite values in [0,1]")
-        if not math.isclose(sum(self.probabilities), 1.0):
+        probability_sum = math.fsum(self.probabilities)
+        absolute_tolerance = math.ulp(1.0) * max(1, len(self.probabilities))
+        if not math.isclose(probability_sum, 1.0, rel_tol=0.0, abs_tol=absolute_tolerance):
             raise ValueError("prediction probabilities must sum to one")
         if not math.isfinite(self.loss) or self.loss < 0.0:
             raise ValueError("prediction loss must be finite and nonnegative")
@@ -100,6 +107,8 @@ class MetricRecord(FrozenRecord):
 
     @model_validator(mode="after")
     def validate_record(self) -> MetricRecord:
+        if not self.pair or not self.condition or not self.metric_unit:
+            raise ValueError("metric identity/unit fields must be non-empty")
         _require_sha256(self.evaluation_class_set_sha256, "evaluation class-set SHA-256")
         _require_sha256(self.dependency_fingerprint_sha256, "metric dependency fingerprint")
         if self.valid:
@@ -109,8 +118,10 @@ class MetricRecord(FrozenRecord):
                 raise ValueError("valid metric must not have an invalid reason")
         elif not self.invalid_reason:
             raise ValueError("invalid metric requires an invalid reason")
-        if not self.input_artifact_ids:
-            raise ValueError("metric requires at least one input artifact")
+        elif self.metric_value is not None and not math.isfinite(self.metric_value):
+            raise ValueError("invalid metric value must be finite when present")
+        if not self.input_artifact_ids or any(not value for value in self.input_artifact_ids):
+            raise ValueError("metric requires non-empty input artifact identities")
         return self
 
 
@@ -137,17 +148,46 @@ class PairedComparisonRecord(FrozenRecord):
 
     @model_validator(mode="after")
     def validate_record(self) -> PairedComparisonRecord:
+        if not self.contrast_name or not self.pair:
+            raise ValueError("comparison identity fields must be non-empty")
+        if self.method_a == self.method_b:
+            raise ValueError("paired comparison methods must differ")
         if self.paired_seed_count < 0:
             raise ValueError("paired seed count must be nonnegative")
+        for name, value in (
+            ("mean_difference", self.mean_difference),
+            ("median_difference", self.median_difference),
+            ("bca_ci_low", self.bca_ci_low),
+            ("bca_ci_high", self.bca_ci_high),
+            ("materiality_threshold", self.materiality_threshold),
+            ("equivalence_margin_low", self.equivalence_margin_low),
+            ("equivalence_margin_high", self.equivalence_margin_high),
+        ):
+            if value is not None and not math.isfinite(value):
+                raise ValueError(f"{name} must be finite when present")
         for name, value in (("raw_p", self.raw_p), ("holm_p", self.holm_p)):
-            if value is not None and not 0.0 <= value <= 1.0:
+            if value is not None and (not math.isfinite(value) or not 0.0 <= value <= 1.0):
                 raise ValueError(f"{name} must be in [0,1]")
+        if (self.bca_ci_low is None) != (self.bca_ci_high is None):
+            raise ValueError("BCa interval endpoints must both be present or absent")
         if (
             self.bca_ci_low is not None
             and self.bca_ci_high is not None
             and self.bca_ci_low > self.bca_ci_high
         ):
             raise ValueError("BCa interval endpoints are reversed")
+        if (self.equivalence_margin_low is None) != (self.equivalence_margin_high is None):
+            raise ValueError("equivalence margins must both be present or absent")
+        if (
+            self.equivalence_margin_low is not None
+            and self.equivalence_margin_high is not None
+            and self.equivalence_margin_low >= self.equivalence_margin_high
+        ):
+            raise ValueError("equivalence margins are not strictly ordered")
+        if not self.input_metric_artifact_ids or any(
+            not value for value in self.input_metric_artifact_ids
+        ):
+            raise ValueError("comparison requires non-empty input metric artifact identities")
         _require_sha256(self.dependency_fingerprint_sha256, "comparison dependency fingerprint")
         return self
 
@@ -165,10 +205,14 @@ class StatisticalMetadataRecord(FrozenRecord):
 
     @model_validator(mode="after")
     def validate_record(self) -> StatisticalMetadataRecord:
+        if not self.test_name:
+            raise ValueError("statistical test name must be non-empty")
         if self.zero_difference_count < 0:
             raise ValueError("zero-difference count must be nonnegative")
         if self.bootstrap_resamples < 0:
             raise ValueError("bootstrap resample count must be nonnegative")
+        if self.bootstrap_seed is not None and self.bootstrap_seed < 0:
+            raise ValueError("bootstrap seed must be nonnegative")
         if self.family_size <= 0:
             raise ValueError("multiplicity family size must be positive")
         if self.holm_rank is not None and not 1 <= self.holm_rank <= self.family_size:

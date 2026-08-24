@@ -1,14 +1,129 @@
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass
 
-from fedorbit.analysis.statistics import PValueSet
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import MultiplicityFamily, TransferMethod
+from fedorbit.domain.enums import MultiplicityFamily, Split, TransferMethod
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ContrastRegistryError(ValueError):
     pass
+
+
+class PairingError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PairingLineage:
+    raw_dataset_lineage_sha256: str
+    directed_pair: str
+    seed: int
+    split: Split
+    target_pre_transfer_checkpoint_artifact_id: str
+    target_importance_artifact_id: str
+    source_packet_artifact_id: str | None
+    action_budget: float
+    support_budget: int
+    confirmation_budget: int
+    environment_lineage_sha256: str
+
+    def __post_init__(self) -> None:
+        if _SHA256.fullmatch(self.raw_dataset_lineage_sha256) is None:
+            raise PairingError("raw dataset lineage must be lowercase SHA-256 hex")
+        if _SHA256.fullmatch(self.environment_lineage_sha256) is None:
+            raise PairingError("environment lineage must be lowercase SHA-256 hex")
+        if not self.directed_pair:
+            raise PairingError("directed pair must be non-empty")
+        if not self.target_pre_transfer_checkpoint_artifact_id:
+            raise PairingError("target checkpoint identity must be non-empty")
+        if not self.target_importance_artifact_id:
+            raise PairingError("target importance identity must be non-empty")
+        if not math.isfinite(self.action_budget) or self.action_budget < 0.0:
+            raise PairingError("action budget must be finite and nonnegative")
+        if self.support_budget < 0 or self.confirmation_budget < 0:
+            raise PairingError("support and confirmation budgets must be nonnegative")
+
+
+@dataclass(frozen=True, slots=True)
+class PairedObservation:
+    method: TransferMethod
+    value: float
+    lineage: PairingLineage
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.value):
+            raise PairingError("paired observation value must be finite")
+
+
+@dataclass(frozen=True, slots=True)
+class PairedValues:
+    directed_pair: str
+    seeds: tuple[int, ...]
+    method_values: tuple[float, ...]
+    reference_values: tuple[float, ...]
+
+
+def validate_paired_observations(
+    method_observations: tuple[PairedObservation, ...],
+    reference_observations: tuple[PairedObservation, ...],
+) -> PairedValues:
+    if not method_observations or not reference_observations:
+        raise PairingError("paired comparison requires observations from both methods")
+    if len(method_observations) != len(reference_observations):
+        raise PairingError("paired comparison sample counts differ")
+    method_index = _index_observations(method_observations)
+    reference_index = _index_observations(reference_observations)
+    if tuple(key for key, _ in method_index) != tuple(key for key, _ in reference_index):
+        raise PairingError("paired comparison pair/seed identities differ")
+    method_values: list[float] = []
+    reference_values: list[float] = []
+    seeds: list[int] = []
+    directed_pair: str | None = None
+    for (method_key, method_observation), (reference_key, reference_observation) in zip(
+        method_index, reference_index, strict=True
+    ):
+        if method_key != reference_key:
+            raise PairingError("paired comparison pair/seed identities differ")
+        if method_observation.lineage != reference_observation.lineage:
+            raise PairingError("paired comparison lineage mismatch")
+        if directed_pair is None:
+            directed_pair = method_observation.lineage.directed_pair
+        elif directed_pair != method_observation.lineage.directed_pair:
+            raise PairingError("one contrast cannot pool directed pairs")
+        seeds.append(method_observation.lineage.seed)
+        method_values.append(method_observation.value)
+        reference_values.append(reference_observation.value)
+    if directed_pair is None:
+        raise PairingError("paired comparison has no directed pair")
+    return PairedValues(
+        directed_pair,
+        tuple(seeds),
+        tuple(method_values),
+        tuple(reference_values),
+    )
+
+
+def _index_observations(
+    observations: tuple[PairedObservation, ...],
+) -> tuple[tuple[tuple[str, int], PairedObservation], ...]:
+    indexed = tuple(
+        sorted(
+            (
+                ((observation.lineage.directed_pair, observation.lineage.seed), observation)
+                for observation in observations
+            ),
+            key=lambda item: item[0],
+        )
+    )
+    keys = tuple(key for key, _ in indexed)
+    if len(set(keys)) != len(keys):
+        raise PairingError("paired comparison contains duplicate pair/seed cells")
+    return indexed
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +153,10 @@ class RegisteredContrast:
     directed_pair: str
     statistic: str
 
+    @property
+    def key(self) -> tuple[MultiplicityFamily, str, str]:
+        return self.family, self.name, self.directed_pair
+
 
 @dataclass(frozen=True, slots=True)
 class RegisteredFamily:
@@ -55,6 +174,46 @@ class RegisteredFamilyInputs:
                 return entry.contrasts
         raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
 
+    def registered_keys(self) -> frozenset[tuple[MultiplicityFamily, str, str]]:
+        return frozenset(contrast.key for entry in self.entries for contrast in entry.contrasts)
+
+
+@dataclass(frozen=True, slots=True)
+class ContrastPValue:
+    family: MultiplicityFamily
+    contrast_name: str
+    directed_pair: str
+    raw_p_value: float
+    valid_seed_count: int
+
+    def __post_init__(self) -> None:
+        if not self.contrast_name or not self.directed_pair:
+            raise ContrastRegistryError("contrast p-value identity must be non-empty")
+        if not math.isfinite(self.raw_p_value) or not 0.0 <= self.raw_p_value <= 1.0:
+            raise ContrastRegistryError("raw p-value must be finite and lie in [0,1]")
+        if self.valid_seed_count < 0:
+            raise ContrastRegistryError("valid seed count must be nonnegative")
+
+    @property
+    def key(self) -> tuple[MultiplicityFamily, str, str]:
+        return self.family, self.contrast_name, self.directed_pair
+
+
+@dataclass(frozen=True, slots=True)
+class ContrastPValueSet:
+    entries: tuple[ContrastPValue, ...]
+
+    def __post_init__(self) -> None:
+        keys = tuple(entry.key for entry in self.entries)
+        if len(set(keys)) != len(keys):
+            raise ContrastRegistryError("duplicate pair-specific multiplicity input")
+
+    def value_for(self, contrast: RegisteredContrast) -> ContrastPValue | None:
+        for entry in self.entries:
+            if entry.key == contrast.key:
+                return entry
+        return None
+
 
 @dataclass(frozen=True, slots=True)
 class FamilyInputState:
@@ -62,6 +221,9 @@ class FamilyInputState:
     available: bool
     unavailable_reason: str | None = None
     raw_p_value: float | None = None
+    holm_p_value: float | None = None
+    holm_rank: int | None = None
+    family_size: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,26 +350,83 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
 
 def build_family_states(
     config: FedorbitConfig,
-    available_p_values: PValueSet,
+    available_p_values: ContrastPValueSet,
 ) -> FamilyStates:
-    del config
-    groups: list[FamilyStateGroup] = []
-    for family_entry in registered_family_inputs().entries:
-        states: list[FamilyInputState] = []
-        for contrast in family_entry.contrasts:
-            raw_p_value = available_p_values.value_of(contrast.name)
-            if raw_p_value is None:
-                states.append(
-                    FamilyInputState(
-                        contrast,
-                        False,
-                        unavailable_reason="insufficient valid paired seeds",
-                    )
+    registry = registered_family_inputs()
+    registered_keys = registry.registered_keys()
+    unknown = tuple(
+        entry.key for entry in available_p_values.entries if entry.key not in registered_keys
+    )
+    if unknown:
+        raise ContrastRegistryError("unregistered confirmatory multiplicity input")
+    groups = tuple(
+        FamilyStateGroup(
+            family_entry.family,
+            _family_states(config, family_entry, available_p_values),
+        )
+        for family_entry in registry.entries
+    )
+    if not any(state.available for group in groups for state in group.states):
+        raise ContrastRegistryError("no registered family input has enough valid paired seeds")
+    return FamilyStates(groups)
+
+
+def _family_states(
+    config: FedorbitConfig,
+    family_entry: RegisteredFamily,
+    available_p_values: ContrastPValueSet,
+) -> tuple[FamilyInputState, ...]:
+    minimum = config.scientific.statistics.minimum_valid_paired_seeds
+    present = tuple(
+        entry
+        for contrast in family_entry.contrasts
+        if (entry := available_p_values.value_for(contrast)) is not None
+        and entry.valid_seed_count >= minimum
+    )
+    ordered = sorted(
+        present,
+        key=lambda entry: (entry.raw_p_value, entry.contrast_name, entry.directed_pair),
+    )
+    family_size = len(ordered)
+    adjusted_by_key: dict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = {}
+    running_max = 0.0
+    for index, entry in enumerate(ordered):
+        scaled = min(1.0, entry.raw_p_value * (family_size - index))
+        running_max = max(running_max, scaled)
+        adjusted_by_key[entry.key] = (running_max, index + 1)
+    states: list[FamilyInputState] = []
+    for contrast in family_entry.contrasts:
+        entry = available_p_values.value_for(contrast)
+        if entry is None:
+            states.append(
+                FamilyInputState(
+                    contrast,
+                    False,
+                    unavailable_reason="registered input missing",
+                    family_size=family_size,
                 )
-            else:
-                states.append(FamilyInputState(contrast, True, raw_p_value=raw_p_value))
-        groups.append(FamilyStateGroup(family_entry.family, tuple(states)))
-    result = FamilyStates(tuple(groups))
-    if not any(state.available for group in result.entries for state in group.states):
-        raise ContrastRegistryError("no registered family input has a computable p-value")
-    return result
+            )
+            continue
+        if entry.valid_seed_count < minimum:
+            states.append(
+                FamilyInputState(
+                    contrast,
+                    False,
+                    unavailable_reason="insufficient valid paired seeds",
+                    raw_p_value=entry.raw_p_value,
+                    family_size=family_size,
+                )
+            )
+            continue
+        holm_p, rank = adjusted_by_key[entry.key]
+        states.append(
+            FamilyInputState(
+                contrast,
+                True,
+                raw_p_value=entry.raw_p_value,
+                holm_p_value=holm_p,
+                holm_rank=rank,
+                family_size=family_size,
+            )
+        )
+    return tuple(states)

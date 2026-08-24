@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fedorbit.analysis.statistics import PValueSet
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.domain.enums import MultiplicityFamily, TransferMethod
+
+
+class ContrastRegistryError(ValueError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,175 +32,171 @@ class PairContrastEvidenceSet:
 
 
 @dataclass(frozen=True, slots=True)
-class TransferCriteriaDecision:
-    supported: bool
-    conditional: bool
-    partially_supported: bool
-    null_result: bool
-    not_supported: bool
-    successful_pairs: tuple[str, ...]
-    harmful_pairs: tuple[str, ...]
-    equal_pair_mean_gain: float | None
-    reasons: tuple[str, ...]
+class RegisteredContrast:
+    family: MultiplicityFamily
+    name: str
+    directed_pair: str
+    statistic: str
 
 
-def _successful_pair(
-    config: FedorbitConfig,
-    evidence: PairContrastEvidence,
-) -> bool:
-    criteria = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    materiality = config.scientific.materiality.realized_relative_macro_ce
-    if evidence.mean_gain is None or evidence.holm_p is None or evidence.bca_lower is None:
-        return False
-    return (
-        evidence.mean_gain >= materiality
-        and evidence.holm_p < criteria.holm_adjusted_p_maximum
-        and evidence.bca_lower > criteria.bca_lower_bound_strictly_greater_than
-        and evidence.strict_resource_valid
-    )
+@dataclass(frozen=True, slots=True)
+class RegisteredFamily:
+    family: MultiplicityFamily
+    contrasts: tuple[RegisteredContrast, ...]
 
 
-def evaluate_transfer_style_criteria(
-    config: FedorbitConfig,
-    evidence_set: PairContrastEvidenceSet,
-    removed_before_outcome_inspection: bool,
-) -> TransferCriteriaDecision:
-    claim = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    materiality = config.scientific.materiality.realized_relative_macro_ce
-    harm_threshold = config.scientific.materiality.harmful_transfer_relative_macro_ce_gain
-    required = claim.successful_primary_pairs_required
-    evidence_by_pair = {entry.directed_pair: entry for entry in evidence_set.entries}
-    all_pairs = sorted(evidence_by_pair)
-    analyzable = {
-        pair: evidence
-        for pair, evidence in evidence_by_pair.items()
-        if evidence.valid_seed_count > 0
+@dataclass(frozen=True, slots=True)
+class RegisteredFamilyInputs:
+    entries: tuple[RegisteredFamily, ...]
+
+    def contrasts_for(self, family: MultiplicityFamily) -> tuple[RegisteredContrast, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.contrasts
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyInputState:
+    contrast: RegisteredContrast
+    available: bool
+    unavailable_reason: str | None = None
+    raw_p_value: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStateGroup:
+    family: MultiplicityFamily
+    states: tuple[FamilyInputState, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyStates:
+    entries: tuple[FamilyStateGroup, ...]
+
+    def states_for(self, family: MultiplicityFamily) -> tuple[FamilyInputState, ...]:
+        for entry in self.entries:
+            if entry.family == family:
+                return entry.states
+        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
+
+
+PRIMARY_PAIR_NAMES = ("Edge→Windows", "Windows→Edge", "Edge→Linux", "Linux→Edge")
+
+
+def _pair_contrast(
+    family: MultiplicityFamily,
+    name: str,
+    pair: str,
+    statistic: str,
+) -> RegisteredContrast:
+    return RegisteredContrast(family, name, pair, statistic)
+
+
+def registered_family_inputs() -> RegisteredFamilyInputs:
+    families: dict[MultiplicityFamily, list[RegisteredContrast]] = {
+        family: [] for family in MultiplicityFamily
     }
-    reasons: list[str] = []
-
-    successful = tuple(pair for pair in analyzable if _successful_pair(config, analyzable[pair]))
-    harmful = tuple(
-        pair
-        for pair in analyzable
-        if (gain := analyzable[pair].mean_gain) is not None and gain <= harm_threshold
-    )
-
-    scope_removed = len(all_pairs) - len(analyzable)
-    if scope_removed > 1:
-        reasons.append("more than one pair removed from claim scope")
-        return TransferCriteriaDecision(
-            False, False, False, False, True, (), (), None, tuple(reasons)
-        )
-
-    reduced_scope = removed_before_outcome_inspection and len(analyzable) == 3
-    full_scope = not removed_before_outcome_inspection and len(analyzable) == 4
-
-    equal_pair_values = tuple(analyzable[pair].mean_gain for pair in sorted(analyzable))
-    numeric_values = tuple(value for value in equal_pair_values if value is not None)
-    equal_pair_mean_value = (
-        sum(numeric_values) / len(numeric_values)
-        if len(numeric_values) == len(equal_pair_values) and numeric_values
-        else None
-    )
-
-    if any(not evidence.strict_resource_valid for evidence in evidence_set.entries):
-        reasons.append("strict-resource validation failed for a contributing run")
-        return TransferCriteriaDecision(
-            False, False, False, False, True, (), (), None, tuple(reasons)
-        )
-
-    if full_scope and len(successful) >= required and not harmful:
-        if equal_pair_mean_value is not None and equal_pair_mean_value >= materiality:
-            return TransferCriteriaDecision(
-                True,
-                False,
-                False,
-                False,
-                False,
-                successful,
-                harmful,
-                equal_pair_mean_value,
-                tuple(reasons),
+    solver = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value
+    for pair in PRIMARY_PAIR_NAMES:
+        families[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY].append(
+            _pair_contrast(
+                MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+                f"{solver} vs Local-Only — TEST relative macro-CE gain",
+                pair,
+                "sign_flip_superiority",
             )
-        reasons.append("equal-pair mean below materiality")
-    elif reduced_scope and len(successful) == 3 and not harmful:
-        if equal_pair_mean_value is not None and equal_pair_mean_value >= materiality:
-            return TransferCriteriaDecision(
-                False,
-                True,
-                False,
-                False,
-                False,
-                successful,
-                harmful,
-                equal_pair_mean_value,
-                tuple(reasons),
+        )
+        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
+            _pair_contrast(
+                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+                f"{solver} vs Local-SIR — TEST relative macro-CE gain superiority",
+                pair,
+                "sign_flip_superiority",
             )
-        reasons.append("reduced-scope equal-pair mean below materiality")
-
-    positive_pairs = [
-        pair
-        for pair in analyzable
-        if (gain := analyzable[pair].mean_gain) is not None
-        and gain >= materiality
-        and _holm_and_bca_pass(config, analyzable[pair])
-        and analyzable[pair].strict_resource_valid
-    ]
-    if harmful:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            False,
-            False,
-            True,
-            tuple(positive_pairs),
-            harmful,
-            equal_pair_mean_value,
-            tuple(reasons),
         )
-    if 0 < len(positive_pairs) <= 2:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            True,
-            False,
-            False,
-            tuple(positive_pairs),
-            harmful,
-            equal_pair_mean_value,
-            tuple(reasons),
+        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
+            _pair_contrast(
+                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+                f"{solver} vs Local-SIR — TEST relative macro-CE gain TOST equivalence",
+                pair,
+                "tost_equivalence",
+            )
         )
-    if not positive_pairs:
-        return TransferCriteriaDecision(
-            False,
-            False,
-            False,
-            True,
-            False,
-            (),
-            harmful,
-            equal_pair_mean_value,
-            (*tuple(reasons), "no materially beneficial pair"),
+        families[MultiplicityFamily.COUPLING_MECHANISM].append(
+            _pair_contrast(
+                MultiplicityFamily.COUPLING_MECHANISM,
+                "Exact correspondence orbit vs Matched-Resource Rectangular — robust coupling value gap",
+                pair,
+                "sign_flip_against_zero",
+            )
         )
-    reasons.append("criteria not met")
-    return TransferCriteriaDecision(
-        False,
-        False,
-        False,
-        False,
-        False,
-        tuple(positive_pairs),
-        harmful,
-        equal_pair_mean_value,
-        tuple(reasons),
+        for suffix in ("difference", "TOST equivalence"):
+            statistic = "tost_equivalence" if suffix == "TOST equivalence" else "sign_flip_superiority"
+            families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
+                _pair_contrast(
+                    MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
+                    f"{solver} vs Point-Correspondence Commitment — TEST relative macro-CE {suffix}",
+                    pair,
+                    statistic,
+                )
+            )
+            families[MultiplicityFamily.MECHANISM_ABLATIONS].append(
+                _pair_contrast(
+                    MultiplicityFamily.MECHANISM_ABLATIONS,
+                    f"{solver} vs Coupling-Destroyed FedORBIT — TEST relative macro-CE {suffix}",
+                    pair,
+                    statistic,
+                )
+            )
+        for sparsity_name in (
+            "exact sparse s=1 vs exact sparse s=2",
+            "exact sparse s=3 vs exact sparse s=2",
+            "dense CCP vs exact sparse s=2",
+        ):
+            families[MultiplicityFamily.SPARSITY_SENSITIVITY].append(
+                _pair_contrast(
+                    MultiplicityFamily.SPARSITY_SENSITIVITY,
+                    sparsity_name,
+                    pair,
+                    "sign_flip_difference_common_reference",
+                )
+            )
+        families[MultiplicityFamily.CONFIRMATION_SAFETY].append(
+            _pair_contrast(
+                MultiplicityFamily.CONFIRMATION_SAFETY,
+                "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with confirmation — harmful-transfer rate difference",
+                pair,
+                "seed_level_rate_difference_sign_flip",
+            )
+        )
+    return RegisteredFamilyInputs(
+        tuple(RegisteredFamily(family, tuple(families[family])) for family in MultiplicityFamily)
     )
 
 
-def _holm_and_bca_pass(config: FedorbitConfig, evidence: PairContrastEvidence) -> bool:
-    claim = config.scientific.claim_criteria.strict_cross_telemetry_utility
-    if evidence.holm_p is None or evidence.bca_lower is None:
-        return False
-    return (
-        evidence.holm_p < claim.holm_adjusted_p_maximum
-        and evidence.bca_lower > claim.bca_lower_bound_strictly_greater_than
-    )
+def build_family_states(
+    config: FedorbitConfig,
+    available_p_values: PValueSet,
+) -> FamilyStates:
+    del config
+    groups: list[FamilyStateGroup] = []
+    for family_entry in registered_family_inputs().entries:
+        states: list[FamilyInputState] = []
+        for contrast in family_entry.contrasts:
+            raw_p_value = available_p_values.value_of(contrast.name)
+            if raw_p_value is None:
+                states.append(
+                    FamilyInputState(
+                        contrast,
+                        False,
+                        unavailable_reason="insufficient valid paired seeds",
+                    )
+                )
+            else:
+                states.append(FamilyInputState(contrast, True, raw_p_value=raw_p_value))
+        groups.append(FamilyStateGroup(family_entry.family, tuple(states)))
+    result = FamilyStates(tuple(groups))
+    if not any(state.available for group in result.entries for state in group.states):
+        raise ContrastRegistryError("no registered family input has a computable p-value")
+    return result

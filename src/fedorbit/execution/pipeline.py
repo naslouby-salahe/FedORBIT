@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fedorbit.artifacts.paths import build_layout
-from fedorbit.artifacts.reuse import ArtifactStore
+from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
-from fedorbit.execution.semantics import ExecutionSemantics
+from fedorbit.execution.reuse import ExecutionReuse
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.response.packet import build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
@@ -28,10 +28,9 @@ def _cells_for_datasets(datasets: tuple[DatasetId, ...]) -> tuple[tuple[str, str
 
 def preprocess_pipeline(datasets: tuple[DatasetId, ...], overwrite: bool) -> None:
     store = ArtifactStore(_execution_root())
-    semantics = ExecutionSemantics(store)
-    cells = _cells_for_datasets(datasets)
-    decisions = semantics.decide(cells, overwrite)
-    semantics.validate_existing(decisions)
+    reuse = ExecutionReuse(store)
+    decisions = reuse.decide(_cells_for_datasets(datasets), overwrite)
+    reuse.validate_existing(decisions)
     for decision in decisions:
         if decision.execute or decision.overwrite:
             raise NotReadyError("preprocessing compute backend is not implemented")
@@ -46,7 +45,7 @@ def smoke_pipeline(overwrite: bool) -> None:
         median_band_width_ratio=0.0,
         stability_rule_passed=True,
     )
-    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     packet = build_source_packet(
         estimate,
         anonymous_fine_node_ids=("node-0001",),
@@ -67,13 +66,13 @@ def run_pipeline(
     overwrite: bool,
 ) -> None:
     store = ArtifactStore(_execution_root())
-    semantics = ExecutionSemantics(store)
+    reuse = ExecutionReuse(store)
     cells = tuple(
         (f"{experiment.value}:{seed}", f"cell-{experiment.value}-{seed}")
         for seed in definition.seeds
     )
-    decisions = semantics.decide(cells, overwrite)
-    semantics.validate_existing(decisions)
+    decisions = reuse.decide(cells, overwrite)
+    reuse.validate_existing(decisions)
     for decision in decisions:
         if decision.execute or decision.overwrite:
             raise NotReadyError("confirmatory experiment compute backend is not implemented")

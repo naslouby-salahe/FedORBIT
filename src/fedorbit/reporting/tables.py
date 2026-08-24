@@ -7,10 +7,19 @@ class TableError(ValueError):
     pass
 
 
+TableScalar = str | int | float | bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceTablePayload:
+    columns: tuple[str, ...]
+    rows: tuple[tuple[TableScalar, ...], ...]
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceTable:
     columns: tuple[str, ...]
-    rows: tuple[tuple[str | int | float | bool | None, ...], ...]
+    rows: tuple[tuple[TableScalar, ...], ...]
 
     def __post_init__(self) -> None:
         if not self.columns:
@@ -20,5 +29,5 @@ class EvidenceTable:
         if any(len(row) != len(self.columns) for row in self.rows):
             raise TableError("evidence table row width differs from column count")
 
-    def payload(self) -> dict[str, object]:
-        return {"columns": self.columns, "rows": self.rows}
+    def payload(self) -> EvidenceTablePayload:
+        return EvidenceTablePayload(self.columns, self.rows)

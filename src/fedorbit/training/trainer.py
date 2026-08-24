@@ -71,7 +71,7 @@ class OptimizerState:
         return cls(buffer.getvalue())
 
     def load_into(self, optimizer: torch.optim.Optimizer) -> None:
-        loaded: object = torch.load(
+        loaded = torch.load(
             io.BytesIO(self.payload),
             map_location="cpu",
             weights_only=True,

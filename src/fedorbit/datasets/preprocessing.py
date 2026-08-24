@@ -3,10 +3,15 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.datasets.common import AdapterSchema
+
+if TYPE_CHECKING:
+    from fedorbit.datasets.canonicalization import CanonicalRow, DuplicateGroups
 
 MISSING_TOKEN_VOCABULARY = frozenset({"", "0", "0.0", "nan", "none", "null"})
 ABSENT_TOKEN = "<ABSENT>"
@@ -136,14 +141,25 @@ def evaluate_feature_quality(
     )
 
 
+def canonicalize_training_rows(
+    schema: AdapterSchema,
+    rows: tuple[CanonicalRow, ...],
+) -> DuplicateGroups:
+    from fedorbit.datasets.canonicalization import deduplicate_rows, validate_duplicate_groups
+
+    groups = deduplicate_rows(schema, rows)
+    validate_duplicate_groups(groups)
+    return groups
+
+
 def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:
     numeric = values.astype(np.float64)
     finite = numeric[np.isfinite(numeric)]
     if finite.size == 0:
         raise PreprocessingError("numeric TRAIN feature has no finite value")
     median = float(np.median(finite))
-    q1 = float(np.quantile(finite, 0.25, method="linear"))
-    q3 = float(np.quantile(finite, 0.75, method="linear"))
+    q1 = float(np.percentile(finite, 25, method="linear"))
+    q3 = float(np.percentile(finite, 75, method="linear"))
     iqr = q3 - q1
     scale = iqr if iqr != 0.0 else 1.0
     imputed = np.where(np.isfinite(numeric), numeric, median)

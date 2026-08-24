@@ -85,7 +85,7 @@ def test_plan_is_read_only_and_derives_catalogue() -> None:
 def test_status_renders_wide_table_per_item() -> None:
     result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
-    assert "experiment" in result.output
+    assert "Experiment" in result.output
     assert "Primary Strict Cross-Telemetry Transfer" in result.output
 
 

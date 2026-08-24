@@ -37,10 +37,28 @@ def test_pre_confirm_capture_restores_model_optimizer_and_rng() -> None:
     assert all(torch.equal(left, right) for left, right in zip(before, after, strict=True))
 
 
-def test_capture_pair_uses_identical_clean_snapshot() -> None:
+def test_capture_pair_uses_independent_identical_clean_snapshots() -> None:
     model, optimizer = _model_and_optimizer()
     baseline, curriculum = capture_pre_confirm_pair(model, optimizer)
-    assert baseline == curriculum
+    assert baseline is not curriculum
+    assert baseline.optimizer_state.payload == curriculum.optimizer_state.payload
+    assert torch.equal(baseline.rng_state.cpu, curriculum.rng_state.cpu)
+    assert len(baseline.rng_state.cuda) == len(curriculum.rng_state.cuda)
+    assert all(
+        torch.equal(left, right)
+        for left, right in zip(baseline.rng_state.cuda, curriculum.rng_state.cuda, strict=True)
+    )
+    assert tuple(entry.name for entry in baseline.model_state.tensors) == tuple(
+        entry.name for entry in curriculum.model_state.tensors
+    )
+    assert all(
+        torch.equal(left.value, right.value)
+        for left, right in zip(
+            baseline.model_state.tensors,
+            curriculum.model_state.tensors,
+            strict=True,
+        )
+    )
 
 
 def test_rejected_proposal_restores_clean_state() -> None:

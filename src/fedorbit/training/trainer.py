@@ -24,7 +24,7 @@ class _BackwardValue(Protocol):
 
 
 class _OptimizerStep(Protocol):
-    def step(self) -> object: ...
+    def step(self) -> None: ...
 
 
 def backward_value(loss: torch.Tensor) -> None:

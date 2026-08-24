@@ -57,11 +57,7 @@ def test_pilot_grid_is_exact_registered_cartesian_product() -> None:
 def test_pilot_selection_uses_registered_tie_order() -> None:
     config = load_fedorbit_config()
     grid = pilot_grid(config)
-    results = tuple(
-        fit
-        for candidate in grid
-        for fit in _fits(candidate, (1.0, 1.0, 1.0))
-    )
+    results = tuple(fit for candidate in grid for fit in _fits(candidate, (1.0, 1.0, 1.0)))
     selection = select_pilot_configuration(results)
     assert selection.configuration == PilotConfiguration(REFERENCE_LEARNING_RATE, 0.0, 0.0)
     assert selection.median_valid_macro_cross_entropy == pytest.approx(1.0)

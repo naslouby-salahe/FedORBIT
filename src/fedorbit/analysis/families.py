@@ -171,10 +171,7 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
             )
         )
     return RegisteredFamilyInputs(
-        tuple(
-            RegisteredFamily(family, tuple(families[family]))
-            for family in MultiplicityFamily
-        )
+        tuple(RegisteredFamily(family, tuple(families[family])) for family in MultiplicityFamily)
     )
 
 

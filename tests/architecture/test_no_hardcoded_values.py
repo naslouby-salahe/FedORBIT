@@ -88,9 +88,15 @@ def test_no_observed_data_facts_hardcoded() -> None:
                 continue
             if isinstance(value, ast.Constant) or (
                 isinstance(value, (ast.Tuple, ast.List, ast.Set, ast.Dict))
-                and all(isinstance(child, ast.Constant) for child in ast.walk(value) if child is not value)
+                and all(
+                    isinstance(child, ast.Constant)
+                    for child in ast.walk(value)
+                    if child is not value
+                )
             ):
-                raise AssertionError(f"observed-data fact {name!r} hardcoded in {path}:{node.lineno}")
+                raise AssertionError(
+                    f"observed-data fact {name!r} hardcoded in {path}:{node.lineno}"
+                )
 
 
 ROADMAP_LOCKED_ARCHITECTURE_VALUES = frozenset({0.1, 1e-3, 2.0})

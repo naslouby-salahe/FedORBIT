@@ -132,7 +132,9 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
             )
         )
         for suffix in ("difference", "TOST equivalence"):
-            statistic = "tost_equivalence" if suffix == "TOST equivalence" else "sign_flip_superiority"
+            statistic = (
+                "tost_equivalence" if suffix == "TOST equivalence" else "sign_flip_superiority"
+            )
             families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
                 _pair_contrast(
                     MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,

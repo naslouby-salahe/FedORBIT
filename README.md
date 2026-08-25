@@ -12,10 +12,10 @@ The principal solver is the **FedORBIT Exact-Sparse Solver**; the secondary dens
 ## Scope
 
 The authoritative scientific, mathematical, architectural, dataset, configuration, experiment,
-statistical, and claim contract is `docs/FedORBIT_Roadmap.md`. `configs/fedorbit.yaml` is the sole
+statistical, and evaluation contract is `docs/FedORBIT_Roadmap.md`. `configs/fedorbit.yaml` is the sole
 authority for retained numerical parameters, thresholds, seeds, experiment grids, dataset/path
 identifiers, and other genuine configurable selections. `configs/tests.yml` and `configs/smoke.yml`
-contain only nonclaim execution-fixture controls.
+contain only execution-fixture controls.
 
 ## Setup
 

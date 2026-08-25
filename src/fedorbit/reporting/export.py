@@ -5,6 +5,7 @@ from pathlib import Path
 from fedorbit.artifacts.paths import WorkspaceLayout, results_workspace
 from fedorbit.artifacts.storage import ArtifactStore, atomic_write_json
 from fedorbit.domain.enums import ExperimentName
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.reporting.figures import EvidenceFigure
 from fedorbit.reporting.tables import EvidenceTable
 
@@ -18,7 +19,12 @@ class VerifiedEvidenceWriter:
         self._store = store
         self._layout = layout
 
-    def write(self, experiment: ExperimentName, artifact_id: str, evidence: object) -> Path:
+    def write(
+        self,
+        experiment: ExperimentName,
+        artifact_id: str,
+        evidence: StableJsonPayload,
+    ) -> Path:
         try:
             self._store.resolve(artifact_id)
         except ValueError as error:

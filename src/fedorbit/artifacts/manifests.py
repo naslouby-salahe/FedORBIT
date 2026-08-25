@@ -9,7 +9,7 @@ from pydantic import Field
 
 from fedorbit.config.models import FrozenModel
 from fedorbit.domain.enums import ArtifactState, TerminalState
-from fedorbit.domain.serialization import stable_json
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
 FINE_CONCEPT_FIELD = "fine_concept"
@@ -139,7 +139,7 @@ def file_sha256(path: Path) -> str:
 
 
 def dependency_fingerprint(
-    coordinates: object,
+    coordinates: StableJsonPayload,
     upstream_artifact_ids: tuple[str, ...],
     configuration_sha256: str,
     code_sha256: str,
@@ -157,7 +157,11 @@ def dependency_fingerprint(
     return _sha256(payload)
 
 
-def artifact_id(artifact_type: str, coordinates: object, fingerprint_sha256: str) -> str:
+def artifact_id(
+    artifact_type: str,
+    coordinates: StableJsonPayload,
+    fingerprint_sha256: str,
+) -> str:
     payload = stable_json(
         {
             "artifact_type": artifact_type,

@@ -8,7 +8,7 @@ WHITELISTED_PUBLIC_API = (
     BaselinesConfig,
     BaseModelPilotConfig,
     CheckpointConfig,
-    ClaimCriteriaConfig,
+    EvaluationCriteriaConfig,
     ClientConfig,
     CommonActionUnresolvedMapGeneratorConfig,
     ConfirmationConfig,

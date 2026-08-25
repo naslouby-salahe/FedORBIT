@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from fedorbit.domain.enums import RngNamespace
-from fedorbit.domain.serialization import stable_json
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 SEED32_MODULUS = 2**32
 
@@ -16,7 +16,11 @@ class SeedDerivationError(ValueError):
     pass
 
 
-def derive_seed32(base_seed: int, namespace: RngNamespace, stable_coordinates: object) -> int:
+def derive_seed32(
+    base_seed: int,
+    namespace: RngNamespace,
+    stable_coordinates: StableJsonPayload,
+) -> int:
     coordinates_text = stable_json(stable_coordinates)
     payload = f"FedORBIT|{base_seed}|{namespace.value}|{coordinates_text}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -36,7 +40,7 @@ class SeedPlan:
         raise SeedDerivationError(f"namespace not in plan: {namespace}")
 
 
-def seed_plan(base_seed: int, coordinates: object) -> SeedPlan:
+def seed_plan(base_seed: int, coordinates: StableJsonPayload) -> SeedPlan:
     coordinates_json_value = stable_json(coordinates)
     return SeedPlan(
         base_seed=base_seed,
@@ -59,7 +63,8 @@ def torch_generator(seed: int) -> torch.Generator:
 
 
 def statistical_bootstrap_stream(
-    statistical_seed: int, contrast_coordinates: object
+    statistical_seed: int,
+    contrast_coordinates: StableJsonPayload,
 ) -> np.random.Generator:
     stream_seed = derive_seed32(
         statistical_seed, RngNamespace.STATISTICAL_BOOTSTRAP, contrast_coordinates

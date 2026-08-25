@@ -188,17 +188,9 @@ LOCKED_VALUE_CONSTANT_PATTERN = {
 
 BOUNDARY_PACKAGES = frozenset({"domain", "config", "artifacts", "reporting", "cli"})
 
-SERIALIZATION_BOUNDARY_MODULES = frozenset(
-    {
-        "domain.serialization",
-        "runtime.seeds",
-        "artifacts.manifests",
-        "artifacts.storage",
-        "reporting.export",
-    }
-)
-
 TODO_MARKERS = ("TODO", "FIXME", "HACK", "XXX")
+
+SERIALIZATION_BOUNDARY_MODULES: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

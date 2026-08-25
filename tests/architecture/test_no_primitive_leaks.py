@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import ast
 
-import pytest
-
 from tests.architecture.scan import (
-    SERIALIZATION_BOUNDARY_MODULES,
-    SRC_ROOT,
     iter_source_files,
     parse_module,
     public_functions,
@@ -15,10 +11,6 @@ from tests.architecture.scan import (
 
 COLLECTION_PRIMITIVES = {"dict", "list", "set", "object"}
 SCALAR_PRIMITIVES = {"str", "int", "float", "bool"}
-
-
-def _is_stable_serializer_boundary(module: str) -> bool:
-    return module in SERIALIZATION_BOUNDARY_MODULES
 
 
 def _annotation_base(annotation: ast.expr | None) -> str | None:
@@ -105,7 +97,7 @@ def production_signature_violations() -> list[str]:
     violations: list[str] = []
     for path in iter_source_files():
         module = relative_module(path)
-        if module.endswith("__init__") or _is_stable_serializer_boundary(module):
+        if module.endswith("__init__"):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for function in public_functions(tree):
@@ -173,12 +165,6 @@ def test_detector_allows_numpy_numeric_payloads() -> None:
     assert _violations_in_source(source) == []
 
 
-@pytest.mark.parametrize("module", sorted(SERIALIZATION_BOUNDARY_MODULES))
-def test_exempt_modules_exist(module: str) -> None:
-    path = SRC_ROOT.joinpath(*module.split(".")).with_suffix(".py")
-    assert path.exists(), f"stale exemption entry: {module}"
-
-
 def _iter_class_field_annotations(tree: ast.Module) -> list[tuple[str, str, ast.expr]]:
     findings: list[tuple[str, str, ast.expr]] = []
     for node in ast.walk(tree):
@@ -227,7 +213,7 @@ def test_public_methods_do_not_leak_primitives() -> None:
     violations: list[str] = []
     for path in iter_source_files():
         module = relative_module(path)
-        if module.endswith("__init__") or module in SERIALIZATION_BOUNDARY_MODULES:
+        if module.endswith("__init__"):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

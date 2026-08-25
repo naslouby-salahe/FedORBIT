@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from fedorbit.analysis.claims import TransferCriteriaDecision, evaluate_transfer_style_criteria
 from fedorbit.analysis.comparisons import (
     ContrastRegistryError,
     FamilyInputState,
@@ -47,9 +46,7 @@ __all__ = [
     "SignFlipResult",
     "StatisticsError",
     "TostResult",
-    "TransferCriteriaDecision",
     "build_family_states",
-    "evaluate_transfer_style_criteria",
     "exact_sign_flip_test",
     "holm_step_down",
     "mcnemar_asymptotic_continuity_corrected_p",

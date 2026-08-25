@@ -35,7 +35,7 @@ def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
     return config
 
 
-def canonical_json(config: FedorbitConfig) -> str:
+def stable_json(config: FedorbitConfig) -> str:
     payload = config.model_dump(mode="json")
     return json.dumps(
         payload,
@@ -54,11 +54,11 @@ def snapshot_matches_contract(config: FedorbitConfig) -> bool:
     if not snapshot.is_file():
         return False
     expected = snapshot.read_text(encoding="utf-8").strip()
-    return canonical_json(config) == expected
+    return stable_json(config) == expected
 
 
 def write_contract_snapshot(config: FedorbitConfig) -> Path:
     snapshot = contract_snapshot_path()
-    rendered = unicodedata.normalize("NFC", canonical_json(config)) + "\n"
+    rendered = unicodedata.normalize("NFC", stable_json(config)) + "\n"
     snapshot.write_text(rendered, encoding="utf-8")
     return snapshot

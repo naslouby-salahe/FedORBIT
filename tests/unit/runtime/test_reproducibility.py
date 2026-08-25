@@ -100,13 +100,13 @@ def test_identity_rejects_statistics_change(
     assert not compatible(current, recorded)
 
 
-def test_identity_rejects_claim_criteria_change(
+def test_identity_rejects_evaluation_criteria_change(
     fedorbit_config: FedorbitConfig,
 ) -> None:
     environment = environment_snapshot(fedorbit_config)
     recorded = build_reproducibility_identity(fedorbit_config, environment)
 
-    criteria = fedorbit_config.scientific.claim_criteria
+    criteria = fedorbit_config.scientific.evaluation_criteria
     utility = criteria.strict_cross_telemetry_utility.model_copy(
         update={"successful_primary_pairs_required": 4}
     )
@@ -115,7 +115,7 @@ def test_identity_rejects_claim_criteria_change(
         update={
             "scientific": fedorbit_config.scientific.model_copy(
                 update={
-                    "claim_criteria": criteria.model_copy(
+                    "evaluation_criteria": criteria.model_copy(
                         update={"strict_cross_telemetry_utility": utility}
                     )
                 }

@@ -27,7 +27,7 @@ class WorkspaceLayout:
     project_summary: Path
 
 
-def canonical_slug(value: str) -> str:
+def safe_slug(value: str) -> str:
     normalized = unicodedata.normalize("NFC", value).casefold()
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
     if not slug:
@@ -54,11 +54,11 @@ def build_layout(config: FedorbitConfig, root: Path | None = None) -> WorkspaceL
 
 
 def experiment_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Path:
-    return layout.experiments / canonical_slug(experiment.value)
+    return layout.experiments / safe_slug(experiment.value)
 
 
 def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Path:
-    return layout.results_experiments / canonical_slug(experiment.value)
+    return layout.results_experiments / safe_slug(experiment.value)
 
 
 def leaf_path(
@@ -70,7 +70,7 @@ def leaf_path(
 ) -> Path:
     if not workspace.is_absolute():
         workspace = layout.execution_root / workspace
-    semantic_slug = canonical_slug(semantic_coordinates)
+    semantic_slug = safe_slug(semantic_coordinates)
     return workspace / f"{semantic_slug}.{fingerprint_sha256[:16]}{suffix}"
 
 
@@ -81,4 +81,4 @@ def enforce_workspace_boundary(layout: WorkspaceLayout, path: Path) -> None:
     if resolved in (execution, manuscript):
         raise WorkspaceError(f"path is a workspace root, not an artifact: {path}")
     if execution not in resolved.parents and manuscript not in resolved.parents:
-        raise WorkspaceError(f"path outside canonical workspace: {path}")
+        raise WorkspaceError(f"path outside stable workspace: {path}")

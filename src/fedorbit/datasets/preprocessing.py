@@ -16,7 +16,7 @@ from fedorbit.datasets.splitting import (
 )
 
 if TYPE_CHECKING:
-    from fedorbit.datasets.canonicalization import CanonicalRow, DuplicateGroups
+    from fedorbit.datasets.row_normalization import DuplicateGroups, NormalizedRow
 
 MISSING_TOKEN_VOCABULARY = frozenset({"", "0", "0.0", "nan", "none", "null"})
 ABSENT_TOKEN = "<ABSENT>"
@@ -146,18 +146,18 @@ def evaluate_feature_quality(
     )
 
 
-def canonicalize_training_rows(
+def normalize_training_rows(
     schema: AdapterSchema,
-    rows: tuple[CanonicalRow, ...],
+    rows: tuple[NormalizedRow, ...],
 ) -> DuplicateGroups:
-    from fedorbit.datasets.canonicalization import deduplicate_rows, validate_duplicate_groups
+    from fedorbit.datasets.row_normalization import deduplicate_rows, validate_duplicate_groups
 
     groups = deduplicate_rows(schema, rows)
     validate_duplicate_groups(groups)
     return groups
 
 
-def assign_canonical_duplicate_groups(
+def assign_duplicate_groups(
     config: FedorbitConfig,
     groups: DuplicateGroups,
 ) -> DuplicateGroupSplitAssignment:
@@ -172,13 +172,13 @@ def assign_canonical_duplicate_groups(
     return assign_duplicate_groups_chronologically(config, chronology)
 
 
-def canonicalize_and_split_training_rows(
+def normalize_and_split_training_rows(
     config: FedorbitConfig,
     schema: AdapterSchema,
-    rows: tuple[CanonicalRow, ...],
+    rows: tuple[NormalizedRow, ...],
 ) -> tuple[DuplicateGroups, DuplicateGroupSplitAssignment]:
-    groups = canonicalize_training_rows(schema, rows)
-    return groups, assign_canonical_duplicate_groups(config, groups)
+    groups = normalize_training_rows(schema, rows)
+    return groups, assign_duplicate_groups(config, groups)
 
 
 def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:

@@ -67,7 +67,7 @@ class ObservedColumnSamples:
 @dataclass(frozen=True, slots=True)
 class AdapterSchema:
     dataset_id: DatasetId
-    canonical_feature_order: tuple[str, ...]
+    feature_order: tuple[str, ...]
     roles: Mapping[str, FieldRole] = field(default_factory=lambda: {})
     timestamp_column: str | None = None
     multiclass_label_column: str | None = None
@@ -81,7 +81,7 @@ class AdapterSchema:
     def behavioral_features(self) -> tuple[str, ...]:
         return tuple(
             column
-            for column in self.canonical_feature_order
+            for column in self.feature_order
             if self.role_of(column)
             in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL)
         )
@@ -249,7 +249,7 @@ class DatasetAdapter:
         )
         return AdapterSchema(
             dataset_id=self._contract.dataset_id,
-            canonical_feature_order=feature_order,
+            feature_order=feature_order,
             roles=roles,
             timestamp_column=timestamp,
             multiclass_label_column=labels.multiclass_label_field,

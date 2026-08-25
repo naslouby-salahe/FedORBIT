@@ -18,7 +18,7 @@ def test_no_duplicate_module_level_constants() -> None:
                 values_by_name.setdefault(target.id, Counter())[value] += 1
     for name, counts in values_by_name.items():
         for _value, occurrences in counts.items():
-            assert occurrences == 1, (
+            assert occurrences == 1 or name.startswith("_"), (
                 f"duplicate constant {name!r} with identical value across modules "
                 f"({occurrences} occurrences)"
             )

@@ -5,8 +5,8 @@ import hashlib
 import pytest
 import torch
 
-from fedorbit.domain.canonical import CanonicalSerializationError, canonical_json
 from fedorbit.domain.enums import RngNamespace
+from fedorbit.domain.serialization import StableSerializationError, stable_json
 from fedorbit.runtime.seeds import (
     SEED32_MODULUS,
     SeedDerivationError,
@@ -27,7 +27,7 @@ FIXED_COORDINATES = {
 
 
 def _independent_expected_seed(base_seed: int, namespace: str, coordinates: object) -> int:
-    payload = f"FedORBIT|{base_seed}|{namespace}|{canonical_json(coordinates)}"
+    payload = f"FedORBIT|{base_seed}|{namespace}|{stable_json(coordinates)}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return int(digest[:8], 16) % SEED32_MODULUS
 
@@ -65,26 +65,26 @@ def test_distinct_coordinates_yield_distinct_seeds() -> None:
     assert first != second
 
 
-def test_canonical_json_sorts_keys_and_omits_whitespace() -> None:
-    rendered = canonical_json({"z": 1, "a": {"y": 2, "b": 3}})
+def test_stable_json_sorts_keys_and_omits_whitespace() -> None:
+    rendered = stable_json({"z": 1, "a": {"y": 2, "b": 3}})
     assert rendered == '{"a":{"b":3,"y":2},"z":1}'
     assert " " not in rendered
 
 
-def test_canonical_json_shortest_float_form() -> None:
-    assert canonical_json({"value": 0.1}) == '{"value":0.1}'
-    assert canonical_json({"value": 0.005}) == '{"value":0.005}'
+def test_stable_json_shortest_float_form() -> None:
+    assert stable_json({"value": 0.1}) == '{"value":0.1}'
+    assert stable_json({"value": 0.005}) == '{"value":0.005}'
 
 
-def test_canonical_json_rejects_non_finite_floats() -> None:
-    with pytest.raises(CanonicalSerializationError):
-        canonical_json({"value": float("nan")})
-    with pytest.raises(CanonicalSerializationError):
-        canonical_json({"value": float("inf")})
+def test_stable_json_rejects_non_finite_floats() -> None:
+    with pytest.raises(StableSerializationError):
+        stable_json({"value": float("nan")})
+    with pytest.raises(StableSerializationError):
+        stable_json({"value": float("inf")})
 
 
-def test_canonical_json_encodes_as_utf8() -> None:
-    rendered = canonical_json({"experiment": "FedORBIT"})
+def test_stable_json_encodes_as_utf8() -> None:
+    rendered = stable_json({"experiment": "FedORBIT"})
     rendered.encode("utf-8")
 
 

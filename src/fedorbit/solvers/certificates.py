@@ -44,14 +44,14 @@ class SeparatorWorkCertificate:
 
 def verify_correspondence_certificate(
     correspondence: BlockCorrespondence,
-    claimed_objective: float,
+    reported_objective: float,
     action: CurriculumAction,
     objective_tolerance: float,
 ) -> bool:
     from fedorbit.orbit.objective import evaluate_objective
 
     recomputed = evaluate_objective(action, correspondence)
-    return abs(recomputed - claimed_objective) <= objective_tolerance
+    return abs(recomputed - reported_objective) <= objective_tolerance
 
 
 def verify_exactness_certificate(
@@ -68,5 +68,5 @@ def require_valid_images(images: Sequence[int], blocks: PaddedBlockStructure) ->
         raise CertificateError("certificate images are not a padded-space bijection")
 
 
-def certificate_residual(claimed: float, recomputed: float) -> float:
-    return float(np.abs(claimed - recomputed))
+def certificate_residual(reported: float, recomputed: float) -> float:
+    return float(np.abs(reported - recomputed))

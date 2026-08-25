@@ -78,7 +78,7 @@ def test_doctor_is_read_only_and_validates_environment() -> None:
 def test_plan_is_read_only_and_derives_catalogue() -> None:
     result = runner.invoke(app, ["plan"])
     assert result.exit_code == 0
-    assert "registered experiments: 27" in result.output
+    assert "registered experiments: 26" in result.output
     assert "Primary Strict Cross-Telemetry Transfer" in result.output
 
 

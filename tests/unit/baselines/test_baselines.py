@@ -224,7 +224,7 @@ def test_without_confirmation_matches_principal_ranking_then_assimilates() -> No
     assert len(no_confirm_matrix) <= 1
 
 
-def test_method_names_are_canonical() -> None:
+def test_method_names_are_stable() -> None:
     for name in (
         TransferMethod.LOCAL_ONLY,
         TransferMethod.LOCAL_SIR,

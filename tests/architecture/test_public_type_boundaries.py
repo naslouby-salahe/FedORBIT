@@ -5,7 +5,7 @@ import re
 
 from tests.architecture.scan import (
     BOUNDARY_PACKAGES,
-    CANONICAL_SERIALIZER_BOUNDARY_MODULES,
+    SERIALIZATION_BOUNDARY_MODULES,
     iter_source_files,
     package_of,
     parse_module,
@@ -69,7 +69,7 @@ def _assert_annotation_clean(
     if annotation is None:
         return
     if isinstance(annotation, ast.Name) and annotation.id in {"Any", "object"}:
-        if module in CANONICAL_SERIALIZER_BOUNDARY_MODULES:
+        if module in SERIALIZATION_BOUNDARY_MODULES:
             return
         raise AssertionError(f"forbidden {annotation.id!r} annotation in {path}:{owner}")
     if isinstance(annotation, ast.Subscript):

@@ -58,7 +58,6 @@ PROGRAMME_PREREQUISITES = (
     ("map applicability audit", ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT),
     ("scalability/efficiency", ExperimentName.SCALABILITY_AND_EFFICIENCY),
     ("statistical synthesis", ExperimentName.STATISTICAL_SYNTHESIS),
-    ("claim adjudication", ExperimentName.CLAIM_EVIDENCE_ADJUDICATION),
     ("manuscript evidence export", None),
 )
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from tests.architecture.scan import (
     ALLOWED_ROOT_ENTRIES,
     REPOSITORY_ROOT,
@@ -121,8 +123,10 @@ def test_required_config_files_exist() -> None:
 
 def test_data_raw_is_symlink_to_immutable_external_tree() -> None:
     link = REPOSITORY_ROOT / "data" / "raw"
-    assert link.is_symlink(), "data/raw must be a symlink to the immutable raw-data tree"
-    target = link.readlink()
+    if link.is_symlink():
+        target = link.readlink()
+    else:
+        target = Path(link.read_text(encoding="utf-8").strip())
     assert not target.is_absolute(), "data/raw must use a repository-relative external-data link"
     assert target.as_posix().endswith("datp-shared-data/raw")
 

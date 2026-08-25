@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import sys
+from pathlib import Path
 
 from tests.architecture.scan import REPOSITORY_ROOT
 
@@ -15,13 +17,18 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _tool(name: str) -> str:
+    suffix = ".exe" if sys.platform == "win32" else ""
+    return str(Path(sys.executable).with_name(f"{name}{suffix}"))
+
+
 def test_ruff_lint_clean() -> None:
-    result = _run(["uv", "run", "ruff", "check", "src", "tests"])
+    result = _run([_tool("ruff"), "check", "src", "tests"])
     assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_ruff_format_clean() -> None:
-    result = _run(["uv", "run", "ruff", "format", "--check", "src", "tests"])
+    result = _run([_tool("ruff"), "format", "--check", "src", "tests"])
     assert result.returncode == 0, result.stdout + result.stderr
 
 

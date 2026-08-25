@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
-from fedorbit.domain.canonical import canonical_json
+from fedorbit.domain.serialization import stable_json
 
 
 class StorageError(ValueError):
@@ -14,7 +14,7 @@ class StorageError(ValueError):
 
 
 def atomic_write_json(path: Path, payload: object) -> None:
-    atomic_write_bytes(path, (canonical_json(payload) + "\n").encode("utf-8"))
+    atomic_write_bytes(path, (stable_json(payload) + "\n").encode("utf-8"))
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:

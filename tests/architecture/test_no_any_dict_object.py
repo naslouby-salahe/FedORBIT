@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from tests.architecture.scan import (
-    CANONICAL_SERIALIZER_BOUNDARY_MODULES,
+    SERIALIZATION_BOUNDARY_MODULES,
     iter_source_files,
     parse_module,
     relative_module,
@@ -29,7 +29,7 @@ def test_no_any_imports_in_production() -> None:
 
 def test_no_object_annotations_in_production() -> None:
     for path in iter_source_files():
-        if _canonical_boundary(path):
+        if _stable_boundary(path):
             continue
         tree = parse_module(path)
         for node in ast.walk(tree):
@@ -43,8 +43,8 @@ def test_no_object_annotations_in_production() -> None:
                         raise AssertionError(f"object parameter annotation in {path}:{node.name}")
 
 
-def _canonical_boundary(path: Path) -> bool:
-    return relative_module(path) in CANONICAL_SERIALIZER_BOUNDARY_MODULES
+def _stable_boundary(path: Path) -> bool:
+    return relative_module(path) in SERIALIZATION_BOUNDARY_MODULES
 
 
 def test_no_typing_object_usage() -> None:

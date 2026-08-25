@@ -13,7 +13,7 @@ from fedorbit.datasets.common import AdapterSchema, FieldRole
 from fedorbit.datasets.preprocessing import is_missing_token
 
 
-class CanonicalizationError(ValueError):
+class RowNormalizationError(ValueError):
     pass
 
 
@@ -21,7 +21,7 @@ RawFeatureValue = str | int | float | np.float64 | None
 
 
 @dataclass(frozen=True, slots=True)
-class CanonicalFeatureVector:
+class NormalizedFeatureVector:
     values_by_feature: Mapping[str, RawFeatureValue]
 
     def value_of(self, feature_name: str) -> RawFeatureValue:
@@ -30,13 +30,13 @@ class CanonicalFeatureVector:
 
 @dataclass(frozen=True, slots=True)
 class PartitionedFeatureValues:
-    numeric: CanonicalFeatureVector
-    categorical: CanonicalFeatureVector
+    numeric: NormalizedFeatureVector
+    categorical: NormalizedFeatureVector
 
 
 @dataclass(frozen=True, slots=True)
-class CanonicalRow:
-    features: CanonicalFeatureVector
+class NormalizedRow:
+    features: NormalizedFeatureVector
     label: str
     timestamp_fraction: float
     group_id: str
@@ -45,7 +45,7 @@ class CanonicalRow:
 @dataclass(frozen=True, slots=True)
 class DuplicateGroupMembers:
     group_sha256: str
-    members: tuple[CanonicalRow, ...]
+    members: tuple[NormalizedRow, ...]
 
     def has_conflicting_labels(self) -> bool:
         return len({member.label for member in self.members}) > 1
@@ -56,13 +56,13 @@ class DuplicateGroupMembers:
 
 @dataclass(frozen=True, slots=True)
 class DuplicateGroups:
-    groups: tuple[tuple[str, tuple[CanonicalRow, ...]], ...]
+    groups: tuple[tuple[str, tuple[NormalizedRow, ...]], ...]
 
     def __post_init__(self) -> None:
         seen: set[str] = set()
         for group_sha256, _ in self.groups:
             if group_sha256 in seen:
-                raise CanonicalizationError(
+                raise RowNormalizationError(
                     f"duplicate group {group_sha256[:16]} appears more than once"
                 )
             seen.add(group_sha256)
@@ -71,7 +71,7 @@ class DuplicateGroups:
     def group_count(self) -> int:
         return len(self.groups)
 
-    def members_of(self, group_sha256: str) -> tuple[CanonicalRow, ...] | None:
+    def members_of(self, group_sha256: str) -> tuple[NormalizedRow, ...] | None:
         for candidate_sha256, members in self.groups:
             if candidate_sha256 == group_sha256:
                 return members
@@ -83,17 +83,17 @@ class DuplicateGroups:
         )
 
 
-def canonical_missing_value(is_categorical: bool) -> RawFeatureValue:
+def normalized_missing_value(is_categorical: bool) -> RawFeatureValue:
     return "" if is_categorical else np.float64(np.nan)
 
 
 def normalize_value(value: RawFeatureValue, is_categorical: bool) -> RawFeatureValue:
     if is_missing_token(str(value).strip(), categorical=is_categorical):
-        return canonical_missing_value(is_categorical)
+        return normalized_missing_value(is_categorical)
     if isinstance(value, str):
         return unicodedata.normalize("NFC", value)
     if isinstance(value, float) and not math.isfinite(float(value)):
-        return canonical_missing_value(False)
+        return normalized_missing_value(False)
     return value
 
 
@@ -124,10 +124,10 @@ def _validity_mask_bits(validity: tuple[int, ...]) -> bytes:
     return bytes(mask)
 
 
-def canonical_row_bytes(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> bytes:
+def normalized_row_bytes(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> bytes:
     encoded = tuple(
         _column_bytes_and_validity(row_features.value_of(column), schema.role_of(column))
-        for column in schema.canonical_feature_order
+        for column in schema.feature_order
         if schema.role_of(column)
         in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL)
     )
@@ -135,12 +135,12 @@ def canonical_row_bytes(row_features: CanonicalFeatureVector, schema: AdapterSch
     return _validity_mask_bits(validity) + b"".join(payload for _, payload in encoded)
 
 
-def exact_duplicate_hash(row_features: CanonicalFeatureVector, schema: AdapterSchema) -> str:
-    return hashlib.sha256(canonical_row_bytes(row_features, schema)).hexdigest()
+def exact_duplicate_hash(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> str:
+    return hashlib.sha256(normalized_row_bytes(row_features, schema)).hexdigest()
 
 
-def deduplicate_rows(schema: AdapterSchema, rows: tuple[CanonicalRow, ...]) -> DuplicateGroups:
-    groups: dict[str, list[CanonicalRow]] = {}
+def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> DuplicateGroups:
+    groups: dict[str, list[NormalizedRow]] = {}
     for row in rows:
         row_hash = exact_duplicate_hash(row.features, schema)
         groups.setdefault(row_hash, []).append(row)
@@ -152,22 +152,22 @@ def deduplicate_rows(schema: AdapterSchema, rows: tuple[CanonicalRow, ...]) -> D
 def validate_duplicate_groups(groups: DuplicateGroups) -> None:
     for members in groups.as_member_records():
         if members.has_conflicting_labels():
-            raise CanonicalizationError(
+            raise RowNormalizationError(
                 f"duplicate group {members.group_sha256[:16]} contains conflicting labels: "
                 f"{members.conflicting_labels()}"
             )
 
 
-def partition_features(schema: AdapterSchema, row: CanonicalRow) -> PartitionedFeatureValues:
+def partition_features(schema: AdapterSchema, row: NormalizedRow) -> PartitionedFeatureValues:
     numeric: dict[str, RawFeatureValue] = {}
     categorical: dict[str, RawFeatureValue] = {}
-    for column in schema.canonical_feature_order:
+    for column in schema.feature_order:
         role = schema.role_of(column)
         if role == FieldRole.BEHAVIORAL_NUMERIC:
             numeric[column] = row.features.value_of(column)
         elif role == FieldRole.BEHAVIORAL_CATEGORICAL:
             categorical[column] = row.features.value_of(column)
     return PartitionedFeatureValues(
-        CanonicalFeatureVector(numeric),
-        CanonicalFeatureVector(categorical),
+        NormalizedFeatureVector(numeric),
+        NormalizedFeatureVector(categorical),
     )

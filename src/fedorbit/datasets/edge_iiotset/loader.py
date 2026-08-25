@@ -60,10 +60,10 @@ def inspect_edge_tabular_files(raw_root: Path) -> tuple[EdgeTabularFile, ...]:
                 columns,
             )
         )
-    canonical_columns = set(inspected[0].columns)
+    expected_columns = set(inspected[0].columns)
     for file in inspected[1:]:
-        if set(file.columns) != canonical_columns:
+        if set(file.columns) != expected_columns:
             raise EdgeLoaderError(
-                f"feature-name set differs from canonical Edge-IIoTset file: {file.relative_path}"
+                f"feature-name set differs from stable Edge-IIoTset file: {file.relative_path}"
             )
     return tuple(inspected)

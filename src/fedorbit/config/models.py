@@ -248,7 +248,7 @@ class ConfirmationSafetyCriteria(FrozenModel):
     equal_pair_relative_risk_reduction_minimum: float
 
 
-class ClaimCriteriaConfig(FrozenModel):
+class EvaluationCriteriaConfig(FrozenModel):
     strict_cross_telemetry_utility: StrictCrossTelemetryUtilityCriteria
     external_source_value_vs_local_sir: ExternalSourceValueVsLocalSirCriteria
     coupling_mechanism: CouplingMechanismCriteria
@@ -326,7 +326,7 @@ class ScientificConfig(FrozenModel):
     target_importance: TargetImportanceConfig
     randomness: RandomnessConfig
     statistics: StatisticsConfig
-    claim_criteria: ClaimCriteriaConfig
+    evaluation_criteria: EvaluationCriteriaConfig
     metrics: MetricsConfig
     multi_source_selection: MultiSourceSelectionConfig
     simplification_rules: SimplificationRulesConfig

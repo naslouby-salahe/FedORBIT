@@ -165,7 +165,7 @@ scientific:
     tost_alpha_per_one_sided_test: 0.05
     spearman_minimum_valid_points: 5
     mcnemar_exact_to_asymptotic_discordant_pair_switch: 25
-  claim_criteria:
+  evaluation_criteria:
     strict_cross_telemetry_utility:
       successful_primary_pairs_required: 3
       holm_adjusted_p_maximum: 0.05

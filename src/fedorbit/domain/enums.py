@@ -89,7 +89,6 @@ class ExperimentName(StrEnum):
     MAP_AVAILABILITY_APPLICABILITY_AUDIT = "Map-Availability Applicability Audit"
     SCALABILITY_AND_EFFICIENCY = "Scalability and Efficiency"
     STATISTICAL_SYNTHESIS = "Statistical Synthesis"
-    CLAIM_EVIDENCE_ADJUDICATION = "Claim-Evidence Adjudication"
 
 
 class ExperimentClassification(StrEnum):
@@ -132,16 +131,6 @@ class TerminalState(StrEnum):
     FAILED_SCIENTIFIC_ALGORITHMIC = "Failed / Scientific Algorithmic Failure"
     TIME_LIMIT = "Time Limit"
     RESOURCE_LIMIT = "Resource Limit"
-
-
-class ClaimState(StrEnum):
-    SUPPORTED = "Supported"
-    PARTIALLY_SUPPORTED = "Partially Supported"
-    MECHANISM_ONLY = "Mechanism Only"
-    CONDITIONAL = "Conditional"
-    NULL_RESULT = "Null Result"
-    NOT_SUPPORTED = "Not Supported"
-    NOT_TESTED = "Not Tested"
 
 
 class RngNamespace(StrEnum):
@@ -195,21 +184,6 @@ class MultiplicityFamily(StrEnum):
     MECHANISM_ABLATIONS = "Mechanism Ablations"
     SPARSITY_SENSITIVITY = "Sparsity Sensitivity"
     CONFIRMATION_SAFETY = "Confirmation Safety"
-
-
-class ClaimId(StrEnum):
-    EXACT_SPARSE_SEPARATOR_EXACTNESS = "Exact Sparse Separator Exactness"
-    JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM = (
-        "Joint Correspondence Avoids Rectangular Pessimism"
-    )
-    ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION = (
-        "Action Certification Without Fine-Map Identification"
-    )
-    STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY = "Strict Cross-Telemetry Transfer Utility"
-    VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE = "Value of External Procedural Evidence"
-    OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT = "Operational Relevance of Sparse Support"
-    TARGET_CONFIRMATION_SAFETY = "Target Confirmation Safety"
-    SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT = "Sparse Solver Work-Structure Agreement"
 
 
 class MetricId(StrEnum):

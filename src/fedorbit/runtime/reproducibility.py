@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from fedorbit.config.loading import repository_root
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.canonical import canonical_json
+from fedorbit.domain.serialization import stable_json
 from fedorbit.runtime.environment import EnvironmentSnapshot
 
 
@@ -72,7 +72,7 @@ def current_code_revision() -> CodeRevision:
 def _seed_digest(config: FedorbitConfig) -> str:
     randomness = config.scientific.randomness
     return hashlib.sha256(
-        canonical_json(
+        stable_json(
             {
                 "pilot_seeds": list(randomness.pilot_seeds),
                 "confirmatory_seeds": list(randomness.confirmatory_seeds),
@@ -107,7 +107,7 @@ class ReproducibilityIdentity:
 def statistical_identity_digest(config: FedorbitConfig, environment: EnvironmentSnapshot) -> str:
     scientific = config.scientific
     statistics = scientific.statistics
-    payload = canonical_json(
+    payload = stable_json(
         {
             "dataset_ids": list(scientific.datasets.clients),
             "primary_pairs": [
@@ -124,7 +124,7 @@ def statistical_identity_digest(config: FedorbitConfig, environment: Environment
             "preprocessing": scientific.preprocessing.model_dump(mode="json"),
             "seeds": _seed_digest(config),
             "confidence_level": statistics.confidence_level,
-            "claim_criteria": scientific.claim_criteria.model_dump(mode="json"),
+            "evaluation_criteria": scientific.evaluation_criteria.model_dump(mode="json"),
             "materiality": scientific.materiality.model_dump(mode="json"),
             "environment": environment.fingerprint_sha256,
         }
@@ -138,7 +138,7 @@ def build_reproducibility_identity(
     code_revision = current_code_revision()
     return ReproducibilityIdentity(
         config_digest=hashlib.sha256(
-            canonical_json(config.model_dump(mode="json")).encode("utf-8")
+            stable_json(config.model_dump(mode="json")).encode("utf-8")
         ).hexdigest(),
         seed_digest=_seed_digest(config),
         environment_fingerprint=environment.fingerprint_sha256,

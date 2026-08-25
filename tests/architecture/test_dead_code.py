@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 
 from tests.architecture.scan import REPOSITORY_ROOT, SRC_ROOT, iter_test_files, relative_module
 
@@ -17,7 +18,7 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 def test_vulture_finds_no_unused_production_code() -> None:
     whitelist = REPOSITORY_ROOT / "vulture_whitelist.py"
-    command = ["uv", "run", "vulture"]
+    command = [sys.executable, "-m", "vulture"]
     if whitelist.is_file():
         command.append(str(whitelist))
     command.extend(["src/fedorbit", "--min-confidence", "80"])

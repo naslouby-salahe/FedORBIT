@@ -9,8 +9,8 @@ from fedorbit.config.loading import (
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.config.testing import (
     FORBIDDEN_PRODUCTION_SECTIONS,
-    NonclaimConfigError,
-    NonclaimFixtureConfig,
+    FixtureConfigError,
+    FixtureFixtureConfig,
     load_smoke_config,
     load_tests_config,
 )
@@ -20,8 +20,8 @@ __all__ = [
     "FORBIDDEN_PRODUCTION_SECTIONS",
     "ConfigurationContractError",
     "FedorbitConfig",
-    "NonclaimConfigError",
-    "NonclaimFixtureConfig",
+    "FixtureConfigError",
+    "FixtureFixtureConfig",
     "contract_snapshot_path",
     "default_config_path",
     "load_fedorbit_config",

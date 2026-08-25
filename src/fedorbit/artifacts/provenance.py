@@ -10,8 +10,8 @@ from pathlib import Path
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.config.loading import repository_root
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.records import SemanticCell
+from fedorbit.domain.serialization import stable_json
 from fedorbit.runtime.environment import environment_snapshot
 from fedorbit.runtime.reproducibility import current_code_revision
 
@@ -147,7 +147,7 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
             versions.append((distribution, importlib.metadata.version(distribution)))
         except importlib.metadata.PackageNotFoundError:
             raise ProvenanceError(f"runtime component not installed: {distribution}") from None
-    payload = canonical_json({"components": components, "versions": versions})
+    payload = stable_json({"components": components, "versions": versions})
     return RuntimeFingerprint(
         components=components,
         versions=tuple(versions),
@@ -192,7 +192,7 @@ def configuration_subset_digest(
         extractor = extractors.get(section)
         if extractor is not None:
             values[section] = extractor()
-    return hashlib.sha256(canonical_json(values).encode("utf-8")).hexdigest()
+    return hashlib.sha256(stable_json(values).encode("utf-8")).hexdigest()
 
 
 def stage_dependency_fingerprint(
@@ -204,7 +204,7 @@ def stage_dependency_fingerprint(
     config_sections: frozenset[str],
     producer_module: str,
 ) -> str:
-    payload = canonical_json(
+    payload = stable_json(
         {
             "stage": stage,
             "semantic_coordinates": cell.identity_json(relevance),

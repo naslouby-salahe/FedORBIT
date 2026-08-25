@@ -4,19 +4,19 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.ontology import (
     NORMAL_LABEL,
     TRANSFER_CONCEPTS,
-    canonicalize_label,
     coarse_group_for,
     native_labels_for,
+    normalize_label,
     transfer_concept_for,
     transfer_eligibility,
 )
 from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
 
 
-def test_label_canonicalization_is_fixed() -> None:
-    assert canonicalize_label(" SQL/Injection ") == "sql_injection"
-    assert canonicalize_label("DDoS__TCP") == "ddos_tcp"
-    assert canonicalize_label("Normal") == NORMAL_LABEL
+def test_label_row_normalization_is_fixed() -> None:
+    assert normalize_label(" SQL/Injection ") == "sql_injection"
+    assert normalize_label("DDoS__TCP") == "ddos_tcp"
+    assert normalize_label("Normal") == NORMAL_LABEL
 
 
 def test_transfer_ontology_uses_ton_mapping_for_all_ton_clients() -> None:

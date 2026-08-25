@@ -8,8 +8,8 @@ import numpy as np
 import torch
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import ClientRole, CoarseGroup, DatasetId
+from fedorbit.domain.serialization import stable_json
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData, ResponseCandidate
 from fedorbit.response.uncertainty import (
@@ -113,10 +113,10 @@ class SourcePacket:
     technical_creation_timestamp: str
 
     def integrity_payload(self) -> str:
-        return canonical_json(self._integrity_payload())
+        return stable_json(self._integrity_payload())
 
     def serialized(self) -> str:
-        return canonical_json(self._wire_payload())
+        return stable_json(self._wire_payload())
 
     def compute_integrity_sha256(self) -> str:
         return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()

@@ -10,7 +10,7 @@ from tests.architecture.scan import (
     relative_module,
 )
 
-CANONICAL_VAGUE_MODULE_EXCEPTIONS = frozenset({"datasets.common"})
+VAGUE_MODULE_EXCEPTIONS = frozenset({"datasets.common"})
 
 
 def test_module_names_are_descriptive() -> None:
@@ -21,7 +21,7 @@ def test_module_names_are_descriptive() -> None:
                 f"banned name fragment {fragment!r} in module {module_name}"
             )
         leaf = module_name.rsplit(".", 1)[-1]
-        if module_name not in CANONICAL_VAGUE_MODULE_EXCEPTIONS:
+        if module_name not in VAGUE_MODULE_EXCEPTIONS:
             assert leaf not in VAGUE_MODULE_NAMES, f"vague module name: {module_name}"
         assert len(leaf) >= 3, f"module name too short: {module_name}"
 

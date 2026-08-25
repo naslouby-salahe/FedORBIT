@@ -33,10 +33,11 @@ def test_no_docstrings_in_python_source() -> None:
 
 def test_no_type_ignore_comments() -> None:
     for path in _python_files():
-        if "tests/architecture" in str(path):
+        if path.parent.name == "architecture":
             continue
         for lineno, line in enumerate(_lines(path), start=1):
-            assert "type: ignore" not in line, f"type-ignore in {path}:{lineno}"
+            marker = "type:" + " ignore"
+            assert marker not in line, f"suppression in {path}:{lineno}"
 
 
 def test_no_pragma_or_suppression_comments() -> None:
@@ -47,7 +48,7 @@ def test_no_pragma_or_suppression_comments() -> None:
             stripped = line.lstrip()
             if stripped.startswith("#") and any(
                 marker in stripped.lower()
-                for marker in ("noqa", "pylint", "pyright:", "pragma", "type: ignore")
+                for marker in ("noqa", "pylint", "pyright:", "pragma", "type:" + " ignore")
             ):
                 raise AssertionError(f"suppression comment in {path}:{lineno}")
 

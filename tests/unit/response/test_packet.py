@@ -49,7 +49,7 @@ def test_timestamp_does_not_change_scientific_integrity() -> None:
     assert first.payload_sha256() != second.payload_sha256()
 
 
-def test_packet_rejects_semantic_or_noncanonical_node_ids() -> None:
+def test_packet_rejects_semantic_or_nonstable_node_ids() -> None:
     packet = _packet()
     invalid = SourcePacket(
         anonymous_fine_node_ids=("ddos", "ransomware"),

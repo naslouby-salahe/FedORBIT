@@ -5358,7 +5358,6 @@ project/
 │       │   ├── __init__.py                        # Exposes registered statistical synthesis, method comparisons, and mechanical claim adjudication.
 │       │   ├── statistics.py                      # Implements exact sign-flip tests, paired BCa intervals, McNemar switching, TOST equivalence, Holm correction, and deterministic statistical metadata.
 │       │   ├── comparisons.py                     # Builds valid seed-paired contrasts, materiality decisions, confirmation-safety comparisons, cross-experiment synthesis inputs, and completeness checks.
-│       │   └── claims.py                          # Mechanically evaluates every roadmap claim against its exact support, falsification, kill, simplification, scope, and evidence-completeness conditions.
 │       │
 │       ├── artifacts/
 │       │   ├── __init__.py                        # Exposes canonical paths, manifests, storage, provenance, and validation for outputs/ and results/.
@@ -5533,7 +5532,6 @@ project/
     │   ├── analysis/
     │   │   ├── test_statistics.py
     │   │   ├── test_comparisons.py
-    │   │   └── test_claims.py
     │   ├── artifacts/
     │   │   ├── test_paths.py
     │   │   ├── test_manifests.py
@@ -5594,7 +5592,6 @@ project/
     │   │   ├── test_selective_invalidation.py
     │   │   └── test_recovery.py
     │   ├── analysis/
-    │   │   └── test_metrics_to_claim_state.py
     │   └── reporting/
     │       └── test_verified_results_export.py
     │

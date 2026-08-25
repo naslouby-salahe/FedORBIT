@@ -76,7 +76,7 @@ class TransferEligibility:
         return self.target_eligible
 
 
-def canonicalize_label(raw: str) -> str:
+def normalize_label(raw: str) -> str:
     normalized = unicodedata.normalize("NFC", raw).strip().casefold()
     underscored = re.sub(r"[^0-9a-z]+", "_", normalized)
     return re.sub(r"_+", "_", underscored).strip("_")
@@ -100,20 +100,20 @@ def native_labels_for(client: DatasetId) -> frozenset[str]:
 
 def transfer_concept_for(
     client: DatasetId,
-    canonical_label: str,
+    normalized_label: str,
 ) -> OracleTransferConcept | None:
     matches = tuple(
         concept
         for concept in OracleTransferConcept
-        if canonical_label in _native_mapping(client, concept)
+        if normalized_label in _native_mapping(client, concept)
     )
     if len(matches) > 1:
-        raise OntologyError(f"label maps to multiple transfer concepts: {canonical_label}")
+        raise OntologyError(f"label maps to multiple transfer concepts: {normalized_label}")
     return matches[0] if matches else None
 
 
-def coarse_group_for(client: DatasetId, canonical_label: str) -> CoarseGroup | None:
-    concept = transfer_concept_for(client, canonical_label)
+def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | None:
+    concept = transfer_concept_for(client, normalized_label)
     return None if concept is None else TRANSFER_ONTOLOGY[concept][0]
 
 

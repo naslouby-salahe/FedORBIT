@@ -129,8 +129,8 @@ def test_nominal_alpha_is_derived_not_configured(fedorbit_config: FedorbitConfig
     assert nominal_alpha(fedorbit_config) == 0.05
 
 
-def test_claim_criteria_locked(fedorbit_config: FedorbitConfig) -> None:
-    criteria = fedorbit_config.scientific.claim_criteria
+def test_evaluation_criteria_locked(fedorbit_config: FedorbitConfig) -> None:
+    criteria = fedorbit_config.scientific.evaluation_criteria
     assert criteria.strict_cross_telemetry_utility.successful_primary_pairs_required == 3
     assert criteria.strict_cross_telemetry_utility.holm_adjusted_p_maximum == 0.05
     assert criteria.coupling_mechanism.theorem_zero_strict_classification_accuracy_required == 1.0
@@ -373,7 +373,7 @@ def test_rejects_missing_primary_pair(mutable_config: ConfigDocument) -> None:
 def test_rejects_claim_requiring_five_pairs(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value(
         "scientific",
-        "claim_criteria",
+        "evaluation_criteria",
         "strict_cross_telemetry_utility",
         "successful_primary_pairs_required",
         value=5,

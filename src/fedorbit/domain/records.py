@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
+from fedorbit.domain.serialization import stable_json
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,4 +50,4 @@ class SemanticCell:
             value = present.get(coordinate)
             if value is not None:
                 values[coordinate] = value
-        return canonical_json(values)
+        return stable_json(values)

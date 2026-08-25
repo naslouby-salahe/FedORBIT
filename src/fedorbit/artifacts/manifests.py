@@ -8,8 +8,8 @@ from pathlib import Path
 from pydantic import Field
 
 from fedorbit.config.models import FrozenModel
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import ArtifactState, TerminalState
+from fedorbit.domain.serialization import stable_json
 
 NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
 FINE_CONCEPT_FIELD = "fine_concept"
@@ -145,7 +145,7 @@ def dependency_fingerprint(
     code_sha256: str,
     runtime_sha256: str,
 ) -> str:
-    payload = canonical_json(
+    payload = stable_json(
         {
             "coordinates": coordinates,
             "upstream_artifact_ids": list(upstream_artifact_ids),
@@ -158,7 +158,7 @@ def dependency_fingerprint(
 
 
 def artifact_id(artifact_type: str, coordinates: object, fingerprint_sha256: str) -> str:
-    payload = canonical_json(
+    payload = stable_json(
         {
             "artifact_type": artifact_type,
             "coordinates": coordinates,
@@ -169,7 +169,5 @@ def artifact_id(artifact_type: str, coordinates: object, fingerprint_sha256: str
 
 
 def completion_manifest_self_hash(manifest: CompletionManifest) -> str:
-    payload = canonical_json(
-        manifest.model_dump(mode="json", exclude={"completion_manifest_sha256"})
-    )
+    payload = stable_json(manifest.model_dump(mode="json", exclude={"completion_manifest_sha256"}))
     return _sha256(payload)

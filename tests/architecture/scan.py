@@ -188,9 +188,9 @@ LOCKED_VALUE_CONSTANT_PATTERN = {
 
 BOUNDARY_PACKAGES = frozenset({"domain", "config", "artifacts", "reporting", "cli"})
 
-CANONICAL_SERIALIZER_BOUNDARY_MODULES = frozenset(
+SERIALIZATION_BOUNDARY_MODULES = frozenset(
     {
-        "domain.canonical",
+        "domain.serialization",
         "runtime.seeds",
         "artifacts.manifests",
         "artifacts.storage",

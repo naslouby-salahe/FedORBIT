@@ -270,8 +270,8 @@ def _validate_statistics(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_claim_criteria(config: FedorbitConfig) -> None:
-    criteria = config.scientific.claim_criteria
+def _validate_evaluation_criteria(config: FedorbitConfig) -> None:
+    criteria = config.scientific.evaluation_criteria
     primary_pair_count = 4
     _require(
         criteria.strict_cross_telemetry_utility.successful_primary_pairs_required
@@ -519,7 +519,7 @@ def validate_cross_field_contract(config: FedorbitConfig) -> None:
     _validate_response(config)
     _validate_confirmation(config)
     _validate_statistics(config)
-    _validate_claim_criteria(config)
+    _validate_evaluation_criteria(config)
     _validate_simplification_rules(config)
     _validate_generators(config)
     _validate_solvers(config)

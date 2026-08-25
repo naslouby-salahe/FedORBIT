@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from fedorbit.domain.canonical import canonical_json
 from fedorbit.domain.enums import RngNamespace
+from fedorbit.domain.serialization import stable_json
 
 SEED32_MODULUS = 2**32
 
@@ -16,8 +16,8 @@ class SeedDerivationError(ValueError):
     pass
 
 
-def derive_seed32(base_seed: int, namespace: RngNamespace, canonical_coordinates: object) -> int:
-    coordinates_text = canonical_json(canonical_coordinates)
+def derive_seed32(base_seed: int, namespace: RngNamespace, stable_coordinates: object) -> int:
+    coordinates_text = stable_json(stable_coordinates)
     payload = f"FedORBIT|{base_seed}|{namespace.value}|{coordinates_text}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return int(digest[:8], 16) % SEED32_MODULUS
@@ -37,7 +37,7 @@ class SeedPlan:
 
 
 def seed_plan(base_seed: int, coordinates: object) -> SeedPlan:
-    coordinates_json_value = canonical_json(coordinates)
+    coordinates_json_value = stable_json(coordinates)
     return SeedPlan(
         base_seed=base_seed,
         coordinates_json=coordinates_json_value,

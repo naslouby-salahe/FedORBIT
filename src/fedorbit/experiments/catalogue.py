@@ -4,12 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import (
-    ClaimId,
-    ExperimentClassification,
-    ExperimentName,
-    TransferMethod,
-)
+from fedorbit.domain.enums import ExperimentClassification, ExperimentName, TransferMethod
 
 _PRIMARY_PAIRS_LABEL = "four primary directed pairs"
 _SECONDARY_PAIRS_LABEL = "four secondary directed pairs"
@@ -29,7 +24,6 @@ class ExperimentDefinition:
     seeds: tuple[int, ...]
     derived_planned_cells: int
     prerequisites: tuple[str, ...]
-    claims: tuple[ClaimId, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +64,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         seeds: tuple[int, ...],
         derived_cells: int,
         prerequisites: tuple[str, ...],
-        claims: tuple[ClaimId, ...],
     ) -> ExperimentDefinition:
         return ExperimentDefinition(
             name=name,
@@ -81,7 +74,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             seeds=seeds,
             derived_planned_cells=derived_cells,
             prerequisites=prerequisites,
-            claims=claims,
         )
 
     catalogue: dict[ExperimentName, ExperimentDefinition] = {}
@@ -95,7 +87,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         (0,),
         0,
         ("primitive implementation",),
-        (ClaimId.EXACT_SPARSE_SEPARATOR_EXACTNESS,),
     )
 
     block_patterns = config.generators.exact_separator_theorem.block_patterns
@@ -112,7 +103,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         theorem_cells,
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.EXACT_SPARSE_SEPARATOR_EXACTNESS,),
     )
 
     coupling_factorial = (
@@ -133,7 +123,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         coupling_factorial,
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
     client_count = len(config.scientific.datasets.clients)
@@ -146,7 +135,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         client_count * (primary_pair_count + secondary_pair_count) * len(confirmatory_seeds),
         ("raw manifests",),
-        (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
     pilot_configs = (
@@ -165,7 +153,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         (*pilot_seeds, *confirmatory_seeds),
         pilot_fits + confirmatory_checkpoints,
         (_experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),),
-        (),
     )
 
     response_candidates = len(
@@ -183,7 +170,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             _experiment_name(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT),
             _experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),
         ),
-        (),
     )
 
     planned_packets = client_count * len(confirmatory_seeds)
@@ -196,7 +182,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         planned_packets,
         (_experiment_name(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT),),
-        (ClaimId.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE,),
     )
 
     validation_seeds = (confirmatory_seeds[0], confirmatory_seeds[4])
@@ -216,7 +201,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         validation_seeds,
         primary_pair_count * len(validation_seeds),
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
     benchmark_k = (
@@ -239,7 +223,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         benchmark_cells,
         (_experiment_name(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION),),
-        (ClaimId.EXACT_SPARSE_SEPARATOR_EXACTNESS, ClaimId.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT),
     )
 
     catalogue[ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION] = definition(
@@ -251,7 +234,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         coupling_factorial * len(experiments.synthetic_coupling_mechanism_validation.methods),
         (_experiment_name(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION),),
-        (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
     catalogue[ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION] = definition(
@@ -266,7 +248,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             _experiment_name(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION),
             _experiment_name(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION),
         ),
-        (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
     diagnostic_fixtures = experiments.common_action_under_unidentified_map.fixtures_per_seed * len(
@@ -281,7 +262,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         diagnostic_fixtures,
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     catalogue[ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP] = definition(
@@ -293,7 +273,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         diagnostic_fixtures,
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     catalogue[ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY] = definition(
@@ -305,7 +284,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         diagnostic_fixtures,
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     bound_fixtures = (
@@ -321,7 +299,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         bound_fixtures,
         (_experiment_name(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     catalogue[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER] = definition(
@@ -336,7 +313,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             _experiment_name(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION),
             _experiment_name(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION),
         ),
-        (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
     multi_source_targets = len(experiments.multi_source_selection_validation.targets)
@@ -349,7 +325,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         multi_source_targets * len(confirmatory_seeds),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,),
     )
 
     ablation_methods = experiments.mechanism_ablations.methods
@@ -362,7 +337,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * len(ablation_methods),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,),
     )
 
     sparse_conditions = 4
@@ -380,7 +354,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * sparse_conditions,
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT,),
     )
 
     confirmation_methods = experiments.target_confirmation_and_portability.methods
@@ -395,7 +368,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         * len(confirmatory_seeds)
         * len(confirmation_methods),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.TARGET_CONFIRMATION_SAFETY,),
     )
 
     secondary_methods = experiments.secondary_cross_modality_generalization.methods
@@ -408,7 +380,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         secondary_pair_count * len(confirmatory_seeds) * len(secondary_methods),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (),
     )
 
     frontier_partitions = len(experiments.semantic_sufficiency_frontier.partitions)
@@ -422,7 +393,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         primary_pair_count * frontier_partitions * len(frontier_methods) * len(confirmatory_seeds),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     weak_signal = experiments.weak_signal_support_and_heterogeneity_boundaries
@@ -443,7 +413,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         weak_conditions * len(weak_signal.methods) * primary_pair_count * len(confirmatory_seeds),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (),
     )
 
     recovery_methods = experiments.map_availability_applicability_audit.packet_only_recovery_methods
@@ -457,7 +426,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         recovery_attempts,
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
-        (ClaimId.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,),
     )
 
     scalability = experiments.scalability_and_efficiency
@@ -485,7 +453,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         confirmatory_seeds,
         scalability_exact_cells + scalability_dense_cells + real_timing_cells,
         (_experiment_name(ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK),),
-        (ClaimId.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT,),
     )
 
     catalogue[ExperimentName.STATISTICAL_SYNTHESIS] = definition(
@@ -497,19 +464,6 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         (),
         0,
         ("completed registered artifacts",),
-        (),
-    )
-
-    catalogue[ExperimentName.CLAIM_EVIDENCE_ADJUDICATION] = definition(
-        ExperimentName.CLAIM_EVIDENCE_ADJUDICATION,
-        ExperimentClassification.FINAL_EVIDENCE,
-        (),
-        (),
-        (),
-        (),
-        0,
-        ("Statistical Synthesis", "claim catalogue"),
-        tuple(ClaimId),
     )
 
     return ExperimentCatalogue(catalogue)

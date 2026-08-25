@@ -47,14 +47,14 @@ def test_programme_prerequisites_in_roadmap_order() -> None:
     assert names[2] == "preprocessing"
     assert names[3] == "smoke validation"
     assert names[-1] == "manuscript evidence export"
-    assert len(PROGRAMME_PREREQUISITES) == 29
+    assert len(PROGRAMME_PREREQUISITES) == 28
 
 
 def test_readiness_empty_store_blocks_before_preprocessing(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path / "outputs")
     readiness = ExecutionReadiness(store, raw_root=tmp_path / "raw")
     states = readiness.prerequisite_states()
-    assert len(states) == 29
+    assert len(states) == 28
     assert not readiness.programme_ready()
     blocked = readiness.first_blocked()
     assert blocked is not None

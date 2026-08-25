@@ -1,9 +1,6 @@
-from fedorbit.domain.canonical import CanonicalSerializationError, canonical_json
 from fedorbit.domain.enums import (
     ArtifactState,
     ArtifactType,
-    ClaimId,
-    ClaimState,
     ClientRole,
     CoarseGroup,
     DatasetId,
@@ -21,13 +18,11 @@ from fedorbit.domain.enums import (
     TransferMethod,
 )
 from fedorbit.domain.records import DirectedPair, SemanticCell
+from fedorbit.domain.serialization import StableSerializationError, stable_json
 
 __all__ = [
     "ArtifactState",
     "ArtifactType",
-    "CanonicalSerializationError",
-    "ClaimId",
-    "ClaimState",
     "ClientRole",
     "CoarseGroup",
     "DatasetId",
@@ -43,7 +38,8 @@ __all__ = [
     "SemanticCell",
     "SolverId",
     "Split",
+    "StableSerializationError",
     "TerminalState",
     "TransferMethod",
-    "canonical_json",
+    "stable_json",
 ]

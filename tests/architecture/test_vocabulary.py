@@ -10,8 +10,8 @@ def test_forbidden_vocabulary_absent_from_production() -> None:
             assert term.lower() not in text, f"forbidden term {term!r} in {path}"
 
 
-def test_canonical_method_names_used_verbatim() -> None:
-    canonical = {
+def test_stable_method_names_used_verbatim() -> None:
+    stable = {
         "FedORBIT Exact-Sparse Solver",
         "FedORBIT Dense-CCP Fallback",
         "Matched-Resource Rectangular",
@@ -22,12 +22,11 @@ def test_canonical_method_names_used_verbatim() -> None:
     }
     for path in iter_source_files():
         text = path.read_text(encoding="utf-8")
-        for name in canonical:
+        for name in stable:
             variant = name.replace(" ", "").replace("-", "_")
             if variant in text and name not in text:
                 raise AssertionError(
-                    f"non-canonical method name spelling in {path}: {variant!r} "
-                    f"(canonical: {name!r})"
+                    f"non-stable method name spelling in {path}: {variant!r} (stable: {name!r})"
                 )
 
 

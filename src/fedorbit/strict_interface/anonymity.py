@@ -43,7 +43,7 @@ class AnonymousNodeOrder:
             raise AnonymityError("anonymous node permutation is not a bijection")
         expected_ids = tuple(f"node-{index:04d}" for index in range(1, len(self.permutation) + 1))
         if self.display_ids != expected_ids:
-            raise AnonymityError("anonymous node identifiers are not canonical sequential IDs")
+            raise AnonymityError("anonymous node identifiers are not stable sequential IDs")
 
     def reorder[T](self, values: tuple[T, ...]) -> tuple[T, ...]:
         if len(values) != len(self.permutation):

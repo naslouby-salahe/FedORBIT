@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 
 from tests.architecture.scan import REPOSITORY_ROOT
 
@@ -16,7 +17,7 @@ ROADMAP_LOCKED_NOT_YET_CONSUMED = {
 
 def test_deptry_reports_only_roadmap_locked_unconsumed_dependencies() -> None:
     result = subprocess.run(
-        ["uv", "run", "deptry", "src/fedorbit"],
+        [sys.executable, "-m", "deptry", "src/fedorbit"],
         cwd=REPOSITORY_ROOT,
         capture_output=True,
         text=True,

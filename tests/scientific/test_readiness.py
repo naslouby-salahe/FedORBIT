@@ -21,7 +21,7 @@ GOVERNED_VALUE_PROBES = (
     ("scientific", "statistics", "ci_bootstrap_repetitions"),
     (
         "scientific",
-        "claim_criteria",
+        "evaluation_criteria",
         "strict_cross_telemetry_utility",
         "successful_primary_pairs_required",
     ),

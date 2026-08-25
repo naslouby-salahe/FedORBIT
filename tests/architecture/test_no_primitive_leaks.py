@@ -5,7 +5,7 @@ import ast
 import pytest
 
 from tests.architecture.scan import (
-    CANONICAL_SERIALIZER_BOUNDARY_MODULES,
+    SERIALIZATION_BOUNDARY_MODULES,
     SRC_ROOT,
     iter_source_files,
     parse_module,
@@ -17,8 +17,8 @@ COLLECTION_PRIMITIVES = {"dict", "list", "set", "object"}
 SCALAR_PRIMITIVES = {"str", "int", "float", "bool"}
 
 
-def _is_canonical_serializer_boundary(module: str) -> bool:
-    return module in CANONICAL_SERIALIZER_BOUNDARY_MODULES
+def _is_stable_serializer_boundary(module: str) -> bool:
+    return module in SERIALIZATION_BOUNDARY_MODULES
 
 
 def _annotation_base(annotation: ast.expr | None) -> str | None:
@@ -105,7 +105,7 @@ def production_signature_violations() -> list[str]:
     violations: list[str] = []
     for path in iter_source_files():
         module = relative_module(path)
-        if module.endswith("__init__") or _is_canonical_serializer_boundary(module):
+        if module.endswith("__init__") or _is_stable_serializer_boundary(module):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for function in public_functions(tree):
@@ -173,7 +173,7 @@ def test_detector_allows_numpy_numeric_payloads() -> None:
     assert _violations_in_source(source) == []
 
 
-@pytest.mark.parametrize("module", sorted(CANONICAL_SERIALIZER_BOUNDARY_MODULES))
+@pytest.mark.parametrize("module", sorted(SERIALIZATION_BOUNDARY_MODULES))
 def test_exempt_modules_exist(module: str) -> None:
     path = SRC_ROOT.joinpath(*module.split(".")).with_suffix(".py")
     assert path.exists(), f"stale exemption entry: {module}"
@@ -239,7 +239,7 @@ def test_public_methods_do_not_leak_primitives() -> None:
     violations: list[str] = []
     for path in iter_source_files():
         module = relative_module(path)
-        if module.endswith("__init__") or module in CANONICAL_SERIALIZER_BOUNDARY_MODULES:
+        if module.endswith("__init__") or module in SERIALIZATION_BOUNDARY_MODULES:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

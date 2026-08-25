@@ -6,18 +6,18 @@ import unicodedata
 import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.datasets.canonicalization import (
-    CanonicalFeatureVector,
-    CanonicalizationError,
-    CanonicalRow,
-    canonical_row_bytes,
+from fedorbit.datasets.common import ObservedColumnSamples
+from fedorbit.datasets.edge_iiotset.schema import edge_iiotset_adapter
+from fedorbit.datasets.row_normalization import (
+    NormalizedFeatureVector,
+    NormalizedRow,
+    RowNormalizationError,
     deduplicate_rows,
     exact_duplicate_hash,
     normalize_value,
+    normalized_row_bytes,
     validate_duplicate_groups,
 )
-from fedorbit.datasets.common import ObservedColumnSamples
-from fedorbit.datasets.edge_iiotset.schema import edge_iiotset_adapter
 
 EDGE_COLUMNS = (
     "frame.time",
@@ -49,8 +49,8 @@ def _features(
     tcp_ack: float | None = 1.0,
     service_state: str = "OPEN",
     identity: str = "host-a",
-) -> CanonicalFeatureVector:
-    return CanonicalFeatureVector(
+) -> NormalizedFeatureVector:
+    return NormalizedFeatureVector(
         {
             "frame.time": "2024-01-01T00:00:00Z",
             "ip.src_host": identity,
@@ -64,13 +64,13 @@ def _features(
 
 
 def test_numeric_float64_serialization_is_little_endian() -> None:
-    payload = canonical_row_bytes(_features(tcp_ack=3.5), _schema())
+    payload = normalized_row_bytes(_features(tcp_ack=3.5), _schema())
     assert b"\x00\x00\x00\x00\x00\x00\x0c@" in payload
 
 
-def test_missing_numeric_uses_canonical_quiet_nan_and_zero_remains_observed() -> None:
-    missing = canonical_row_bytes(_features(tcp_ack=None), _schema())
-    zero = canonical_row_bytes(_features(tcp_ack=0.0), _schema())
+def test_missing_numeric_uses_stable_quiet_nan_and_zero_remains_observed() -> None:
+    missing = normalized_row_bytes(_features(tcp_ack=None), _schema())
+    zero = normalized_row_bytes(_features(tcp_ack=0.0), _schema())
     assert b"\x00\x00\x00\x00\x00\x00\xf8\x7f" in missing
     assert zero != missing
 
@@ -78,8 +78,8 @@ def test_missing_numeric_uses_canonical_quiet_nan_and_zero_remains_observed() ->
 def test_behavioral_categorical_strings_are_nfc_normalized() -> None:
     decomposed = unicodedata.normalize("NFD", "é")
     composed = unicodedata.normalize("NFC", "é")
-    first = canonical_row_bytes(_features(service_state=decomposed), _schema())
-    second = canonical_row_bytes(_features(service_state=composed), _schema())
+    first = normalized_row_bytes(_features(service_state=decomposed), _schema())
+    second = normalized_row_bytes(_features(service_state=composed), _schema())
     assert first == second
 
 
@@ -93,12 +93,12 @@ def test_duplicate_hash_ignores_forbidden_identity_fields() -> None:
 def test_exact_duplicate_grouping_rejects_conflicting_labels() -> None:
     schema = _schema()
     rows = (
-        CanonicalRow(_features(), "ddos", 0.1, ""),
-        CanonicalRow(_features(), "normal", 0.2, ""),
+        NormalizedRow(_features(), "ddos", 0.1, ""),
+        NormalizedRow(_features(), "normal", 0.2, ""),
     )
     groups = deduplicate_rows(schema, rows)
     assert groups.group_count == 1
-    with pytest.raises(CanonicalizationError):
+    with pytest.raises(RowNormalizationError):
         validate_duplicate_groups(groups)
 
 

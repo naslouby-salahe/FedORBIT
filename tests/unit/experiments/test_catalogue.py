@@ -205,16 +205,6 @@ def test_baseline_validation_seeds(
     assert definition.derived_planned_cells == 8
 
 
-def test_claims_are_assigned_to_governing_experiments(
-    catalogue: ExperimentCatalogue,
-) -> None:
-    assert catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER).claims
-    assert catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY).claims
-    assert catalogue.definition(ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY).claims
-    adjudication = catalogue.definition(ExperimentName.CLAIM_EVIDENCE_ADJUDICATION)
-    assert len(adjudication.claims) == 8
-
-
 def test_semantic_frontier_partitions_registered(
     catalogue: ExperimentCatalogue,
     fedorbit_config: FedorbitConfig,
@@ -239,10 +229,6 @@ def test_classifications_match_roadmap(
     assert (
         catalogue.definition(ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY).classification.value
         == "Failure Boundary"
-    )
-    assert (
-        catalogue.definition(ExperimentName.CLAIM_EVIDENCE_ADJUDICATION).classification.value
-        == "FINAL EVIDENCE"
     )
     assert (
         catalogue.definition(ExperimentName.STATISTICAL_SYNTHESIS).classification.value

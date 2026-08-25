@@ -26,7 +26,7 @@ SCIENTIFIC_SECTION_NAMES = {
     "target_importance",
     "randomness",
     "statistics",
-    "claim_criteria",
+    "evaluation_criteria",
     "metrics",
     "multi_source_selection",
     "simplification_rules",

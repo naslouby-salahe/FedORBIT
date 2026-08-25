@@ -8,12 +8,12 @@ from pydantic import ValidationError
 from tests.typed_access import ConfigDocument
 
 from fedorbit.config.loading import (
-    canonical_json,
     contract_snapshot_path,
     default_config_path,
     load_fedorbit_config,
     repository_root,
     snapshot_matches_contract,
+    stable_json,
     write_contract_snapshot,
 )
 from fedorbit.config.models import FedorbitConfig
@@ -75,17 +75,17 @@ def test_load_rejects_wrong_type(mutable_config: ConfigDocument) -> None:
         FedorbitConfig.model_validate(payload)
 
 
-def test_canonical_json_is_deterministic(fedorbit_config: FedorbitConfig) -> None:
-    first = canonical_json(fedorbit_config)
-    second = canonical_json(fedorbit_config)
+def test_stable_json_is_deterministic(fedorbit_config: FedorbitConfig) -> None:
+    first = stable_json(fedorbit_config)
+    second = stable_json(fedorbit_config)
     assert first == second
     assert "\n" not in first
     parsed = json.loads(first)
     assert parsed["scientific"]["action"]["principal_sparse_support"] == 2
 
 
-def test_canonical_json_sorts_keys(fedorbit_config: FedorbitConfig) -> None:
-    rendered = canonical_json(fedorbit_config)
+def test_stable_json_sorts_keys(fedorbit_config: FedorbitConfig) -> None:
+    rendered = stable_json(fedorbit_config)
     top = json.loads(rendered)
     assert list(top.keys()) == sorted(top.keys())
 

@@ -155,8 +155,8 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> str:
             "os_release": snapshot.hardware.os_release,
         },
     }
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    stable = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(stable.encode("utf-8")).hexdigest()
 
 
 def environment_snapshot(config: FedorbitConfig) -> EnvironmentSnapshot:

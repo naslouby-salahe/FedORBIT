@@ -75,9 +75,9 @@ def inspect_ton_iot_component_files(
                 columns,
             )
         )
-    canonical_columns = set(inspected[0].columns)
+    expected_columns = set(inspected[0].columns)
     for file in inspected[1:]:
-        if set(file.columns) != canonical_columns:
+        if set(file.columns) != expected_columns:
             message = (
                 f"feature-name set differs within component {component.component_name}: "
                 f"{file.relative_path}"

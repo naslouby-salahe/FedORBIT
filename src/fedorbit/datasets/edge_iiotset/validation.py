@@ -8,7 +8,7 @@ from fedorbit.datasets.edge_iiotset.schema import (
     EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
     EDGE_MULTICLASS_LABEL,
 )
-from fedorbit.datasets.ontology import canonicalize_label
+from fedorbit.datasets.ontology import normalize_label
 
 
 class EdgeValidationError(ValueError):
@@ -38,7 +38,7 @@ def validate_edge_schema(schema: AdapterSchema) -> None:
 
 def validate_binary_multiclass_consistency(rows: tuple[LabelObservation, ...]) -> None:
     for row in rows:
-        is_normal = canonicalize_label(row.multiclass_label) == "normal"
+        is_normal = normalize_label(row.multiclass_label) == "normal"
         if row.binary_label not in (0, 1):
             raise EdgeValidationError("binary label must be 0 or 1")
         if is_normal != (row.binary_label == 0):

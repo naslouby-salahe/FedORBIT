@@ -7,13 +7,13 @@ import platform
 import subprocess
 import tomllib
 from dataclasses import dataclass
-from typing import cast
 
 import psutil
 import torch
+from pydantic import ConfigDict
 
 from fedorbit.config.loading import repository_root
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.models import FedorbitConfig, FrozenModel
 
 DEPENDENCY_SPECS = (
     ("pytorch", "torch"),
@@ -205,41 +205,61 @@ class LockfileSummary:
         return self.hashed_package_count == len(self.package_names)
 
 
-LockfileEntry = dict[str, str | dict[str, str] | list[dict[str, str]]]
+class LockfileSource(FrozenModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    editable: str | None = None
+    path: str | None = None
+    git: str | None = None
+    url: str | None = None
+
+
+class LockfileDistribution(FrozenModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    hash: str | None = None
+
+
+class LockfilePackage(FrozenModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    name: str
+    version: str | None = None
+    source: LockfileSource | None = None
+    sdist: LockfileDistribution | None = None
+    wheels: tuple[LockfileDistribution, ...] = ()
+
+
+class LockfileDocument(FrozenModel):
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    package: tuple[LockfilePackage, ...] = ()
 
 
 SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"})
 
 
-def _package_has_hash(package: LockfileEntry) -> bool:
-    source = package.get("source")
-    if isinstance(source, dict) and any(marker in source for marker in SOURCE_MARKERS):
+def _package_has_hash(package: LockfilePackage) -> bool:
+    source = package.source
+    if source is not None and any(getattr(source, marker) is not None for marker in SOURCE_MARKERS):
         return True
-    sdist = package.get("sdist")
-    if isinstance(sdist, dict) and "hash" in sdist:
+    if package.sdist is not None and package.sdist.hash is not None:
         return True
-    wheels = package.get("wheels")
-    if isinstance(wheels, list):
-        for wheel in wheels:
-            if "hash" in wheel:
-                return True
-    return False
+    return any(wheel.hash is not None for wheel in package.wheels)
 
 
 def _collect_locked_packages(
-    packages: list[LockfileEntry],
+    packages: tuple[LockfilePackage, ...],
 ) -> tuple[list[str], dict[str, str]]:
     package_names: list[str] = []
     locked_versions: dict[str, str] = {}
     for package in packages:
-        name = package.get("name")
-        if not isinstance(name, str):
-            raise ValueError("uv.lock package entry lacks a name")
+        name = package.name
         if not _package_has_hash(package):
             raise ValueError(f"uv.lock package without hashes: {name}")
         package_names.append(name)
-        version = package.get("version")
-        if isinstance(version, str):
+        version = package.version
+        if version is not None:
             locked_versions[name] = version
     return package_names, locked_versions
 
@@ -252,11 +272,10 @@ def validate_lockfile(
         raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
     with lock_path.open("rb") as handle:
         lock = tomllib.load(handle)
-    raw_packages = lock.get("package", [])
-    if not isinstance(raw_packages, list) or not raw_packages:
+    document = LockfileDocument.model_validate(lock)
+    if not document.package:
         raise ValueError("uv.lock contains no package entries")
-    packages = cast(list[LockfileEntry], raw_packages)
-    package_names, locked_versions = _collect_locked_packages(packages)
+    package_names, locked_versions = _collect_locked_packages(document.package)
     environment = config.environment
     expected = {
         "torch": environment.pytorch,

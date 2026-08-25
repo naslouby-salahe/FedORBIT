@@ -19,9 +19,7 @@ def config() -> FedorbitConfig:
 def test_reserved_categories_sum_to_total_cap(config: FedorbitConfig) -> None:
     ledger = TargetOptimizerStepLedger.from_config(config)
     budget = config.scientific.target_optimizer_budget
-    assert sum(ledger.reserved_steps.values()) == (
-        budget.maximum_steps_per_method_pair_seed_before_test
-    )
+    assert ledger.reserved_steps.total == (budget.maximum_steps_per_method_pair_seed_before_test)
 
 
 def test_target_response_reserve_matches_registered_derivation(
@@ -31,7 +29,7 @@ def test_target_response_reserve_matches_registered_derivation(
     expected = 8 * diagnostic.paired_replicates * 2 * diagnostic.shadow_optimizer_steps
     ledger = TargetOptimizerStepLedger.from_config(config)
     assert (
-        ledger.reserved_steps[BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC]
+        ledger.reserved_steps.target_response_diagnostic
         == expected
         == config.scientific.target_optimizer_budget.reserved.target_response_diagnostic
     )
@@ -39,8 +37,8 @@ def test_target_response_reserve_matches_registered_derivation(
 
 def test_consumption_is_tracked_per_category(config: FedorbitConfig) -> None:
     ledger = TargetOptimizerStepLedger.from_config(config)
-    ledger.consume(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC, 100)
-    ledger.consume(BudgetCategory.LIVE_ASSIMILATION, 50)
+    ledger = ledger.consume(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC, 100)
+    ledger = ledger.consume(BudgetCategory.LIVE_ASSIMILATION, 50)
     assert ledger.remaining(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC) == 3100
     assert ledger.remaining(BudgetCategory.LIVE_ASSIMILATION) == 450
     assert ledger.total_consumed == 150
@@ -53,11 +51,11 @@ def test_unused_budget_never_transfers_across_categories_or_methods(
     with pytest.raises(OptimizerBudgetError):
         ledger.consume(
             BudgetCategory.CONFIRMATION_CANDIDATES,
-            ledger.reserved_steps[BudgetCategory.CONFIRMATION_CANDIDATES] + 1,
+            ledger.reserved_steps.confirmation_candidates + 1,
         )
-    ledger.consume(BudgetCategory.NONTRANSFERABLE_SAFETY_RESERVE, 0)
+    ledger = ledger.consume(BudgetCategory.NONTRANSFERABLE_SAFETY_RESERVE, 0)
     fresh = TargetOptimizerStepLedger.from_config(config)
-    ledger.consume(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC, 3200)
+    ledger = ledger.consume(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC, 3200)
     assert fresh.remaining(BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC) == 3200
 
 

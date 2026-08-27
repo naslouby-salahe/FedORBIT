@@ -49,7 +49,7 @@ packages = ["src/fedorbit"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
-exclude = ["outputs", "results", "data"]
+exclude = ["outputs", "results", "data", "vulture_whitelist.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "N", "ARG"]

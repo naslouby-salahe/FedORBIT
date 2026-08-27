@@ -14,7 +14,7 @@ from fedorbit.domain.enums import (
     TransferMethod,
 )
 
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SHA256_HEXDIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class MetricDirection(StrEnum):
@@ -222,5 +222,5 @@ class StatisticalMetadataRecord(FrozenRecord):
 
 
 def _require_sha256(value: str, field_name: str) -> None:
-    if _SHA256.fullmatch(value) is None:
+    if _SHA256_HEXDIGEST_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")

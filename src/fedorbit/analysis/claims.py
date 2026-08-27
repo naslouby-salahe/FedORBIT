@@ -419,7 +419,7 @@ def evaluate_confirmation_safety(
         if item.relative_risk_reduction is not None
     )
     equal_rrr = (
-        sum(value for value in rrr_values if value is not None) / len(rrr_values)
+        sum(rrr_values) / len(rrr_values)
         if len(rrr_values) == len(analyzable) and rrr_values
         else None
     )

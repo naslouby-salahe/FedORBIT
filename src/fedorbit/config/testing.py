@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
@@ -7,6 +8,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from fedorbit.config.loading import repository_root
+from fedorbit.domain.serialization import StableJsonPayload
 
 
 class FixtureConfigError(ValueError):
@@ -44,9 +46,9 @@ def _load_fixture(path: Path) -> FixtureFixtureConfig:
         raise FileNotFoundError(f"fixture configuration missing: {path}")
     with path.open(encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
-    if not isinstance(raw, dict):
+    if not isinstance(raw, Mapping):
         raise FixtureConfigError(f"fixture configuration must be a mapping: {path}")
-    present = set(cast(dict[str, object], raw))
+    present = set(cast(Mapping[str, StableJsonPayload], raw))
     unknown = present - REGISTERED_FIXTURE_KEYS
     if unknown:
         raise FixtureConfigError(f"unregistered fixture keys in {path.name}: {sorted(unknown)}")

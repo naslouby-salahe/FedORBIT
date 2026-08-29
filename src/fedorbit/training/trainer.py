@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, cast
 
@@ -11,6 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 
@@ -76,9 +78,9 @@ class OptimizerState:
             map_location="cpu",
             weights_only=True,
         )
-        if not isinstance(loaded, dict):
+        if not isinstance(loaded, Mapping):
             raise TrainingError("optimizer snapshot is not a state dictionary")
-        optimizer.load_state_dict(cast(dict[str, object], loaded))
+        optimizer.load_state_dict(cast(dict[str, StableJsonPayload], loaded))
 
 
 @dataclass(frozen=True, slots=True)

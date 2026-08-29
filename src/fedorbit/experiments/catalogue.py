@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -76,7 +77,7 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             prerequisites=prerequisites,
         )
 
-    catalogue: dict[ExperimentName, ExperimentDefinition] = {}
+    catalogue: OrderedDict[ExperimentName, ExperimentDefinition] = OrderedDict()
 
     catalogue[ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION] = definition(
         ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION,

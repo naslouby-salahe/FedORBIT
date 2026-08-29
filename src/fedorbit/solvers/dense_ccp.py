@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Mapping
+from collections import OrderedDict
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 
 import highspy
@@ -126,7 +127,7 @@ def _collect_block_products_for_target_pair(
     target_k: int,
     target_j: int,
     block_index: int,
-    coefficients: dict[tuple[int, int, int, int], float],
+    coefficients: MutableMapping[tuple[int, int, int, int], float],
 ) -> None:
     blocks = problem.blocks
     weight = float(problem.target_importance[target_k])
@@ -142,8 +143,8 @@ def _collect_block_products_for_target_pair(
 
 def _nonzero_product_coefficients(
     problem: RobustActionProblem, alpha: CurriculumAction
-) -> dict[tuple[int, int, int, int], float]:
-    coefficients: dict[tuple[int, int, int, int], float] = {}
+) -> Mapping[tuple[int, int, int, int], float]:
+    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict()
     blocks = problem.blocks
     for target_k in range(blocks.total_padded_nodes):
         block_of_k = blocks.block_of_node(target_k)
@@ -183,7 +184,7 @@ class _LiftedConstraintMatrix:
 def _append_lifted_assignment_rows(
     blocks: PaddedBlockStructure,
     layout: AssignmentVariableLayout,
-    add_row: Callable[[dict[int, float], float, float], None],
+    add_row: Callable[[Mapping[int, float], float, float], None],
 ) -> None:
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
@@ -212,7 +213,7 @@ def _build_lifted_constraint_matrix(
     blocks: PaddedBlockStructure,
     layout: AssignmentVariableLayout,
     product_keys: list[tuple[int, int, int, int]],
-    product_column: dict[tuple[int, int, int, int], int],
+    product_column: Mapping[tuple[int, int, int, int], int],
 ) -> _LiftedConstraintMatrix:
     infinity = highspy.kHighsInf
     row_lower: list[float] = []
@@ -221,7 +222,7 @@ def _build_lifted_constraint_matrix(
     index: list[int] = []
     value: list[float] = []
 
-    def add_row(entries: dict[int, float], lower: float, upper: float) -> None:
+    def add_row(entries: Mapping[int, float], lower: float, upper: float) -> None:
         for column in sorted(entries):
             index.append(column)
             value.append(entries[column])
@@ -249,7 +250,7 @@ def _build_lifted_constraint_matrix(
             -infinity,
             0.0,
         )
-        lower_combined: dict[int, float] = {}
+        lower_combined: OrderedDict[int, float] = OrderedDict()
         for node_pair in (
             AssignmentVariableKey(source_a, target_k),
             AssignmentVariableKey(source_b, target_j),
@@ -269,7 +270,7 @@ def _build_lifted_constraint_matrix(
 
 def _lifted_objective_vector(
     layout: AssignmentVariableLayout,
-    product_map: dict[tuple[int, int, int, int], float],
+    product_map: Mapping[tuple[int, int, int, int], float],
     product_keys: list[tuple[int, int, int, int]],
     penalty_coefficient: float,
     linearization_point: NDArray[np.float64],
@@ -460,7 +461,7 @@ def dense_starts(
     seed: int,
     coordinates: str,
 ) -> tuple[NDArray[np.float64], ...]:
-    unique_permutations: dict[tuple[int, ...], NDArray[np.float64]] = {}
+    unique_permutations: OrderedDict[tuple[int, ...], NDArray[np.float64]] = OrderedDict()
     for correspondence in enumerate_block_permutations(layout.blocks):
         unique_permutations.setdefault(
             correspondence.images,

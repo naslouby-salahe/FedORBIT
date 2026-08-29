@@ -8,11 +8,11 @@ from typing import Protocol, cast
 
 import torch
 from torch import nn
+from torch.optim.optimizer import StateDict
 from torch.utils.data import DataLoader, TensorDataset
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
-from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 
@@ -80,7 +80,7 @@ class OptimizerState:
         )
         if not isinstance(loaded, Mapping):
             raise TrainingError("optimizer snapshot is not a state dictionary")
-        optimizer.load_state_dict(cast(dict[str, StableJsonPayload], loaded))
+        optimizer.load_state_dict(cast(StateDict, loaded))
 
 
 @dataclass(frozen=True, slots=True)

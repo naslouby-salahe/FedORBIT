@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import ExperimentClassification, ExperimentName, TransferMethod
+from fedorbit.experiments.conditions import RegisteredConditions
 
 _PRIMARY_PAIRS_LABEL = "four primary directed pairs"
 _SECONDARY_PAIRS_LABEL = "four secondary directed pairs"
@@ -21,7 +22,7 @@ class ExperimentDefinition:
     classification: ExperimentClassification
     methods: tuple[str, ...]
     datasets_or_pairs: tuple[str, ...]
-    conditions: tuple[str | tuple[str, ...], ...]
+    conditions: RegisteredConditions
     seeds: tuple[int, ...]
     derived_planned_cells: int
     prerequisites: tuple[str, ...]
@@ -71,7 +72,7 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
             classification=classification,
             methods=method_names,
             datasets_or_pairs=pairs,
-            conditions=conditions,
+            conditions=RegisteredConditions(conditions),
             seeds=seeds,
             derived_planned_cells=derived_cells,
             prerequisites=prerequisites,
@@ -467,4 +468,8 @@ def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
         ("completed registered artifacts",),
     )
 
-    return ExperimentCatalogue(catalogue)
+    completed = ExperimentCatalogue(catalogue)
+    from fedorbit.experiments.validation import validate_catalogue
+
+    validate_catalogue(completed)
+    return completed

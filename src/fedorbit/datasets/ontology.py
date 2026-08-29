@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -12,44 +13,37 @@ NORMAL_LABEL = "normal"
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
 TRANSFER_ONTOLOGY: Mapping[
     OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]
-] = {
-    OracleTransferConcept.DDOS: (
-        CoarseGroup.DISRUPTION,
-        ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"),
-        ("ddos",),
-    ),
-    OracleTransferConcept.RANSOMWARE: (
-        CoarseGroup.DISRUPTION,
-        ("ransomware",),
-        ("ransomware",),
-    ),
-    OracleTransferConcept.BACKDOOR: (
-        CoarseGroup.EXPLOITATION,
-        ("backdoor",),
-        ("backdoor",),
-    ),
-    OracleTransferConcept.INJECTION: (
-        CoarseGroup.EXPLOITATION,
-        ("sql_injection",),
-        ("injection",),
-    ),
-    OracleTransferConcept.XSS: (CoarseGroup.EXPLOITATION, ("xss",), ("xss",)),
-    OracleTransferConcept.PASSWORD_ATTACK: (
-        CoarseGroup.ACCESS_AND_DISCOVERY,
-        ("password",),
-        ("password",),
-    ),
-    OracleTransferConcept.SCANNING: (
-        CoarseGroup.ACCESS_AND_DISCOVERY,
-        ("port_scanning", "fingerprinting", "vulnerability_scanner"),
-        ("scanning",),
-    ),
-    OracleTransferConcept.MITM: (
-        CoarseGroup.ACCESS_AND_DISCOVERY,
-        ("mitm",),
-        ("mitm",),
-    ),
-}
+] = OrderedDict[OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]](
+    (
+        (
+            OracleTransferConcept.DDOS,
+            (CoarseGroup.DISRUPTION, ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"), ("ddos",)),
+        ),
+        (
+            OracleTransferConcept.RANSOMWARE,
+            (CoarseGroup.DISRUPTION, ("ransomware",), ("ransomware",)),
+        ),
+        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, ("backdoor",), ("backdoor",))),
+        (
+            OracleTransferConcept.INJECTION,
+            (CoarseGroup.EXPLOITATION, ("sql_injection",), ("injection",)),
+        ),
+        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, ("xss",), ("xss",))),
+        (
+            OracleTransferConcept.PASSWORD_ATTACK,
+            (CoarseGroup.ACCESS_AND_DISCOVERY, ("password",), ("password",)),
+        ),
+        (
+            OracleTransferConcept.SCANNING,
+            (
+                CoarseGroup.ACCESS_AND_DISCOVERY,
+                ("port_scanning", "fingerprinting", "vulnerability_scanner"),
+                ("scanning",),
+            ),
+        ),
+        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, ("mitm",), ("mitm",))),
+    )
+)
 EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({"uploading"})
 TON_ELIGIBLE_LOCAL_CLASSES = frozenset({"dos"})
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
@@ -19,6 +20,32 @@ from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstim
 
 class ExecutionError(ValueError):
     pass
+
+
+class OverwritePolicy(StrEnum):
+    REUSE = "reuse"
+    REPLACE = "replace"
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetPreparationRequest:
+    datasets: tuple[DatasetId, ...]
+    overwrite_policy: OverwritePolicy
+
+    @property
+    def overwrite_requested(self) -> bool:
+        return self.overwrite_policy == OverwritePolicy.REPLACE
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentExecutionRequest:
+    experiment: ExperimentName
+    definition: ExperimentDefinition
+    overwrite_policy: OverwritePolicy
+
+    @property
+    def overwrite_requested(self) -> bool:
+        return self.overwrite_policy == OverwritePolicy.REPLACE
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,26 +88,26 @@ def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:
     recovery.next_resume(cells)
 
 
-def preprocess_datasets(datasets: tuple[DatasetId, ...], overwrite: bool) -> None:
+def preprocess_datasets(request: DatasetPreparationRequest) -> None:
     store = execution_store()
     reuse = ExecutionReuse(store)
     cells = tuple(
         cell
-        for dataset in datasets
+        for dataset in request.datasets
         for cell in (
             (f"raw-manifest:{dataset.value}", f"raw-{dataset.value}"),
             (f"prepared:{dataset.value}", f"prepared-{dataset.value}"),
         )
     )
     _recover(store, cells)
-    decisions = reuse.decide(cells, overwrite)
+    decisions = reuse.decide(cells, request.overwrite_requested)
     reuse.validate_existing(decisions)
     if any(decision.execute or decision.overwrite for decision in decisions):
         raise NotReadyError("preprocessing compute backend is not implemented")
 
 
-def run_smoke_validation(overwrite: bool) -> None:
-    del overwrite
+def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
+    del overwrite_policy
     estimate = FinalResponseEstimate(
         entries=(FinalResponseEntry(0, 0, 1.0, 0.0, 1.0, 1.0, True),),
         critical_value=1.0,
@@ -102,19 +129,15 @@ def run_smoke_validation(overwrite: bool) -> None:
     packet.validate()
 
 
-def run_experiment(
-    experiment: ExperimentName,
-    definition: ExperimentDefinition,
-    overwrite: bool,
-) -> None:
+def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
     reuse = ExecutionReuse(store)
     cells = tuple(
-        (f"{experiment.value}:{seed}", f"cell-{experiment.value}-{seed}")
-        for seed in definition.seeds
+        (f"{request.experiment.value}:{seed}", f"cell-{request.experiment.value}-{seed}")
+        for seed in request.definition.seeds
     )
     _recover(store, cells)
-    decisions = reuse.decide(cells, overwrite)
+    decisions = reuse.decide(cells, request.overwrite_requested)
     reuse.validate_existing(decisions)
     if any(decision.execute or decision.overwrite for decision in decisions):
         raise NotReadyError("confirmatory experiment compute backend is not implemented")

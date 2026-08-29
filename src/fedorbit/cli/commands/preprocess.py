@@ -7,7 +7,11 @@ from fedorbit.cli.parsing import dataset_identifier
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import DatasetId
 from fedorbit.execution.errors import NotReadyError
-from fedorbit.execution.executor import preprocess_datasets
+from fedorbit.execution.executor import (
+    DatasetPreparationRequest,
+    OverwritePolicy,
+    preprocess_datasets,
+)
 
 
 def preprocess(
@@ -20,7 +24,12 @@ def preprocess(
             if dataset_name is not None
             else _registered_datasets()
         )
-        preprocess_datasets(selected, overwrite)
+        preprocess_datasets(
+            DatasetPreparationRequest(
+                datasets=selected,
+                overwrite_policy=OverwritePolicy.REPLACE if overwrite else OverwritePolicy.REUSE,
+            )
+        )
     except (CliUsageError, NotReadyError) as error:
         exit_from_error(error)
 

@@ -6,6 +6,8 @@ import json
 import platform
 import subprocess
 import tomllib
+from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import psutil
@@ -250,9 +252,9 @@ def _package_has_hash(package: LockfilePackage) -> bool:
 
 def _collect_locked_packages(
     packages: tuple[LockfilePackage, ...],
-) -> tuple[list[str], dict[str, str]]:
+) -> tuple[list[str], Mapping[str, str]]:
     package_names: list[str] = []
-    locked_versions: dict[str, str] = {}
+    locked_versions: OrderedDict[str, str] = OrderedDict()
     for package in packages:
         name = package.name
         if not _package_has_hash(package):

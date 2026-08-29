@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -80,8 +81,8 @@ def build_target_importance(
     if floor <= 0.0:
         raise TargetImportanceError("class risk floor must be positive")
     seen: set[int] = set()
-    floored: dict[int, float] = {}
-    zero_nodes: dict[int, float] = {}
+    floored: OrderedDict[int, float] = OrderedDict()
+    zero_nodes: OrderedDict[int, float] = OrderedDict()
     for node_risk in node_risks:
         if node_risk.node_index in seen:
             raise TargetImportanceError(f"node {node_risk.node_index} reported more than once")
@@ -95,9 +96,11 @@ def build_target_importance(
             "no actionable target nodes with META risk; target importance undefined"
         )
     total = sum(floored.values())
-    weights = {node_index: value / total for node_index, value in sorted(floored.items())}
-    combined = {**zero_nodes, **weights}
-    ordered = {node_index: combined[node_index] for node_index in sorted(seen)}
+    weights = OrderedDict(
+        (node_index, value / total) for node_index, value in sorted(floored.items())
+    )
+    combined = OrderedDict((*zero_nodes.items(), *weights.items()))
+    ordered = OrderedDict((node_index, combined[node_index]) for node_index in sorted(seen))
     return TargetImportance(weights_by_node_index=ordered)
 
 

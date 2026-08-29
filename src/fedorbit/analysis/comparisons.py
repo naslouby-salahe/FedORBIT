@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
@@ -256,9 +257,7 @@ def _pair_contrast(
 
 
 def registered_family_inputs() -> RegisteredFamilyInputs:
-    families: dict[MultiplicityFamily, list[RegisteredContrast]] = {
-        family: [] for family in MultiplicityFamily
-    }
+    families: defaultdict[MultiplicityFamily, list[RegisteredContrast]] = defaultdict(list)
     solver = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value
     for pair in PRIMARY_PAIR_NAMES:
         families[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY].append(
@@ -388,7 +387,9 @@ def _family_states(
         key=lambda entry: (entry.raw_p_value, entry.contrast_name, entry.directed_pair),
     )
     family_size = len(ordered)
-    adjusted_by_key: dict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = {}
+    adjusted_by_key: OrderedDict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = (
+        OrderedDict()
+    )
     running_max = 0.0
     for index, entry in enumerate(ordered):
         scaled = min(1.0, entry.raw_p_value * (family_size - index))

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -272,7 +273,7 @@ def enumerate_active_image_maps(
     blocks: PaddedBlockStructure,
     active_support_nodes: Sequence[int],
 ) -> Iterator[ActiveImageMap]:
-    by_block: dict[int, list[int]] = {}
+    by_block: defaultdict[int, list[int]] = defaultdict(list)
     for node in sorted(active_support_nodes):
         by_block.setdefault(blocks.block_of_node(node), []).append(node)
     choices: list[BlockActiveImageChoice] = []

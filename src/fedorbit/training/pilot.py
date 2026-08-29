@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import statistics
+from collections import defaultdict
 from dataclasses import dataclass
 
 import torch
@@ -108,7 +109,7 @@ def run_base_model_pilot(
 
 
 def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSelection:
-    grouped: dict[PilotConfiguration, list[float]] = {}
+    grouped: defaultdict[PilotConfiguration, list[float]] = defaultdict(list)
     for result in results:
         grouped.setdefault(result.configuration, []).append(
             result.outcome.valid_macro_cross_entropy

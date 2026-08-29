@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from fedorbit.domain.enums import ExperimentName
 
 
 def experiment_relevance(experiment: ExperimentName) -> frozenset[str]:
     common = frozenset({"experiment", "seed"})
-    by_experiment: dict[ExperimentName, frozenset[str]] = {
+    by_experiment: Mapping[ExperimentName, frozenset[str]] = {
         ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION: frozenset(
             {"experiment", "seed", "condition", "support"}
         ),

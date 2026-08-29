@@ -141,22 +141,27 @@ def _driver_version() -> str | None:
 
 
 def _fingerprint(snapshot: EnvironmentSnapshot) -> str:
-    payload = {
-        "python_version": snapshot.python_version,
-        "dependencies": {
-            dependency.configured_key: dependency.observed for dependency in snapshot.dependencies
-        },
-        "hardware": {
-            "gpu_name": snapshot.hardware.gpu_name,
-            "gpu_memory_bytes": snapshot.hardware.gpu_memory_bytes,
-            "cuda_available": snapshot.hardware.cuda_available,
-            "driver_cuda_version": snapshot.hardware.driver_cuda_version,
-            "torch_cuda_version": snapshot.hardware.torch_cuda_version,
-            "cpu_name": snapshot.hardware.cpu_name,
-            "ram_bytes": snapshot.hardware.ram_bytes,
-            "os_release": snapshot.hardware.os_release,
-        },
-    }
+    dependencies = OrderedDict(
+        (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
+    )
+    hardware: OrderedDict[str, str | int | bool | None] = OrderedDict(
+        gpu_name=snapshot.hardware.gpu_name,
+        gpu_memory_bytes=snapshot.hardware.gpu_memory_bytes,
+        cuda_available=snapshot.hardware.cuda_available,
+        driver_cuda_version=snapshot.hardware.driver_cuda_version,
+        torch_cuda_version=snapshot.hardware.torch_cuda_version,
+        cpu_name=snapshot.hardware.cpu_name,
+        ram_bytes=snapshot.hardware.ram_bytes,
+        os_release=snapshot.hardware.os_release,
+    )
+    payload: OrderedDict[
+        str,
+        str | OrderedDict[str, str] | OrderedDict[str, str | int | bool | None],
+    ] = OrderedDict(
+        python_version=snapshot.python_version,
+        dependencies=dependencies,
+        hardware=hardware,
+    )
     stable = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(stable.encode("utf-8")).hexdigest()
 
@@ -279,21 +284,23 @@ def validate_lockfile(
         raise ValueError("uv.lock contains no package entries")
     package_names, locked_versions = _collect_locked_packages(document.package)
     environment = config.environment
-    expected = {
-        "torch": environment.pytorch,
-        "numpy": environment.numpy,
-        "scipy": environment.scipy,
-        "scikit-learn": environment.scikit_learn,
-        "pandas": environment.pandas,
-        "pyarrow": environment.pyarrow,
-        "highspy": environment.highspy_highs,
-        "pyscipopt": environment.pyscipopt,
-        "pydantic": environment.pydantic,
-        "typer": environment.typer,
-        "psutil": environment.psutil,
-        "pytest": environment.pytest,
-        "pytest-cov": environment.pytest_cov,
-    }
+    expected: OrderedDict[str, str] = OrderedDict(
+        (
+            ("torch", environment.pytorch),
+            ("numpy", environment.numpy),
+            ("scipy", environment.scipy),
+            ("scikit-learn", environment.scikit_learn),
+            ("pandas", environment.pandas),
+            ("pyarrow", environment.pyarrow),
+            ("highspy", environment.highspy_highs),
+            ("pyscipopt", environment.pyscipopt),
+            ("pydantic", environment.pydantic),
+            ("typer", environment.typer),
+            ("psutil", environment.psutil),
+            ("pytest", environment.pytest),
+            ("pytest-cov", environment.pytest_cov),
+        )
+    )
     for distribution, configured in expected.items():
         locked = locked_versions.get(distribution)
         if locked != configured and distribution not in allow_deviations:

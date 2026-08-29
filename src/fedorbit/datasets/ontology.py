@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fedorbit.config.models import FedorbitConfig
@@ -9,7 +10,7 @@ from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
 
 NORMAL_LABEL = "normal"
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
-TRANSFER_ONTOLOGY: dict[
+TRANSFER_ONTOLOGY: Mapping[
     OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]
 ] = {
     OracleTransferConcept.DDOS: (

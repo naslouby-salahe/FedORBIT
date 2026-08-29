@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -213,7 +214,7 @@ class DatasetAdapter:
             self._contract.multiclass_label_candidates,
             self._contract.binary_label_candidates,
         )
-        roles: dict[str, FieldRole] = {}
+        roles: OrderedDict[str, FieldRole] = OrderedDict()
         excluded = self._contract.additional_exclusions
         for column in observed_columns:
             if column == timestamp:

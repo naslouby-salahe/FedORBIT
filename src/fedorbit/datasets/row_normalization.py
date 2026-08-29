@@ -4,6 +4,7 @@ import hashlib
 import math
 import struct
 import unicodedata
+from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -140,7 +141,7 @@ def exact_duplicate_hash(row_features: NormalizedFeatureVector, schema: AdapterS
 
 
 def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> DuplicateGroups:
-    groups: dict[str, list[NormalizedRow]] = {}
+    groups: defaultdict[str, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
         row_hash = exact_duplicate_hash(row.features, schema)
         groups.setdefault(row_hash, []).append(row)
@@ -159,8 +160,8 @@ def validate_duplicate_groups(groups: DuplicateGroups) -> None:
 
 
 def partition_features(schema: AdapterSchema, row: NormalizedRow) -> PartitionedFeatureValues:
-    numeric: dict[str, RawFeatureValue] = {}
-    categorical: dict[str, RawFeatureValue] = {}
+    numeric: OrderedDict[str, RawFeatureValue] = OrderedDict()
+    categorical: OrderedDict[str, RawFeatureValue] = OrderedDict()
     for column in schema.feature_order:
         role = schema.role_of(column)
         if role == FieldRole.BEHAVIORAL_NUMERIC:

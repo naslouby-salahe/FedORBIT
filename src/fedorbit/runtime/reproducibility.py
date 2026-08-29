@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import cast
 
 from fedorbit.config.loading import repository_root
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.serialization import stable_json
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import EnvironmentSnapshot
 
 
@@ -73,11 +75,14 @@ def _seed_digest(config: FedorbitConfig) -> str:
     randomness = config.scientific.randomness
     return hashlib.sha256(
         stable_json(
-            {
-                "pilot_seeds": list(randomness.pilot_seeds),
-                "confirmatory_seeds": list(randomness.confirmatory_seeds),
-                "statistical_seed": randomness.statistical_seed,
-            }
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    pilot_seeds=list(randomness.pilot_seeds),
+                    confirmatory_seeds=list(randomness.confirmatory_seeds),
+                    statistical_seed=randomness.statistical_seed,
+                ),
+            )
         ).encode("utf-8")
     ).hexdigest()
 
@@ -108,26 +113,29 @@ def statistical_identity_digest(config: FedorbitConfig, environment: Environment
     scientific = config.scientific
     statistics = scientific.statistics
     payload = stable_json(
-        {
-            "dataset_ids": list(scientific.datasets.clients),
-            "primary_pairs": [
-                [pair.source.value, pair.target.value]
-                for pair in scientific.datasets.primary_directed_pairs
-            ],
-            "secondary_pairs": [
-                [pair.source.value, pair.target.value]
-                for pair in scientific.datasets.secondary_directed_pairs
-            ],
-            "split": scientific.split.duplicate_safe_chronological_intervals.model_dump(
-                mode="json"
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                dataset_ids=list(scientific.datasets.clients),
+                primary_pairs=[
+                    [pair.source.value, pair.target.value]
+                    for pair in scientific.datasets.primary_directed_pairs
+                ],
+                secondary_pairs=[
+                    [pair.source.value, pair.target.value]
+                    for pair in scientific.datasets.secondary_directed_pairs
+                ],
+                split=scientific.split.duplicate_safe_chronological_intervals.model_dump(
+                    mode="json"
+                ),
+                preprocessing=scientific.preprocessing.model_dump(mode="json"),
+                seeds=_seed_digest(config),
+                confidence_level=statistics.confidence_level,
+                evaluation_criteria=scientific.evaluation_criteria.model_dump(mode="json"),
+                materiality=scientific.materiality.model_dump(mode="json"),
+                environment=environment.fingerprint_sha256,
             ),
-            "preprocessing": scientific.preprocessing.model_dump(mode="json"),
-            "seeds": _seed_digest(config),
-            "confidence_level": statistics.confidence_level,
-            "evaluation_criteria": scientific.evaluation_criteria.model_dump(mode="json"),
-            "materiality": scientific.materiality.model_dump(mode="json"),
-            "environment": environment.fingerprint_sha256,
-        }
+        )
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

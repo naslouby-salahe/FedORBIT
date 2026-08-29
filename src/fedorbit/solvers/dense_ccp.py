@@ -235,18 +235,22 @@ def _build_lifted_constraint_matrix(
         source_a, source_b, target_k, target_j = product_key
         y_column = product_column[product_key]
         add_row(
-            {
-                y_column: 1.0,
-                layout.column_of(AssignmentVariableKey(source_a, target_k)): -1.0,
-            },
+            OrderedDict(
+                (
+                    (y_column, 1.0),
+                    (layout.column_of(AssignmentVariableKey(source_a, target_k)), -1.0),
+                )
+            ),
             -infinity,
             0.0,
         )
         add_row(
-            {
-                y_column: 1.0,
-                layout.column_of(AssignmentVariableKey(source_b, target_j)): -1.0,
-            },
+            OrderedDict(
+                (
+                    (y_column, 1.0),
+                    (layout.column_of(AssignmentVariableKey(source_b, target_j)), -1.0),
+                )
+            ),
             -infinity,
             0.0,
         )

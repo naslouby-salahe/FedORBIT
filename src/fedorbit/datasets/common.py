@@ -69,7 +69,7 @@ class ObservedColumnSamples:
 class AdapterSchema:
     dataset_id: DatasetId
     feature_order: tuple[str, ...]
-    roles: Mapping[str, FieldRole] = field(default_factory=lambda: {})
+    roles: Mapping[str, FieldRole] = field(default_factory=OrderedDict)
     timestamp_column: str | None = None
     multiclass_label_column: str | None = None
     binary_label_column: str | None = None

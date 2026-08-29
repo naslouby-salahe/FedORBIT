@@ -3,7 +3,8 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.metadata
-from collections.abc import Callable
+from collections import OrderedDict
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from fedorbit.domain.serialization import stable_json
 from fedorbit.runtime.environment import environment_snapshot
 from fedorbit.runtime.reproducibility import current_code_revision
 
-JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+JsonValue = str | int | float | bool | None | list["JsonValue"] | Mapping[str, "JsonValue"]
 
 STAGES = (
     "raw",
@@ -34,7 +35,7 @@ STAGES = (
     "reporting",
 )
 
-STAGE_DEPENDENCIES: dict[str, tuple[str, ...]] = {
+STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
     "raw": (),
     "preprocessing": ("raw",),
     "eligibility": ("preprocessing",),
@@ -51,7 +52,7 @@ STAGE_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "reporting": ("statistics",),
 }
 
-RUNTIME_COMPONENTS: dict[str, tuple[str, ...]] = {
+RUNTIME_COMPONENTS: Mapping[str, tuple[str, ...]] = {
     "raw": ("numpy", "pandas"),
     "preprocessing": ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn"),
     "eligibility": ("numpy",),
@@ -155,7 +156,7 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
     )
 
 
-def _section_extractors(config: FedorbitConfig) -> dict[str, Callable[[], JsonValue]]:
+def _section_extractors(config: FedorbitConfig) -> Mapping[str, Callable[[], JsonValue]]:
     scientific = config.scientific
     return {
         "generators": lambda: config.generators.model_dump(mode="json"),
@@ -187,7 +188,7 @@ def configuration_subset_digest(
     relevant_sections: frozenset[str],
 ) -> str:
     extractors = _section_extractors(config)
-    values: dict[str, JsonValue] = {}
+    values: OrderedDict[str, JsonValue] = OrderedDict()
     for section in sorted(relevant_sections):
         extractor = extractors.get(section)
         if extractor is not None:

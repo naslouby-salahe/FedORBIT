@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import OrderedDict
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -136,7 +137,7 @@ def _support_block_counts(
 def _fixed_active_contribution(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    image_by_target: dict[int, int],
+    image_by_target: Mapping[int, int],
 ) -> float:
     active_targets = sorted(image_by_target.keys())
     coordinates = alpha.coordinates
@@ -158,7 +159,7 @@ def _evaluate_active_image_map(
     lap_tie_tolerance: float,
 ) -> tuple[float, tuple[int, ...]]:
     blocks = problem.blocks
-    image_by_target: dict[int, int] = dict(mapping.fixed_pairs())
+    image_by_target: OrderedDict[int, int] = OrderedDict(mapping.fixed_pairs())
     fixed_cost = _fixed_active_contribution(problem, alpha, image_by_target)
     completion_cost, images = _complete_with_blockwise_laps(
         problem, alpha, image_by_target, lap_tie_tolerance
@@ -171,7 +172,7 @@ def _lap_cost_entry(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     active_targets: list[int],
-    image_by_target: dict[int, int],
+    image_by_target: Mapping[int, int],
     target_node: int,
     source_node: int,
 ) -> float:
@@ -188,14 +189,14 @@ def _lap_cost_entry(
 def _complete_with_blockwise_laps(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    image_by_target: dict[int, int],
+    image_by_target: Mapping[int, int],
     lap_tie_tolerance: float,
 ) -> tuple[float, tuple[int, ...]]:
     blocks = problem.blocks
     used_sources = set(image_by_target.values())
     active_targets = sorted(image_by_target.keys())
     completion_cost = 0.0
-    full_assignment = dict(image_by_target)
+    full_assignment = OrderedDict(image_by_target)
     for block_index in range(len(blocks.padded_size_tuple)):
         remaining_targets = [
             node for node in blocks.block_index_range(block_index) if node not in image_by_target
@@ -227,7 +228,7 @@ def _solve_block_completion(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     active_targets: list[int],
-    image_by_target: dict[int, int],
+    image_by_target: Mapping[int, int],
     remaining_targets: list[int],
     unused_sources: list[int],
     lap_tie_tolerance: float,

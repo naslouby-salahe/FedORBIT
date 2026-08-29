@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 
 from fedorbit.config.models import FedorbitConfig, SourceResponsePilotConfig
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
@@ -134,13 +137,16 @@ def _evaluate_candidate(
             schedule_seed = derive_seed32(
                 seed,
                 RngNamespace.RESPONSE_SCHEDULE,
-                {
-                    "stage": "pilot",
-                    "magnitude": candidate.intervention_magnitude,
-                    "horizon": candidate.optimizer_step_horizon,
-                    "replicate": replicate,
-                    "intervention": intervention_index,
-                },
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        stage="pilot",
+                        magnitude=candidate.intervention_magnitude,
+                        horizon=candidate.optimizer_step_horizon,
+                        replicate=replicate,
+                        intervention=intervention_index,
+                    ),
+                ),
             )
             shadow_data = ShadowData(
                 data.train_features,

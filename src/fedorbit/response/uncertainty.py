@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 import torch
 
 from fedorbit.config.models import FedorbitConfig, SourceResponseFinalConfig
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
@@ -78,12 +81,15 @@ def max_t_critical_value(
     bootstrap_seed = derive_seed32(
         seed,
         RngNamespace.RESPONSE_BOOTSTRAP,
-        {
-            "entries": len(entry_derivatives),
-            "replicates": replicate_count,
-            "resamples": resample_count,
-            "confidence": level,
-        },
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                entries=len(entry_derivatives),
+                replicates=replicate_count,
+                resamples=resample_count,
+                confidence=level,
+            ),
+        ),
     )
     rng = torch.Generator().manual_seed(bootstrap_seed)
     maxima: list[float] = []
@@ -173,11 +179,14 @@ def estimate_response_bands(
             schedule_seed = derive_seed32(
                 seed,
                 RngNamespace.RESPONSE_SCHEDULE,
-                {
-                    "stage": seed_stage,
-                    "replicate": replicate,
-                    "intervention": intervention_index,
-                },
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        stage=seed_stage,
+                        replicate=replicate,
+                        intervention=intervention_index,
+                    ),
+                ),
             )
             risks = run_shadow_pair(
                 config,

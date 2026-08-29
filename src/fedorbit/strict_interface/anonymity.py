@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 
 from fedorbit.domain.enums import ClientRole, CoarseGroup, RngNamespace
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
 
 
@@ -65,11 +68,14 @@ def anonymous_node_order(
     seed = derive_seed32(
         base_seed,
         RngNamespace.ANONYMOUS_NODE_ORDER,
-        {
-            "endpoint": endpoint.value,
-            "coarse_group": coarse_group.value,
-            "coordinate": coordinate,
-        },
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                endpoint=endpoint.value,
+                coarse_group=coarse_group.value,
+                coordinate=coordinate,
+            ),
+        ),
     )
     generator = torch.Generator().manual_seed(seed)
     permutation = tuple(int(index) for index in torch.randperm(node_count, generator=generator))

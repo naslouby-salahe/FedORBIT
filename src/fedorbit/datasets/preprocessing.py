@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -220,7 +221,7 @@ def fit_categorical_preprocessor(
     observed = tuple(ABSENT_TOKEN if is_missing_token(value, True) else value for value in values)
     non_missing = tuple(value for value in observed if value != ABSENT_TOKEN)
     total = len(observed)
-    counts = {value: non_missing.count(value) for value in set(non_missing)}
+    counts = OrderedDict((value, non_missing.count(value)) for value in set(non_missing))
     threshold = config.scientific.preprocessing.rare_category_train_frequency_threshold
     rare = frozenset(value for value, count in counts.items() if count / total < threshold)
     retained = tuple(value for value in non_missing if value not in rare)

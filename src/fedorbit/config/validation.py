@@ -161,7 +161,7 @@ def _validate_datasets(config: FedorbitConfig) -> None:
         and DatasetId.TON_IOT_NETWORK not in primary_targets,
         "the secondary network client must not appear in primary directed pairs",
     )
-    roles = {client_id: client.role for client_id, client in datasets.clients.items()}
+    roles = OrderedDict((client_id, client.role) for client_id, client in datasets.clients.items())
     _require(
         roles[DatasetId.EDGE_IIOTSET_NETWORK].value == ClientRole.PRIMARY.value
         and roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == ClientRole.PRIMARY.value

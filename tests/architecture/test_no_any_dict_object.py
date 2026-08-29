@@ -65,6 +65,14 @@ def test_no_generic_dict_models_for_domain_concepts() -> None:
             assert pattern not in text, f"anonymous dict pattern {pattern!r} in {path}"
 
 
+def test_production_never_constructs_raw_dictionary_values() -> None:
+    for path in iter_source_files():
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Dict, ast.DictComp)):
+                raise AssertionError(f"raw dictionary construction in {path}:{node.lineno}")
+
+
 def _is_object(annotation: ast.expr) -> bool:
     if isinstance(annotation, ast.Name):
         return annotation.id == "object"

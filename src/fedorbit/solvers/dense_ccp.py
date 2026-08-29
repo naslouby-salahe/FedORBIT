@@ -61,7 +61,7 @@ class AssignmentVariableLayout:
             for source in sources:
                 for target in targets:
                     columns.append(AssignmentVariableKey(int(source), int(target)))
-        index_map = {key: index for index, key in enumerate(columns)}
+        index_map = OrderedDict((key, index) for index, key in enumerate(columns))
         return cls(blocks=blocks, columns=tuple(columns), column_index=index_map)
 
     @property
@@ -191,19 +191,19 @@ def _append_lifted_assignment_rows(
         sources = list(blocks.block_index_range(block_index))
         for target in targets:
             add_row(
-                {
-                    layout.column_of(AssignmentVariableKey(source, target)): 1.0
+                OrderedDict(
+                    (layout.column_of(AssignmentVariableKey(source, target)), 1.0)
                     for source in sources
-                },
+                ),
                 1.0,
                 1.0,
             )
         for source in sources:
             add_row(
-                {
-                    layout.column_of(AssignmentVariableKey(source, target)): 1.0
+                OrderedDict(
+                    (layout.column_of(AssignmentVariableKey(source, target)), 1.0)
                     for target in targets
-                },
+                ),
                 1.0,
                 1.0,
             )
@@ -279,7 +279,9 @@ def _lifted_objective_vector(
     penalty_coefficient: float,
     linearization_point: NDArray[np.float64],
 ) -> list[float]:
-    product_column = {key: layout.size + offset for offset, key in enumerate(product_keys)}
+    product_column = OrderedDict(
+        (key, layout.size + offset) for offset, key in enumerate(product_keys)
+    )
     col_cost = [0.0] * (layout.size + len(product_keys))
     for key in product_keys:
         col_cost[product_column[key]] = product_map[key]
@@ -300,7 +302,9 @@ def solve_lifted_lp(
 ) -> LiftedRelaxationSolution:
     product_map = _nonzero_product_coefficients(problem, alpha)
     product_keys = sorted(product_map)
-    product_column = {key: layout.size + offset for offset, key in enumerate(product_keys)}
+    product_column = OrderedDict(
+        (key, layout.size + offset) for offset, key in enumerate(product_keys)
+    )
     matrix = _build_lifted_constraint_matrix(problem.blocks, layout, product_keys, product_column)
     col_cost = _lifted_objective_vector(
         layout,

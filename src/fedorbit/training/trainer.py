@@ -60,7 +60,7 @@ class ModelParameterState:
 
     def load_into(self, model: nn.Module) -> None:
         model.load_state_dict(
-            {entry.name: entry.value.clone() for entry in self.tensors}, strict=True
+            OrderedDict((entry.name, entry.value.clone()) for entry in self.tensors), strict=True
         )
 
 

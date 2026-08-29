@@ -352,9 +352,9 @@ def apply_accepted_assimilation(
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")
     total_steps = config.scientific.confirmation.accepted_live_assimilation_steps
-    coordinates_payload = {
-        name: getattr(assimilation_coordinates, name) for name in ASSIMILATION_COORDINATE_KEYS
-    }
+    coordinates_payload = OrderedDict(
+        (name, getattr(assimilation_coordinates, name)) for name in ASSIMILATION_COORDINATE_KEYS
+    )
     rng_seed = derive_seed32(
         seed,
         RngNamespace.ASSIMILATION_SCHEDULE,

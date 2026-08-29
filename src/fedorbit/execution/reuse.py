@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -60,7 +61,7 @@ def stage_rules() -> tuple[StageRule, ...]:
 
 
 def descendants_of_stage(stage: str) -> frozenset[str]:
-    rules = {rule.stage: rule for rule in stage_rules()}
+    rules = OrderedDict((rule.stage, rule) for rule in stage_rules())
     if stage not in rules:
         raise ReuseError(f"unknown stage: {stage}")
     visited: set[str] = set()

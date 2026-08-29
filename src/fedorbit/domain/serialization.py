@@ -15,7 +15,7 @@ class StableSerializationError(ValueError):
 
 
 class StableJsonPayload(Protocol):
-    """Value accepted by the deterministic serialization boundary."""
+    __slots__ = ()
 
 
 def stable_json(value: StableJsonPayload) -> str:

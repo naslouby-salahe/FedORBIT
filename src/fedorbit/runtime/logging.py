@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -22,12 +23,12 @@ class ExecutionLogger:
     def record(self, event: ExecutionLogEvent) -> None:
         self._logger.info(
             "execution_event",
-            extra={
-                "occurred_at": event.occurred_at.isoformat(),
-                "cell_coordinates": event.cell_coordinates,
-                "artifact_id": event.artifact_id,
-                "state": event.state.value,
-            },
+            extra=OrderedDict(
+                occurred_at=event.occurred_at.isoformat(),
+                cell_coordinates=event.cell_coordinates,
+                artifact_id=event.artifact_id,
+                state=event.state.value,
+            ),
         )
 
 

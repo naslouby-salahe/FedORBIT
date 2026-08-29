@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import time
+from collections import OrderedDict
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from itertools import product
 
@@ -85,8 +87,8 @@ def _build_assignment_structure(
     model: Model,
     blocks: PaddedBlockStructure,
     prefix: str,
-) -> dict[tuple[int, int], Expr]:
-    assignment_variables: dict[tuple[int, int], Expr] = {}
+) -> Mapping[tuple[int, int], Expr]:
+    assignment_variables: OrderedDict[tuple[int, int], Expr] = OrderedDict()
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
         sources = list(blocks.block_index_range(block_index))
@@ -107,11 +109,11 @@ def _build_assignment_structure(
 
 def _add_mccormick_products(
     model: Model,
-    assignment_variables: dict[tuple[int, int], Expr],
-    coefficients: dict[tuple[int, int, int, int], float],
+    assignment_variables: Mapping[tuple[int, int], Expr],
+    coefficients: Mapping[tuple[int, int, int, int], float],
     prefix: str,
 ) -> list[Expr]:
-    product_variables: dict[tuple[int, int, int, int], Expr] = {}
+    product_variables: OrderedDict[tuple[int, int, int, int], Expr] = OrderedDict()
     objective_terms: list[Expr] = []
     for key, coefficient in sorted(coefficients.items()):
         source_a, source_b, target_k, target_j = key
@@ -135,7 +137,7 @@ def _append_products_for_target_pair(
     alpha: CurriculumAction,
     target_k: int,
     target_j: int,
-    coefficients: dict[tuple[int, int, int, int], float],
+    coefficients: MutableMapping[tuple[int, int, int, int], float],
 ) -> None:
     blocks = problem.blocks
     lower = problem.lower_response_matrix
@@ -153,9 +155,9 @@ def _append_products_for_target_pair(
 def _fixed_action_product_coefficients(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-) -> dict[tuple[int, int, int, int], float]:
+) -> Mapping[tuple[int, int, int, int], float]:
     blocks = problem.blocks
-    coefficients: dict[tuple[int, int, int, int], float] = {}
+    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict()
     for target_k in range(blocks.total_padded_nodes):
         for target_j in alpha.active_support_nodes:
             _append_products_for_target_pair(problem, alpha, target_k, target_j, coefficients)
@@ -213,7 +215,7 @@ def point_correspondence_commitment(
     size = blocks.total_padded_nodes
     if source_response_matrix.shape != (size, size) or target_response_matrix.shape != (size, size):
         raise SolverExecutionError("point-correspondence matrices must match padded size")
-    coefficients: dict[tuple[int, int, int, int], float] = {}
+    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict()
     for source_a, source_b, target_k, target_j in product(range(size), repeat=4):
         if blocks.block_of_node(source_a) != blocks.block_of_node(target_k):
             continue
@@ -275,7 +277,7 @@ def point_correspondence_commitment(
 
 def _refine_lexicographic_correspondence(
     model: Model,
-    assignment_variables: dict[tuple[int, int], Expr],
+    assignment_variables: Mapping[tuple[int, int], Expr],
     objective_terms: list[Expr],
     blocks: PaddedBlockStructure,
     best_objective: float,
@@ -419,7 +421,7 @@ def solve_robust_action_qap(
 
 def _extract_images(
     model: Model,
-    assignment_variables: dict[tuple[int, int], Expr],
+    assignment_variables: Mapping[tuple[int, int], Expr],
     blocks: PaddedBlockStructure,
 ) -> tuple[int, ...]:
     images: list[int] = []

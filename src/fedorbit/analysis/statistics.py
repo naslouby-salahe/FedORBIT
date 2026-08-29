@@ -4,6 +4,7 @@ import itertools
 import math
 import statistics
 import warnings
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -188,13 +189,13 @@ def statistical_bootstrap_seed(
     metric: str,
     purpose: str,
 ) -> int:
-    coordinates = {
-        "contrast": contrast_name,
-        "family": family,
-        "metric": metric,
-        "pair": directed_pair,
-        "purpose": purpose,
-    }
+    coordinates: OrderedDict[str, str] = OrderedDict(
+        contrast=contrast_name,
+        family=family,
+        metric=metric,
+        pair=directed_pair,
+        purpose=purpose,
+    )
     return derive_seed32(
         config.scientific.randomness.statistical_seed,
         RngNamespace.STATISTICAL_BOOTSTRAP,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
 
@@ -21,13 +23,13 @@ def _require(condition: bool, message: str) -> None:
 def _validate_split_intervals(config: FedorbitConfig) -> None:
     intervals = config.scientific.split.duplicate_safe_chronological_intervals
     numerical_tolerance = config.scientific.source_response_pilot.numerical_floor
-    named = {
-        "train": intervals.train,
-        "meta": intervals.meta,
-        "valid": intervals.valid,
-        "confirm": intervals.confirm,
-        "test": intervals.test,
-    }
+    named: OrderedDict[str, tuple[float, float]] = OrderedDict(
+        train=intervals.train,
+        meta=intervals.meta,
+        valid=intervals.valid,
+        confirm=intervals.confirm,
+        test=intervals.test,
+    )
     previous_upper = 0.0
     for name, (lower, upper) in named.items():
         _require(

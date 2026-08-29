@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -23,7 +25,7 @@ def _block_pair_permutation(
     rng_seed = derive_seed32(
         seed,
         RngNamespace.COUPLING_DESTRUCTION,
-        {"coordinates": coordinates, "block_pair": block_pair_index},
+        OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index),
     )
     generator = np.random.default_rng(rng_seed)
     return generator.permutation(entry_count)

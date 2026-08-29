@@ -8,9 +8,10 @@ from enum import StrEnum
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.config.loading import load_fedorbit_config, repository_root
 from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
+from fedorbit.execution.inventory import RawInventoryRequest, inspect_raw_inventory
 from fedorbit.execution.recovery import RecoveryBoundary
 from fedorbit.execution.reuse import CellDecision, ExecutionAction, ExecutionReuse
 from fedorbit.experiments.catalogue import ExperimentDefinition
@@ -107,6 +108,13 @@ def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:
 
 
 def preprocess_datasets(request: DatasetPreparationRequest) -> None:
+    raw_root = repository_root() / "data" / "raw"
+    inventories = tuple(
+        inspect_raw_inventory(RawInventoryRequest(dataset, raw_root))
+        for dataset in request.datasets
+    )
+    if len(inventories) != len(request.datasets):
+        raise ExecutionError("raw inventory collection did not cover every requested dataset")
     store = execution_store()
     reuse = ExecutionReuse(store)
     cells = tuple(

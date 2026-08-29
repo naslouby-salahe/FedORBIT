@@ -9,13 +9,14 @@ from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import DatasetId, ExperimentName
+from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.recovery import RecoveryBoundary
 from fedorbit.execution.reuse import CellDecision, ExecutionAction, ExecutionReuse
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.response.packet import build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
+from fedorbit.runtime.logging import ExecutionLogEvent, ExecutionLogger, execution_logger
 
 
 class ExecutionError(ValueError):
@@ -55,8 +56,9 @@ class ExecutionResult:
 
 
 class ExecutionExecutor:
-    def __init__(self, store: ArtifactStore) -> None:
+    def __init__(self, store: ArtifactStore, logger: ExecutionLogger | None = None) -> None:
         self._store = store
+        self._logger = logger if logger is not None else execution_logger()
 
     def execute(
         self,
@@ -70,11 +72,27 @@ class ExecutionExecutor:
                     raise ExecutionError("reuse decision has no manifest")
                 manifest = self._store.resolve(decision.manifest.artifact_id)
                 results.append(ExecutionResult(decision, manifest))
+                self._logger.record(
+                    ExecutionLogEvent(
+                        occurred_at=datetime.now(UTC),
+                        cell_coordinates=decision.cell_coordinates,
+                        artifact_id=manifest.artifact_id,
+                        state=ArtifactState.COMPLETED,
+                    )
+                )
                 continue
             manifest = producer(decision)
             self._store.write_reusable(manifest)
             validated = self._store.resolve(manifest.artifact_id)
             results.append(ExecutionResult(decision, validated))
+            self._logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=decision.cell_coordinates,
+                    artifact_id=validated.artifact_id,
+                    state=ArtifactState.COMPLETED,
+                )
+            )
         return tuple(results)
 
 

@@ -41,20 +41,25 @@ class RawDatasetInventory:
             raise RawInventoryError("raw dataset inventory requires at least one file")
 
     def fingerprint(self) -> str:
+        file_entries: list[StableJsonPayload] = []
+        for file in self.files:
+            file_entries.append(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict[str, StableJsonPayload](
+                        relative_path=file.relative_path,
+                        byte_size=file.byte_size,
+                        sha256=file.sha256,
+                        columns=list(file.columns),
+                    ),
+                )
+            )
         payload = stable_json(
             cast(
                 StableJsonPayload,
-                OrderedDict(
+                OrderedDict[str, StableJsonPayload](
                     dataset=self.dataset.value,
-                    files=[
-                        OrderedDict(
-                            relative_path=file.relative_path,
-                            byte_size=file.byte_size,
-                            sha256=file.sha256,
-                            columns=list(file.columns),
-                        )
-                        for file in self.files
-                    ],
+                    files=file_entries,
                 ),
             )
         )

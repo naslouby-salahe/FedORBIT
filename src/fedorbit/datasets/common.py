@@ -54,6 +54,10 @@ class DatasetSchemaError(ValueError):
     pass
 
 
+def _empty_roles() -> Mapping[str, FieldRole]:
+    return OrderedDict()
+
+
 RawCellValue = str | int | float | None
 
 
@@ -69,7 +73,7 @@ class ObservedColumnSamples:
 class AdapterSchema:
     dataset_id: DatasetId
     feature_order: tuple[str, ...]
-    roles: Mapping[str, FieldRole] = field(default_factory=OrderedDict)
+    roles: Mapping[str, FieldRole] = field(default_factory=_empty_roles)
     timestamp_column: str | None = None
     multiclass_label_column: str | None = None
     binary_label_column: str | None = None

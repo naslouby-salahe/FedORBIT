@@ -20,7 +20,7 @@ from fedorbit.baselines.fairness import (
     assert_registered_method_name,
 )
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup, TransferMethod
+from fedorbit.domain.enums import CoarseGroup, DatasetId, TransferMethod
 from fedorbit.orbit.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
@@ -202,12 +202,20 @@ def test_committed_map_optimizes_under_chosen_correspondence() -> None:
 
 
 def test_exact_map_oracle_uses_given_correspondence() -> None:
-    from fedorbit.oracle import exact_map_action
+    from fedorbit.oracle import OracleCorrespondence, exact_map_action
 
     config = load_fedorbit_config()
     problem = _problem(37)
     identity = next(iter(enumerate_block_permutations(problem.blocks)))
-    action, value = exact_map_action(problem, identity, config)
+    action, value = exact_map_action(
+        problem,
+        OracleCorrespondence(
+            source_client=DatasetId.EDGE_IIOTSET_NETWORK,
+            target_client=DatasetId.TON_IOT_WINDOWS10_HOST,
+            correspondence=identity,
+        ),
+        config,
+    )
     committed = identity.permute_response_matrix(problem.lower_response_matrix)
     expected = float(
         problem.target_importance @ committed @ action.coordinates

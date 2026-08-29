@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import math
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, cast
@@ -13,6 +14,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 
@@ -237,7 +239,7 @@ def train_base_model(
         epoch_seed = derive_seed32(
             seed,
             RngNamespace.TRAIN_EPOCH_SHUFFLE,
-            {"stage": "base-training", "epoch": epoch},
+            cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)),
         )
         generator = torch.Generator().manual_seed(epoch_seed)
         loader = DataLoader(

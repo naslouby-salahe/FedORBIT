@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+from typing import cast
+
 import typer
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
@@ -9,6 +12,7 @@ from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import ArtifactState, ExperimentName
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.reporting.export import VerifiedEvidenceWriter
 
@@ -53,12 +57,15 @@ def report(
             destination = writer.write(
                 experiment,
                 manifest.artifact_id,
-                {
-                    "experiment": experiment.value,
-                    "artifact_id": manifest.artifact_id,
-                    "state": manifest.state.value,
-                    "dependency_fingerprint_sha256": manifest.dependency_fingerprint_sha256,
-                },
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        experiment=experiment.value,
+                        artifact_id=manifest.artifact_id,
+                        state=manifest.state.value,
+                        dependency_fingerprint_sha256=manifest.dependency_fingerprint_sha256,
+                    ),
+                ),
             )
             typer.echo(str(destination))
             exported += 1

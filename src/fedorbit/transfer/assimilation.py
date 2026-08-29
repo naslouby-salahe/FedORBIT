@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 from fedorbit.training.trainer import (
@@ -117,7 +120,10 @@ def _confirmation_batches_for_replicate(
     rng_seed = derive_seed32(
         seed,
         RngNamespace.CONFIRMATION_SCHEDULE,
-        {"coordinates": contrast_coordinates, "replicate": replicate_index},
+        cast(
+            StableJsonPayload,
+            OrderedDict(coordinates=contrast_coordinates, replicate=replicate_index),
+        ),
     )
     generator = torch.Generator().manual_seed(rng_seed)
     train_size = int(features.shape[0])

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import itertools
 import statistics
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import DatasetId, RngNamespace
+from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.models.host_classifier import HostClassifier
 from fedorbit.models.network_classifier import NetworkFlowClassifier
 from fedorbit.runtime.seeds import derive_seed32
@@ -149,7 +151,14 @@ def create_classifier(
     initialization_seed = derive_seed32(
         seed,
         RngNamespace.MODEL_INITIALIZATION,
-        {"dataset": dataset.value, "input_dimension": input_dimension, "n_classes": n_classes},
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                dataset=dataset.value,
+                input_dimension=input_dimension,
+                n_classes=n_classes,
+            ),
+        ),
     )
     generator = torch.Generator().manual_seed(initialization_seed)
     if dataset in NETWORK_DATASETS:

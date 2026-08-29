@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from collections.abc import Mapping
 from pathlib import Path
 
 import yaml
@@ -28,7 +29,7 @@ def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
     text = config_path.read_text(encoding="utf-8")
     raw = yaml.safe_load(text)
-    if not isinstance(raw, dict):
+    if not isinstance(raw, Mapping):
         raise ValueError(f"Configuration file must contain a mapping: {config_path}")
     config = FedorbitConfig.model_validate(raw)
     validate_cross_field_contract(config)

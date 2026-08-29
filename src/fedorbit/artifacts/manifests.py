@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
 from collections.abc import Mapping
 from enum import StrEnum
 from pathlib import Path
+from typing import cast
 
 from pydantic import Field
 
@@ -118,11 +120,13 @@ def eligibility_copy(
     kind: EligibilityCopyKind,
 ) -> TransferEligibilityManifest:
     if kind == EligibilityCopyKind.METHOD_READABLE:
-        return manifest.model_copy(update={NATIVE_CLASS_IDS_FIELD: (), FINE_CONCEPT_FIELD: None})
+        return manifest.model_copy(
+            update=OrderedDict(((NATIVE_CLASS_IDS_FIELD, ()), (FINE_CONCEPT_FIELD, None)))
+        )
     if kind == EligibilityCopyKind.ORACLE:
         if manifest.fine_concept is None:
             raise ValueError("oracle eligibility copy requires the fine concept")
-        return manifest.model_copy(update={NATIVE_CLASS_IDS_FIELD: ()})
+        return manifest.model_copy(update=OrderedDict(((NATIVE_CLASS_IDS_FIELD, ()),)))
     return manifest
 
 
@@ -146,13 +150,16 @@ def dependency_fingerprint(
     runtime_sha256: str,
 ) -> str:
     payload = stable_json(
-        {
-            "coordinates": coordinates,
-            "upstream_artifact_ids": list(upstream_artifact_ids),
-            "configuration_sha256": configuration_sha256,
-            "code_sha256": code_sha256,
-            "runtime_sha256": runtime_sha256,
-        }
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                coordinates=coordinates,
+                upstream_artifact_ids=list(upstream_artifact_ids),
+                configuration_sha256=configuration_sha256,
+                code_sha256=code_sha256,
+                runtime_sha256=runtime_sha256,
+            ),
+        )
     )
     return _sha256(payload)
 
@@ -163,11 +170,14 @@ def artifact_id(
     fingerprint_sha256: str,
 ) -> str:
     payload = stable_json(
-        {
-            "artifact_type": artifact_type,
-            "coordinates": coordinates,
-            "dependency_fingerprint_sha256": fingerprint_sha256,
-        }
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                artifact_type=artifact_type,
+                coordinates=coordinates,
+                dependency_fingerprint_sha256=fingerprint_sha256,
+            ),
+        )
     )
     return _sha256(payload)
 

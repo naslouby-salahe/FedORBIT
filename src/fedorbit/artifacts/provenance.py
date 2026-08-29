@@ -7,12 +7,13 @@ from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.config.loading import repository_root
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.records import SemanticCell
-from fedorbit.domain.serialization import stable_json
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import environment_snapshot
 from fedorbit.runtime.reproducibility import current_code_revision
 
@@ -35,39 +36,39 @@ STAGES = (
     "reporting",
 )
 
-STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = {
-    "raw": (),
-    "preprocessing": ("raw",),
-    "eligibility": ("preprocessing",),
-    "pilot_selection": ("preprocessing", "eligibility"),
-    "training": ("preprocessing", "eligibility", "pilot_selection"),
-    "scoring": ("training", "preprocessing"),
-    "response": ("preprocessing", "scoring"),
-    "target_importance": ("training", "scoring"),
-    "correspondence": ("response", "target_importance"),
-    "confirmation": ("correspondence", "response"),
-    "multi_source_selection": ("confirmation", "correspondence"),
-    "evaluation": ("confirmation", "scoring"),
-    "statistics": ("evaluation",),
-    "reporting": ("statistics",),
-}
+STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = OrderedDict(
+    raw=(),
+    preprocessing=("raw",),
+    eligibility=("preprocessing",),
+    pilot_selection=("preprocessing", "eligibility"),
+    training=("preprocessing", "eligibility", "pilot_selection"),
+    scoring=("training", "preprocessing"),
+    response=("preprocessing", "scoring"),
+    target_importance=("training", "scoring"),
+    correspondence=("response", "target_importance"),
+    confirmation=("correspondence", "response"),
+    multi_source_selection=("confirmation", "correspondence"),
+    evaluation=("confirmation", "scoring"),
+    statistics=("evaluation",),
+    reporting=("statistics",),
+)
 
-RUNTIME_COMPONENTS: Mapping[str, tuple[str, ...]] = {
-    "raw": ("numpy", "pandas"),
-    "preprocessing": ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn"),
-    "eligibility": ("numpy",),
-    "pilot_selection": ("numpy", "scipy"),
-    "training": ("torch", "numpy", "torch-cuda"),
-    "scoring": ("torch", "numpy"),
-    "response": ("numpy", "scipy", "torch"),
-    "target_importance": ("numpy", "torch"),
-    "correspondence": ("highspy", "pyscipopt", "numpy", "scipy"),
-    "confirmation": ("numpy", "scipy", "torch"),
-    "multi_source_selection": ("numpy", "scipy"),
-    "evaluation": ("numpy", "scipy", "scikit-learn"),
-    "statistics": ("numpy", "scipy"),
-    "reporting": (),
-}
+RUNTIME_COMPONENTS: Mapping[str, tuple[str, ...]] = OrderedDict(
+    raw=("numpy", "pandas"),
+    preprocessing=("numpy", "pandas", "pyarrow", "scipy", "scikit-learn"),
+    eligibility=("numpy",),
+    pilot_selection=("numpy", "scipy"),
+    training=("torch", "numpy", "torch-cuda"),
+    scoring=("torch", "numpy"),
+    response=("numpy", "scipy", "torch"),
+    target_importance=("numpy", "torch"),
+    correspondence=("highspy", "pyscipopt", "numpy", "scipy"),
+    confirmation=("numpy", "scipy", "torch"),
+    multi_source_selection=("numpy", "scipy"),
+    evaluation=("numpy", "scipy", "scikit-learn"),
+    statistics=("numpy", "scipy"),
+    reporting=(),
+)
 
 
 class ProvenanceError(ValueError):
@@ -148,7 +149,9 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
             versions.append((distribution, importlib.metadata.version(distribution)))
         except importlib.metadata.PackageNotFoundError:
             raise ProvenanceError(f"runtime component not installed: {distribution}") from None
-    payload = stable_json({"components": components, "versions": versions})
+    payload = stable_json(
+        cast(StableJsonPayload, OrderedDict(components=components, versions=versions))
+    )
     return RuntimeFingerprint(
         components=components,
         versions=tuple(versions),
@@ -158,29 +161,29 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
 
 def _section_extractors(config: FedorbitConfig) -> Mapping[str, Callable[[], JsonValue]]:
     scientific = config.scientific
-    return {
-        "generators": lambda: config.generators.model_dump(mode="json"),
-        "action": lambda: scientific.action.model_dump(mode="json"),
-        "models": lambda: {
-            "training": scientific.training.model_dump(mode="json"),
-            "base_model_pilot": scientific.base_model_pilot.model_dump(mode="json"),
-        },
-        "response": lambda: {
-            "source_response_pilot": scientific.source_response_pilot.model_dump(mode="json"),
-            "source_response_final": scientific.source_response_final.model_dump(mode="json"),
-            "target_response_diagnostic": scientific.target_response_diagnostic.model_dump(
+    return OrderedDict(
+        generators=lambda: config.generators.model_dump(mode="json"),
+        action=lambda: scientific.action.model_dump(mode="json"),
+        models=lambda: OrderedDict(
+            training=scientific.training.model_dump(mode="json"),
+            base_model_pilot=scientific.base_model_pilot.model_dump(mode="json"),
+        ),
+        response=lambda: OrderedDict(
+            source_response_pilot=scientific.source_response_pilot.model_dump(mode="json"),
+            source_response_final=scientific.source_response_final.model_dump(mode="json"),
+            target_response_diagnostic=scientific.target_response_diagnostic.model_dump(
                 mode="json"
             ),
-        },
-        "confirmation": lambda: scientific.confirmation.model_dump(mode="json"),
-        "evaluation": lambda: {
-            "metrics": scientific.metrics.model_dump(mode="json"),
-            "statistics": scientific.statistics.model_dump(mode="json"),
-        },
-        "statistics": lambda: scientific.statistics.model_dump(mode="json"),
-        "experiments": lambda: config.experiments.model_dump(mode="json"),
-        "simplification_rules": lambda: scientific.simplification_rules.model_dump(mode="json"),
-    }
+        ),
+        confirmation=lambda: scientific.confirmation.model_dump(mode="json"),
+        evaluation=lambda: OrderedDict(
+            metrics=scientific.metrics.model_dump(mode="json"),
+            statistics=scientific.statistics.model_dump(mode="json"),
+        ),
+        statistics=lambda: scientific.statistics.model_dump(mode="json"),
+        experiments=lambda: config.experiments.model_dump(mode="json"),
+        simplification_rules=lambda: scientific.simplification_rules.model_dump(mode="json"),
+    )
 
 
 def configuration_subset_digest(
@@ -206,14 +209,17 @@ def stage_dependency_fingerprint(
     producer_module: str,
 ) -> str:
     payload = stable_json(
-        {
-            "stage": stage,
-            "semantic_coordinates": cell.identity_json(relevance),
-            "upstream_artifact_ids": list(upstream_artifact_ids),
-            "configuration_sha256": configuration_subset_digest(config, config_sections),
-            "implementation_sha256": implementation_fingerprint(producer_module),
-            "runtime_sha256": runtime_fingerprint(stage).sha256,
-        }
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                stage=stage,
+                semantic_coordinates=cell.identity_json(relevance),
+                upstream_artifact_ids=list(upstream_artifact_ids),
+                configuration_sha256=configuration_subset_digest(config, config_sections),
+                implementation_sha256=implementation_fingerprint(producer_module),
+                runtime_sha256=runtime_fingerprint(stage).sha256,
+            ),
+        )
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

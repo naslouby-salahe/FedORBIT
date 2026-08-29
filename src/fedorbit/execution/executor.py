@@ -119,10 +119,10 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> None:
     reuse = ExecutionReuse(store)
     cells = tuple(
         cell
-        for dataset in request.datasets
+        for inventory in inventories
         for cell in (
-            (f"raw-manifest:{dataset.value}", f"raw-{dataset.value}"),
-            (f"prepared:{dataset.value}", f"prepared-{dataset.value}"),
+            (f"raw-manifest:{inventory.dataset.value}", inventory.fingerprint()),
+            (f"prepared:{inventory.dataset.value}", inventory.fingerprint()),
         )
     )
     _recover(store, cells)

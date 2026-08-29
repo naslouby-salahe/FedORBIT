@@ -17,3 +17,4 @@ def test_edge_raw_inventory_records_file_identity(tmp_path: Path) -> None:
     assert inventory.files[0].relative_path == "traffic.csv"
     assert inventory.files[0].columns == ("timestamp", "label")
     assert len(inventory.files[0].sha256) == 64
+    assert len(inventory.fingerprint()) == 64

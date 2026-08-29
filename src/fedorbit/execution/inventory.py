@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
 from fedorbit.domain.enums import DatasetId
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 
 class RawInventoryError(ValueError):
@@ -35,6 +39,26 @@ class RawDatasetInventory:
     def __post_init__(self) -> None:
         if not self.files:
             raise RawInventoryError("raw dataset inventory requires at least one file")
+
+    def fingerprint(self) -> str:
+        payload = stable_json(
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=self.dataset.value,
+                    files=[
+                        OrderedDict(
+                            relative_path=file.relative_path,
+                            byte_size=file.byte_size,
+                            sha256=file.sha256,
+                            columns=list(file.columns),
+                        )
+                        for file in self.files
+                    ],
+                ),
+            )
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:

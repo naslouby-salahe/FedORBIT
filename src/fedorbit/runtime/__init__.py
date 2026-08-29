@@ -46,6 +46,7 @@ from fedorbit.runtime.failures import (
     solver_limit_outcome,
     validation_failure_outcome,
 )
+from fedorbit.runtime.logging import ExecutionLogEvent, ExecutionLogger, execution_logger
 from fedorbit.runtime.reproducibility import (
     CodeRevision,
     IncompatibleIdentityError,
@@ -75,6 +76,8 @@ __all__ = [
     "CudaRuntimeError",
     "EnvironmentMismatchError",
     "EnvironmentSnapshot",
+    "ExecutionLogEvent",
+    "ExecutionLogger",
     "ExecutionOutcome",
     "FedorbitValidationError",
     "FilesystemFailureError",
@@ -105,6 +108,7 @@ __all__ = [
     "derive_seed32",
     "deterministic_backend_state",
     "environment_snapshot",
+    "execution_logger",
     "failure_boundary_outcome",
     "infrastructure_exhausted_outcome",
     "numpy_generator",

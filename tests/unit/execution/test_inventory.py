@@ -4,7 +4,12 @@ from pathlib import Path
 
 from fedorbit.domain.enums import DatasetId
 from fedorbit.domain.serialization import stable_json
-from fedorbit.execution.inventory import RawInventoryRequest, inspect_raw_inventory
+from fedorbit.execution.inventory import (
+    RawInventoryPersistenceRequest,
+    RawInventoryRequest,
+    inspect_raw_inventory,
+    persist_raw_inventory,
+)
 
 
 def test_edge_raw_inventory_records_file_identity(tmp_path: Path) -> None:
@@ -20,3 +25,7 @@ def test_edge_raw_inventory_records_file_identity(tmp_path: Path) -> None:
     assert len(inventory.files[0].sha256) == 64
     assert len(inventory.fingerprint()) == 64
     assert '"dataset":"edge_iiotset_network"' in stable_json(inventory.serialization_payload())
+
+    path = persist_raw_inventory(RawInventoryPersistenceRequest(inventory, tmp_path / "outputs"))
+    assert path.is_file()
+    assert path.parent.name == "inventories"

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from fedorbit.artifacts.storage import atomic_write_json
 from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
@@ -64,6 +65,23 @@ class RawDatasetInventory:
                 files=file_entries,
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class RawInventoryPersistenceRequest:
+    inventory: RawDatasetInventory
+    preprocessing_root: Path
+
+
+def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
+    fingerprint = request.inventory.fingerprint()
+    destination = (
+        request.preprocessing_root
+        / "inventories"
+        / f"{request.inventory.dataset.value}.{fingerprint[:16]}.json"
+    )
+    atomic_write_json(destination, request.inventory.serialization_payload())
+    return destination
 
 
 def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:

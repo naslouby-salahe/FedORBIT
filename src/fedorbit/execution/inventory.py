@@ -41,6 +41,9 @@ class RawDatasetInventory:
             raise RawInventoryError("raw dataset inventory requires at least one file")
 
     def fingerprint(self) -> str:
+        return hashlib.sha256(stable_json(self.serialization_payload()).encode("utf-8")).hexdigest()
+
+    def serialization_payload(self) -> StableJsonPayload:
         file_entries: list[StableJsonPayload] = []
         for file in self.files:
             file_entries.append(
@@ -54,16 +57,13 @@ class RawDatasetInventory:
                     ),
                 )
             )
-        payload = stable_json(
-            cast(
-                StableJsonPayload,
-                OrderedDict[str, StableJsonPayload](
-                    dataset=self.dataset.value,
-                    files=file_entries,
-                ),
-            )
+        return cast(
+            StableJsonPayload,
+            OrderedDict[str, StableJsonPayload](
+                dataset=self.dataset.value,
+                files=file_entries,
+            ),
         )
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:

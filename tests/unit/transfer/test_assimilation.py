@@ -39,7 +39,9 @@ def test_pre_confirm_capture_restores_model_optimizer_and_rng() -> None:
 
 def test_capture_pair_uses_independent_identical_clean_snapshots() -> None:
     model, optimizer = _model_and_optimizer()
-    baseline, curriculum = capture_pre_confirm_pair(model, optimizer)
+    states = capture_pre_confirm_pair(model, optimizer)
+    baseline = states.baseline
+    curriculum = states.curriculum
     assert baseline is not curriculum
     assert baseline.optimizer_state.payload == curriculum.optimizer_state.payload
     assert torch.equal(baseline.rng_state.cpu, curriculum.rng_state.cpu)

@@ -35,6 +35,12 @@ class TestOpeningRuleError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class PreConfirmStatePair:
+    baseline: PreConfirmTargetState
+    curriculum: PreConfirmTargetState
+
+
 ASSIMILATION_COORDINATE_KEYS = (
     "target_client",
     "directed_pair",
@@ -101,8 +107,8 @@ class PreConfirmTargetState:
 def capture_pre_confirm_pair(
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
-) -> tuple[PreConfirmTargetState, PreConfirmTargetState]:
-    return (
+) -> PreConfirmStatePair:
+    return PreConfirmStatePair(
         PreConfirmTargetState.capture(model, optimizer),
         PreConfirmTargetState.capture(model, optimizer),
     )

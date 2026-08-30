@@ -30,6 +30,12 @@ class PreprocessingError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class NormalizedSplitRows:
+    duplicate_groups: DuplicateGroups
+    split_assignment: DuplicateGroupSplitAssignment
+
+
+@dataclass(frozen=True, slots=True)
 class CandidateFeature:
     name: str
     is_categorical: bool
@@ -177,9 +183,9 @@ def normalize_and_split_training_rows(
     config: FedorbitConfig,
     schema: AdapterSchema,
     rows: tuple[NormalizedRow, ...],
-) -> tuple[DuplicateGroups, DuplicateGroupSplitAssignment]:
+) -> NormalizedSplitRows:
     groups = normalize_training_rows(schema, rows)
-    return groups, assign_duplicate_groups(config, groups)
+    return NormalizedSplitRows(groups, assign_duplicate_groups(config, groups))
 
 
 def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:

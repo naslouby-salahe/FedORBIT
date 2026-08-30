@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.orbit.correspondence import BlockCorrespondence, PaddedBlockStructure
 from fedorbit.orbit.objective import CurriculumAction, RobustActionProblem
@@ -84,12 +83,11 @@ def committed_map_action(
     problem: RobustActionProblem,
     source_matrix: NDArray[np.float64],
     target_matrix: NDArray[np.float64],
-    config: FedorbitConfig,
 ) -> CommittedMapAction:
     from fedorbit.baselines.local import optimize_against_fixed_matrix
     from fedorbit.solvers.exact_qap import point_correspondence_commitment
 
-    result = point_correspondence_commitment(source_matrix, target_matrix, problem.blocks, config)
+    result = point_correspondence_commitment(source_matrix, target_matrix, problem.blocks)
     correspondence = result.require_certified().correspondence
     committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
     solution = optimize_against_fixed_matrix(problem, committed)

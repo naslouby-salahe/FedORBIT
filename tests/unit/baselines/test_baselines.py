@@ -19,7 +19,6 @@ from fedorbit.baselines.fairness import (
     assert_identical_resources,
     assert_registered_method_name,
 )
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import CoarseGroup, DatasetId, TransferMethod
 from fedorbit.orbit.correspondence import (
     build_padded_block_structure,
@@ -182,12 +181,9 @@ def test_coupling_destruction_preserves_multisets_pairing_and_dimensions() -> No
 
 
 def test_committed_map_optimizes_under_chosen_correspondence() -> None:
-    config = load_fedorbit_config()
     problem = _problem(31)
     target_matrix = problem.lower_response_matrix.copy()
-    committed_action = committed_map_action(
-        problem, problem.lower_response_matrix, target_matrix, config
-    )
+    committed_action = committed_map_action(problem, problem.lower_response_matrix, target_matrix)
     committed = committed_action.correspondence.permute_response_matrix(
         problem.lower_response_matrix
     )

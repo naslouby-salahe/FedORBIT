@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pyscipopt import Expr, Model, quicksum
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import TerminalState
 from fedorbit.orbit.correspondence import BlockCorrespondence, PaddedBlockStructure
 from fedorbit.orbit.objective import (
@@ -75,8 +75,8 @@ def _terminal_state_for(status: str) -> TerminalState | None:
     return None
 
 
-def _configure_model(model: Model, config: FedorbitConfig, deadline: float | None) -> None:
-    settings = config.solvers.generic_exact_qap
+def _configure_model(model: Model, deadline: float | None) -> None:
+    settings = active_config().solvers.generic_exact_qap
     model.hideOutput()
     remaining = settings.wall_time_seconds_per_solve
     if deadline is not None:
@@ -182,8 +182,8 @@ def _uncertified_result(reason: TerminalState | None) -> QapSeparatorResult:
 def fixed_action_worst_correspondence_qap(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    config: FedorbitConfig,
 ) -> QapSeparatorResult:
+    config = active_config()
     active_nodes = alpha.active_support_nodes
     if not active_nodes:
         raise SolverExecutionError("QAP separator requires a nonzero action")
@@ -191,7 +191,7 @@ def fixed_action_worst_correspondence_qap(
     coefficients = _fixed_action_product_coefficients(problem, alpha)
     deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     model = Model("qap_fixed_action")
-    _configure_model(model, config, deadline)
+    _configure_model(model, deadline)
     assignment_variables = _build_assignment_structure(model, blocks, "fa")
     objective_terms = _add_mccormick_products(model, assignment_variables, coefficients, "fa")
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
@@ -216,8 +216,8 @@ def point_correspondence_commitment(
     source_response_matrix: NDArray[np.float64],
     target_response_matrix: NDArray[np.float64],
     blocks: PaddedBlockStructure,
-    config: FedorbitConfig,
 ) -> QapSeparatorResult:
+    config = active_config()
     size = blocks.total_padded_nodes
     if source_response_matrix.shape != (size, size) or target_response_matrix.shape != (size, size):
         raise SolverExecutionError("point-correspondence matrices must match padded size")
@@ -234,7 +234,7 @@ def point_correspondence_commitment(
             coefficients[(source_a, source_b, target_k, target_j)] = coefficient
     deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     model = Model("qap_point_correspondence")
-    _configure_model(model, config, deadline)
+    _configure_model(model, deadline)
     assignment_variables = _build_assignment_structure(model, blocks, "pc")
     objective_terms = _add_mccormick_products(model, assignment_variables, coefficients, "pc")
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
@@ -257,7 +257,6 @@ def point_correspondence_commitment(
         blocks,
         best_objective,
         tie_tolerance,
-        config,
         deadline,
     )
     if refined is None:
@@ -288,7 +287,6 @@ def _refine_lexicographic_correspondence(
     blocks: PaddedBlockStructure,
     best_objective: float,
     tie_tolerance: float,
-    config: FedorbitConfig,
     deadline: float,
 ) -> tuple[tuple[int, ...], float] | None:
     model.freeTransform()
@@ -308,7 +306,7 @@ def _refine_lexicographic_correspondence(
                 name=f"lex_fix_{source}_{target}",
                 removable=True,
             )
-            _configure_model(model, config, deadline)
+            _configure_model(model, deadline)
             model.optimize()
             status = model.getStatus()
             if status == "optimal":
@@ -337,9 +335,8 @@ def _refine_lexicographic_correspondence(
 def solve_support_master_qap(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    config: FedorbitConfig,
 ) -> SupportMasterSolution | TerminalState:
-    settings = config.solvers.exact_sparse
+    settings = active_config().solvers.exact_sparse
     initial = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     scenario_rows: list[NDArray[np.float64]] = [scenario_cut_row(problem, initial)]
     scenarios: list[BlockCorrespondence] = [initial]
@@ -360,7 +357,7 @@ def solve_support_master_qap(
                 iterations=iterations,
                 cut_count=len(scenarios),
             )
-        separator = fixed_action_worst_correspondence_qap(problem, alpha, config)
+        separator = fixed_action_worst_correspondence_qap(problem, alpha)
         if not separator.certified:
             assert separator.terminal_state is not None
             return separator.terminal_state
@@ -385,10 +382,9 @@ def solve_support_master_qap(
 
 def solve_robust_action_qap(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     support_limit: int | None = None,
 ) -> QapRobustOutcome:
-    settings = config.solvers.exact_sparse
+    settings = active_config().solvers.exact_sparse
     supports = enumerate_support_coordinate_sets(problem, support_limit)
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     zero_candidate = zero_action(problem)
@@ -397,7 +393,7 @@ def solve_robust_action_qap(
     ]
     solutions: list[SupportMasterSolution] = []
     for support in supports:
-        outcome = solve_support_master_qap(problem, support, config)
+        outcome = solve_support_master_qap(problem, support)
         if isinstance(outcome, TerminalState):
             return QapRobustOutcome(certified_solution=None, terminal_state=outcome)
         solutions.append(outcome)

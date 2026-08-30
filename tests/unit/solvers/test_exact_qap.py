@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from fedorbit.config.context import configured
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import CoarseGroup
 from fedorbit.orbit.correspondence import (
@@ -53,11 +54,10 @@ def _exhaustive_worst_value(problem: RobustActionProblem, alpha: CurriculumActio
 
 
 def test_qap_separator_matches_exhaustive_orbit_truth() -> None:
-    config = load_fedorbit_config()
     for seed in range(3):
         problem = _two_block_problem(seed)
         alpha = CurriculumAction(problem, np.array([0.2, 0.1, 0.15, 0.05]))
-        result = fixed_action_worst_correspondence_qap(problem, alpha, config)
+        result = fixed_action_worst_correspondence_qap(problem, alpha)
         certificate = result.require_certified()
         correspondence = certificate.correspondence
         value = certificate.objective_value
@@ -76,7 +76,8 @@ def test_uncertified_result_refuses_to_release_action() -> None:
     limited_config = config.model_copy(
         update={"solvers": config.solvers.model_copy(update={"generic_exact_qap": tiny_limit})}
     )
-    result = fixed_action_worst_correspondence_qap(problem, alpha, limited_config)
+    with configured(limited_config):
+        result = fixed_action_worst_correspondence_qap(problem, alpha)
     if not result.certified:
         with pytest.raises(QapUncertifiedError):
             result.require_certified()
@@ -92,8 +93,7 @@ def test_point_correspondence_recovers_structural_match() -> None:
     )
     source_matrix = np.array([[0.9, -0.4], [0.5, -0.1]])
     target_matrix = np.array([[-0.1, 0.5], [-0.4, 0.9]])
-    config = load_fedorbit_config()
-    result = point_correspondence_commitment(source_matrix, target_matrix, blocks, config)
+    result = point_correspondence_commitment(source_matrix, target_matrix, blocks)
     certificate = result.require_certified()
     distance, images = certificate.objective_value, certificate.correspondence.images
     del distance
@@ -114,17 +114,15 @@ def test_point_correspondence_tie_prefers_lexicographically_smallest() -> None:
         {CoarseGroup.DISRUPTION: 2},
     )
     symmetric = np.array([[0.5, 0.2], [0.2, 0.8]])
-    config = load_fedorbit_config()
-    result = point_correspondence_commitment(symmetric, symmetric, blocks, config)
+    result = point_correspondence_commitment(symmetric, symmetric, blocks)
     correspondence = result.require_certified().correspondence
     assert correspondence.images == (0, 1)
 
 
 def test_qap_robust_action_agrees_with_exact_sparse_solver() -> None:
-    config = load_fedorbit_config()
     problem = _two_block_problem(33)
     sparse_solution = solve_robust_action(problem, support_limit=1)
-    qap_outcome = solve_robust_action_qap(problem, config, support_limit=1)
+    qap_outcome = solve_robust_action_qap(problem, support_limit=1)
     assert qap_outcome.is_exact
     assert qap_outcome.certified_solution is not None
     qap_solution = qap_outcome.certified_solution
@@ -143,7 +141,6 @@ def test_qap_robust_action_agrees_with_exact_sparse_solver() -> None:
 
 
 def test_zero_action_candidate_present_in_qap_method() -> None:
-    config = load_fedorbit_config()
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION,),
         {CoarseGroup.DISRUPTION: 2},
@@ -159,7 +156,7 @@ def test_zero_action_candidate_present_in_qap_method() -> None:
         total_budget=0.5,
         principal_support=2,
     )
-    outcome = solve_robust_action_qap(negative_problem, config)
+    outcome = solve_robust_action_qap(negative_problem)
     assert outcome.certified_solution is not None
     selected = outcome.certified_solution.certified_action
     assert int(np.count_nonzero(selected.coordinates)) == 0

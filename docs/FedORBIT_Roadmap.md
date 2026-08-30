@@ -1911,7 +1911,7 @@ The implementation environment is fixed to:
 
 | Dependency      | Required version |
 | --------------- | -------------: |
-| Python          |        3.13.15 |
+| Python          |        3.13.12 |
 | PyTorch         |         2.13.0 |
 | NumPy           |          2.5.2 |
 | SciPy           |         1.18.0 |
@@ -2477,7 +2477,7 @@ runtime:
       - execution
 
 environment:
-  python: "3.13.15"
+  python: "3.13.12"
   pytorch: "2.13.0"
   numpy: "2.5.2"
   scipy: "1.18.0"
@@ -2824,6 +2824,27 @@ The following are observed, never hardcoded from papers:
 * exact dataset checksum.
 
 `fedorbit preprocess` records these values.
+
+### Observed repository release, 2026-08-30
+
+The immutable tables selected from the repository release were inspected directly. The
+Edge-IIoTset network table is
+`Edge-IIoTset dataset/Selected dataset for ML and DL/DNN-EdgeIIoT-dataset.csv`; it has
+2,219,201 data rows, 63 columns, `frame.time`, `Attack_label`, and `Attack_type`.
+Its observed local-class counts are Normal 1,615,643; Backdoor 24,862; DDoS_HTTP
+49,911; DDoS_ICMP 116,436; DDoS_TCP 50,062; DDoS_UDP 121,568; Fingerprinting 1,001;
+MITM 1,214; Password 50,153; Port_Scanning 22,564; Ransomware 10,925;
+SQL_injection 51,203; Uploading 37,634; Vulnerability_scanner 50,110; and XSS 15,915.
+
+The selected ToN-IoT release tables are `Train_Test_Windows_dataset/Train_Test_Windows_10.csv`
+(21,104 rows, 126 columns), `Train_Test_Linux_dataset/Train_Test_Linux_process.csv`
+(90,112 rows, 16 columns), and `Train_Test_Network_dataset/train_test_network.csv`
+(211,043 rows, 44 columns). Each contains the required `label` and `type` fields, but
+none contains `ts` or another uniquely resolvable event-time field. Consequently these
+three available selected tables are Invalid Data for the chronological protocol in
+Section 6.8. Preprocessing must record that validation result and must not substitute
+file order, row order, or an inferred timestamp; principal training and evaluation are
+blocked until a release containing the required event-time field is supplied.
 
 # 7. Local Models and Procedural-Response Estimation
 

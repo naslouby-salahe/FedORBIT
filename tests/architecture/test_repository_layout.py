@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from tests.architecture.scan import (
@@ -74,6 +75,9 @@ def test_repository_root_entries_are_allowed() -> None:
         ".nox",
         "__pycache__",
         ".scannerwork",
+        ".import_linter_cache",
+        "outputs",
+        "results",
     }
     actual = {
         entry.name
@@ -139,8 +143,15 @@ def test_no_markdown_planning_documents_in_repo_root() -> None:
 
 
 def test_no_generated_workspaces_committed() -> None:
-    assert not (REPOSITORY_ROOT / "outputs").exists(), "outputs/ must not be committed"
-    assert not (REPOSITORY_ROOT / "results").exists(), "results/ must not be committed"
+    for workspace in ("outputs", "results"):
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", workspace],
+            cwd=REPOSITORY_ROOT,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert tracked.returncode != 0, f"generated workspace is committed: {workspace}"
 
 
 def test_no_temp_planning_directory() -> None:

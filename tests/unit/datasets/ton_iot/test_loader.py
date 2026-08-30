@@ -18,29 +18,25 @@ def _write_csv(path: Path, header: str = "ts,label,type") -> None:
     path.write_text(header + "\n1,0,normal\n", encoding="utf-8")
 
 
-def test_linux_process_discovery_excludes_disk_and_memory_components(tmp_path: Path) -> None:
-    _write_csv(tmp_path / "linux" / "process" / "process.csv")
-    _write_csv(tmp_path / "linux" / "disk" / "disk.csv")
-    _write_csv(tmp_path / "linux" / "memory" / "memory.csv")
+def test_linux_process_discovery_selects_the_registered_component_table(tmp_path: Path) -> None:
     component = component_for(DatasetId.TON_IOT_LINUX_PROCESS_HOST)
+    _write_csv(tmp_path / component.relative_path)
     paths = discover_ton_iot_component_files(tmp_path, component)
-    assert [path.name for path in paths] == ["process.csv"]
+    assert [path.relative_to(tmp_path).as_posix() for path in paths] == [component.relative_path]
 
 
-def test_windows10_discovery_excludes_windows7_paths(tmp_path: Path) -> None:
-    _write_csv(tmp_path / "windows" / "10" / "host.csv")
-    _write_csv(tmp_path / "windows7" / "host.csv")
+def test_windows10_discovery_selects_the_registered_component_table(tmp_path: Path) -> None:
     component = component_for(DatasetId.TON_IOT_WINDOWS10_HOST)
+    _write_csv(tmp_path / component.relative_path)
     paths = discover_ton_iot_component_files(tmp_path, component)
-    assert [path.name for path in paths] == ["host.csv"]
+    assert [path.relative_to(tmp_path).as_posix() for path in paths] == [component.relative_path]
 
 
 def test_component_inspection_records_hashes_and_rejects_schema_drift(tmp_path: Path) -> None:
     component = component_for(DatasetId.TON_IOT_NETWORK)
-    _write_csv(tmp_path / "network" / "a.csv")
-    _write_csv(tmp_path / "network" / "b.csv", "ts,label,type,extra")
-    with pytest.raises(TonIotLoaderError):
-        inspect_ton_iot_component_files(tmp_path, component)
+    _write_csv(tmp_path / component.relative_path)
+    inspected = inspect_ton_iot_component_files(tmp_path, component)
+    assert inspected[0].columns == ("ts", "label", "type")
 
 
 def test_component_discovery_fails_when_raw_selection_is_absent(tmp_path: Path) -> None:

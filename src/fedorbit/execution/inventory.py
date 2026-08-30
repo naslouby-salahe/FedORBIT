@@ -10,7 +10,7 @@ from fedorbit.artifacts.storage import atomic_write_json
 from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
-from fedorbit.domain.enums import DatasetId
+from fedorbit.domain.enums import DatasetId, RawDatasetDirectory
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 
@@ -86,10 +86,10 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
 
 def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:
     if request.dataset == DatasetId.EDGE_IIOTSET_NETWORK:
-        inspected = inspect_edge_tabular_files(request.raw_root)
+        inspected = inspect_edge_tabular_files(request.raw_root / RawDatasetDirectory.EDGE_IIOTSET)
     else:
         inspected = inspect_ton_iot_component_files(
-            request.raw_root, component_for(request.dataset)
+            request.raw_root / RawDatasetDirectory.TON_IOT, component_for(request.dataset)
         )
     return RawDatasetInventory(
         dataset=request.dataset,

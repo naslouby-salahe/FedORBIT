@@ -10,6 +10,11 @@ class EdgeLoaderError(ValueError):
     pass
 
 
+EDGE_NETWORK_RELATIVE_PATH = (
+    "Edge-IIoTset dataset/Selected dataset for ML and DL/DNN-EdgeIIoT-dataset.csv"
+)
+
+
 @dataclass(frozen=True, slots=True)
 class EdgeTabularFile:
     relative_path: str
@@ -29,16 +34,10 @@ def _file_sha256(path: Path) -> str:
 def discover_edge_tabular_files(raw_root: Path) -> tuple[Path, ...]:
     if not raw_root.is_dir():
         raise FileNotFoundError(raw_root)
-    candidates = tuple(
-        path
-        for path in raw_root.rglob("*.csv")
-        if path.is_file() and "description_stats_datasets" not in path.name.casefold()
-    )
-    if not candidates:
-        raise EdgeLoaderError("no Edge-IIoTset tabular traffic CSV files found")
-    return tuple(
-        sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode())
-    )
+    selected = raw_root / EDGE_NETWORK_RELATIVE_PATH
+    if not selected.is_file():
+        raise EdgeLoaderError(f"selected Edge-IIoTset network table is absent: {selected}")
+    return (selected,)
 
 
 def inspect_edge_tabular_files(raw_root: Path) -> tuple[EdgeTabularFile, ...]:

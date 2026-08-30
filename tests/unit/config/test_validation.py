@@ -170,7 +170,7 @@ def test_target_budget_locked(fedorbit_config: FedorbitConfig) -> None:
 
 def test_environment_versions_locked(fedorbit_config: FedorbitConfig) -> None:
     environment = fedorbit_config.environment
-    assert environment.python == "3.13.15"
+    assert environment.python == "3.13.12"
     assert environment.pytorch == "2.13.0"
     assert environment.numpy == "2.5.2"
     assert environment.scipy == "1.18.0"

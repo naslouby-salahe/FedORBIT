@@ -44,7 +44,9 @@ def scientific(session: nox.Session) -> None:
 
 @nox.session
 def integration(session: nox.Session) -> None:
-    session.run("uv", "run", "pytest", "tests/integration", "-q", external=True, success_codes=[0, 5])
+    session.run(
+        "uv", "run", "pytest", "tests/integration", "-q", external=True, success_codes=[0, 5]
+    )
 
 
 @nox.session

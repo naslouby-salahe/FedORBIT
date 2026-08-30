@@ -15,8 +15,9 @@ def test_ton_iot_component_registry_is_exact() -> None:
         DatasetId.TON_IOT_NETWORK,
     )
     linux = component_for(DatasetId.TON_IOT_LINUX_PROCESS_HOST)
-    assert "process" in linux.required_path_tokens
-    assert {"disk", "memory"} <= set(linux.forbidden_path_tokens)
+    assert linux.relative_path == (
+        "Train_Test_datasets/Train_Test_Linux_dataset/Train_Test_Linux_process.csv"
+    )
 
 
 def test_ton_windows_adapter_resolves_timestamp_labels_and_identity_exclusion() -> None:

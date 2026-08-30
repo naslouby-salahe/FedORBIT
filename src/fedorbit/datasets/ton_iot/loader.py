@@ -28,29 +28,18 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _matches_component(path: Path, raw_root: Path, component: TonIotComponent) -> bool:
-    relative = path.relative_to(raw_root).as_posix().casefold()
-    return all(token in relative for token in component.required_path_tokens) and not any(
-        token in relative for token in component.forbidden_path_tokens
-    )
-
-
 def discover_ton_iot_component_files(
     raw_root: Path,
     component: TonIotComponent,
 ) -> tuple[Path, ...]:
     if not raw_root.is_dir():
         raise FileNotFoundError(raw_root)
-    candidates = tuple(
-        path
-        for path in raw_root.rglob("*.csv")
-        if path.is_file() and _matches_component(path, raw_root, component)
-    )
-    if not candidates:
-        raise TonIotLoaderError(f"no files found for ToN-IoT component {component.component_name}")
-    return tuple(
-        sorted(candidates, key=lambda path: path.relative_to(raw_root).as_posix().encode())
-    )
+    selected = raw_root / component.relative_path
+    if not selected.is_file():
+        raise TonIotLoaderError(
+            f"selected ToN-IoT component table is absent for {component.component_name}: {selected}"
+        )
+    return (selected,)
 
 
 def inspect_ton_iot_component_files(

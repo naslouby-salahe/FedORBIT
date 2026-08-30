@@ -11,28 +11,24 @@ from fedorbit.domain.enums import DatasetId
 class TonIotComponent:
     dataset_id: DatasetId
     component_name: str
-    required_path_tokens: tuple[str, ...]
-    forbidden_path_tokens: tuple[str, ...]
+    relative_path: str
 
 
 TON_COMPONENTS = (
     TonIotComponent(
         DatasetId.TON_IOT_WINDOWS10_HOST,
         "windows10_host",
-        ("windows", "10"),
-        ("windows7", "windows_7", "win7"),
+        "Train_Test_datasets/Train_Test_Windows_dataset/Train_Test_Windows_10.csv",
     ),
     TonIotComponent(
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
         "linux_process",
-        ("linux", "process"),
-        ("disk", "memory"),
+        "Train_Test_datasets/Train_Test_Linux_dataset/Train_Test_Linux_process.csv",
     ),
     TonIotComponent(
         DatasetId.TON_IOT_NETWORK,
         "network",
-        ("network",),
-        (),
+        "Train_Test_datasets/Train_Test_Network_dataset/train_test_network.csv",
     ),
 )
 

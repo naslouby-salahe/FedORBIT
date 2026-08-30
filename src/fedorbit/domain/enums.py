@@ -17,6 +17,11 @@ class DatasetId(StrEnum):
     TON_IOT_NETWORK = "ton_iot_network"
 
 
+class RawDatasetDirectory(StrEnum):
+    EDGE_IIOTSET = "Edge-IIoTset"
+    TON_IOT = "TON-IoT"
+
+
 class Split(StrEnum):
     TRAIN = "TRAIN"
     META = "META"

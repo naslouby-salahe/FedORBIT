@@ -125,8 +125,8 @@ def test_statistics_parameters_locked(fedorbit_config: FedorbitConfig) -> None:
     assert statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch == 25
 
 
-def test_nominal_alpha_is_derived_not_configured(fedorbit_config: FedorbitConfig) -> None:
-    assert nominal_alpha(fedorbit_config) == 0.05
+def test_nominal_alpha_is_derived_not_configured() -> None:
+    assert nominal_alpha() == 0.05
 
 
 def test_evaluation_criteria_locked(fedorbit_config: FedorbitConfig) -> None:

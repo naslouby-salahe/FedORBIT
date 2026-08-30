@@ -634,8 +634,10 @@ class FedorbitConfig(FrozenModel):
     reporting: ReportingConfig
 
 
-def nominal_alpha(config: FedorbitConfig) -> float:
-    return round(1.0 - config.scientific.statistics.confidence_level, 10)
+def nominal_alpha() -> float:
+    from fedorbit.config.context import active_config
+
+    return round(1.0 - active_config().scientific.statistics.confidence_level, 10)
 
 
 def _registered_method_values() -> set[str]:
@@ -652,7 +654,10 @@ def _append_registered_method(
         methods.append(candidate)
 
 
-def all_registered_methods(config: FedorbitConfig) -> tuple[TransferMethod, ...]:
+def all_registered_methods() -> tuple[TransferMethod, ...]:
+    from fedorbit.config.context import active_config
+
+    config = active_config()
     experiment_configs: tuple[
         PrimaryStrictCrossTelemetryTransferConfig
         | MechanismAblationsConfig
@@ -685,5 +690,7 @@ def all_registered_methods(config: FedorbitConfig) -> tuple[TransferMethod, ...]
     return tuple(methods)
 
 
-def registered_client_ids(config: FedorbitConfig) -> tuple[DatasetId, ...]:
-    return tuple(config.scientific.datasets.clients.keys())
+def registered_client_ids() -> tuple[DatasetId, ...]:
+    from fedorbit.config.context import active_config
+
+    return tuple(active_config().scientific.datasets.clients.keys())

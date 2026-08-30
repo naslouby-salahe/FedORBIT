@@ -17,6 +17,7 @@ from fedorbit.transfer.assimilation import (
     settle_rejected_proposal,
 )
 from fedorbit.transfer.assimilation import TestOpeningRuleError as OpeningRuleError
+from fedorbit.transfer.curriculum import CurriculumMultipliers
 
 
 def _model_and_optimizer() -> tuple[NetworkFlowClassifier, torch.optim.AdamW]:
@@ -96,7 +97,7 @@ def test_live_assimilation_uses_registered_step_count_and_coordinates() -> None:
         features,
         targets,
         ClassWeights.from_targets(targets, 2),
-        torch.tensor([1.25, 1.0]),
+        CurriculumMultipliers(torch.tensor([1.25, 1.0])),
         1103,
         coordinates,
         batch_size=16,

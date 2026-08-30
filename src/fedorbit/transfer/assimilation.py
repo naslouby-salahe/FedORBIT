@@ -25,6 +25,7 @@ from fedorbit.transfer.confirmation import (
     ConfirmReplicateOutcomes,
     hierarchical_bootstrap_lower_bound,
 )
+from fedorbit.transfer.curriculum import CurriculumMultipliers
 
 
 class AssimilationError(ValueError):
@@ -156,7 +157,7 @@ def _step_shadow(
     state: PreConfirmTargetState,
     batches: tuple[ShadowBatch, ...],
     class_weights: ClassWeights,
-    multipliers: torch.Tensor,
+    multipliers: CurriculumMultipliers,
 ) -> None:
     config = active_config()
     state.restore_into(model, optimizer)
@@ -171,7 +172,7 @@ def _step_shadow(
             targets,
             class_weights,
             config.scientific.metrics.probability_log_floor,
-            multipliers,
+            multipliers.values,
         )
         if not bool(torch.isfinite(loss)):
             raise AssimilationError("non-finite confirmation shadow loss")
@@ -226,7 +227,7 @@ class ConfirmationRequest:
     confirm_features: torch.Tensor
     confirm_targets: torch.Tensor
     base_class_weights: ClassWeights
-    curriculum_multipliers: torch.Tensor
+    curriculum_multipliers: CurriculumMultipliers
     selected_hyperparameters: SelectedHyperparameters
     seed: int
     contrast_coordinates: str
@@ -245,7 +246,7 @@ def run_proposal_confirmation(
         raise AssimilationError("CONFIRM split is empty")
     model = request.model
     class_count = int(request.base_class_weights.values.shape[0])
-    neutral = torch.ones_like(request.base_class_weights.values)
+    neutral = CurriculumMultipliers(torch.ones_like(request.base_class_weights.values))
     replicated: list[ConfirmReplicateOutcomes] = []
     for replicate_index in range(confirmation.paired_replicates):
         batches = _confirmation_batches_for_replicate(
@@ -345,7 +346,7 @@ def apply_accepted_assimilation(
     train_features: torch.Tensor,
     train_targets: torch.Tensor,
     base_class_weights: ClassWeights,
-    curriculum_multipliers: torch.Tensor,
+    curriculum_multipliers: CurriculumMultipliers,
     seed: int,
     assimilation_coordinates: AssimilationCoordinates,
     batch_size: int | None = None,
@@ -385,7 +386,7 @@ def apply_accepted_assimilation(
             targets,
             base_class_weights,
             config.scientific.metrics.probability_log_floor,
-            curriculum_multipliers,
+            curriculum_multipliers.values,
         )
         if not bool(torch.isfinite(loss)):
             raise AssimilationError("non-finite live assimilation loss")

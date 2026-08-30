@@ -72,6 +72,10 @@ REQUIRED_SYNTHETIC_MODULES = {
     "src/fedorbit/synthetic/scalability.py",
 }
 
+REQUIRED_TRANSFER_MODULES = {
+    "src/fedorbit/transfer/curriculum.py",
+}
+
 
 def test_repository_root_entries_are_allowed() -> None:
     machine_local = {
@@ -139,6 +143,15 @@ def test_roadmap_required_synthetic_modules_exist() -> None:
         if not (REPOSITORY_ROOT / relative).is_file()
     }
     assert not missing, f"missing roadmap synthetic modules: {sorted(missing)}"
+
+
+def test_roadmap_required_transfer_modules_exist() -> None:
+    missing = {
+        relative
+        for relative in REQUIRED_TRANSFER_MODULES
+        if not (REPOSITORY_ROOT / relative).is_file()
+    }
+    assert not missing, f"missing roadmap transfer modules: {sorted(missing)}"
 
 
 def test_data_raw_is_symlink_to_immutable_external_tree() -> None:

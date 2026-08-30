@@ -31,7 +31,7 @@ def test_importance_uses_meta_risk_only_with_floor_and_normalization(
 ) -> None:
     floor = config.scientific.target_importance.class_risk_floor
     assert floor == 1e-4
-    importance = build_target_importance(config, _risks())
+    importance = build_target_importance(_risks())
     floored_total = 0.20 + 0.08 + floor
     assert importance.weight_of(0) == pytest.approx(0.20 / floored_total)
     assert importance.weight_of(1) == pytest.approx(0.08 / floored_total)
@@ -39,15 +39,15 @@ def test_importance_uses_meta_risk_only_with_floor_and_normalization(
     assert importance.actionable_total == pytest.approx(1.0)
 
 
-def test_normal_and_null_nodes_have_zero_importance(config: FedorbitConfig) -> None:
-    importance = build_target_importance(config, _risks())
+def test_normal_and_null_nodes_have_zero_importance() -> None:
+    importance = build_target_importance(_risks())
     assert importance.weight_of(3) == 0.0
     assert importance.weight_of(4) == 0.0
 
 
-def test_vector_expansion_places_zero_coordinates(config: FedorbitConfig) -> None:
+def test_vector_expansion_places_zero_coordinates() -> None:
 
-    importance = build_target_importance(config, _risks())
+    importance = build_target_importance(_risks())
     vector = importance.as_vector(6)
     assert vector.shape == (6,)
     assert vector[5] == 0.0
@@ -56,10 +56,10 @@ def test_vector_expansion_places_zero_coordinates(config: FedorbitConfig) -> Non
         importance.as_vector(2)
 
 
-def test_duplicate_node_reports_rejected(config: FedorbitConfig) -> None:
+def test_duplicate_node_reports_rejected() -> None:
     duplicated = (*_risks(), TransferNodeRisk(0, True, 0.1))
     with pytest.raises(TargetImportanceError):
-        build_target_importance(config, duplicated)
+        build_target_importance(duplicated)
 
 
 def test_negative_risk_report_rejected_at_construction() -> None:
@@ -78,31 +78,31 @@ def test_negative_node_index_rejected_at_construction() -> None:
         TransferNodeRisk(-1, False, 0.1)
 
 
-def test_no_actionable_nodes_is_insufficient_evidence(config: FedorbitConfig) -> None:
+def test_no_actionable_nodes_is_insufficient_evidence() -> None:
     non_actionable_reports = (
         TransferNodeRisk(0, is_actionable=False, meta_class_risk=0.4),
         TransferNodeRisk(1, is_actionable=False, meta_class_risk=0.1),
     )
     with pytest.raises(TargetImportanceError):
-        build_target_importance(config, non_actionable_reports)
+        build_target_importance(non_actionable_reports)
 
 
-def test_construction_is_deterministic_and_sorted(config: FedorbitConfig) -> None:
-    first = build_target_importance(config, tuple(reversed(_risks())))
-    second = build_target_importance(config, _risks())
+def test_construction_is_deterministic_and_sorted() -> None:
+    first = build_target_importance(tuple(reversed(_risks())))
+    second = build_target_importance(_risks())
     assert first == second
     weights = [first.weight_of(node) for node in sorted(first.weights_by_node_index)]
     assert all(weight >= 0.0 for weight in weights)
 
 
-def test_importance_feeds_robust_action_problem(config: FedorbitConfig) -> None:
+def test_importance_feeds_robust_action_problem() -> None:
     import numpy as np
 
     from fedorbit.domain.enums import CoarseGroup
     from fedorbit.orbit.correspondence import build_padded_block_structure
     from fedorbit.orbit.objective import RobustActionProblem, build_robust_action_problem
 
-    importance = build_target_importance(config, _risks())
+    importance = build_target_importance(_risks())
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION,),
         {CoarseGroup.DISRUPTION: 5},

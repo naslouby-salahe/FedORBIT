@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from fedorbit.config.context import active_config
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData
@@ -74,10 +75,9 @@ class TargetImportance:
 
 
 def build_target_importance(
-    config: FedorbitConfig,
     node_risks: tuple[TransferNodeRisk, ...],
 ) -> TargetImportance:
-    floor = config.scientific.target_importance.class_risk_floor
+    floor = active_config().scientific.target_importance.class_risk_floor
     if floor <= 0.0:
         raise TargetImportanceError("class risk floor must be positive")
     seen: set[int] = set()

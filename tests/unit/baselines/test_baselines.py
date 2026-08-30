@@ -221,9 +221,8 @@ def test_exact_map_oracle_uses_given_correspondence() -> None:
 
 
 def test_without_confirmation_matches_principal_ranking_then_assimilates() -> None:
-    config = load_fedorbit_config()
     problem = _problem(41)
-    principal = solve_robust_action(problem, config, support_limit=1)
+    principal = solve_robust_action(problem, support_limit=1)
     no_confirm_matrix = principal.selected_action.active_support_nodes
     assert len(no_confirm_matrix) <= 1
 

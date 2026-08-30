@@ -123,7 +123,7 @@ def test_point_correspondence_tie_prefers_lexicographically_smallest() -> None:
 def test_qap_robust_action_agrees_with_exact_sparse_solver() -> None:
     config = load_fedorbit_config()
     problem = _two_block_problem(33)
-    sparse_solution = solve_robust_action(problem, config, support_limit=1)
+    sparse_solution = solve_robust_action(problem, support_limit=1)
     qap_outcome = solve_robust_action_qap(problem, config, support_limit=1)
     assert qap_outcome.is_exact
     assert qap_outcome.certified_solution is not None

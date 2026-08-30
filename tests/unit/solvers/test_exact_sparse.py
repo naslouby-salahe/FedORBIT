@@ -136,7 +136,6 @@ def test_size_one_completion_counts_as_lap_call() -> None:
 
 
 def test_robust_master_certifies_known_hand_solution() -> None:
-    config = load_fedorbit_config()
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION,),
         {CoarseGroup.DISRUPTION: 2},
@@ -152,7 +151,7 @@ def test_robust_master_certifies_known_hand_solution() -> None:
         total_budget=2.0,
         principal_support=2,
     )
-    solution = solve_robust_action(problem, config)
+    solution = solve_robust_action(problem)
     assert isinstance(solution, RobustActionSolution)
     assert solution.certified_robust_value >= solution.zero_action_value
     orbit_values = [
@@ -164,7 +163,6 @@ def test_robust_master_certifies_known_hand_solution() -> None:
 
 
 def test_cut_cap_exhaustion_raises_non_convergence() -> None:
-    config = load_fedorbit_config()
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION, CoarseGroup.EXPLOITATION),
         {CoarseGroup.DISRUPTION: 2, CoarseGroup.EXPLOITATION: 2},
@@ -188,11 +186,10 @@ def test_cut_cap_exhaustion_raises_non_convergence() -> None:
         principal_support=2,
     )
     with pytest.raises(SparseMasterNonConvergenceError):
-        solve_robust_action(problem, config, maximum_cuts=0)
+        solve_robust_action(problem, maximum_cuts=0)
 
 
 def test_zero_action_is_explicit_candidate() -> None:
-    config = load_fedorbit_config()
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION,),
         {CoarseGroup.DISRUPTION: 2},
@@ -208,6 +205,6 @@ def test_zero_action_is_explicit_candidate() -> None:
         total_budget=0.5,
         principal_support=2,
     )
-    solution = solve_robust_action(negative_problem, config)
+    solution = solve_robust_action(negative_problem)
     assert int(np.count_nonzero(solution.selected_action.coordinates)) == 0
     assert solution.certified_robust_value == pytest.approx(0.0, abs=1e-12)

@@ -9,7 +9,8 @@ import highspy
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import ExactSparseSolverConfig, FedorbitConfig
+from fedorbit.config.context import active_config
+from fedorbit.config.models import ExactSparseSolverConfig
 from fedorbit.orbit.correspondence import (
     ActiveImageMap,
     BlockCorrespondence,
@@ -258,10 +259,9 @@ def scenario_cut_row(
 def solve_support_master(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    config: FedorbitConfig,
     maximum_cuts: int | None = None,
 ) -> SupportMasterSolution:
-    settings = config.solvers.exact_sparse
+    settings = active_config().solvers.exact_sparse
     cut_cap = maximum_cuts if maximum_cuts is not None else settings.maximum_cuts_per_support
     initial = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     scenario_rows: list[NDArray[np.float64]] = [scenario_cut_row(problem, initial)]
@@ -380,23 +380,22 @@ def run_support_master_lp(
 
 def solve_robust_action(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     support_limit: int | None = None,
     maximum_cuts: int | None = None,
 ) -> RobustActionSolution:
-    settings = config.solvers.exact_sparse
+    settings = active_config().solvers.exact_sparse
     supports = enumerate_support_coordinate_sets(problem, support_limit)
     concurrency = max(1, min(settings.maximum_concurrent_supports, len(supports)))
     if concurrency > 1:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = [
-                executor.submit(solve_support_master, problem, support, config, maximum_cuts)
+                executor.submit(solve_support_master, problem, support, maximum_cuts)
                 for support in supports
             ]
             solutions = tuple(future.result() for future in futures)
     else:
         solutions = tuple(
-            solve_support_master(problem, support, config, maximum_cuts) for support in supports
+            solve_support_master(problem, support, maximum_cuts) for support in supports
         )
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     zero_candidate = zero_action(problem)

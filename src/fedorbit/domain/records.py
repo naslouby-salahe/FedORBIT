@@ -2,9 +2,19 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from pathlib import Path
 
 from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
 from fedorbit.domain.serialization import stable_json
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPath:
+    value: Path
+
+    def __post_init__(self) -> None:
+        if not self.value.is_absolute():
+            raise ValueError("artifact paths must be absolute")
 
 
 @dataclass(frozen=True, slots=True)

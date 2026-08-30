@@ -18,6 +18,7 @@ from fedorbit.datasets.inspection import (
     persist_dataset_observation,
 )
 from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName, ScalabilityBlockPattern
+from fedorbit.domain.records import ArtifactPath
 from fedorbit.execution.inventory import (
     RawInventoryPersistenceRequest,
     RawInventoryRequest,
@@ -82,7 +83,7 @@ class ExecutionResult:
 @dataclass(frozen=True, slots=True)
 class DatasetPreparationResult:
     observations: tuple[DatasetObservation, ...]
-    validation_artifact_paths: tuple[str, ...]
+    validation_artifact_paths: tuple[ArtifactPath, ...]
 
     @property
     def blocked_datasets(self) -> tuple[DatasetId, ...]:
@@ -174,7 +175,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     )
     return DatasetPreparationResult(
         observations=observations,
-        validation_artifact_paths=tuple(str(path) for path in validation_paths),
+        validation_artifact_paths=tuple(ArtifactPath(path) for path in validation_paths),
     )
 
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 
 from fedorbit.config.context import active_config
+from fedorbit.domain.enums import ScalabilityBlockPattern
 from fedorbit.runtime.seeds import RandomSeed
 from fedorbit.synthetic.scalability import (
-    ScalabilityBlockPattern,
     ScalabilityInstanceRequest,
     generate_scalability_instance,
 )
@@ -27,7 +27,7 @@ def test_balanced_scalability_instance_uses_roadmap_support_and_weights() -> Non
 
 def test_scalability_generation_is_seed_deterministic() -> None:
     request = ScalabilityInstanceRequest(
-        6, ScalabilityBlockPattern.MAXIMALLY_SKEWED_TWO_BLOCK, 3, RandomSeed(202)
+        6, ScalabilityBlockPattern.MAXIMALLY_SKEWED, 3, RandomSeed(202)
     )
     first = generate_scalability_instance(request)
     second = generate_scalability_instance(request)

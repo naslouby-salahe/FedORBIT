@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
 import numpy as np
 
 from fedorbit.config.context import active_config
+from fedorbit.domain.enums import ScalabilityBlockPattern
 from fedorbit.runtime.seeds import RandomSeed
 from fedorbit.synthetic.generators import SyntheticRandomRequest, create_float64_random_stream
 
 
 class ScalabilityGenerationError(ValueError):
     pass
-
-
-class ScalabilityBlockPattern(StrEnum):
-    BALANCED = "balanced"
-    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two-block"
 
 
 @dataclass(frozen=True, slots=True)

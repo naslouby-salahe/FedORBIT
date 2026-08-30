@@ -17,7 +17,7 @@ from fedorbit.datasets.inspection import (
     inspect_dataset,
     persist_dataset_observation,
 )
-from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
+from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName, ScalabilityBlockPattern
 from fedorbit.execution.inventory import (
     RawInventoryPersistenceRequest,
     RawInventoryRequest,
@@ -40,11 +40,7 @@ from fedorbit.synthetic.mechanisms import (
     UnresolvedMapWorldRequest,
     generate_unresolved_map_world,
 )
-from fedorbit.synthetic.scalability import (
-    ScalabilityBlockPattern,
-    ScalabilityInstanceRequest,
-    generate_scalability_instance,
-)
+from fedorbit.synthetic.scalability import ScalabilityInstanceRequest, generate_scalability_instance
 
 
 class ExecutionError(ValueError):

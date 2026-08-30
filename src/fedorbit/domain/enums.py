@@ -118,6 +118,11 @@ class SolverId(StrEnum):
     DENSE_CCP = "dense_ccp"
 
 
+class ScalabilityBlockPattern(StrEnum):
+    BALANCED = "balanced"
+    MAXIMALLY_SKEWED = "maximally_skewed"
+
+
 class ArtifactState(StrEnum):
     MISSING = "Missing"
     RUNNING = "Running"

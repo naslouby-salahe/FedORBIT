@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 
 
 class BudgetCategory(StrEnum):
@@ -79,7 +79,8 @@ class TargetOptimizerStepLedger:
     consumed_steps: OptimizerStepAllocation
 
     @classmethod
-    def from_config(cls, config: FedorbitConfig) -> TargetOptimizerStepLedger:
+    def from_context(cls) -> TargetOptimizerStepLedger:
+        config = active_config()
         budget = config.scientific.target_optimizer_budget
         diagnostic = config.scientific.target_response_diagnostic
         expected_diagnostic_reserve = (

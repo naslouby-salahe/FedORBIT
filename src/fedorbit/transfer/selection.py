@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 
 
 class SelectionError(ValueError):
@@ -38,9 +38,9 @@ class SelectionDecision:
 
 
 def rank_source_proposals(
-    config: FedorbitConfig,
     candidates: Sequence[SourceProposal],
 ) -> tuple[RankedProposal, ...]:
+    config = active_config()
     action = config.scientific.action
     multi_source = config.scientific.multi_source_selection
     communication = abs(multi_source.communication_cost_coefficient_in_principal_ranking)
@@ -70,11 +70,10 @@ def rank_source_proposals(
 
 
 def select_source_sequentially(
-    config: FedorbitConfig,
     ranked: Sequence[RankedProposal],
     confirmation_decision: Callable[[SourceProposal], bool],
 ) -> SelectionDecision:
-    maximum = config.scientific.action.maximum_source_proposals_per_target
+    maximum = active_config().scientific.action.maximum_source_proposals_per_target
     attempts: list[SelectionAttempt] = []
     for ranked_proposal in sorted(ranked, key=lambda entry: entry.rank)[:maximum]:
         if len(attempts) >= maximum:

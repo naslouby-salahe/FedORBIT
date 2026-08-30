@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fedorbit.config.context import configured
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.transfer.selection import (
     SelectionError,
@@ -14,9 +15,7 @@ def _proposal(name: str, value: float) -> SourceProposal:
 
 
 def test_nonpositive_proposals_discarded_before_ranking() -> None:
-    config = load_fedorbit_config()
     ranked = rank_source_proposals(
-        config,
         (
             _proposal("edge", -0.5),
             _proposal("windows", 0.0),
@@ -29,9 +28,7 @@ def test_nonpositive_proposals_discarded_before_ranking() -> None:
 
 
 def test_descending_value_order_with_stable_client_name_ties() -> None:
-    config = load_fedorbit_config()
     ranked = rank_source_proposals(
-        config,
         (
             _proposal("ton_network", 0.3),
             _proposal("zeta", 0.5),
@@ -51,15 +48,13 @@ def test_maximum_proposal_cap_enforced_from_configuration() -> None:
     maximum = config.scientific.action.maximum_source_proposals_per_target
     assert maximum == 3
     candidates = tuple(_proposal(f"source_{i}", 0.9 - i * 0.05) for i in range(6))
-    ranked = rank_source_proposals(config, candidates)
+    ranked = rank_source_proposals(candidates)
     assert len(ranked) == maximum
     assert all(entry.rank <= maximum for entry in ranked)
 
 
 def test_sequential_confirmation_stops_at_first_accept() -> None:
-    config = load_fedorbit_config()
     ranked = rank_source_proposals(
-        config,
         (
             _proposal("first", 0.9),
             _proposal("second", 0.7),
@@ -67,7 +62,6 @@ def test_sequential_confirmation_stops_at_first_accept() -> None:
         ),
     )
     decision = select_source_sequentially(
-        config,
         ranked,
         lambda proposal: proposal.source_client_name == "second",
     )
@@ -80,12 +74,10 @@ def test_sequential_confirmation_stops_at_first_accept() -> None:
 
 
 def test_no_accepted_candidate_remains_local_only() -> None:
-    config = load_fedorbit_config()
     ranked = rank_source_proposals(
-        config,
         tuple(_proposal(f"source_{i}", 0.5 - i * 0.1) for i in range(4)),
     )
-    decision = select_source_sequentially(config, ranked, lambda _proposal: False)
+    decision = select_source_sequentially(ranked, lambda _proposal: False)
     assert decision.remained_local_only
     assert decision.accepted_proposal is None
     assert decision.accepted_rank is None
@@ -93,10 +85,9 @@ def test_no_accepted_candidate_remains_local_only() -> None:
 
 
 def test_empty_candidates_remain_local_only() -> None:
-    config = load_fedorbit_config()
-    ranked = rank_source_proposals(config, ())
+    ranked = rank_source_proposals(())
     assert ranked == ()
-    decision = select_source_sequentially(config, ranked, lambda _p: True)
+    decision = select_source_sequentially(ranked, lambda _p: True)
     assert decision.remained_local_only
     assert decision.attempts == ()
 
@@ -113,7 +104,8 @@ def test_principal_cost_coefficients_are_zero_and_validated() -> None:
         0.5,
     )
     try:
-        rank_source_proposals(nonzero, (_proposal("edge", 0.4),))
+        with configured(nonzero):
+            rank_source_proposals((_proposal("edge", 0.4),))
     except SelectionError:
         pass
     else:
@@ -121,12 +113,11 @@ def test_principal_cost_coefficients_are_zero_and_validated() -> None:
 
 
 def test_ranking_is_deterministic() -> None:
-    config = load_fedorbit_config()
     candidates = (
         _proposal("b", 0.4),
         _proposal("a", 0.6),
         _proposal("c", 0.2),
     )
-    first = rank_source_proposals(config, candidates)
-    second = rank_source_proposals(config, tuple(reversed(candidates)))
+    first = rank_source_proposals(candidates)
+    second = rank_source_proposals(tuple(reversed(candidates)))
     assert first == second

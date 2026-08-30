@@ -5,8 +5,6 @@ from pathlib import Path
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import ArtifactState, ExperimentClassification, ExperimentName
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.runtime.environment import EnvironmentMismatchError, validate_environment
@@ -86,8 +84,8 @@ def layer_index(layer: str) -> int:
     raise ValueError(f"unknown execution layer: {layer}")
 
 
-def build_plan(config: FedorbitConfig) -> tuple[PlanRow, ...]:
-    catalogue = build_catalogue(config)
+def build_plan() -> tuple[PlanRow, ...]:
+    catalogue = build_catalogue()
     return tuple(
         PlanRow(
             experiment=name,
@@ -103,11 +101,9 @@ class ExecutionReadiness:
     def __init__(
         self,
         store: ArtifactStore,
-        config: FedorbitConfig | None = None,
         raw_root: Path = Path("data/raw"),
     ) -> None:
         self._store = store
-        self._config = config if config is not None else load_fedorbit_config()
         self._raw_root = raw_root
 
     def prerequisite_states(self) -> tuple[PrerequisiteState, ...]:

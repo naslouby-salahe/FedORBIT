@@ -60,11 +60,9 @@ def test_readiness_gate_all_governed_values_bound(fedorbit_config: FedorbitConfi
         assert current is not None, f"unbound governed value: {'.'.join(probe)}"
 
 
-def test_readiness_gate_catalogue_expansion_is_deterministic(
-    fedorbit_config: FedorbitConfig,
-) -> None:
-    first = build_catalogue(fedorbit_config)
-    second = build_catalogue(fedorbit_config)
+def test_readiness_gate_catalogue_expansion_is_deterministic() -> None:
+    first = build_catalogue()
+    second = build_catalogue()
     assert first == second
     assert len(first) == len(second)
 

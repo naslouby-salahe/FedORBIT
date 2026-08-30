@@ -6,7 +6,6 @@ from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import ArtifactState, ExperimentName
 from fedorbit.execution.executor import execution_store
 from fedorbit.execution.planner import build_plan
@@ -30,7 +29,7 @@ def _verified_manifest(
 
 def status(experiment_name: str | None = typer.Argument(None)) -> None:
     try:
-        rows = build_plan(load_fedorbit_config())
+        rows = build_plan()
         selected = (
             {experiment_identifier(experiment_name)}
             if experiment_name is not None

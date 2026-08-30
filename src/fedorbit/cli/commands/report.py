@@ -40,7 +40,7 @@ def report(
     del overwrite
     try:
         config = load_fedorbit_config()
-        catalogue = build_catalogue(config)
+        catalogue = build_catalogue()
         selected = (
             (experiment_identifier(experiment_name),)
             if experiment_name is not None

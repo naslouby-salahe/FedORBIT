@@ -4,7 +4,6 @@ import typer
 
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.executor import ExperimentExecutionRequest, OverwritePolicy, run_experiment
 from fedorbit.experiments.catalogue import build_catalogue
@@ -16,7 +15,7 @@ def run(
 ) -> None:
     try:
         experiment = experiment_identifier(experiment_name)
-        definition = build_catalogue(load_fedorbit_config()).definition(experiment)
+        definition = build_catalogue().definition(experiment)
         run_experiment(
             ExperimentExecutionRequest(
                 experiment=experiment,

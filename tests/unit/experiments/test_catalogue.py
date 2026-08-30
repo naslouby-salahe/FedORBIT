@@ -8,8 +8,8 @@ from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
 
 
 @pytest.fixture(scope="module")
-def catalogue(fedorbit_config: FedorbitConfig) -> ExperimentCatalogue:
-    return build_catalogue(fedorbit_config)
+def catalogue() -> ExperimentCatalogue:
+    return build_catalogue()
 
 
 def test_every_registered_experiment_has_a_catalogue_entry(

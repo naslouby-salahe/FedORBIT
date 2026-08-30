@@ -4,7 +4,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import ExperimentClassification, ExperimentName, TransferMethod
 from fedorbit.experiments.conditions import RegisteredConditions
 
@@ -49,7 +49,8 @@ class CatalogueError(KeyError):
     pass
 
 
-def build_catalogue(config: FedorbitConfig) -> ExperimentCatalogue:
+def build_catalogue() -> ExperimentCatalogue:
+    config = active_config()
     confirmatory_seeds = config.scientific.randomness.confirmatory_seeds
     pilot_seeds = config.scientific.randomness.pilot_seeds
     primary_pair_count = len(config.scientific.datasets.primary_directed_pairs)

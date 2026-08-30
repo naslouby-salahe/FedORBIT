@@ -16,6 +16,8 @@ def test_operational_modules_do_not_accept_application_configuration() -> None:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
+            if isinstance(node, ast.AnnAssign) and _is_fedorbit_config(node.annotation):
+                violations.append(f"{path}:{node.lineno}:configuration-field")
             if not isinstance(node, ast.FunctionDef):
                 continue
             for parameter in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
@@ -29,3 +31,12 @@ def test_detector_catches_application_configuration_parameter() -> None:
     function = tree.body[0]
     assert isinstance(function, ast.FunctionDef)
     assert _is_fedorbit_config(function.args.args[0].annotation)
+
+
+def test_detector_catches_application_configuration_field() -> None:
+    tree = ast.parse("class Request:\n    configuration: FedorbitConfig\n")
+    declaration = tree.body[0]
+    assert isinstance(declaration, ast.ClassDef)
+    field = declaration.body[0]
+    assert isinstance(field, ast.AnnAssign)
+    assert _is_fedorbit_config(field.annotation)

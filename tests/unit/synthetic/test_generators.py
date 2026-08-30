@@ -9,8 +9,8 @@ from fedorbit.synthetic.generators import (
 )
 
 
-def test_exact_separator_generation_is_deterministic(fedorbit_config: FedorbitConfig) -> None:
-    request = ExactSeparatorInstanceRequest(fedorbit_config, (2, 2), 101)
+def test_exact_separator_generation_is_deterministic() -> None:
+    request = ExactSeparatorInstanceRequest((2, 2), 101)
     first = generate_exact_separator_instance(request)
     second = generate_exact_separator_instance(request)
 
@@ -22,9 +22,7 @@ def test_exact_separator_generation_is_deterministic(fedorbit_config: FedorbitCo
 def test_exact_separator_generation_respects_response_bands(
     fedorbit_config: FedorbitConfig,
 ) -> None:
-    instance = generate_exact_separator_instance(
-        ExactSeparatorInstanceRequest(fedorbit_config, (2, 3), 202)
-    )
+    instance = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 3), 202))
     lower, upper = fedorbit_config.generators.exact_separator_theorem.response_uniform
 
     assert np.all(instance.lower_response_matrix >= lower)

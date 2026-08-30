@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 
 
 class SyntheticGenerationError(ValueError):
@@ -13,7 +13,6 @@ class SyntheticGenerationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ExactSeparatorInstanceRequest:
-    configuration: FedorbitConfig
     block_pattern: tuple[int, ...]
     seed: int
 
@@ -35,7 +34,7 @@ class ExactSeparatorInstance:
 def generate_exact_separator_instance(
     request: ExactSeparatorInstanceRequest,
 ) -> ExactSeparatorInstance:
-    generator_config = request.configuration.generators.exact_separator_theorem
+    generator_config = active_config().generators.exact_separator_theorem
     random = np.random.Generator(np.random.PCG64(request.seed))
     size = sum(request.block_pattern)
     response_lower, response_upper = generator_config.response_uniform

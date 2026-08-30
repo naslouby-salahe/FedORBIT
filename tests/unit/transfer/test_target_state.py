@@ -110,7 +110,6 @@ def test_importance_feeds_robust_action_problem(config: FedorbitConfig) -> None:
     )
     size = blocks.total_padded_nodes
     problem = build_robust_action_problem(
-        config,
         blocks,
         np.zeros((size, size)),
         np.zeros((size, size)),

@@ -47,7 +47,6 @@ def test_action_configuration_values_come_from_authoritative_yaml() -> None:
     config = load_fedorbit_config()
     blocks = _single_block()
     problem = build_robust_action_problem(
-        config,
         blocks,
         np.zeros((2, 2)),
         np.zeros((2, 2)),
@@ -62,10 +61,8 @@ def test_action_configuration_values_come_from_authoritative_yaml() -> None:
 
 
 def test_non_actionable_nodes_have_zero_cap_and_zero_cost() -> None:
-    config = load_fedorbit_config()
     blocks = _single_block()
     problem = build_robust_action_problem(
-        config,
         blocks,
         np.zeros((2, 2)),
         np.zeros((2, 2)),

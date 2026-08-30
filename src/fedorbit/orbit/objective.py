@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.orbit.correspondence import (
     BlockCorrespondence,
     BlockNodeCounts,
@@ -107,14 +107,13 @@ class CurriculumAction:
 
 
 def build_robust_action_problem(
-    config: FedorbitConfig,
     blocks: PaddedBlockStructure,
     lower_response_matrix: NDArray[np.float64],
     upper_response_matrix: NDArray[np.float64],
     target_importance: NDArray[np.float64],
     actionable_nodes: Sequence[int],
 ) -> RobustActionProblem:
-    action_config = config.scientific.action
+    action_config = active_config().scientific.action
     size = blocks.total_padded_nodes
     actionable = frozenset(actionable_nodes)
     invalid = sorted(node for node in actionable if node < 0 or node >= size)

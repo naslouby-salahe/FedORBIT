@@ -5,7 +5,6 @@ import math
 import numpy as np
 import pytest
 
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.response.uncertainty import (
     FinalResponseEntry,
     FinalResponseEstimate,
@@ -16,9 +15,8 @@ from fedorbit.response.uncertainty import (
 
 
 def test_max_t_bootstrap_is_deterministic() -> None:
-    config = load_fedorbit_config()
     entries = ((1.0, 1.5, 2.0), (0.5, 1.0, 1.5))
-    assert max_t_critical_value(config, entries, 7) == max_t_critical_value(config, entries, 7)
+    assert max_t_critical_value(entries, 7) == max_t_critical_value(entries, 7)
 
 
 def test_max_t_bootstrap_uses_higher_quantile() -> None:
@@ -27,13 +25,12 @@ def test_max_t_bootstrap_uses_higher_quantile() -> None:
 
 
 def test_max_t_bootstrap_rejects_invalid_replication() -> None:
-    config = load_fedorbit_config()
     with pytest.raises(ResponseUncertaintyError):
-        max_t_critical_value(config, (), 7)
+        max_t_critical_value((), 7)
     with pytest.raises(ResponseUncertaintyError):
-        max_t_critical_value(config, ((1.0,),), 7)
+        max_t_critical_value(((1.0,),), 7)
     with pytest.raises(ResponseUncertaintyError):
-        max_t_critical_value(config, ((1.0, 2.0), (1.0,)), 7)
+        max_t_critical_value(((1.0, 2.0), (1.0,)), 7)
 
 
 def test_standard_error_uses_sample_sd() -> None:

@@ -9,7 +9,8 @@ from typing import cast
 import numpy as np
 import torch
 
-from fedorbit.config.models import FedorbitConfig, SourceResponseFinalConfig
+from fedorbit.config.context import active_config
+from fedorbit.config.models import SourceResponseFinalConfig
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
@@ -47,14 +48,13 @@ class FinalResponseEstimate:
 
 
 def max_t_critical_value(
-    config: FedorbitConfig,
     entry_derivatives: tuple[tuple[float, ...], ...],
     seed: int,
     resamples: int | None = None,
     confidence_level: float | None = None,
     standard_error_floor: float | None = None,
 ) -> float:
-    final = config.scientific.source_response_final
+    final = active_config().scientific.source_response_final
     resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
     level = (
         confidence_level if confidence_level is not None else final.simultaneous_confidence_level
@@ -117,7 +117,6 @@ def max_t_critical_value(
 
 
 def estimate_final_response(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
@@ -125,9 +124,8 @@ def estimate_final_response(
     settings: ShadowSettings,
     seed: int,
 ) -> FinalResponseEstimate:
-    final = config.scientific.source_response_final
+    final = active_config().scientific.source_response_final
     return estimate_response_bands(
-        config,
         model,
         checkpoint,
         data,
@@ -142,7 +140,6 @@ def estimate_final_response(
 
 
 def estimate_response_bands(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
@@ -155,7 +152,7 @@ def estimate_response_bands(
     confidence_level: float,
     seed_stage: str,
 ) -> FinalResponseEstimate:
-    final = config.scientific.source_response_final
+    final = active_config().scientific.source_response_final
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
     if outcome_count == 0 or intervention_count == 0:
@@ -217,7 +214,6 @@ def estimate_response_bands(
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     standard_errors = tuple(standard_error(values) for values in entry_derivatives)
     critical = max_t_critical_value(
-        config,
         entry_derivatives,
         seed,
         resamples=bootstrap_resamples,

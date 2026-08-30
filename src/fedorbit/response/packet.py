@@ -7,7 +7,7 @@ from dataclasses import dataclass, fields
 import numpy as np
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import ClientRole, CoarseGroup, DatasetId
 from fedorbit.domain.serialization import stable_json
 from fedorbit.response.estimation import ShadowSettings
@@ -223,7 +223,6 @@ class PacketConstructionError(ValueError):
 
 
 def construct_source_packet(
-    config: FedorbitConfig,
     context: PacketConstructionContext,
     checkpoint: BaseCheckpoint,
     model: torch.nn.Module | None,
@@ -264,7 +263,6 @@ def construct_source_packet(
         hyperparameters.weight_decay,
     )
     estimate = estimate_final_response(
-        config,
         model,
         checkpoint,
         data,
@@ -295,7 +293,9 @@ def construct_source_packet(
             )
         ),
     )
-    replicate_count = config.scientific.source_response_final.paired_replicates_per_intervention
+    replicate_count = (
+        active_config().scientific.source_response_final.paired_replicates_per_intervention
+    )
     packet = build_source_packet(
         complete_estimate,
         anonymous_fine_node_ids=ordering.display_ids,

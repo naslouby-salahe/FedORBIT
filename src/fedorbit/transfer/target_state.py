@@ -10,7 +10,6 @@ import torch
 from numpy.typing import NDArray
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData
 from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_response_bands
@@ -105,14 +104,13 @@ def build_target_importance(
 
 
 def estimate_target_response_diagnostic(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
     intervention_classes: tuple[int, ...],
     seed: int,
 ) -> FinalResponseEstimate:
-    diagnostic = config.scientific.target_response_diagnostic
+    diagnostic = active_config().scientific.target_response_diagnostic
     settings = ShadowSettings(
         diagnostic.intervention_magnitude,
         diagnostic.shadow_optimizer_steps,
@@ -120,7 +118,6 @@ def estimate_target_response_diagnostic(
         data.weight_decay,
     )
     return estimate_response_bands(
-        config,
         model,
         checkpoint,
         data,

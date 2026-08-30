@@ -7,7 +7,7 @@ from typing import cast
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
@@ -149,7 +149,6 @@ def _confirmation_batches_for_replicate(
 
 
 def _step_shadow(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
     state: PreConfirmTargetState,
@@ -157,6 +156,7 @@ def _step_shadow(
     class_weights: ClassWeights,
     multipliers: torch.Tensor,
 ) -> None:
+    config = active_config()
     state.restore_into(model, optimizer)
     model.train()
     device = next(model.parameters()).device
@@ -231,10 +231,10 @@ class ConfirmationRequest:
 
 
 def run_proposal_confirmation(
-    config: FedorbitConfig,
     request: ConfirmationRequest,
     batch_size: int | None = None,
 ) -> ConfirmationVerdict:
+    config = active_config()
     confirmation = config.scientific.confirmation
     effective_batch = batch_size or config.scientific.training.batch_size
     if effective_batch <= 0:
@@ -262,7 +262,6 @@ def run_proposal_confirmation(
             request.selected_hyperparameters.weight_decay,
         )
         _step_shadow(
-            config,
             model,
             baseline_optimizer,
             request.pre_confirm_baseline,
@@ -284,7 +283,6 @@ def run_proposal_confirmation(
             request.selected_hyperparameters.weight_decay,
         )
         _step_shadow(
-            config,
             model,
             curriculum_optimizer,
             request.pre_confirm_curriculum,
@@ -341,7 +339,6 @@ def _assimilation_batches(
 
 
 def apply_accepted_assimilation(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     optimizer: torch.optim.AdamW,
     pre_confirm: PreConfirmTargetState,
@@ -353,6 +350,7 @@ def apply_accepted_assimilation(
     assimilation_coordinates: AssimilationCoordinates,
     batch_size: int | None = None,
 ) -> int:
+    config = active_config()
     effective_batch = batch_size or config.scientific.training.batch_size
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")

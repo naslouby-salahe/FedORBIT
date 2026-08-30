@@ -91,7 +91,6 @@ def test_live_assimilation_uses_registered_step_count_and_coordinates() -> None:
         action_artifact_sha256="d" * 64,
     )
     steps = apply_accepted_assimilation(
-        config,
         model,
         optimizer,
         clean,

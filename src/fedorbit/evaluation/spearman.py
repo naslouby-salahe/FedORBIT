@@ -4,7 +4,7 @@ import math
 import statistics
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import MetricId
 
 
@@ -20,12 +20,11 @@ class SpearmanReport:
 
 
 def descriptive_spearman(
-    config: FedorbitConfig,
     predicted_values: tuple[float, ...],
     realized_values: tuple[float, ...],
     directed_pair: str,
 ) -> SpearmanReport | None:
-    minimum = config.scientific.statistics.spearman_minimum_valid_points
+    minimum = active_config().scientific.statistics.spearman_minimum_valid_points
     if len(predicted_values) != len(realized_values):
         raise SpearmanError("predicted and realized value counts differ")
     if len(predicted_values) < minimum:

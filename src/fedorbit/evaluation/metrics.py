@@ -5,7 +5,7 @@ import statistics
 from collections import OrderedDict
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import MetricId
 
 
@@ -45,11 +45,10 @@ def macro_cross_entropy(class_entropies: tuple[float, ...]) -> float:
 
 
 def relative_macro_ce_gain(
-    config: FedorbitConfig,
     reference_macro_ce: float,
     method_macro_ce: float,
 ) -> RelativeMacroCeGain:
-    floor = config.scientific.metrics.relative_macro_ce_denominator_floor
+    floor = active_config().scientific.metrics.relative_macro_ce_denominator_floor
     absolute_difference = reference_macro_ce - method_macro_ce
     if reference_macro_ce < floor:
         return RelativeMacroCeGain(
@@ -156,11 +155,10 @@ def absolute_objective_error(objective_value: float, truth_value: float) -> floa
 
 
 def relative_objective_error(
-    config: FedorbitConfig,
     objective_value: float,
     truth_value: float,
 ) -> float:
-    floor = config.scientific.metrics.relative_solver_error_denominator_floor
+    floor = active_config().scientific.metrics.relative_solver_error_denominator_floor
     return abs(objective_value - truth_value) / max(abs(truth_value), floor)
 
 

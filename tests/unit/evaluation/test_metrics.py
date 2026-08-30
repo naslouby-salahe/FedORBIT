@@ -68,13 +68,13 @@ def test_macro_entropy_is_arithmetic_mean(config: FedorbitConfig) -> None:
         macro_cross_entropy(())
 
 
-def test_relative_gain_formula_and_na_semantics(config: FedorbitConfig) -> None:
-    gain = relative_macro_ce_gain(config, reference_macro_ce=2.0, method_macro_ce=1.5)
+def test_relative_gain_formula_and_na_semantics() -> None:
+    gain = relative_macro_ce_gain(reference_macro_ce=2.0, method_macro_ce=1.5)
     assert not gain.is_na
     assert gain.value == pytest.approx(0.25)
     assert gain.absolute_difference == pytest.approx(0.5)
 
-    tiny_reference = relative_macro_ce_gain(config, reference_macro_ce=1e-15, method_macro_ce=5e-16)
+    tiny_reference = relative_macro_ce_gain(reference_macro_ce=1e-15, method_macro_ce=5e-16)
     assert tiny_reference.is_na
     assert tiny_reference.value is None
     assert tiny_reference.absolute_difference == pytest.approx(5e-16)
@@ -113,9 +113,9 @@ def test_macro_f1_and_balanced_accuracy_are_class_means(config: FedorbitConfig) 
 def test_absolute_and_relative_solver_errors() -> None:
     cfg = load_fedorbit_config()
     assert absolute_objective_error(1.2, 1.0) == pytest.approx(0.2)
-    error = relative_objective_error(cfg, objective_value=1.05, truth_value=1.0)
+    error = relative_objective_error(objective_value=1.05, truth_value=1.0)
     assert error == pytest.approx(0.05)
-    degenerate = relative_objective_error(cfg, objective_value=1.0, truth_value=0.0)
+    degenerate = relative_objective_error(objective_value=1.0, truth_value=0.0)
     floor = cfg.scientific.metrics.relative_solver_error_denominator_floor
     assert degenerate == pytest.approx(1.0 / max(abs(0.0), floor))
 

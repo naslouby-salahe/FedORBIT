@@ -95,14 +95,14 @@ def test_spearman_reports_rho_n_pair_and_gates_min_points() -> None:
     minimum = config.scientific.statistics.spearman_minimum_valid_points
     predicted = tuple(float(value) for value in range(minimum))
     realized = tuple(float(value) * 2 for value in range(minimum))
-    report = descriptive_spearman(config, predicted, realized, "edge -> windows")
+    report = descriptive_spearman(predicted, realized, "edge -> windows")
     assert report is not None
     assert report.rho == pytest.approx(1.0)
     assert report.point_count == minimum
     assert report.pair == "edge -> windows"
 
     short = descriptive_spearman(
-        config, predicted[: minimum - 1], realized[: minimum - 1], "edge -> windows"
+        predicted[: minimum - 1], realized[: minimum - 1], "edge -> windows"
     )
     assert short is None
 
@@ -112,16 +112,15 @@ def test_spearman_perfect_negative_and_ties() -> None:
     count = config.scientific.statistics.spearman_minimum_valid_points
     predicted = tuple(float(value) for value in range(count))
     descending = tuple(float(count - 1 - value) for value in range(count))
-    negative = descriptive_spearman(config, predicted, descending, "pair")
+    negative = descriptive_spearman(predicted, descending, "pair")
     assert negative is not None
     assert negative.rho == pytest.approx(-1.0)
     constant = (1.0,) * count
-    tied = descriptive_spearman(config, predicted, constant, "pair")
+    tied = descriptive_spearman(predicted, constant, "pair")
     assert tied is not None
     assert math.isfinite(tied.rho)
 
 
 def test_spearman_rejects_length_mismatch() -> None:
-    config = load_fedorbit_config()
     with pytest.raises(SpearmanError):
-        descriptive_spearman(config, (1.0, 2.0), (1.0,), "pair")
+        descriptive_spearman((1.0, 2.0), (1.0,), "pair")

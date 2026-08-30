@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.runtime.seeds import derive_seed32
 
@@ -91,11 +91,11 @@ def _macro_ce_from_losses(
 
 
 def hierarchical_bootstrap_relative_gains(
-    config: FedorbitConfig,
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: int,
     contrast_coordinates: str,
 ) -> tuple[float, ...]:
+    config = active_config()
     confirmation = config.scientific.confirmation
     denominator_floor = config.scientific.metrics.relative_macro_ce_denominator_floor
     if not replicate_outcomes:
@@ -124,15 +124,12 @@ def hierarchical_bootstrap_relative_gains(
 
 
 def hierarchical_bootstrap_lower_bound(
-    config: FedorbitConfig,
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: int,
     contrast_coordinates: str,
 ) -> float:
-    gains = hierarchical_bootstrap_relative_gains(
-        config, replicate_outcomes, seed, contrast_coordinates
-    )
-    lower_probability = 1.0 - config.scientific.confirmation.one_sided_confidence_level
+    gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
+    lower_probability = 1.0 - active_config().scientific.confirmation.one_sided_confidence_level
     return _linear_quantile(sorted(gains), lower_probability)
 
 
@@ -152,13 +149,12 @@ def _linear_quantile(sorted_values: list[float], probability: float) -> float:
 
 
 def confirmation_decision(
-    config: FedorbitConfig,
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: int,
     contrast_coordinates: str,
 ) -> bool:
-    lower_bound = hierarchical_bootstrap_lower_bound(
-        config, replicate_outcomes, seed, contrast_coordinates
+    lower_bound = hierarchical_bootstrap_lower_bound(replicate_outcomes, seed, contrast_coordinates)
+    threshold = (
+        active_config().scientific.confirmation.lower_bound_acceptance_threshold_relative_macro_ce
     )
-    threshold = config.scientific.confirmation.lower_bound_acceptance_threshold_relative_macro_ce
     return lower_bound >= threshold

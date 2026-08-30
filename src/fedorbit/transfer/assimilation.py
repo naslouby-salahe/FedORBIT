@@ -301,7 +301,6 @@ def run_proposal_confirmation(
         )
         replicated.append(ConfirmReplicateOutcomes(baseline_losses, curriculum_losses))
     lower_bound = hierarchical_bootstrap_lower_bound(
-        config,
         tuple(replicated),
         request.seed,
         request.contrast_coordinates,

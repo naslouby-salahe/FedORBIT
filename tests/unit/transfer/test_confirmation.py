@@ -75,7 +75,7 @@ def test_bootstrap_gain_averages_across_sampled_replicates(
         _outcomes((2.0,), (1.5,), examples_per_class=64, seed=100 + index)
         for index in range(config.scientific.confirmation.paired_replicates)
     )
-    gains = hierarchical_bootstrap_relative_gains(config, replicates, 1103, "unit-test-contrast")
+    gains = hierarchical_bootstrap_relative_gains(replicates, 1103, "unit-test-contrast")
     assert len(gains) == config.scientific.confirmation.hierarchical_bootstrap_resamples
     expected = (2.0 - 1.5) / 2.0
     assert all(abs(gain - expected) < 0.05 for gain in gains)
@@ -86,8 +86,8 @@ def test_lower_bound_uses_linear_quantile_of_lower_tail(config: FedorbitConfig) 
         _outcomes((2.0,), (1.6,), examples_per_class=128, seed=200 + index)
         for index in range(config.scientific.confirmation.paired_replicates)
     )
-    lower_bound = hierarchical_bootstrap_lower_bound(config, replicates, 2207, "lower-bound-test")
-    gains = hierarchical_bootstrap_relative_gains(config, replicates, 2207, "lower-bound-test")
+    lower_bound = hierarchical_bootstrap_lower_bound(replicates, 2207, "lower-bound-test")
+    gains = hierarchical_bootstrap_relative_gains(replicates, 2207, "lower-bound-test")
     assert lower_bound == pytest.approx(min(gains), abs=0.05)
     assert lower_bound <= max(gains) + 1e-12
 
@@ -101,8 +101,8 @@ def test_acceptance_requires_threshold_on_lower_bound(config: FedorbitConfig) ->
         _outcomes((2.0,), (1.99,), examples_per_class=256, seed=400 + index)
         for index in range(config.scientific.confirmation.paired_replicates)
     )
-    assert confirmation_decision(config, strong, 3319, "strong")
-    assert not confirmation_decision(config, weak, 3319, "weak")
+    assert confirmation_decision(strong, 3319, "strong")
+    assert not confirmation_decision(weak, 3319, "weak")
 
 
 def test_harmful_curriculum_rejects_transfer(config: FedorbitConfig) -> None:
@@ -110,4 +110,4 @@ def test_harmful_curriculum_rejects_transfer(config: FedorbitConfig) -> None:
         _outcomes((1.5,), (2.5,), examples_per_class=256, seed=500 + index)
         for index in range(config.scientific.confirmation.paired_replicates)
     )
-    assert not confirmation_decision(config, harmful, 4421, "harmful")
+    assert not confirmation_decision(harmful, 4421, "harmful")

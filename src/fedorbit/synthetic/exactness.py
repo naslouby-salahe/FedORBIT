@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from fedorbit.config.context import active_config
+from fedorbit.runtime.seeds import RandomSeed
 from fedorbit.synthetic.generators import SyntheticRandomRequest, create_float64_random_stream
 
 
@@ -15,7 +16,7 @@ class SyntheticGenerationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class ExactSeparatorInstanceRequest:
     block_pattern: tuple[int, ...]
-    seed: int
+    seed: RandomSeed
 
     def __post_init__(self) -> None:
         if not self.block_pattern or any(size < 1 for size in self.block_pattern):
@@ -29,7 +30,7 @@ class ExactSeparatorInstance:
     upper_response_matrix: np.ndarray
     target_importance: np.ndarray
     active_action: np.ndarray
-    generation_seed: int
+    generation_seed: RandomSeed
 
 
 def generate_exact_separator_instance(

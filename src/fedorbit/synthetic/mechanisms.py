@@ -6,6 +6,7 @@ from enum import StrEnum
 import numpy as np
 
 from fedorbit.config.context import active_config
+from fedorbit.runtime.seeds import RandomSeed
 from fedorbit.synthetic.generators import SyntheticRandomRequest, create_float64_random_stream
 
 
@@ -22,7 +23,7 @@ class UnresolvedMapWorldKind(StrEnum):
 @dataclass(frozen=True, slots=True)
 class UnresolvedMapWorldRequest:
     world_kind: UnresolvedMapWorldKind
-    seed: int
+    seed: RandomSeed
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +31,7 @@ class UnresolvedMapWorld:
     block_pattern: tuple[int, int]
     lower_response_matrix: np.ndarray
     target_importance: np.ndarray
-    generation_seed: int
+    generation_seed: RandomSeed
     world_kind: UnresolvedMapWorldKind
 
 

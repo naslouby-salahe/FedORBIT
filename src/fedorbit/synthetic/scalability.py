@@ -6,6 +6,7 @@ from enum import StrEnum
 import numpy as np
 
 from fedorbit.config.context import active_config
+from fedorbit.runtime.seeds import RandomSeed
 from fedorbit.synthetic.generators import SyntheticRandomRequest, create_float64_random_stream
 
 
@@ -23,7 +24,7 @@ class ScalabilityInstanceRequest:
     node_count: int
     block_pattern: ScalabilityBlockPattern
     support_size: int
-    seed: int
+    seed: RandomSeed
 
     def __post_init__(self) -> None:
         if self.node_count < 2:
@@ -38,7 +39,7 @@ class ScalabilityInstance:
     lower_response_matrix: np.ndarray
     target_importance: np.ndarray
     fixed_action: np.ndarray
-    generation_seed: int
+    generation_seed: RandomSeed
 
 
 def generate_scalability_instance(request: ScalabilityInstanceRequest) -> ScalabilityInstance:

@@ -152,23 +152,23 @@ def test_matched_resource_rectangular_lower_bounds_dominate_every_permutation() 
 def test_coupling_destruction_preserves_multisets_pairing_and_dimensions() -> None:
     problem = _problem(29)
     seed = 8861
-    destroyed_lower, destroyed_upper = coupling_destroyed_matrices(
+    destroyed = coupling_destroyed_matrices(
         problem.blocks,
         problem.lower_response_matrix,
         problem.upper_response_matrix,
         seed,
         "destruction-probe",
     )
-    assert destroyed_lower.shape == problem.lower_response_matrix.shape
-    assert destroyed_upper.shape == problem.upper_response_matrix.shape
+    assert destroyed.lower_response_matrix.shape == problem.lower_response_matrix.shape
+    assert destroyed.upper_response_matrix.shape == problem.upper_response_matrix.shape
     for block_index in range(len(problem.blocks.padded_size_tuple)):
         rows = problem.blocks.block_index_range(block_index)
         for other in range(len(problem.blocks.padded_size_tuple)):
             columns = problem.blocks.block_index_range(other)
             original_lower = problem.lower_response_matrix[np.ix_(rows, columns)].reshape(-1)
             original_upper = problem.upper_response_matrix[np.ix_(rows, columns)].reshape(-1)
-            new_lower = destroyed_lower[np.ix_(rows, columns)].reshape(-1)
-            new_upper = destroyed_upper[np.ix_(rows, columns)].reshape(-1)
+            new_lower = destroyed.lower_response_matrix[np.ix_(rows, columns)].reshape(-1)
+            new_upper = destroyed.upper_response_matrix[np.ix_(rows, columns)].reshape(-1)
             assert sorted(original_lower.tolist()) == sorted(new_lower.tolist())
             assert sorted(original_upper.tolist()) == sorted(new_upper.tolist())
             original_pairs = set(zip(original_lower.tolist(), original_upper.tolist(), strict=True))
@@ -181,24 +181,26 @@ def test_coupling_destruction_preserves_multisets_pairing_and_dimensions() -> No
         seed,
         "destruction-probe",
     )
-    assert np.allclose(destroyed_lower, replay[0])
-    assert np.allclose(destroyed_upper, replay[1])
+    assert np.allclose(destroyed.lower_response_matrix, replay.lower_response_matrix)
+    assert np.allclose(destroyed.upper_response_matrix, replay.upper_response_matrix)
 
 
 def test_committed_map_optimizes_under_chosen_correspondence() -> None:
     config = load_fedorbit_config()
     problem = _problem(31)
     target_matrix = problem.lower_response_matrix.copy()
-    correspondence, action = committed_map_action(
+    committed_action = committed_map_action(
         problem, problem.lower_response_matrix, target_matrix, config
     )
-    committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
+    committed = committed_action.correspondence.permute_response_matrix(
+        problem.lower_response_matrix
+    )
     expected_objective = float(
-        problem.target_importance @ committed @ action.coordinates
-        - problem.linear_costs @ action.coordinates
+        problem.target_importance @ committed @ committed_action.selected_action.coordinates
+        - problem.linear_costs @ committed_action.selected_action.coordinates
     )
     del expected_objective
-    assert isinstance(action, CurriculumAction)
+    assert isinstance(committed_action.selected_action, CurriculumAction)
 
 
 def test_exact_map_oracle_uses_given_correspondence() -> None:
@@ -207,7 +209,7 @@ def test_exact_map_oracle_uses_given_correspondence() -> None:
     config = load_fedorbit_config()
     problem = _problem(37)
     identity = next(iter(enumerate_block_permutations(problem.blocks)))
-    action, value = exact_map_action(
+    outcome = exact_map_action(
         problem,
         OracleCorrespondence(
             source_client=DatasetId.EDGE_IIOTSET_NETWORK,
@@ -218,10 +220,10 @@ def test_exact_map_oracle_uses_given_correspondence() -> None:
     )
     committed = identity.permute_response_matrix(problem.lower_response_matrix)
     expected = float(
-        problem.target_importance @ committed @ action.coordinates
-        - problem.linear_costs @ action.coordinates
+        problem.target_importance @ committed @ outcome.selected_action.coordinates
+        - problem.linear_costs @ outcome.selected_action.coordinates
     )
-    assert value == pytest.approx(expected)
+    assert outcome.objective_value == pytest.approx(expected)
 
 
 def test_without_confirmation_matches_principal_ranking_then_assimilates() -> None:

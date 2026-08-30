@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from fedorbit.baselines.correspondence import (
+    CommittedMapAction,
+    CouplingDestroyedMatrices,
     CouplingDestructionError,
     committed_map_action,
     coupling_destroyed_matrices,
@@ -27,7 +29,9 @@ from fedorbit.baselines.summaries import (
 
 __all__ = [
     "CoarseBlockSummary",
+    "CommittedMapAction",
     "ComparatorResources",
+    "CouplingDestroyedMatrices",
     "CouplingDestructionError",
     "FairnessViolationError",
     "FixedMatrixActionSolution",

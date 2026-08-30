@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
@@ -14,6 +15,18 @@ from fedorbit.runtime.seeds import derive_seed32
 
 class CouplingDestructionError(ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class CouplingDestroyedMatrices:
+    lower_response_matrix: NDArray[np.float64]
+    upper_response_matrix: NDArray[np.float64]
+
+
+@dataclass(frozen=True, slots=True)
+class CommittedMapAction:
+    correspondence: BlockCorrespondence
+    selected_action: CurriculumAction
 
 
 def _block_pair_permutation(
@@ -37,7 +50,7 @@ def coupling_destroyed_matrices(
     upper_response_matrix: NDArray[np.float64],
     seed: int,
     contrast_coordinates: str,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+) -> CouplingDestroyedMatrices:
     size = blocks.total_padded_nodes
     if lower_response_matrix.shape != (size, size):
         raise CouplingDestructionError("lower matrix shape mismatch")
@@ -64,7 +77,7 @@ def coupling_destroyed_matrices(
             destroyed_lower[np.ix_(rows, columns)] = permuted_lower
             destroyed_upper[np.ix_(rows, columns)] = permuted_upper
             block_pair_index += 1
-    return destroyed_lower, destroyed_upper
+    return CouplingDestroyedMatrices(destroyed_lower, destroyed_upper)
 
 
 def committed_map_action(
@@ -72,7 +85,7 @@ def committed_map_action(
     source_matrix: NDArray[np.float64],
     target_matrix: NDArray[np.float64],
     config: FedorbitConfig,
-) -> tuple[BlockCorrespondence, CurriculumAction]:
+) -> CommittedMapAction:
     from fedorbit.baselines.local import optimize_against_fixed_matrix
     from fedorbit.solvers.exact_qap import point_correspondence_commitment
 
@@ -80,4 +93,4 @@ def committed_map_action(
     correspondence, _distance = result.require_certified()
     committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
     solution = optimize_against_fixed_matrix(problem, committed, config)
-    return correspondence, solution.selected_action
+    return CommittedMapAction(correspondence, solution.selected_action)

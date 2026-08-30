@@ -8,7 +8,8 @@ from typing import cast
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig, SourceResponsePilotConfig
+from fedorbit.config.context import active_config
+from fedorbit.config.models import SourceResponsePilotConfig
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
@@ -66,17 +67,15 @@ class ResponsePilotError(ValueError):
 
 
 def run_source_response_pilot(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
     seed: int,
 ) -> tuple[CandidateResult, ...]:
-    pilot = config.scientific.source_response_pilot
+    pilot = active_config().scientific.source_response_pilot
     return tuple(
         _evaluate_candidate(
-            config,
             model,
             checkpoint,
             data,
@@ -105,7 +104,6 @@ def select_response_configuration(results: tuple[CandidateResult, ...]) -> Respo
 
 
 def _evaluate_candidate(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
@@ -114,7 +112,7 @@ def _evaluate_candidate(
     replicate_count: int,
     seed: int,
 ) -> CandidateResult:
-    pilot = config.scientific.source_response_pilot
+    pilot = active_config().scientific.source_response_pilot
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
     full_values: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]

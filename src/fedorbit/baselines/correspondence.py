@@ -92,5 +92,5 @@ def committed_map_action(
     result = point_correspondence_commitment(source_matrix, target_matrix, problem.blocks, config)
     correspondence = result.require_certified().correspondence
     committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
-    solution = optimize_against_fixed_matrix(problem, committed, config)
+    solution = optimize_against_fixed_matrix(problem, committed)
     return CommittedMapAction(correspondence, solution.selected_action)

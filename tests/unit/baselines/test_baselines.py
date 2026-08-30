@@ -55,11 +55,10 @@ def _problem(seed: int) -> RobustActionProblem:
 
 
 def test_fixed_matrix_optimizer_matches_exhaustive_support_truth() -> None:
-    config = load_fedorbit_config()
     for seed in range(3):
         problem = _problem(seed)
         matrix = problem.lower_response_matrix
-        solution = optimize_against_fixed_matrix(problem, matrix, config)
+        solution = optimize_against_fixed_matrix(problem, matrix)
         brute_best = -np.inf
         for support_size in (1, 2):
             from itertools import combinations
@@ -82,13 +81,10 @@ def test_fixed_matrix_optimizer_matches_exhaustive_support_truth() -> None:
 
 
 def test_local_only_is_identity_and_local_sir_uses_target_response() -> None:
-    config = load_fedorbit_config()
     problem = _problem(11)
-    local_only = optimize_against_fixed_matrix(
-        problem, np.zeros((problem.size, problem.size)), config
-    )
+    local_only = optimize_against_fixed_matrix(problem, np.zeros((problem.size, problem.size)))
     assert int(np.count_nonzero(local_only.selected_action.coordinates)) == 0
-    sir = optimize_against_fixed_matrix(problem, problem.lower_response_matrix, config)
+    sir = optimize_against_fixed_matrix(problem, problem.lower_response_matrix)
     brute_sir = -np.inf
     grid = np.linspace(0.0, 0.5, 21)
     for first in grid:
@@ -206,7 +202,6 @@ def test_committed_map_optimizes_under_chosen_correspondence() -> None:
 def test_exact_map_oracle_uses_given_correspondence() -> None:
     from fedorbit.oracle import OracleCorrespondence, exact_map_action
 
-    config = load_fedorbit_config()
     problem = _problem(37)
     identity = next(iter(enumerate_block_permutations(problem.blocks)))
     outcome = exact_map_action(
@@ -216,7 +211,6 @@ def test_exact_map_oracle_uses_given_correspondence() -> None:
             target_client=DatasetId.TON_IOT_WINDOWS10_HOST,
             correspondence=identity,
         ),
-        config,
     )
     committed = identity.permute_response_matrix(problem.lower_response_matrix)
     expected = float(

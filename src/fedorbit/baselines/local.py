@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.config.models import ExactSparseSolverConfig, FedorbitConfig
+from fedorbit.config.context import active_config
+from fedorbit.config.models import ExactSparseSolverConfig
 from fedorbit.orbit.objective import (
     CurriculumAction,
     RobustActionProblem,
@@ -83,7 +84,6 @@ def _solve_support_lp(
 def optimize_against_fixed_matrix(
     problem: RobustActionProblem,
     matrix: NDArray[np.float64],
-    config: FedorbitConfig,
     support_limit: int | None = None,
 ) -> FixedMatrixActionSolution:
     expected_shape = (problem.size, problem.size)
@@ -91,7 +91,7 @@ def optimize_against_fixed_matrix(
         raise FixedMatrixOptimizationError(
             f"fixed matrix shape {matrix.shape} does not match {expected_shape}"
         )
-    settings = config.solvers.exact_sparse
+    settings = active_config().solvers.exact_sparse
     objective_row = linear_objective_row(problem, matrix)
     supports = enumerate_support_coordinate_sets(problem, support_limit)
 

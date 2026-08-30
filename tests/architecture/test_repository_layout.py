@@ -65,6 +65,13 @@ REQUIRED_CONFIG_FILES = {
     "configs/scientific_contract_snapshot.json",
 }
 
+REQUIRED_SYNTHETIC_MODULES = {
+    "src/fedorbit/synthetic/generators.py",
+    "src/fedorbit/synthetic/exactness.py",
+    "src/fedorbit/synthetic/mechanisms.py",
+    "src/fedorbit/synthetic/scalability.py",
+}
+
 
 def test_repository_root_entries_are_allowed() -> None:
     machine_local = {
@@ -123,6 +130,15 @@ def test_required_config_files_exist() -> None:
         relative for relative in REQUIRED_CONFIG_FILES if not (REPOSITORY_ROOT / relative).is_file()
     }
     assert not missing, f"missing required config files: {sorted(missing)}"
+
+
+def test_roadmap_required_synthetic_modules_exist() -> None:
+    missing = {
+        relative
+        for relative in REQUIRED_SYNTHETIC_MODULES
+        if not (REPOSITORY_ROOT / relative).is_file()
+    }
+    assert not missing, f"missing roadmap synthetic modules: {sorted(missing)}"
 
 
 def test_data_raw_is_symlink_to_immutable_external_tree() -> None:

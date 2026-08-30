@@ -124,7 +124,7 @@ class ExecutionReadiness:
     ) -> PrerequisiteState:
         if name == "environment diagnosis":
             try:
-                validate_environment(self._config, strict=True)
+                validate_environment(strict=True)
                 return PrerequisiteState(index, name, True)
             except EnvironmentMismatchError as error:
                 return PrerequisiteState(index, name, False, reason=str(error))

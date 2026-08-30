@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import cast
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
+from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.records import SemanticCell
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import environment_snapshot
@@ -159,7 +159,8 @@ def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
     )
 
 
-def _section_extractors(config: FedorbitConfig) -> Mapping[str, Callable[[], JsonValue]]:
+def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]:
+    config = active_config()
     scientific = config.scientific
     return OrderedDict(
         generators=lambda: config.generators.model_dump(mode="json"),
@@ -186,11 +187,8 @@ def _section_extractors(config: FedorbitConfig) -> Mapping[str, Callable[[], Jso
     )
 
 
-def configuration_subset_digest(
-    config: FedorbitConfig,
-    relevant_sections: frozenset[str],
-) -> str:
-    extractors = _section_extractors(config)
+def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
+    extractors = _section_extractors()
     values: OrderedDict[str, JsonValue] = OrderedDict()
     for section in sorted(relevant_sections):
         extractor = extractors.get(section)
@@ -204,7 +202,6 @@ def stage_dependency_fingerprint(
     cell: SemanticCell,
     relevance: frozenset[str],
     upstream_artifact_ids: tuple[str, ...],
-    config: FedorbitConfig,
     config_sections: frozenset[str],
     producer_module: str,
 ) -> str:
@@ -215,7 +212,7 @@ def stage_dependency_fingerprint(
                 stage=stage,
                 semantic_coordinates=cell.identity_json(relevance),
                 upstream_artifact_ids=list(upstream_artifact_ids),
-                configuration_sha256=configuration_subset_digest(config, config_sections),
+                configuration_sha256=configuration_subset_digest(config_sections),
                 implementation_sha256=implementation_fingerprint(producer_module),
                 runtime_sha256=runtime_fingerprint(stage).sha256,
             ),
@@ -224,11 +221,8 @@ def stage_dependency_fingerprint(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def provenance_record(
-    config: FedorbitConfig,
-    manifest: ReusableArtifactManifest,
-) -> ProvenanceRecord:
-    environment = environment_snapshot(config)
+def provenance_record(manifest: ReusableArtifactManifest) -> ProvenanceRecord:
+    environment = environment_snapshot()
     revision = current_code_revision()
     return ProvenanceRecord(
         artifact_id=manifest.artifact_id,

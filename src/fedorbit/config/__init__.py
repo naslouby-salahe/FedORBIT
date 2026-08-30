@@ -1,3 +1,4 @@
+from fedorbit.config.context import active_config, configured
 from fedorbit.config.loading import (
     contract_snapshot_path,
     default_config_path,
@@ -22,6 +23,8 @@ __all__ = [
     "FedorbitConfig",
     "FixtureConfigError",
     "FixtureFixtureConfig",
+    "active_config",
+    "configured",
     "contract_snapshot_path",
     "default_config_path",
     "load_fedorbit_config",

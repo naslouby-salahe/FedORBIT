@@ -6,7 +6,6 @@ import typer
 from typer import Exit
 
 from fedorbit.cli.errors import EXIT_RUNTIME, CliUsageError
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.runtime.environment import (
     EnvironmentMismatchError,
     environment_snapshot,
@@ -16,11 +15,10 @@ from fedorbit.runtime.environment import (
 
 
 def doctor() -> None:
-    config = load_fedorbit_config()
     try:
-        snapshot = environment_snapshot(config)
-        lockfile = validate_lockfile(config)
-        gpu_ok = reference_gpu_matches(config)
+        snapshot = environment_snapshot()
+        lockfile = validate_lockfile()
+        gpu_ok = reference_gpu_matches()
         raw_root = Path("data/raw")
         typer.echo(f"python: {snapshot.python_version}")
         typer.echo(f"dependencies: {len(snapshot.dependencies)} registered")

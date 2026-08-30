@@ -6,8 +6,8 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import cast
 
+from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import EnvironmentSnapshot
 
@@ -71,8 +71,8 @@ def current_code_revision() -> CodeRevision:
     )
 
 
-def _seed_digest(config: FedorbitConfig) -> str:
-    randomness = config.scientific.randomness
+def _seed_digest() -> str:
+    randomness = active_config().scientific.randomness
     return hashlib.sha256(
         stable_json(
             cast(
@@ -109,8 +109,8 @@ class ReproducibilityIdentity:
         ).hexdigest()
 
 
-def statistical_identity_digest(config: FedorbitConfig, environment: EnvironmentSnapshot) -> str:
-    scientific = config.scientific
+def statistical_identity_digest(environment: EnvironmentSnapshot) -> str:
+    scientific = active_config().scientific
     statistics = scientific.statistics
     payload = stable_json(
         cast(
@@ -129,7 +129,7 @@ def statistical_identity_digest(config: FedorbitConfig, environment: Environment
                     mode="json"
                 ),
                 preprocessing=scientific.preprocessing.model_dump(mode="json"),
-                seeds=_seed_digest(config),
+                seeds=_seed_digest(),
                 confidence_level=statistics.confidence_level,
                 evaluation_criteria=scientific.evaluation_criteria.model_dump(mode="json"),
                 materiality=scientific.materiality.model_dump(mode="json"),
@@ -140,18 +140,17 @@ def statistical_identity_digest(config: FedorbitConfig, environment: Environment
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def build_reproducibility_identity(
-    config: FedorbitConfig, environment: EnvironmentSnapshot
-) -> ReproducibilityIdentity:
+def build_reproducibility_identity(environment: EnvironmentSnapshot) -> ReproducibilityIdentity:
     code_revision = current_code_revision()
+    config = active_config()
     return ReproducibilityIdentity(
         config_digest=hashlib.sha256(
             stable_json(config.model_dump(mode="json")).encode("utf-8")
         ).hexdigest(),
-        seed_digest=_seed_digest(config),
+        seed_digest=_seed_digest(),
         environment_fingerprint=environment.fingerprint_sha256,
         code_revision=code_revision,
-        statistical_identity_digest=statistical_identity_digest(config, environment),
+        statistical_identity_digest=statistical_identity_digest(environment),
     )
 
 

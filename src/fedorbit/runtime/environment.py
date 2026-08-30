@@ -14,8 +14,9 @@ import psutil
 import torch
 from pydantic import ConfigDict
 
+from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
-from fedorbit.config.models import FedorbitConfig, FrozenModel
+from fedorbit.config.models import FrozenModel
 
 DEPENDENCY_SPECS = (
     ("pytorch", "torch"),
@@ -77,8 +78,8 @@ def observed_python_version() -> str:
     return platform.python_version()
 
 
-def observed_dependencies(config: FedorbitConfig) -> tuple[DependencyVersion, ...]:
-    environment = config.environment
+def observed_dependencies() -> tuple[DependencyVersion, ...]:
+    environment = active_config().environment
     observed: list[DependencyVersion] = []
     for configured_key, distribution in DEPENDENCY_SPECS:
         configured = getattr(environment, configured_key)
@@ -166,8 +167,8 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> str:
     return hashlib.sha256(stable.encode("utf-8")).hexdigest()
 
 
-def environment_snapshot(config: FedorbitConfig) -> EnvironmentSnapshot:
-    dependencies = observed_dependencies(config)
+def environment_snapshot() -> EnvironmentSnapshot:
+    dependencies = observed_dependencies()
     hardware = observed_hardware()
     snapshot = EnvironmentSnapshot(
         python_version=observed_python_version(),
@@ -183,10 +184,10 @@ def environment_snapshot(config: FedorbitConfig) -> EnvironmentSnapshot:
     )
 
 
-def validate_environment(config: FedorbitConfig, strict: bool = True) -> EnvironmentSnapshot:
-    snapshot = environment_snapshot(config)
+def validate_environment(strict: bool = True) -> EnvironmentSnapshot:
+    snapshot = environment_snapshot()
     deviations: list[str] = []
-    configured_python = config.environment.python
+    configured_python = active_config().environment.python
     if snapshot.python_version != configured_python:
         deviations.append(
             f"python: configured {configured_python}, observed {snapshot.python_version}"
@@ -271,9 +272,7 @@ def _collect_locked_packages(
     return package_names, locked_versions
 
 
-def validate_lockfile(
-    config: FedorbitConfig, allow_deviations: frozenset[str] = frozenset()
-) -> LockfileSummary:
+def validate_lockfile(allow_deviations: frozenset[str] = frozenset()) -> LockfileSummary:
     lock_path = repository_root() / "uv.lock"
     if not lock_path.is_file():
         raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
@@ -283,7 +282,7 @@ def validate_lockfile(
     if not document.package:
         raise ValueError("uv.lock contains no package entries")
     package_names, locked_versions = _collect_locked_packages(document.package)
-    environment = config.environment
+    environment = active_config().environment
     expected: OrderedDict[str, str] = OrderedDict(
         (
             ("torch", environment.pytorch),
@@ -313,9 +312,9 @@ def validate_lockfile(
     )
 
 
-def reference_gpu_matches(config: FedorbitConfig) -> bool:
+def reference_gpu_matches() -> bool:
     hardware = observed_hardware()
-    reference = config.runtime.reference_model_gpu
+    reference = active_config().runtime.reference_model_gpu
     if hardware.gpu_name is None or hardware.gpu_memory_bytes is None:
         return False
     reference_parts = reference.split()

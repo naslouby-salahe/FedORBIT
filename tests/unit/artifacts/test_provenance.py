@@ -8,7 +8,6 @@ from fedorbit.artifacts.provenance import (
     runtime_fingerprint,
     stage_dependency_fingerprint,
 )
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
 from fedorbit.domain.records import DirectedPair, SemanticCell
 from fedorbit.experiments.cells import experiment_relevance
@@ -97,14 +96,12 @@ def test_runtime_fingerprint_unknown_stage_rejected() -> None:
 
 
 def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
-    config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     arguments = (
         "training",
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
-        config,
         frozenset({"models", "generators"}),
         "fedorbit.artifacts.manifests",
     )
@@ -112,14 +109,12 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
 
 
 def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
-    config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
         "training",
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
-        config,
         frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
@@ -128,7 +123,6 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         PRIMARY_CELL,
         relevance,
         ("upstream-2",),
-        config,
         frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
@@ -136,14 +130,12 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
 
 
 def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
-    config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
         "training",
         PRIMARY_CELL,
         relevance,
         (),
-        config,
         frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
@@ -152,7 +144,6 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         PRIMARY_CELL,
         relevance,
         (),
-        config,
         frozenset({"models", "generators"}),
         "fedorbit.artifacts.manifests",
     )
@@ -160,14 +151,12 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
 
 
 def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
-    config = load_fedorbit_config()
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
         "training",
         PRIMARY_CELL,
         relevance,
         (),
-        config,
         frozenset({"models"}),
         "fedorbit.artifacts.manifests",
     )
@@ -176,7 +165,6 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
         PRIMARY_CELL,
         relevance,
         (),
-        config,
         frozenset({"models"}),
         "fedorbit.execution.reuse",
     )

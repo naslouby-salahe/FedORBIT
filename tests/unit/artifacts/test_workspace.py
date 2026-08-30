@@ -104,7 +104,7 @@ def test_provenance_record_captures_all_components(tmp_path: Path) -> None:
     payload = tmp_path / "probe-payload.bin"
     payload.write_bytes(b"x")
     manifest = _manifest(payload, "fp-probe")
-    record = provenance_record(load_fedorbit_config(), manifest)
+    record = provenance_record(manifest)
     assert record.artifact_id == manifest.artifact_id
     assert len(record.created_git_commit) == 40
     assert record.operating_system

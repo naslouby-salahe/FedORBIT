@@ -8,7 +8,7 @@ from enum import StrEnum
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.config.loading import load_fedorbit_config, repository_root
+from fedorbit.config.loading import repository_root
 from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.inventory import (
@@ -103,7 +103,7 @@ class ExecutionExecutor:
 
 
 def execution_store() -> ArtifactStore:
-    return ArtifactStore(build_layout(load_fedorbit_config()).execution_root)
+    return ArtifactStore(build_layout().execution_root)
 
 
 def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:

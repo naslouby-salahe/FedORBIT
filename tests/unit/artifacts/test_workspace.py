@@ -15,7 +15,6 @@ from fedorbit.artifacts.paths import (
 )
 from fedorbit.artifacts.provenance import provenance_record
 from fedorbit.artifacts.storage import ArtifactStore, atomic_write_bytes, atomic_write_json
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import ArtifactState, ExperimentName
 from fedorbit.reporting.export import EvidenceExportError, VerifiedEvidenceWriter
 
@@ -48,7 +47,7 @@ def _manifest(
 
 
 def test_layout_matches_workspace_roots(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     assert layout.execution_root.name == "outputs"
     assert layout.manuscript_root.name == "results"
     assert layout.preprocessing == layout.execution_root / "preprocessing"
@@ -61,7 +60,7 @@ def test_layout_matches_workspace_roots(tmp_path: Path) -> None:
 
 
 def test_experiment_workspaces(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     workspace = experiment_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     assert workspace == layout.experiments / "primary-strict-cross-telemetry-transfer"
     results = results_workspace(layout, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
@@ -69,7 +68,7 @@ def test_experiment_workspaces(tmp_path: Path) -> None:
 
 
 def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     path = leaf_path(
         layout,
         layout.artifacts,
@@ -83,7 +82,7 @@ def test_leaf_path_carries_coordinates_and_fingerprint(tmp_path: Path) -> None:
 
 
 def test_workspace_boundary_rejects_outside_paths(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     with pytest.raises(WorkspaceError):
         enforce_workspace_boundary(layout, tmp_path / "outside.bin")
     with pytest.raises(WorkspaceError):
@@ -114,7 +113,7 @@ def test_provenance_record_captures_all_components(tmp_path: Path) -> None:
 
 
 def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "packet.pt"
     payload.write_bytes(b"payload")
@@ -130,7 +129,7 @@ def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) ->
 
 
 def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "packet.pt"
     payload.write_bytes(b"payload")
@@ -145,7 +144,7 @@ def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
 
 
 def test_evidence_writer_rejects_missing_payload(tmp_path: Path) -> None:
-    layout = build_layout(load_fedorbit_config(), root=tmp_path)
+    layout = build_layout(root=tmp_path)
     store = ArtifactStore(tmp_path)
     missing = tmp_path / "missing.pt"
     missing.write_bytes(b"payload")

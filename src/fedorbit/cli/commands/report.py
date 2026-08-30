@@ -10,7 +10,6 @@ from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.domain.enums import ArtifactState, ExperimentName
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.experiments.catalogue import build_catalogue
@@ -39,14 +38,13 @@ def report(
 ) -> None:
     del overwrite
     try:
-        config = load_fedorbit_config()
         catalogue = build_catalogue()
         selected = (
             (experiment_identifier(experiment_name),)
             if experiment_name is not None
             else catalogue.registered_names()
         )
-        layout = build_layout(config)
+        layout = build_layout()
         store = ArtifactStore(layout.execution_root)
         writer = VerifiedEvidenceWriter(store, layout)
         exported = 0

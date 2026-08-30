@@ -5,8 +5,8 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
-from fedorbit.config.models import FedorbitConfig
 from fedorbit.domain.enums import ExperimentName
 
 
@@ -35,8 +35,8 @@ def safe_slug(value: str) -> str:
     return slug
 
 
-def build_layout(config: FedorbitConfig, root: Path | None = None) -> WorkspaceLayout:
-    layout = config.runtime.artifact_layout
+def build_layout(root: Path | None = None) -> WorkspaceLayout:
+    layout = active_config().runtime.artifact_layout
     base = root if root is not None else repository_root()
     execution_root = base / layout.execution_root
     manuscript_root = base / layout.manuscript_root

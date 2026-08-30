@@ -15,7 +15,7 @@ from numpy.random import PCG64, Generator
 from numpy.typing import NDArray
 from scipy import stats as scipy_stats
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.runtime.seeds import derive_seed32
 
@@ -88,8 +88,8 @@ _BOOTSTRAP = _TYPED_SCIPY_STATS.bootstrap
 _CHI_SQUARE_CDF = _TYPED_SCIPY_STATS.chi2.cdf
 
 
-def nominal_alpha(config: FedorbitConfig) -> float:
-    return 1.0 - config.scientific.statistics.confidence_level
+def nominal_alpha() -> float:
+    return 1.0 - active_config().scientific.statistics.confidence_level
 
 
 def _mean(values: tuple[float, ...]) -> float:
@@ -153,7 +153,6 @@ class SignFlipResult:
 
 
 def exact_sign_flip_test(
-    config: FedorbitConfig,
     method_values: tuple[float, ...],
     reference_values: tuple[float, ...],
 ) -> SignFlipResult:
@@ -166,13 +165,14 @@ def exact_sign_flip_test(
         for method, reference in zip(method_values, reference_values, strict=True)
     )
     nonzero_count = sum(value != 0.0 for value in differences)
-    maximum = config.scientific.statistics.exact_sign_flip_max_nonzero_differences_for_enumeration
+    statistics_config = active_config().scientific.statistics
+    maximum = statistics_config.exact_sign_flip_max_nonzero_differences_for_enumeration
     if nonzero_count > maximum:
         raise StatisticsError(
             f"exact sign-flip enumeration has {nonzero_count} nonzero differences; "
             f"maximum is {maximum}"
         )
-    tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
+    tolerance = statistics_config.exact_sign_flip_comparison_tolerance
     return SignFlipResult(
         p_value=sign_flip_p_value(differences, tolerance),
         mean_difference=_mean(differences),
@@ -182,7 +182,6 @@ def exact_sign_flip_test(
 
 
 def statistical_bootstrap_seed(
-    config: FedorbitConfig,
     contrast_name: str,
     family: str,
     directed_pair: str,
@@ -197,7 +196,7 @@ def statistical_bootstrap_seed(
         purpose=purpose,
     )
     return derive_seed32(
-        config.scientific.randomness.statistical_seed,
+        active_config().scientific.randomness.statistical_seed,
         RngNamespace.STATISTICAL_BOOTSTRAP,
         coordinates,
     )
@@ -212,7 +211,6 @@ class BcaInterval:
 
 
 def paired_bca_interval(
-    config: FedorbitConfig,
     method_values: tuple[float, ...],
     reference_values: tuple[float, ...],
     bootstrap_seed: int,
@@ -228,7 +226,8 @@ def paired_bca_interval(
     if any(not math.isfinite(value) for value in differences):
         return BcaInterval(None, None, math.nan, True)
     point_estimate = _mean(differences)
-    identical_tolerance = config.scientific.statistics.identical_difference_tolerance
+    statistics_config = active_config().scientific.statistics
+    identical_tolerance = statistics_config.identical_difference_tolerance
     if all(abs(value - differences[0]) <= identical_tolerance for value in differences):
         return BcaInterval(point_estimate, point_estimate, point_estimate, False)
     method_array = np.asarray(method_values, dtype=np.float64)
@@ -247,8 +246,8 @@ def paired_bca_interval(
             vectorized=False,
             method="BCa",
             alternative="two-sided",
-            confidence_level=config.scientific.statistics.confidence_level,
-            n_resamples=config.scientific.statistics.ci_bootstrap_repetitions,
+            confidence_level=statistics_config.confidence_level,
+            n_resamples=statistics_config.ci_bootstrap_repetitions,
             rng=rng,
         )
     lower = float(result.confidence_interval.low)
@@ -266,12 +265,12 @@ class TostResult:
 
 
 def tost_equivalence(
-    config: FedorbitConfig,
     method_values: tuple[float, ...],
     reference_values: tuple[float, ...],
 ) -> TostResult:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
+    config = active_config()
     margins = config.scientific.materiality.equivalence_relative_macro_ce
     tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
     differences = tuple(
@@ -320,11 +319,12 @@ def mcnemar_asymptotic_continuity_corrected_p(b01: int, b10: int) -> float:
 
 
 def mcnemar_test(
-    config: FedorbitConfig,
     b01: int,
     b10: int,
 ) -> McNemarResult:
-    switch = config.scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
+    switch = (
+        active_config().scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
+    )
     if b01 + b10 <= switch:
         return McNemarResult(McNemarMode.EXACT, mcnemar_exact_p(b01, b10))
     return McNemarResult(
@@ -333,5 +333,5 @@ def mcnemar_test(
     )
 
 
-def minimum_valid_seeds_met(config: FedorbitConfig, seed_count: int) -> bool:
-    return seed_count >= config.scientific.statistics.minimum_valid_paired_seeds
+def minimum_valid_seeds_met(seed_count: int) -> bool:
+    return seed_count >= active_config().scientific.statistics.minimum_valid_paired_seeds

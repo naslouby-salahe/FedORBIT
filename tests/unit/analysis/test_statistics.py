@@ -36,7 +36,7 @@ def config() -> FedorbitConfig:
 def test_nominal_alpha_is_derived_not_configured(config: FedorbitConfig) -> None:
     level = config.scientific.statistics.confidence_level
     assert "alpha" not in set(dir(config.scientific.statistics))
-    assert nominal_alpha(config) == pytest.approx(1.0 - level)
+    assert nominal_alpha() == pytest.approx(1.0 - level)
 
 
 def test_sign_flip_all_zero_differences_returns_one() -> None:
@@ -56,10 +56,10 @@ def test_sign_flip_two_sided_matches_hand_enumeration() -> None:
     assert sign_flip_p_value(differences, 1e-15) == expected
 
 
-def test_exact_sign_flip_test_reports_point_summaries(config: FedorbitConfig) -> None:
+def test_exact_sign_flip_test_reports_point_summaries() -> None:
     method = (2.0, 3.0, 2.5, 3.5)
     reference = (1.0, 1.5, 1.2, 1.1)
-    result = exact_sign_flip_test(config, method, reference)
+    result = exact_sign_flip_test(method, reference)
     differences = [m - r for m, r in zip(method, reference, strict=True)]
     assert result.mean_difference == pytest.approx(sum(differences) / len(differences))
     assert result.median_difference == pytest.approx(statistics.median(differences))
@@ -74,14 +74,12 @@ def test_one_sided_greater_is_half_of_two_sided_when_strict() -> None:
     assert greater >= two_sided / 2 - 1e-12
 
 
-def test_bca_interval_contains_point_estimate_for_spread_data(
-    config: FedorbitConfig,
-) -> None:
+def test_bca_interval_contains_point_estimate_for_spread_data() -> None:
     rng = np.random.default_rng(42)
     reference = tuple(float(v) for v in rng.uniform(1.0, 2.0, size=10))
     method = tuple(value + 0.3 for value in reference)
-    seed = statistical_bootstrap_seed(config, "contrast", "family", "pair", "metric", "ci")
-    interval = paired_bca_interval(config, method, reference, seed)
+    seed = statistical_bootstrap_seed("contrast", "family", "pair", "metric", "ci")
+    interval = paired_bca_interval(method, reference, seed)
     assert isinstance(interval, BcaInterval)
     assert not interval.degenerate
     assert interval.lower is not None
@@ -89,21 +87,19 @@ def test_bca_interval_contains_point_estimate_for_spread_data(
     assert interval.lower <= interval.point_estimate <= interval.upper
 
 
-def test_identical_differences_return_point_interval_without_degenerate_flag(
-    config: FedorbitConfig,
-) -> None:
+def test_identical_differences_return_point_interval_without_degenerate_flag() -> None:
     reference = (1.0, 2.0, 3.0, 4.0, 5.0)
     method = tuple(value + 0.25 for value in reference)
-    interval = paired_bca_interval(config, method, reference, 7)
+    interval = paired_bca_interval(method, reference, 7)
     assert not interval.degenerate
     assert interval.lower == pytest.approx(interval.point_estimate)
     assert interval.upper == pytest.approx(interval.point_estimate)
 
 
-def test_statistical_seed_depends_on_contrast_and_pair(config: FedorbitConfig) -> None:
-    first = statistical_bootstrap_seed(config, "c1", "fam", "pair-a", "m", "ci")
-    second = statistical_bootstrap_seed(config, "c2", "fam", "pair-a", "m", "ci")
-    third = statistical_bootstrap_seed(config, "c1", "fam", "pair-b", "m", "ci")
+def test_statistical_seed_depends_on_contrast_and_pair() -> None:
+    first = statistical_bootstrap_seed("c1", "fam", "pair-a", "m", "ci")
+    second = statistical_bootstrap_seed("c2", "fam", "pair-a", "m", "ci")
+    third = statistical_bootstrap_seed("c1", "fam", "pair-b", "m", "ci")
     assert len({first, second, third}) == 3
 
 
@@ -137,9 +133,9 @@ def test_mcnemar_exact_small_discordant_counts() -> None:
 
 def test_mcnemar_switch_by_configured_discordant_count(config: FedorbitConfig) -> None:
     switch = config.scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
-    exact = mcnemar_test(config, switch // 2, switch // 2)
+    exact = mcnemar_test(switch // 2, switch // 2)
     assert exact.mode == McNemarMode.EXACT
-    asymptotic = mcnemar_test(config, switch + 10, 0)
+    asymptotic = mcnemar_test(switch + 10, 0)
     assert asymptotic.mode == McNemarMode.ASYMPTOTIC
     assert 0.0 <= asymptotic.p_value <= 1.0
     assert math.isfinite(mcnemar_asymptotic_continuity_corrected_p(switch + 10, 0))
@@ -148,7 +144,7 @@ def test_mcnemar_switch_by_configured_discordant_count(config: FedorbitConfig) -
 def test_tost_equivalence_detects_within_margin_differences(config: FedorbitConfig) -> None:
     reference = (1.0, 1.2, 0.9, 1.1, 1.05, 0.95)
     method = tuple(value + 0.005 for value in reference)
-    tost = tost_equivalence(config, method, reference)
+    tost = tost_equivalence(method, reference)
     alpha = config.scientific.statistics.tost_alpha_per_one_sided_test
     assert max(tost.p_lower, tost.p_upper) < alpha or tost.p_equiv < 0.25
 
@@ -156,12 +152,12 @@ def test_tost_equivalence_detects_within_margin_differences(config: FedorbitConf
 def test_tost_rejects_outside_margin_differences(config: FedorbitConfig) -> None:
     reference = (1.0,) * 8
     method = tuple(value + 0.05 for value in reference)
-    tost = tost_equivalence(config, method, reference)
+    tost = tost_equivalence(method, reference)
     alpha = config.scientific.statistics.tost_alpha_per_one_sided_test
     assert tost.p_equiv >= alpha
 
 
 def test_minimum_seeds_gate(config: FedorbitConfig) -> None:
     required = config.scientific.statistics.minimum_valid_paired_seeds
-    assert minimum_valid_seeds_met(config, required)
-    assert not minimum_valid_seeds_met(config, required - 1)
+    assert minimum_valid_seeds_met(required)
+    assert not minimum_valid_seeds_met(required - 1)

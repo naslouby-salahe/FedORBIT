@@ -158,7 +158,6 @@ def _evaluate_candidate(
                 data.base_class_weights,
             )
             full_risks = run_shadow_pair(
-                config,
                 model,
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,
@@ -168,7 +167,6 @@ def _evaluate_candidate(
                 schedule_seed,
             )
             half_risks = run_shadow_pair(
-                config,
                 model,
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,

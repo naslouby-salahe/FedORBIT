@@ -189,7 +189,6 @@ def estimate_response_bands(
                 ),
             )
             risks = run_shadow_pair(
-                config,
                 model,
                 checkpoint.state_dict,
                 checkpoint.optimizer_state,

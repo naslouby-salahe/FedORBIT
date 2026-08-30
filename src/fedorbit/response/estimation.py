@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.training.losses import ClassWeights
 from fedorbit.training.trainer import (
     ModelParameterState,
@@ -108,7 +108,6 @@ def paired_shadow_derivative(
 
 
 def run_shadow_pair(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
@@ -117,11 +116,11 @@ def run_shadow_pair(
     settings: ShadowSettings,
     schedule_seed: int,
 ) -> tuple[tuple[float, float, float], ...]:
+    config = active_config()
     batch_size = config.scientific.training.batch_size
     positive_rng = torch.Generator().manual_seed(schedule_seed)
     negative_rng = torch.Generator().manual_seed(schedule_seed)
     positive = _run_shadow(
-        config,
         model,
         base_state,
         base_optimizer_state,
@@ -133,7 +132,6 @@ def run_shadow_pair(
         positive_rng,
     )
     negative = _run_shadow(
-        config,
         model,
         base_state,
         base_optimizer_state,
@@ -146,7 +144,6 @@ def run_shadow_pair(
     )
     base_state.load_into(model)
     baseline = _evaluate_risks(
-        config,
         model,
         data.meta_features,
         data.meta_targets,
@@ -159,7 +156,6 @@ def run_shadow_pair(
 
 
 def _run_shadow(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     base_state: ModelParameterState,
     base_optimizer_state: OptimizerState,
@@ -174,6 +170,7 @@ def _run_shadow(
         raise ResponseEstimationError("shadow optimizer horizon must be positive")
     base_state.load_into(model)
     base_rng_state.restore()
+    config = active_config()
     optimizer = make_adamw(config, model, settings.learning_rate, settings.weight_decay)
     base_optimizer_state.load_into(optimizer)
     model.train()
@@ -184,7 +181,7 @@ def _run_shadow(
         targets = data.train_targets[batch].to(device=device, dtype=torch.long)
         optimizer.zero_grad(set_to_none=True)
         logits = model(data.train_features[batch].to(device=device, dtype=torch.float32))
-        per_example_ce = _shadow_ce(logits, targets, config)
+        per_example_ce = _shadow_ce(logits, targets)
         weights = _shadow_weights(
             data.base_class_weights,
             targets,
@@ -218,9 +215,8 @@ def _run_shadow(
 def _shadow_ce(
     logits: torch.Tensor,
     targets: torch.Tensor,
-    config: FedorbitConfig,
 ) -> torch.Tensor:
-    floor = config.scientific.metrics.probability_log_floor
+    floor = active_config().scientific.metrics.probability_log_floor
     probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
     selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
     return -torch.log(torch.clamp(selected, min=floor))
@@ -239,7 +235,6 @@ def _shadow_weights(
 
 
 def _evaluate_risks(
-    config: FedorbitConfig,
     model: torch.nn.Module,
     meta_features: torch.Tensor,
     meta_targets: torch.Tensor,
@@ -255,7 +250,7 @@ def _evaluate_risks(
             logits,
             targets,
             class_set,
-            config.scientific.metrics.probability_log_floor,
+            active_config().scientific.metrics.probability_log_floor,
         )
         for class_set in outcome_native_class_sets
     )

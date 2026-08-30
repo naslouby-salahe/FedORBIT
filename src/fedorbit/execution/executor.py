@@ -8,6 +8,7 @@ from enum import StrEnum
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
+from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
 from fedorbit.datasets.inspection import (
     DatasetInspectionRequest,
@@ -29,6 +30,21 @@ from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.response.packet import build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
 from fedorbit.runtime.logging import ExecutionLogEvent, ExecutionLogger, execution_logger
+from fedorbit.runtime.seeds import RandomSeed
+from fedorbit.synthetic.exactness import (
+    ExactSeparatorInstanceRequest,
+    generate_exact_separator_instance,
+)
+from fedorbit.synthetic.mechanisms import (
+    UnresolvedMapWorldKind,
+    UnresolvedMapWorldRequest,
+    generate_unresolved_map_world,
+)
+from fedorbit.synthetic.scalability import (
+    ScalabilityBlockPattern,
+    ScalabilityInstanceRequest,
+    generate_scalability_instance,
+)
 
 
 class ExecutionError(ValueError):
@@ -168,6 +184,20 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
 
 def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
     del overwrite_policy
+    seed = RandomSeed(active_config().scientific.randomness.pilot_seeds[0])
+    exact = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 2), seed))
+    if exact.lower_response_matrix.shape != (4, 4):
+        raise ExecutionError("synthetic exactness smoke instance has an invalid matrix shape")
+    mechanism = generate_unresolved_map_world(
+        UnresolvedMapWorldRequest(UnresolvedMapWorldKind.COMMON_ACTION, seed)
+    )
+    if mechanism.lower_response_matrix.shape != (4, 4):
+        raise ExecutionError("synthetic mechanism smoke instance has an invalid matrix shape")
+    scalability = generate_scalability_instance(
+        ScalabilityInstanceRequest(4, ScalabilityBlockPattern.BALANCED, 1, seed)
+    )
+    if scalability.fixed_action.shape != (4,):
+        raise ExecutionError("synthetic scalability smoke instance has an invalid action shape")
     estimate = FinalResponseEstimate(
         entries=(FinalResponseEntry(0, 0, 1.0, 0.0, 1.0, 1.0, True),),
         critical_value=1.0,

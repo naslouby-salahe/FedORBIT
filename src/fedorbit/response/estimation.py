@@ -171,7 +171,7 @@ def _run_shadow(
     base_state.load_into(model)
     base_rng_state.restore()
     config = active_config()
-    optimizer = make_adamw(config, model, settings.learning_rate, settings.weight_decay)
+    optimizer = make_adamw(model, settings.learning_rate, settings.weight_decay)
     base_optimizer_state.load_into(optimizer)
     model.train()
     schedule = shadow_batch_schedule(data.train_features.shape[0], batch_size, schedule_rng)

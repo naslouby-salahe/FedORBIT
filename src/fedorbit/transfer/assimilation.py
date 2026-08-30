@@ -256,7 +256,6 @@ def run_proposal_confirmation(
             confirmation.optimizer_steps_per_shadow,
         )
         baseline_optimizer = make_adamw(
-            config,
             model,
             request.selected_hyperparameters.learning_rate,
             request.selected_hyperparameters.weight_decay,
@@ -277,7 +276,6 @@ def run_proposal_confirmation(
             config.scientific.metrics.probability_log_floor,
         )
         curriculum_optimizer = make_adamw(
-            config,
             model,
             request.selected_hyperparameters.learning_rate,
             request.selected_hyperparameters.weight_decay,

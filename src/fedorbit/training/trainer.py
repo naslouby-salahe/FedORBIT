@@ -12,7 +12,7 @@ from torch import nn
 from torch.optim.optimizer import StateDict
 from torch.utils.data import DataLoader, TensorDataset
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.runtime.seeds import derive_seed32
@@ -165,12 +165,11 @@ def macro_cross_entropy(
 
 
 def make_adamw(
-    config: FedorbitConfig,
     model: nn.Module,
     learning_rate: float,
     weight_decay: float,
 ) -> torch.optim.AdamW:
-    adamw = config.scientific.training.adamw
+    adamw = active_config().scientific.training.adamw
     return torch.optim.AdamW(
         model.parameters(),
         lr=learning_rate,
@@ -197,7 +196,6 @@ def _seed_training_rng(epoch_seed: int, device: torch.device) -> None:
 
 
 def train_base_model(
-    config: FedorbitConfig,
     model: nn.Module,
     train_features: torch.Tensor,
     train_targets: torch.Tensor,
@@ -207,6 +205,7 @@ def train_base_model(
     seed: int,
     selected_hyperparameters: SelectedHyperparameters,
 ) -> TrainingOutcome:
+    config = active_config()
     if train_features.ndim != 2 or train_targets.ndim != 1 or train_features.shape[0] == 0:
         raise TrainingError("TRAIN must contain at least one example")
     if valid_features.ndim != 2 or valid_targets.ndim != 1 or valid_features.shape[0] == 0:
@@ -225,7 +224,6 @@ def train_base_model(
     device = next(model.parameters()).device
     model.to(device=device, dtype=torch.float32)
     optimizer = make_adamw(
-        config,
         model,
         selected_hyperparameters.learning_rate,
         selected_hyperparameters.weight_decay,

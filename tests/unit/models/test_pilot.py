@@ -45,7 +45,7 @@ def _fits(
 
 def test_pilot_grid_is_exact_registered_cartesian_product() -> None:
     config = load_fedorbit_config()
-    grid = pilot_grid(config)
+    grid = pilot_grid()
     assert len(grid) == 12
     assert len(set(grid)) == 12
     assert {item.learning_rate for item in grid} == {0.0003, 0.001, 0.003}
@@ -55,8 +55,7 @@ def test_pilot_grid_is_exact_registered_cartesian_product() -> None:
 
 
 def test_pilot_selection_uses_registered_tie_order() -> None:
-    config = load_fedorbit_config()
-    grid = pilot_grid(config)
+    grid = pilot_grid()
     results = tuple(fit for candidate in grid for fit in _fits(candidate, (1.0, 1.0, 1.0)))
     selection = select_pilot_configuration(results)
     assert selection.configuration == PilotConfiguration(REFERENCE_LEARNING_RATE, 0.0, 0.0)

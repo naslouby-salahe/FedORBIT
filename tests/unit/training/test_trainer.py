@@ -5,7 +5,6 @@ import math
 import pytest
 import torch
 
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.models.network_classifier import NetworkFlowClassifier
 from fedorbit.training.losses import ClassWeights
 from fedorbit.training.trainer import (
@@ -27,9 +26,8 @@ def test_macro_cross_entropy_is_equal_class_average() -> None:
 
 
 def test_adamw_contract_disables_unregistered_variants() -> None:
-    config = load_fedorbit_config()
     model = NetworkFlowClassifier(4, 2, 0.0)
-    optimizer = make_adamw(config, model, 1e-3, 0.0)
+    optimizer = make_adamw(model, 1e-3, 0.0)
     group = optimizer.param_groups[0]
     assert group["amsgrad"] is False
     assert group["maximize"] is False
@@ -38,7 +36,6 @@ def test_adamw_contract_disables_unregistered_variants() -> None:
 
 
 def test_training_checkpoint_contains_complete_reusable_state() -> None:
-    config = load_fedorbit_config()
     generator = torch.Generator().manual_seed(17)
     train_features = torch.randn(32, 4, generator=generator)
     train_targets = torch.tensor([0, 1] * 16)
@@ -49,7 +46,6 @@ def test_training_checkpoint_contains_complete_reusable_state() -> None:
     model = NetworkFlowClassifier(4, 2, selected.dropout_probability)
     model.initialize(torch.Generator().manual_seed(19))
     outcome = train_base_model(
-        config,
         model,
         train_features,
         train_targets,

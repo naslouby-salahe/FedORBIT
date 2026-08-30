@@ -8,7 +8,7 @@ from typing import cast
 
 import torch
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import DatasetId, RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.models.host_classifier import HostClassifier
@@ -59,8 +59,8 @@ class PilotData:
     n_classes: int
 
 
-def pilot_grid(config: FedorbitConfig) -> tuple[PilotConfiguration, ...]:
-    pilot = config.scientific.base_model_pilot
+def pilot_grid() -> tuple[PilotConfiguration, ...]:
+    pilot = active_config().scientific.base_model_pilot
     configurations = tuple(
         PilotConfiguration(learning_rate, weight_decay, dropout)
         for learning_rate, weight_decay, dropout in itertools.product(
@@ -75,16 +75,15 @@ def pilot_grid(config: FedorbitConfig) -> tuple[PilotConfiguration, ...]:
 
 
 def run_base_model_pilot(
-    config: FedorbitConfig,
     data: PilotData,
     dataset: DatasetId,
 ) -> tuple[PilotFitResult, ...]:
-    seeds = config.scientific.randomness.pilot_seeds
+    seeds = active_config().scientific.randomness.pilot_seeds
     if len(seeds) != 3:
         raise PilotError("base-model pilot requires exactly three pilot seeds")
     class_weights = ClassWeights.from_targets(data.train_targets, data.n_classes)
     results: list[PilotFitResult] = []
-    for candidate in pilot_grid(config):
+    for candidate in pilot_grid():
         for seed in seeds:
             model = create_classifier(
                 dataset,
@@ -94,7 +93,6 @@ def run_base_model_pilot(
                 seed,
             )
             outcome = train_base_model(
-                config,
                 model,
                 data.train_features,
                 data.train_targets,

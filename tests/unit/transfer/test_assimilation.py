@@ -20,10 +20,9 @@ from fedorbit.transfer.assimilation import TestOpeningRuleError as OpeningRuleEr
 
 
 def _model_and_optimizer() -> tuple[NetworkFlowClassifier, torch.optim.AdamW]:
-    config = load_fedorbit_config()
     model = NetworkFlowClassifier(3, 2, 0.0)
     model.initialize(torch.Generator().manual_seed(7))
-    return model, make_adamw(config, model, 1e-3, 0.0)
+    return model, make_adamw(model, 1e-3, 0.0)
 
 
 def test_pre_confirm_capture_restores_model_optimizer_and_rng() -> None:

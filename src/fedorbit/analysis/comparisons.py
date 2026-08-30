@@ -5,7 +5,7 @@ import re
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import MultiplicityFamily, Split, TransferMethod
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -348,7 +348,6 @@ def registered_family_inputs() -> RegisteredFamilyInputs:
 
 
 def build_family_states(
-    config: FedorbitConfig,
     available_p_values: ContrastPValueSet,
 ) -> FamilyStates:
     registry = registered_family_inputs()
@@ -361,7 +360,7 @@ def build_family_states(
     groups = tuple(
         FamilyStateGroup(
             family_entry.family,
-            _family_states(config, family_entry, available_p_values),
+            _family_states(family_entry, available_p_values),
         )
         for family_entry in registry.entries
     )
@@ -371,11 +370,10 @@ def build_family_states(
 
 
 def _family_states(
-    config: FedorbitConfig,
     family_entry: RegisteredFamily,
     available_p_values: ContrastPValueSet,
 ) -> tuple[FamilyInputState, ...]:
-    minimum = config.scientific.statistics.minimum_valid_paired_seeds
+    minimum = active_config().scientific.statistics.minimum_valid_paired_seeds
     present = tuple(
         entry
         for contrast in family_entry.contrasts

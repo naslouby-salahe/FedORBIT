@@ -58,9 +58,8 @@ def _pvalue(
     )
 
 
-def test_pair_specific_p_value_does_not_populate_other_pairs(config: FedorbitConfig) -> None:
+def test_pair_specific_p_value_does_not_populate_other_pairs() -> None:
     states = build_family_states(
-        config,
         ContrastPValueSet((_pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.02),)),
     )
     coupling_states = states.states_for(MultiplicityFamily.COUPLING_MECHANISM)
@@ -71,7 +70,7 @@ def test_pair_specific_p_value_does_not_populate_other_pairs(config: FedorbitCon
     assert available[0].family_size == 1
 
 
-def test_holm_is_applied_within_family_only(config: FedorbitConfig) -> None:
+def test_holm_is_applied_within_family_only() -> None:
     values = ContrastPValueSet(
         (
             _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.01),
@@ -79,7 +78,7 @@ def test_holm_is_applied_within_family_only(config: FedorbitConfig) -> None:
             _pvalue(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY, 0, 0.02),
         )
     )
-    states = build_family_states(config, values)
+    states = build_family_states(values)
     coupling = [
         state
         for state in states.states_for(MultiplicityFamily.COUPLING_MECHANISM)
@@ -95,11 +94,8 @@ def test_holm_is_applied_within_family_only(config: FedorbitConfig) -> None:
     assert primary[0].family_size == 1
 
 
-def test_inputs_with_insufficient_paired_seeds_are_not_in_holm_family(
-    config: FedorbitConfig,
-) -> None:
+def test_inputs_with_insufficient_paired_seeds_are_not_in_holm_family() -> None:
     states = build_family_states(
-        config,
         ContrastPValueSet(
             (
                 _pvalue(MultiplicityFamily.COUPLING_MECHANISM, 0, 0.01),

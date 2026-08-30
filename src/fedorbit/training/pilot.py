@@ -13,7 +13,7 @@ from fedorbit.domain.enums import DatasetId, RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.models.host_classifier import HostClassifier
 from fedorbit.models.network_classifier import NetworkFlowClassifier
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.training.losses import ClassWeights
 from fedorbit.training.trainer import SelectedHyperparameters, TrainingOutcome, train_base_model
 
@@ -147,17 +147,19 @@ def create_classifier(
     seed: int,
 ) -> NetworkFlowClassifier | HostClassifier:
     initialization_seed = derive_seed32(
-        seed,
-        RngNamespace.MODEL_INITIALIZATION,
-        cast(
-            StableJsonPayload,
-            OrderedDict(
-                dataset=dataset.value,
-                input_dimension=input_dimension,
-                n_classes=n_classes,
+        SeedDerivationRequest(
+            RandomSeed(seed),
+            RngNamespace.MODEL_INITIALIZATION,
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=dataset.value,
+                    input_dimension=input_dimension,
+                    n_classes=n_classes,
+                ),
             ),
-        ),
-    )
+        )
+    ).value
     generator = torch.Generator().manual_seed(initialization_seed)
     if dataset in NETWORK_DATASETS:
         model: NetworkFlowClassifier | HostClassifier = NetworkFlowClassifier(

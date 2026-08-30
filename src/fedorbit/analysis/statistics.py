@@ -17,7 +17,7 @@ from scipy import stats as scipy_stats
 
 from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 
 FloatArray = NDArray[np.float64]
 
@@ -196,10 +196,12 @@ def statistical_bootstrap_seed(
         purpose=purpose,
     )
     return derive_seed32(
-        active_config().scientific.randomness.statistical_seed,
-        RngNamespace.STATISTICAL_BOOTSTRAP,
-        coordinates,
-    )
+        SeedDerivationRequest(
+            RandomSeed(active_config().scientific.randomness.statistical_seed),
+            RngNamespace.STATISTICAL_BOOTSTRAP,
+            coordinates,
+        )
+    ).value
 
 
 @dataclass(frozen=True, slots=True)

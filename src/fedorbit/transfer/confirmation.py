@@ -8,7 +8,7 @@ import torch
 
 from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 
 
 class ConfirmationError(ValueError):
@@ -47,7 +47,9 @@ def confirmation_schedule(
     if batch_size <= 0:
         raise ConfirmationError("confirmation batch size must be positive")
     rng = torch.Generator().manual_seed(
-        derive_seed32(seed, RngNamespace.CONFIRMATION_SCHEDULE, coordinates)
+        derive_seed32(
+            SeedDerivationRequest(RandomSeed(seed), RngNamespace.CONFIRMATION_SCHEDULE, coordinates)
+        ).value
     )
     return _infinite_pass_batches(train_size, batch_size, rng)
 
@@ -102,7 +104,11 @@ def hierarchical_bootstrap_relative_gains(
         raise ConfirmationError("hierarchical bootstrap requires at least one replicate")
     replicate_count = len(replicate_outcomes)
     bootstrap_rng = torch.Generator().manual_seed(
-        derive_seed32(seed, RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates)
+        derive_seed32(
+            SeedDerivationRequest(
+                RandomSeed(seed), RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates
+            )
+        ).value
     )
     collected_gains: list[float] = []
     for _ in range(confirmation.hierarchical_bootstrap_resamples):

@@ -28,7 +28,7 @@ from fedorbit.orbit.objective import (
     evaluate_objective,
     zero_action,
 )
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.solvers.assignment import solve_minimum_cost_assignment
 from fedorbit.solvers.exact_sparse import (
     run_support_master_lp,
@@ -478,7 +478,9 @@ def dense_starts(
             starts.append(unique_permutations[images].copy())
         return tuple(starts[:5])
     starts.append(unique_permutations[ordered_permutations[0]].copy())
-    rng_seed = derive_seed32(seed, RngNamespace.DENSE_START, coordinates)
+    rng_seed = derive_seed32(
+        SeedDerivationRequest(RandomSeed(seed), RngNamespace.DENSE_START, coordinates)
+    ).value
     rng = np.random.default_rng(rng_seed)
     seen_orders: list[tuple[int, ...]] = [ordered_permutations[0]]
     attempts = 0

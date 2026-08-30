@@ -8,7 +8,7 @@ import torch
 
 from fedorbit.domain.enums import ClientRole, CoarseGroup, RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 
 
 class AnonymityError(ValueError):
@@ -66,17 +66,19 @@ def anonymous_node_order(
     if endpoint not in (ClientRole.SOURCE, ClientRole.TARGET):
         raise AnonymityError("anonymous ordering endpoint must be source or target")
     seed = derive_seed32(
-        base_seed,
-        RngNamespace.ANONYMOUS_NODE_ORDER,
-        cast(
-            StableJsonPayload,
-            OrderedDict(
-                endpoint=endpoint.value,
-                coarse_group=coarse_group.value,
-                coordinate=coordinate,
+        SeedDerivationRequest(
+            RandomSeed(base_seed),
+            RngNamespace.ANONYMOUS_NODE_ORDER,
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    endpoint=endpoint.value,
+                    coarse_group=coarse_group.value,
+                    coordinate=coordinate,
+                ),
             ),
-        ),
-    )
+        )
+    ).value
     generator = torch.Generator().manual_seed(seed)
     permutation = tuple(int(index) for index in torch.randperm(node_count, generator=generator))
     display_ids = tuple(f"node-{index:04d}" for index in range(1, node_count + 1))

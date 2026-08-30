@@ -10,7 +10,7 @@ import torch
 from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 from fedorbit.training.trainer import (
     ModelParameterState,
@@ -124,13 +124,15 @@ def _confirmation_batches_for_replicate(
     horizon: int,
 ) -> tuple[ShadowBatch, ...]:
     rng_seed = derive_seed32(
-        seed,
-        RngNamespace.CONFIRMATION_SCHEDULE,
-        cast(
-            StableJsonPayload,
-            OrderedDict(coordinates=contrast_coordinates, replicate=replicate_index),
-        ),
-    )
+        SeedDerivationRequest(
+            RandomSeed(seed),
+            RngNamespace.CONFIRMATION_SCHEDULE,
+            cast(
+                StableJsonPayload,
+                OrderedDict(coordinates=contrast_coordinates, replicate=replicate_index),
+            ),
+        )
+    ).value
     generator = torch.Generator().manual_seed(rng_seed)
     train_size = int(features.shape[0])
     if train_size <= 0:
@@ -357,10 +359,12 @@ def apply_accepted_assimilation(
         (name, getattr(assimilation_coordinates, name)) for name in ASSIMILATION_COORDINATE_KEYS
     )
     rng_seed = derive_seed32(
-        seed,
-        RngNamespace.ASSIMILATION_SCHEDULE,
-        coordinates_payload,
-    )
+        SeedDerivationRequest(
+            RandomSeed(seed),
+            RngNamespace.ASSIMILATION_SCHEDULE,
+            coordinates_payload,
+        )
+    ).value
     generator = torch.Generator().manual_seed(rng_seed)
     pre_confirm.restore_into(model, optimizer)
     model.train()

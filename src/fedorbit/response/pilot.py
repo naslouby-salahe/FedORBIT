@@ -17,7 +17,7 @@ from fedorbit.response.estimation import (
     paired_shadow_derivative,
     run_shadow_pair,
 )
-from fedorbit.runtime.seeds import RngNamespace, derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, RngNamespace, SeedDerivationRequest, derive_seed32
 from fedorbit.training.losses import ClassWeights
 from fedorbit.training.trainer import BaseCheckpoint
 
@@ -133,19 +133,21 @@ def _evaluate_candidate(
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
             schedule_seed = derive_seed32(
-                seed,
-                RngNamespace.RESPONSE_SCHEDULE,
-                cast(
-                    StableJsonPayload,
-                    OrderedDict(
-                        stage="pilot",
-                        magnitude=candidate.intervention_magnitude,
-                        horizon=candidate.optimizer_step_horizon,
-                        replicate=replicate,
-                        intervention=intervention_index,
+                SeedDerivationRequest(
+                    RandomSeed(seed),
+                    RngNamespace.RESPONSE_SCHEDULE,
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            stage="pilot",
+                            magnitude=candidate.intervention_magnitude,
+                            horizon=candidate.optimizer_step_horizon,
+                            replicate=replicate,
+                            intervention=intervention_index,
+                        ),
                     ),
-                ),
-            )
+                )
+            ).value
             shadow_data = ShadowData(
                 data.train_features,
                 data.train_targets,

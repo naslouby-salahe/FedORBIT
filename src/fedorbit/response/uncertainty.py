@@ -19,7 +19,7 @@ from fedorbit.response.estimation import (
     run_shadow_pair,
 )
 from fedorbit.response.pilot import PilotData
-from fedorbit.runtime.seeds import RngNamespace, derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, RngNamespace, SeedDerivationRequest, derive_seed32
 from fedorbit.training.trainer import BaseCheckpoint
 
 
@@ -79,18 +79,20 @@ def max_t_critical_value(
         )
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     bootstrap_seed = derive_seed32(
-        seed,
-        RngNamespace.RESPONSE_BOOTSTRAP,
-        cast(
-            StableJsonPayload,
-            OrderedDict(
-                entries=len(entry_derivatives),
-                replicates=replicate_count,
-                resamples=resample_count,
-                confidence=level,
+        SeedDerivationRequest(
+            RandomSeed(seed),
+            RngNamespace.RESPONSE_BOOTSTRAP,
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    entries=len(entry_derivatives),
+                    replicates=replicate_count,
+                    resamples=resample_count,
+                    confidence=level,
+                ),
             ),
-        ),
-    )
+        )
+    ).value
     rng = torch.Generator().manual_seed(bootstrap_seed)
     maxima: list[float] = []
     for _ in range(resample_count):
@@ -174,17 +176,19 @@ def estimate_response_bands(
                 data.base_class_weights,
             )
             schedule_seed = derive_seed32(
-                seed,
-                RngNamespace.RESPONSE_SCHEDULE,
-                cast(
-                    StableJsonPayload,
-                    OrderedDict(
-                        stage=seed_stage,
-                        replicate=replicate,
-                        intervention=intervention_index,
+                SeedDerivationRequest(
+                    RandomSeed(seed),
+                    RngNamespace.RESPONSE_SCHEDULE,
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            stage=seed_stage,
+                            replicate=replicate,
+                            intervention=intervention_index,
+                        ),
                     ),
-                ),
-            )
+                )
+            ).value
             risks = run_shadow_pair(
                 model,
                 checkpoint.state_dict,

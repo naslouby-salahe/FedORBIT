@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.orbit.correspondence import BlockCorrespondence, PaddedBlockStructure
 from fedorbit.orbit.objective import CurriculumAction, RobustActionProblem
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 
 
 class CouplingDestructionError(ValueError):
@@ -35,10 +35,12 @@ def _block_pair_permutation(
     block_pair_index: int,
 ) -> NDArray[np.intp]:
     rng_seed = derive_seed32(
-        seed,
-        RngNamespace.COUPLING_DESTRUCTION,
-        OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index),
-    )
+        SeedDerivationRequest(
+            RandomSeed(seed),
+            RngNamespace.COUPLING_DESTRUCTION,
+            OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index),
+        )
+    ).value
     generator = np.random.default_rng(rng_seed)
     return generator.permutation(entry_count)
 

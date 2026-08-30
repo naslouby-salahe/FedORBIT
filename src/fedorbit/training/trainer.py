@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from fedorbit.config.context import active_config
 from fedorbit.domain.enums import RngNamespace
 from fedorbit.domain.serialization import StableJsonPayload
-from fedorbit.runtime.seeds import derive_seed32
+from fedorbit.runtime.seeds import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.training.losses import ClassWeights, minibatch_objective
 
 
@@ -235,10 +235,12 @@ def train_base_model(
 
     for epoch in range(training.maximum_epochs):
         epoch_seed = derive_seed32(
-            seed,
-            RngNamespace.TRAIN_EPOCH_SHUFFLE,
-            cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)),
-        )
+            SeedDerivationRequest(
+                RandomSeed(seed),
+                RngNamespace.TRAIN_EPOCH_SHUFFLE,
+                cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)),
+            )
+        ).value
         generator = torch.Generator().manual_seed(epoch_seed)
         loader = DataLoader(
             TensorDataset(train_features, train_targets),

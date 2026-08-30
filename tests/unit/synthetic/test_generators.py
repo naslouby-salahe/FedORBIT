@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.synthetic.generators import (
+from fedorbit.synthetic.exactness import (
     ExactSeparatorInstanceRequest,
     generate_exact_separator_instance,
 )

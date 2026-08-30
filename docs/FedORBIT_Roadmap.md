@@ -5279,7 +5279,7 @@ project/
 │       ├── datasets/
 │       │   ├── __init__.py                        # Exposes supported dataset implementations and common preparation operations.
 │       │   ├── common.py                          # Owns meaningful cross-dataset records and common adapter behavior without hiding dataset-specific scientific rules.
-│       │   ├── canonicalization.py                # Implements missing-token normalization, float64 canonical hashing, NFC strings, Arrow row serialization, duplicate hashing, and conflicting-duplicate detection.
+│       │   ├── row_normalization.py               # Implements missing-token normalization, float64 row hashing, NFC strings, Arrow row serialization, duplicate hashing, and conflicting-duplicate detection.
 │       │   ├── splitting.py                       # Implements duplicate-group-preserving chronological TRAIN/META/VALID/CONFIRM/TEST assignment.
 │       │   ├── preprocessing.py                   # Implements TRAIN-only quality filtering, imputation, robust scaling, missing indicators, categorical vocabularies, one-hot encoding, and constant-feature removal.
 │       │   ├── ontology.py                        # Owns coarse semantic groups, transfer concepts, source/target eligibility, actionability, pseudonymous node ordering, and explicit null-node padding.

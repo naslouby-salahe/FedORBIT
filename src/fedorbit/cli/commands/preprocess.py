@@ -6,9 +6,9 @@ from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import dataset_identifier
 from fedorbit.config.context import active_config
 from fedorbit.domain.enums import DatasetId
-from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.executor import (
     DatasetPreparationRequest,
+    ExecutionError,
     OverwritePolicy,
     preprocess_datasets,
 )
@@ -30,7 +30,7 @@ def preprocess(
                 overwrite_policy=OverwritePolicy.REPLACE if overwrite else OverwritePolicy.REUSE,
             )
         )
-    except (CliUsageError, NotReadyError) as error:
+    except (CliUsageError, ExecutionError) as error:
         exit_from_error(error)
 
 

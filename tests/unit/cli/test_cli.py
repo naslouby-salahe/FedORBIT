@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
 
-from fedorbit.cli.errors import EXIT_NOT_READY, EXIT_USAGE, CliUsageError
+from fedorbit.cli.errors import EXIT_RUNTIME, EXIT_USAGE, CliUsageError
 from fedorbit.cli.main import app
 from fedorbit.cli.parsing import dataset_identifier, experiment_identifier
 from fedorbit.domain.enums import ExperimentName
@@ -106,7 +106,7 @@ def test_report_rejects_invented_experiment() -> None:
 
 def test_preprocess_accepts_registered_dataset() -> None:
     result = runner.invoke(app, ["preprocess", "edge_iiotset_network"])
-    assert result.exit_code in (EXIT_NOT_READY, 0)
+    assert result.exit_code == 0
 
 
 def test_preprocess_rejects_display_name() -> None:
@@ -116,12 +116,12 @@ def test_preprocess_rejects_display_name() -> None:
 
 def test_preprocess_accepts_overwrite_flag() -> None:
     result = runner.invoke(app, ["preprocess", "--overwrite"])
-    assert result.exit_code in (EXIT_NOT_READY, 0)
+    assert result.exit_code == 0
 
 
 def test_run_accepts_registered_experiment() -> None:
     result = runner.invoke(app, ["run", "Mathematical Primitive Validation"])
-    assert result.exit_code in (EXIT_NOT_READY, 0)
+    assert result.exit_code == EXIT_RUNTIME
 
 
 def test_smoke_accepts_overwrite_flag() -> None:

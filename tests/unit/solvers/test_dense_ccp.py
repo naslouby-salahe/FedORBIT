@@ -104,12 +104,11 @@ def test_penalty_scale_matches_registered_formula() -> None:
 
 
 def test_relaxation_lower_bounds_exhaustive_orbit_minimum() -> None:
-    config = load_fedorbit_config()
     for seed in range(4):
         problem = _two_block_problem(seed)
         layout = AssignmentVariableLayout.build(problem.blocks)
         alpha = CurriculumAction(problem, np.array([0.3, 0.2, 0.1, 0.05]))
-        bound = relaxed_fixed_action_lower_bound(problem, alpha, config, layout).objective_value
+        bound = relaxed_fixed_action_lower_bound(problem, alpha, layout).objective_value
         truth = min(
             response_only_objective(problem, alpha, correspondence)
             for correspondence in enumerate_block_permutations(problem.blocks)
@@ -118,7 +117,6 @@ def test_relaxation_lower_bounds_exhaustive_orbit_minimum() -> None:
 
 
 def test_projection_recovers_permutation_and_prefers_weighted_entries() -> None:
-    config = load_fedorbit_config()
     blocks = build_padded_block_structure(
         (CoarseGroup.DISRUPTION,),
         {CoarseGroup.DISRUPTION: 2},
@@ -129,10 +127,10 @@ def test_projection_recovers_permutation_and_prefers_weighted_entries() -> None:
     skewed[layout.column_of(AssignmentVariableKey(0, 0))] = 0.9
     skewed[layout.column_of(AssignmentVariableKey(1, 0))] = 0.2
     skewed[layout.column_of(AssignmentVariableKey(1, 1))] = 0.8
-    correspondence = project_to_permutation(config, layout, skewed)
+    correspondence = project_to_permutation(layout, skewed)
     assert correspondence.images == (0, 1)
     uniform = np.full(layout.size, 0.5)
-    tie_broken = project_to_permutation(config, layout, uniform)
+    tie_broken = project_to_permutation(layout, uniform)
     assert tie_broken.images == (0, 1)
 
 
@@ -169,7 +167,7 @@ def test_ccp_trajectory_improves_and_records_convergence_state() -> None:
     layout = AssignmentVariableLayout.build(problem.blocks)
     alpha = CurriculumAction(problem, np.array([0.4, 0.3, 0.2, 0.1]))
     start = permutation_to_vector((0, 1, 2, 3), layout)
-    trajectory = ccp_trajectory(problem, alpha, start, config, layout)
+    trajectory = ccp_trajectory(problem, alpha, start, layout)
     assert (
         trajectory.iterations
         >= config.solvers.dense_ccp.penalty_multipliers_relative_to_scale.__len__()
@@ -179,9 +177,8 @@ def test_ccp_trajectory_improves_and_records_convergence_state() -> None:
 
 
 def test_solve_dense_ccp_returns_complete_non_exact_record() -> None:
-    config = load_fedorbit_config()
     problem = _two_block_problem(59)
-    outcome = solve_dense_ccp(problem, config, 8861, "dense-outcome-probe")
+    outcome = solve_dense_ccp(problem, 8861, "dense-outcome-probe")
     assert outcome.is_exact is False
     assert outcome.dense_bound_gap >= -1e-9
     assert outcome.relaxation_lower_bound <= outcome.best_projected_response_objective + 1e-9
@@ -195,10 +192,9 @@ def test_solve_dense_ccp_returns_complete_non_exact_record() -> None:
 
 
 def test_dense_ccp_is_deterministic_for_fixed_seed() -> None:
-    config = load_fedorbit_config()
     problem = _two_block_problem(71)
-    first = solve_dense_ccp(problem, config, 9973, "determinism-probe")
-    second = solve_dense_ccp(problem, config, 9973, "determinism-probe")
+    first = solve_dense_ccp(problem, 9973, "determinism-probe")
+    second = solve_dense_ccp(problem, 9973, "determinism-probe")
     assert first.selected_action.coordinates.shape == second.selected_action.coordinates.shape
     assert np.allclose(first.selected_action.coordinates, second.selected_action.coordinates)
     assert (

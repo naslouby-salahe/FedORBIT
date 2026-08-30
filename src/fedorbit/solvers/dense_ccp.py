@@ -9,10 +9,10 @@ import highspy
 import numpy as np
 from numpy.typing import NDArray
 
+from fedorbit.config.context import active_config
 from fedorbit.config.models import (
     DenseCcpSolverConfig,
     ExactSparseSolverConfig,
-    FedorbitConfig,
 )
 from fedorbit.domain.enums import RngNamespace, TerminalState
 from fedorbit.orbit.correspondence import (
@@ -295,11 +295,11 @@ def _lifted_objective_vector(
 def solve_lifted_lp(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
     penalty_coefficient: float,
     linearization_point: NDArray[np.float64],
 ) -> LiftedRelaxationSolution:
+    config = active_config()
     product_map = _nonzero_product_coefficients(problem, alpha)
     product_keys = sorted(product_map)
     product_column = OrderedDict(
@@ -353,10 +353,9 @@ def solve_lifted_lp(
 def relaxed_fixed_action_lower_bound(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
 ) -> LiftedRelaxationSolution:
-    return solve_lifted_lp(problem, alpha, config, layout, 0.0, layout.zeros())
+    return solve_lifted_lp(problem, alpha, layout, 0.0, layout.zeros())
 
 
 def unpenalized_fixed_action_objective(
@@ -378,20 +377,19 @@ def unpenalized_fixed_action_objective(
 def _run_penalty_level(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
     penalty: float,
     start_assignment: NDArray[np.float64],
     start_residual: float,
     start_iterations: int,
 ) -> tuple[NDArray[np.float64], float, int, bool]:
-    settings = config.solvers.dense_ccp
+    settings = active_config().solvers.dense_ccp
     current = start_assignment.copy()
     previous_objective: float | None = None
     residual = start_residual
     iterations = start_iterations
     for _ in range(settings.maximum_iterations_per_penalty_level):
-        step = solve_lifted_lp(problem, alpha, config, layout, penalty, current)
+        step = solve_lifted_lp(problem, alpha, layout, penalty, current)
         current = step.assignment_values
         objective = step.objective_value
         residual = integrality_residual(current)
@@ -413,10 +411,9 @@ def ccp_trajectory(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     start_assignment: NDArray[np.float64],
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
 ) -> CcpTrajectoryOutcome:
-    settings = config.solvers.dense_ccp
+    settings = active_config().solvers.dense_ccp
     scale = penalty_scale(problem, alpha)
     current = start_assignment.copy()
     residual = integrality_residual(current)
@@ -426,7 +423,6 @@ def ccp_trajectory(
         current, residual, iterations, level_converged = _run_penalty_level(
             problem,
             alpha,
-            config,
             layout,
             multiplier * scale,
             current,
@@ -502,13 +498,12 @@ def dense_starts(
 
 
 def project_to_permutation(
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
     assignment_values: NDArray[np.float64],
 ) -> BlockCorrespondence:
     blocks = layout.blocks
     images: list[int] = [-1] * blocks.total_padded_nodes
-    lap_tie_tolerance = config.solvers.exact_sparse.lap_objective_tie_tolerance
+    lap_tie_tolerance = active_config().solvers.exact_sparse.lap_objective_tie_tolerance
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
         sources = list(blocks.block_index_range(block_index))
@@ -536,7 +531,6 @@ def response_only_objective(
 
 def _evaluate_projected_candidates(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
     alpha: CurriculumAction,
     seed: int,
@@ -547,8 +541,8 @@ def _evaluate_projected_candidates(
     for start in dense_starts(layout, seed, contrast_coordinates):
         if time.monotonic() > deadline:
             return candidates, True
-        trajectory = ccp_trajectory(problem, alpha, start, config, layout)
-        correspondence = project_to_permutation(config, layout, trajectory.final_assignment)
+        trajectory = ccp_trajectory(problem, alpha, start, layout)
+        correspondence = project_to_permutation(layout, trajectory.final_assignment)
         candidates.append(
             ProjectedCandidate(
                 correspondence=correspondence,
@@ -629,11 +623,10 @@ def _outer_iteration_timed_out(timed_out: bool) -> bool:
 
 def _action_relaxation_bound(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     layout: AssignmentVariableLayout,
     alpha: CurriculumAction,
 ) -> float:
-    return relaxed_fixed_action_lower_bound(problem, alpha, config, layout).objective_value
+    return relaxed_fixed_action_lower_bound(problem, alpha, layout).objective_value
 
 
 @dataclass(frozen=True, slots=True)
@@ -656,10 +649,10 @@ def _apply_outer_outcome(
 
 def _run_dense_outer_loop(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     seed: int,
     contrast_coordinates: str,
 ) -> DenseOuterLoopResult:
+    config = active_config()
     settings = config.solvers.dense_ccp
     exact_settings = config.solvers.exact_sparse
     deadline = time.monotonic() + settings.wall_time_seconds
@@ -682,9 +675,9 @@ def _run_dense_outer_loop(
         alpha_values = master_result.action_coordinates
         selected_action = CurriculumAction(problem, alpha_values)
         master_objective = z_value
-        lower_bound = _action_relaxation_bound(problem, config, layout, selected_action)
+        lower_bound = _action_relaxation_bound(problem, layout, selected_action)
         candidates, timed_out = _evaluate_projected_candidates(
-            problem, config, layout, selected_action, seed, contrast_coordinates, deadline
+            problem, layout, selected_action, seed, contrast_coordinates, deadline
         )
         if _outer_iteration_timed_out(timed_out):
             terminal_state = TerminalState.TIME_LIMIT
@@ -723,11 +716,10 @@ def _run_dense_outer_loop(
 
 def solve_dense_ccp(
     problem: RobustActionProblem,
-    config: FedorbitConfig,
     seed: int,
     contrast_coordinates: str,
 ) -> DenseCcpOutcome:
-    result = _run_dense_outer_loop(problem, config, seed, contrast_coordinates)
+    result = _run_dense_outer_loop(problem, seed, contrast_coordinates)
     best_candidate = result.best_candidate
     if best_candidate is None:
         raise DenseCcpError("dense CCP terminated without a projected correspondence")

@@ -24,7 +24,7 @@ EDGE_COLUMNS = (
 
 def test_edge_schema_resolves_timestamp_labels_and_feature_roles() -> None:
     config = load_fedorbit_config()
-    schema = edge_iiotset_adapter(config).resolve_schema(
+    schema = edge_iiotset_adapter().resolve_schema(
         EDGE_COLUMNS,
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
@@ -69,7 +69,7 @@ def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:
 def test_edge_timestamp_parse_failure_is_data_invalid() -> None:
     config = load_fedorbit_config()
     with pytest.raises(DatasetSchemaError):
-        edge_iiotset_adapter(config).resolve_schema(
+        edge_iiotset_adapter().resolve_schema(
             EDGE_COLUMNS,
             0.5,
             config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
@@ -78,7 +78,7 @@ def test_edge_timestamp_parse_failure_is_data_invalid() -> None:
 
 def test_duplicate_or_missing_semantic_columns_fail_closed() -> None:
     config = load_fedorbit_config()
-    adapter = edge_iiotset_adapter(config)
+    adapter = edge_iiotset_adapter()
     threshold = (
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
     )

@@ -6,7 +6,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
 
 NORMAL_LABEL = "normal"
@@ -113,7 +113,6 @@ def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | 
 
 
 def transfer_eligibility(
-    config: FedorbitConfig,
     source_train_support: int,
     source_meta_support: int,
     target_meta_support: int,
@@ -131,7 +130,7 @@ def transfer_eligibility(
         < 0
     ):
         raise OntologyError("transfer support counts must be nonnegative")
-    support = config.scientific.transfer_support
+    support = active_config().scientific.transfer_support
     source_train_passes = source_train_support >= support.source_train_minimum
     source_meta_passes = source_meta_support >= support.source_meta_minimum
     target_meta_passes = target_meta_support >= support.target_meta_minimum

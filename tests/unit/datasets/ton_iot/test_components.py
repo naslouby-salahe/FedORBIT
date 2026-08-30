@@ -22,7 +22,7 @@ def test_ton_iot_component_registry_is_exact() -> None:
 
 def test_ton_windows_adapter_resolves_timestamp_labels_and_identity_exclusion() -> None:
     config = load_fedorbit_config()
-    schema = ton_iot_adapter(DatasetId.TON_IOT_WINDOWS10_HOST, config).resolve_schema(
+    schema = ton_iot_adapter(DatasetId.TON_IOT_WINDOWS10_HOST).resolve_schema(
         ("ts", "src_ip", "label", "type", "Processor_pct_User_Time"),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
@@ -39,7 +39,7 @@ def test_ton_adapter_requires_exact_label_semantics() -> None:
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
     )
     with pytest.raises(DatasetSchemaError):
-        ton_iot_adapter(DatasetId.TON_IOT_NETWORK, config).resolve_schema(
+        ton_iot_adapter(DatasetId.TON_IOT_NETWORK).resolve_schema(
             ("ts", "label", "attack_type"), 1.0, threshold
         )
 

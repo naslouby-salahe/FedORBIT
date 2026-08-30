@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import Split
 
 
@@ -37,8 +37,8 @@ class DuplicateGroupSplitAssignment:
         return tuple(group for group, assigned in self.assignments if assigned == split)
 
 
-def interval_edges(config: FedorbitConfig) -> tuple[tuple[Split, float, float], ...]:
-    interval = config.scientific.split.duplicate_safe_chronological_intervals
+def interval_edges() -> tuple[tuple[Split, float, float], ...]:
+    interval = active_config().scientific.split.duplicate_safe_chronological_intervals
     return (
         (Split.TRAIN, interval.train[0], interval.train[1]),
         (Split.META, interval.meta[0], interval.meta[1]),
@@ -48,10 +48,10 @@ def interval_edges(config: FedorbitConfig) -> tuple[tuple[Split, float, float], 
     )
 
 
-def split_for_duplicate_group(config: FedorbitConfig, midpoint_fraction: float) -> Split:
+def split_for_duplicate_group(midpoint_fraction: float) -> Split:
     if not 0.0 <= midpoint_fraction <= 1.0:
         raise SplitError(f"midpoint fraction outside [0, 1]: {midpoint_fraction}")
-    for split, lower, upper in interval_edges(config):
+    for split, lower, upper in interval_edges():
         if split == Split.TEST:
             if lower <= midpoint_fraction <= upper:
                 return split
@@ -79,7 +79,6 @@ def duplicate_group_midpoint_fraction(
 
 
 def assign_duplicate_groups_chronologically(
-    config: FedorbitConfig,
     duplicate_groups: tuple[DuplicateGroupChronology, ...],
 ) -> DuplicateGroupSplitAssignment:
     if not duplicate_groups:
@@ -96,6 +95,6 @@ def assign_duplicate_groups_chronologically(
             item.row_count,
             retained_class_row_count,
         )
-        assignments.append((item.group_id, split_for_duplicate_group(config, midpoint)))
+        assignments.append((item.group_id, split_for_duplicate_group(midpoint)))
         rows_before += item.row_count
     return DuplicateGroupSplitAssignment(tuple(assignments))

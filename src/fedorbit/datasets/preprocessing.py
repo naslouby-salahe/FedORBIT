@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.datasets.common import AdapterSchema
 from fedorbit.datasets.splitting import (
     DuplicateGroupChronology,
@@ -107,13 +107,12 @@ def _nonfinite_fraction(values: np.ndarray, categorical: bool) -> float:
 
 
 def evaluate_feature_quality(
-    config: FedorbitConfig,
     feature_names: tuple[str, ...],
     categorical_features: frozenset[str],
     train_values: TrainingFeatureValues,
     excluded_features: frozenset[str] = frozenset(),
 ) -> FeatureQualityReport:
-    settings = config.scientific.preprocessing
+    settings = active_config().scientific.preprocessing
     candidates: list[CandidateFeature] = []
     for name in feature_names:
         if name in excluded_features:
@@ -164,10 +163,7 @@ def normalize_training_rows(
     return groups
 
 
-def assign_duplicate_groups(
-    config: FedorbitConfig,
-    groups: DuplicateGroups,
-) -> DuplicateGroupSplitAssignment:
+def assign_duplicate_groups(groups: DuplicateGroups) -> DuplicateGroupSplitAssignment:
     chronology = tuple(
         DuplicateGroupChronology(
             group_sha256,
@@ -176,16 +172,15 @@ def assign_duplicate_groups(
         )
         for group_sha256, members in groups.groups
     )
-    return assign_duplicate_groups_chronologically(config, chronology)
+    return assign_duplicate_groups_chronologically(chronology)
 
 
 def normalize_and_split_training_rows(
-    config: FedorbitConfig,
     schema: AdapterSchema,
     rows: tuple[NormalizedRow, ...],
 ) -> NormalizedSplitRows:
     groups = normalize_training_rows(schema, rows)
-    return NormalizedSplitRows(groups, assign_duplicate_groups(config, groups))
+    return NormalizedSplitRows(groups, assign_duplicate_groups(groups))
 
 
 def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:
@@ -203,15 +198,11 @@ def fit_numeric_preprocessor(values: np.ndarray) -> NumericPreprocessor:
     return NumericPreprocessor(median, iqr, scale, constant)
 
 
-def transform_numeric(
-    config: FedorbitConfig,
-    values: np.ndarray,
-    fitted: NumericPreprocessor,
-) -> np.ndarray:
+def transform_numeric(values: np.ndarray, fitted: NumericPreprocessor) -> np.ndarray:
     numeric = values.astype(np.float64)
     imputed = np.where(np.isfinite(numeric), numeric, fitted.median)
     scaled = (imputed - fitted.median) / fitted.scale
-    clip = config.scientific.preprocessing.numeric_clip
+    clip = active_config().scientific.preprocessing.numeric_clip
     return np.clip(scaled, clip.lower, clip.upper).astype(np.float64, copy=False)
 
 
@@ -220,15 +211,12 @@ def categorical_vocabulary(train_categories: tuple[str, ...]) -> tuple[str, ...]
     return (ABSENT_TOKEN, RARE_TOKEN, UNK_TOKEN, *normalized)
 
 
-def fit_categorical_preprocessor(
-    config: FedorbitConfig,
-    values: tuple[str, ...],
-) -> CategoricalPreprocessor:
+def fit_categorical_preprocessor(values: tuple[str, ...]) -> CategoricalPreprocessor:
     observed = tuple(ABSENT_TOKEN if is_missing_token(value, True) else value for value in values)
     non_missing = tuple(value for value in observed if value != ABSENT_TOKEN)
     total = len(observed)
     counts = OrderedDict((value, non_missing.count(value)) for value in set(non_missing))
-    threshold = config.scientific.preprocessing.rare_category_train_frequency_threshold
+    threshold = active_config().scientific.preprocessing.rare_category_train_frequency_threshold
     rare = frozenset(value for value, count in counts.items() if count / total < threshold)
     retained = tuple(value for value in non_missing if value not in rare)
     return CategoricalPreprocessor(categorical_vocabulary(retained), rare)

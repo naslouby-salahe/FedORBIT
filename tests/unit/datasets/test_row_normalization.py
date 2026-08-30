@@ -32,7 +32,7 @@ EDGE_COLUMNS = (
 
 def _schema():
     config = load_fedorbit_config()
-    return edge_iiotset_adapter(config).resolve_schema(
+    return edge_iiotset_adapter().resolve_schema(
         EDGE_COLUMNS,
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,

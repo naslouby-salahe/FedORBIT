@@ -52,7 +52,6 @@ def test_transfer_eligibility_uses_registered_count_thresholds(
 ) -> None:
     support = fedorbit_config.scientific.transfer_support
     eligible = transfer_eligibility(
-        fedorbit_config,
         support.source_train_minimum,
         support.source_meta_minimum,
         support.target_meta_minimum,
@@ -62,7 +61,6 @@ def test_transfer_eligibility_uses_registered_count_thresholds(
     assert eligible.source_eligible
     assert eligible.target_eligible
     source_null = transfer_eligibility(
-        fedorbit_config,
         support.source_train_minimum - 1,
         support.source_meta_minimum,
         support.target_meta_minimum,
@@ -72,7 +70,6 @@ def test_transfer_eligibility_uses_registered_count_thresholds(
     assert not source_null.source_eligible
     assert not source_null.present_for_source
     target_null = transfer_eligibility(
-        fedorbit_config,
         support.source_train_minimum,
         support.source_meta_minimum,
         support.target_meta_minimum,

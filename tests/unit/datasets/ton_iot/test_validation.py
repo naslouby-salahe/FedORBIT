@@ -16,7 +16,7 @@ from fedorbit.domain.enums import DatasetId
 def test_ton_schema_validation_matches_selected_component() -> None:
     config = load_fedorbit_config()
     component = component_for(DatasetId.TON_IOT_NETWORK)
-    schema = ton_iot_adapter(component.dataset_id, config).resolve_schema(
+    schema = ton_iot_adapter(component.dataset_id).resolve_schema(
         ("ts", "src_ip", "label", "type", "duration"),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
@@ -28,7 +28,7 @@ def test_ton_schema_validation_rejects_component_identity_mismatch() -> None:
     config = load_fedorbit_config()
     network = component_for(DatasetId.TON_IOT_NETWORK)
     windows = component_for(DatasetId.TON_IOT_WINDOWS10_HOST)
-    schema = ton_iot_adapter(network.dataset_id, config).resolve_schema(
+    schema = ton_iot_adapter(network.dataset_id).resolve_schema(
         ("ts", "label", "type"),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,

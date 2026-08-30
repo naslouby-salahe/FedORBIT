@@ -28,9 +28,8 @@ def test_missing_token_contract_is_type_scoped() -> None:
     assert numeric_zero_is_not_missing(0.0)
 
 
-def test_feature_quality_uses_raw_semantic_features_once(fedorbit_config: FedorbitConfig) -> None:
+def test_feature_quality_uses_raw_semantic_features_once() -> None:
     report = evaluate_feature_quality(
-        fedorbit_config,
         ("good", "bad", "category"),
         frozenset({"category"}),
         TrainingFeatureValues(
@@ -53,7 +52,6 @@ def test_numeric_preprocessor_uses_linear_quartiles_and_configured_clip(
     assert fitted.median == 1.5
     assert fitted.iqr == 1.5
     transformed = transform_numeric(
-        fedorbit_config,
         np.array([np.nan, -100.0, 100.0]),
         fitted,
     )
@@ -70,12 +68,10 @@ def test_zero_iqr_constant_feature_is_identified() -> None:
     assert fitted.constant_after_imputation
 
 
-def test_categorical_vocabulary_and_mapping_are_deterministic(
-    fedorbit_config: FedorbitConfig,
-) -> None:
+def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
     vocabulary = categorical_vocabulary(("z", "a", "z"))
     assert vocabulary == (ABSENT_TOKEN, RARE_TOKEN, UNK_TOKEN, "a", "z")
-    fitted = fit_categorical_preprocessor(fedorbit_config, ("a", "a", "b", ""))
+    fitted = fit_categorical_preprocessor(("a", "a", "b", ""))
     assert transform_categorical("", fitted) == ABSENT_TOKEN
     assert transform_categorical("never-seen", fitted) == UNK_TOKEN
     encoded = one_hot("a", fitted)

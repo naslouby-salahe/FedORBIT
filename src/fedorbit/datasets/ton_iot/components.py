@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
 from fedorbit.domain.enums import DatasetId
 
@@ -40,8 +40,9 @@ def component_for(dataset_id: DatasetId) -> TonIotComponent:
     raise ValueError(f"dataset is not a ToN-IoT client: {dataset_id.value}")
 
 
-def ton_iot_adapter(dataset_id: DatasetId, config: FedorbitConfig) -> DatasetAdapter:
+def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
     component_for(dataset_id)
+    config = active_config()
     expected_timestamp = config.scientific.datasets.clients[dataset_id].expected_timestamp_field
     return DatasetAdapter(
         AdapterContract(

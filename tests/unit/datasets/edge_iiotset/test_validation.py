@@ -22,7 +22,7 @@ def _schema():
         "Attack_label",
         "Attack_type",
     )
-    return edge_iiotset_adapter(config).resolve_schema(
+    return edge_iiotset_adapter().resolve_schema(
         columns,
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,

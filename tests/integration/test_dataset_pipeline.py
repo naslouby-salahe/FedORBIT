@@ -13,7 +13,6 @@ def test_dataset_support_and_chronology_contracts_share_authoritative_config() -
     config = load_fedorbit_config()
     support = config.scientific.transfer_support
     eligibility = transfer_eligibility(
-        config,
         support.source_train_minimum,
         support.source_meta_minimum,
         support.target_meta_minimum,
@@ -22,7 +21,6 @@ def test_dataset_support_and_chronology_contracts_share_authoritative_config() -
     )
     assert eligibility.source_eligible and eligibility.target_eligible
     assignment = assign_duplicate_groups_chronologically(
-        config,
         (
             DuplicateGroupChronology("a", 1.0, 55),
             DuplicateGroupChronology("b", 2.0, 15),

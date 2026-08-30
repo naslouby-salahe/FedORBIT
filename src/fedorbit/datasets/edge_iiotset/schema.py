@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedorbit.config.models import FedorbitConfig
+from fedorbit.config.context import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
 from fedorbit.domain.enums import DatasetId
 
@@ -38,7 +38,8 @@ EDGE_MULTICLASS_LABEL = "Attack_type"
 EDGE_BINARY_LABEL = "Attack_label"
 
 
-def edge_iiotset_adapter(config: FedorbitConfig) -> DatasetAdapter:
+def edge_iiotset_adapter() -> DatasetAdapter:
+    config = active_config()
     expected_timestamp = config.scientific.datasets.clients[
         DatasetId.EDGE_IIOTSET_NETWORK
     ].expected_timestamp_field

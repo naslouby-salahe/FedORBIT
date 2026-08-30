@@ -4,7 +4,7 @@ import typer
 
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import dataset_identifier
-from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.config.context import active_config
 from fedorbit.domain.enums import DatasetId
 from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.executor import (
@@ -35,4 +35,4 @@ def preprocess(
 
 
 def _registered_datasets() -> tuple[DatasetId, ...]:
-    return tuple(load_fedorbit_config().scientific.datasets.clients.keys())
+    return tuple(active_config().scientific.datasets.clients.keys())

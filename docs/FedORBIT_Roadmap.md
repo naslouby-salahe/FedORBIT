@@ -2835,6 +2835,13 @@ Its observed local-class counts are Normal 1,615,643; Backdoor 24,862; DDoS_HTTP
 49,911; DDoS_ICMP 116,436; DDoS_TCP 50,062; DDoS_UDP 121,568; Fingerprinting 1,001;
 MITM 1,214; Password 50,153; Port_Scanning 22,564; Ransomware 10,925;
 SQL_injection 51,203; Uploading 37,634; Vulnerability_scanner 50,110; and XSS 15,915.
+The observed `frame.time` cells are additionally invalid for chronology: 2,096,419 have
+the form `YYYY HH:MM:SS.fraction`, which omits calendar month and day, while 122,782
+are not timestamp-shaped after CSV parsing. A datetime library can coerce the former by
+inventing a date, but that is not a uniquely resolvable event time. Therefore this
+selected Edge table is also Invalid Data for the chronological protocol in Section 6.8;
+preprocessing records that validation result and does not use file order, row order, or
+an inferred date.
 
 The selected ToN-IoT release tables are `Train_Test_Windows_dataset/Train_Test_Windows_10.csv`
 (21,104 rows, 126 columns), `Train_Test_Linux_dataset/Train_Test_Linux_process.csv`
@@ -2844,7 +2851,7 @@ none contains `ts` or another uniquely resolvable event-time field. Consequently
 three available selected tables are Invalid Data for the chronological protocol in
 Section 6.8. Preprocessing must record that validation result and must not substitute
 file order, row order, or an inferred timestamp; principal training and evaluation are
-blocked until a release containing the required event-time field is supplied.
+blocked until releases containing the required event-time fields are supplied.
 
 # 7. Local Models and Procedural-Response Estimation
 

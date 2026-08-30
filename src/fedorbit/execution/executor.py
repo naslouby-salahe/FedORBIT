@@ -9,8 +9,14 @@ from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.config.loading import repository_root
+from fedorbit.datasets.inspection import (
+    DatasetInspectionRequest,
+    DatasetObservation,
+    DatasetObservationPersistenceRequest,
+    inspect_dataset,
+    persist_dataset_observation,
+)
 from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName
-from fedorbit.execution.errors import NotReadyError
 from fedorbit.execution.inventory import (
     RawInventoryPersistenceRequest,
     RawInventoryRequest,
@@ -59,6 +65,20 @@ class ExperimentExecutionRequest:
 class ExecutionResult:
     decision: CellDecision
     manifest: ReusableArtifactManifest | None
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetPreparationResult:
+    observations: tuple[DatasetObservation, ...]
+    validation_artifact_paths: tuple[str, ...]
+
+    @property
+    def blocked_datasets(self) -> tuple[DatasetId, ...]:
+        return tuple(
+            observation.dataset
+            for observation in self.observations
+            if not observation.valid_for_chronological_preprocessing
+        )
 
 
 class ExecutionExecutor:
@@ -112,7 +132,7 @@ def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:
     recovery.next_resume(cells)
 
 
-def preprocess_datasets(request: DatasetPreparationRequest) -> None:
+def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparationResult:
     raw_root = repository_root() / "data" / "raw"
     inventories = tuple(
         inspect_raw_inventory(RawInventoryRequest(dataset, raw_root))
@@ -129,20 +149,21 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> None:
     )
     if len(persisted_inventory_paths) != len(inventories):
         raise ExecutionError("raw inventory persistence did not cover every requested dataset")
-    reuse = ExecutionReuse(store)
-    cells = tuple(
-        cell
-        for inventory in inventories
-        for cell in (
-            (f"raw-manifest:{inventory.dataset.value}", inventory.fingerprint()),
-            (f"prepared:{inventory.dataset.value}", inventory.fingerprint()),
-        )
+    observations = tuple(
+        inspect_dataset(DatasetInspectionRequest(dataset, raw_root)) for dataset in request.datasets
     )
-    _recover(store, cells)
-    decisions = reuse.decide(cells, request.overwrite_requested)
-    reuse.validate_existing(decisions)
-    if any(decision.execute or decision.overwrite for decision in decisions):
-        raise NotReadyError("preprocessing compute backend is not implemented")
+    if len(observations) != len(request.datasets):
+        raise ExecutionError("dataset observation collection did not cover every requested dataset")
+    validation_paths = tuple(
+        persist_dataset_observation(
+            DatasetObservationPersistenceRequest(observation, store.root / "preprocessing")
+        )
+        for observation in observations
+    )
+    return DatasetPreparationResult(
+        observations=observations,
+        validation_artifact_paths=tuple(str(path) for path in validation_paths),
+    )
 
 
 def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
@@ -179,4 +200,4 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     decisions = reuse.decide(cells, request.overwrite_requested)
     reuse.validate_existing(decisions)
     if any(decision.execute or decision.overwrite for decision in decisions):
-        raise NotReadyError("confirmatory experiment compute backend is not implemented")
+        raise ExecutionError("registered experiment execution has no completed producer")

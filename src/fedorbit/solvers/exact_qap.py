@@ -37,18 +37,24 @@ class QapUncertifiedError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class CertifiedQapSeparator:
+    correspondence: BlockCorrespondence
+    objective_value: float
+
+
+@dataclass(frozen=True, slots=True)
 class QapSeparatorResult:
     correspondence: BlockCorrespondence | None
     objective_value: float | None
     certified: bool
     terminal_state: TerminalState | None
 
-    def require_certified(self) -> tuple[BlockCorrespondence, float]:
+    def require_certified(self) -> CertifiedQapSeparator:
         if not self.certified or self.correspondence is None or self.objective_value is None:
             raise QapUncertifiedError(
                 f"QAP separator result carries no exact certificate: {self.terminal_state}"
             )
-        return self.correspondence, self.objective_value
+        return CertifiedQapSeparator(self.correspondence, self.objective_value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,7 +345,9 @@ def solve_support_master_qap(
     scenarios: list[BlockCorrespondence] = [initial]
     iterations = 0
     while True:
-        z_value, alpha_values = run_support_master_lp(problem, support, scenario_rows, settings)
+        master_result = run_support_master_lp(problem, support, scenario_rows, settings)
+        z_value = master_result.robust_value
+        alpha_values = master_result.action_coordinates
         iterations += 1
         alpha = CurriculumAction(problem, alpha_values)
         if not alpha.active_support_nodes:
@@ -356,7 +364,9 @@ def solve_support_master_qap(
         if not separator.certified:
             assert separator.terminal_state is not None
             return separator.terminal_state
-        worst_correspondence, worst_value = separator.require_certified()
+        certified_separator = separator.require_certified()
+        worst_correspondence = certified_separator.correspondence
+        worst_value = certified_separator.objective_value
         gap = z_value - worst_value
         if gap <= settings.separator_cut_stopping_tolerance:
             return SupportMasterSolution(

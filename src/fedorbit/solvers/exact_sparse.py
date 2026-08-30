@@ -38,6 +38,12 @@ class SolverExecutionError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class SupportMasterLpResult:
+    robust_value: float
+    action_coordinates: NDArray[np.float64]
+
+
+@dataclass(frozen=True, slots=True)
 class SeparatorOutcome:
     worst_correspondence: BlockCorrespondence
     separator_objective: float
@@ -262,7 +268,9 @@ def solve_support_master(
     scenarios: list[BlockCorrespondence] = [initial]
     iterations = 0
     while True:
-        z_value, alpha_values = run_support_master_lp(problem, support, scenario_rows, settings)
+        master_result = run_support_master_lp(problem, support, scenario_rows, settings)
+        z_value = master_result.robust_value
+        alpha_values = master_result.action_coordinates
         iterations += 1
         alpha = CurriculumAction(problem, alpha_values)
         if not alpha.active_support_nodes:
@@ -309,7 +317,7 @@ def run_support_master_lp(
     support: SupportCoordinateSet,
     scenario_rows: Sequence[NDArray[np.float64]],
     settings: ExactSparseSolverConfig,
-) -> tuple[float, NDArray[np.float64]]:
+) -> SupportMasterLpResult:
     columns = 1 + support.size
     infinity = highspy.kHighsInf
     row_lower: list[float] = []
@@ -367,7 +375,7 @@ def run_support_master_lp(
     embedded = np.zeros(problem.size, dtype=np.float64)
     for offset, node in enumerate(support.nodes):
         embedded[node] = column_values[1 + offset]
-    return -objective, embedded
+    return SupportMasterLpResult(-objective, embedded)
 
 
 def solve_robust_action(

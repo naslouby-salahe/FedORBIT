@@ -677,9 +677,9 @@ def _run_dense_outer_loop(
     converged_heuristically = False
     terminal_state: TerminalState | None = None
     while True:
-        z_value, alpha_values = run_support_master_lp(
-            problem, full_support, scenario_rows, exact_settings
-        )
+        master_result = run_support_master_lp(problem, full_support, scenario_rows, exact_settings)
+        z_value = master_result.robust_value
+        alpha_values = master_result.action_coordinates
         selected_action = CurriculumAction(problem, alpha_values)
         master_objective = z_value
         lower_bound = _action_relaxation_bound(problem, config, layout, selected_action)

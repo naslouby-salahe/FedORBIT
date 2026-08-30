@@ -58,7 +58,9 @@ def test_qap_separator_matches_exhaustive_orbit_truth() -> None:
         problem = _two_block_problem(seed)
         alpha = CurriculumAction(problem, np.array([0.2, 0.1, 0.15, 0.05]))
         result = fixed_action_worst_correspondence_qap(problem, alpha, config)
-        correspondence, value = result.require_certified()
+        certificate = result.require_certified()
+        correspondence = certificate.correspondence
+        value = certificate.objective_value
         truth = _exhaustive_worst_value(problem, alpha)
         assert value == pytest.approx(truth, abs=1e-9)
         assert evaluate_objective(alpha, correspondence) == pytest.approx(truth, abs=1e-9)
@@ -92,7 +94,8 @@ def test_point_correspondence_recovers_structural_match() -> None:
     target_matrix = np.array([[-0.1, 0.5], [-0.4, 0.9]])
     config = load_fedorbit_config()
     result = point_correspondence_commitment(source_matrix, target_matrix, blocks, config)
-    distance, images = result.require_certified()[1], result.require_certified()[0].images
+    certificate = result.require_certified()
+    distance, images = certificate.objective_value, certificate.correspondence.images
     del distance
     brute: dict[tuple[int, ...], float] = {}
     for correspondence in enumerate_block_permutations(blocks):
@@ -113,7 +116,7 @@ def test_point_correspondence_tie_prefers_lexicographically_smallest() -> None:
     symmetric = np.array([[0.5, 0.2], [0.2, 0.8]])
     config = load_fedorbit_config()
     result = point_correspondence_commitment(symmetric, symmetric, blocks, config)
-    correspondence, _ = result.require_certified()
+    correspondence = result.require_certified().correspondence
     assert correspondence.images == (0, 1)
 
 

@@ -90,7 +90,7 @@ def committed_map_action(
     from fedorbit.solvers.exact_qap import point_correspondence_commitment
 
     result = point_correspondence_commitment(source_matrix, target_matrix, problem.blocks, config)
-    correspondence, _distance = result.require_certified()
+    correspondence = result.require_certified().correspondence
     committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
     solution = optimize_against_fixed_matrix(problem, committed, config)
     return CommittedMapAction(correspondence, solution.selected_action)

@@ -193,8 +193,6 @@ class ArtifactStage(StrEnum):
 
 
 class SemanticCoordinate(StrEnum):
-    """A dimension that may participate in an experiment artifact identity."""
-
     EXPERIMENT = "experiment"
     DATASET = "dataset"
     SOURCE_CLIENT = "source_client"

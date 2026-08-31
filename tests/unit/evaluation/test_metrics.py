@@ -7,9 +7,13 @@ import pytest
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.evaluation import (
+    ClassEntropySet,
     ConfusionCounts,
+    CrossEntropy,
     MetricComputationError,
+    Probability,
     ProposalOutcomeTally,
+    TrueClassProbabilities,
     absolute_objective_error,
     absolute_risk_reduction,
     balanced_accuracy,
@@ -47,25 +51,27 @@ def test_class_conditional_entropy_matches_hand_computation(
     log_floor = config.scientific.metrics.probability_log_floor
     probabilities = (0.5, 0.25, 1.0)
     expected = (-math.log(0.5) - math.log(0.25) - math.log(1.0)) / 3
-    value = class_conditional_cross_entropy(probabilities, log_floor)
-    assert value == pytest.approx(expected)
-    clamped = class_conditional_cross_entropy((0.0,), log_floor)
-    assert clamped == pytest.approx(-math.log(log_floor))
+    value = class_conditional_cross_entropy(
+        TrueClassProbabilities(tuple(Probability(probability) for probability in probabilities))
+    )
+    assert value.value == pytest.approx(expected)
+    clamped = class_conditional_cross_entropy(TrueClassProbabilities((Probability(0.0),)))
+    assert clamped.value == pytest.approx(-math.log(log_floor))
 
 
 def test_zero_examples_in_class_is_invalid_data(config: FedorbitConfig) -> None:
     del config
     with pytest.raises(MetricComputationError):
-        class_conditional_cross_entropy((), 1e-12)
+        TrueClassProbabilities(())
     with pytest.raises(MetricComputationError):
-        class_conditional_cross_entropy((1.2,), 1e-12)
+        Probability(1.2)
 
 
 def test_macro_entropy_is_arithmetic_mean(config: FedorbitConfig) -> None:
     del config
-    assert macro_cross_entropy((1.0, 3.0)) == 2.0
+    assert macro_cross_entropy(ClassEntropySet((CrossEntropy(1.0), CrossEntropy(3.0)))).value == 2.0
     with pytest.raises(MetricComputationError):
-        macro_cross_entropy(())
+        ClassEntropySet(())
 
 
 def test_relative_gain_formula_and_na_semantics() -> None:

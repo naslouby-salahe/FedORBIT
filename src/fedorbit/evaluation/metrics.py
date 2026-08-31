@@ -14,6 +14,42 @@ class MetricComputationError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class Probability:
+    value: float
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.value <= 1.0:
+            raise MetricComputationError(f"class probability outside [0,1]: {self.value}")
+
+
+@dataclass(frozen=True, slots=True)
+class TrueClassProbabilities:
+    values: tuple[Probability, ...]
+
+    def __post_init__(self) -> None:
+        if not self.values:
+            raise MetricComputationError(
+                "evaluation class with zero examples makes the cell Invalid Data"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class CrossEntropy:
+    value: float
+
+
+@dataclass(frozen=True, slots=True)
+class ClassEntropySet:
+    values: tuple[CrossEntropy, ...]
+
+    def __post_init__(self) -> None:
+        if not self.values:
+            raise MetricComputationError(
+                "fixed evaluation class set is empty; the cell is Invalid Data"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class RelativeMacroCeGain:
     value: float | None
     absolute_difference: float
@@ -21,27 +57,17 @@ class RelativeMacroCeGain:
 
 
 def class_conditional_cross_entropy(
-    true_class_probabilities: tuple[float, ...],
-    log_floor: float,
-) -> float:
-    if not true_class_probabilities:
-        raise MetricComputationError(
-            "evaluation class with zero examples makes the cell Invalid Data"
-        )
+    true_class_probabilities: TrueClassProbabilities,
+) -> CrossEntropy:
+    log_floor = active_config().scientific.metrics.probability_log_floor
     total = 0.0
-    for probability in true_class_probabilities:
-        if not 0.0 <= probability <= 1.0:
-            raise MetricComputationError(f"class probability outside [0,1]: {probability}")
-        total += -math.log(max(probability, log_floor))
-    return total / len(true_class_probabilities)
+    for probability in true_class_probabilities.values:
+        total += -math.log(max(probability.value, log_floor))
+    return CrossEntropy(total / len(true_class_probabilities.values))
 
 
-def macro_cross_entropy(class_entropies: tuple[float, ...]) -> float:
-    if not class_entropies:
-        raise MetricComputationError(
-            "fixed evaluation class set is empty; the cell is Invalid Data"
-        )
-    return statistics.fmean(class_entropies)
+def macro_cross_entropy(class_entropies: ClassEntropySet) -> CrossEntropy:
+    return CrossEntropy(statistics.fmean(entry.value for entry in class_entropies.values))
 
 
 def relative_macro_ce_gain(

@@ -129,6 +129,57 @@ def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) ->
     assert "primary-strict-cross-telemetry-transfer" in str(destination)
 
 
+def test_evidence_writer_reuses_matching_export_without_overwriting(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(tmp_path)
+    payload = tmp_path / "packet.pt"
+    payload.write_bytes(b"payload")
+    manifest = _manifest(payload, "fp-idempotent")
+    store.write_reusable(manifest)
+    writer = VerifiedEvidenceWriter(store, layout)
+    destination = writer.write(
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        ArtifactIdentifier(manifest.artifact_id),
+        {"evidence": 1},
+    )
+    assert (
+        writer.write(
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            ArtifactIdentifier(manifest.artifact_id),
+            {"evidence": 1},
+        )
+        == destination
+    )
+
+
+def test_evidence_writer_requires_explicit_overwrite_for_changed_export(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(tmp_path)
+    payload = tmp_path / "packet.pt"
+    payload.write_bytes(b"payload")
+    manifest = _manifest(payload, "fp-overwrite")
+    store.write_reusable(manifest)
+    writer = VerifiedEvidenceWriter(store, layout)
+    writer.write(
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        ArtifactIdentifier(manifest.artifact_id),
+        {"evidence": 1},
+    )
+    with pytest.raises(EvidenceExportError, match="--overwrite"):
+        writer.write(
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            ArtifactIdentifier(manifest.artifact_id),
+            {"evidence": 2},
+        )
+    destination = writer.write(
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        ArtifactIdentifier(manifest.artifact_id),
+        {"evidence": 2},
+        overwrite=True,
+    )
+    assert destination.read_text(encoding="utf-8") == '{"evidence":2}\n'
+
+
 def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
     layout = build_layout(root=tmp_path)
     store = ArtifactStore(tmp_path)

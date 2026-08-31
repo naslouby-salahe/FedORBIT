@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from fedorbit.artifacts.paths import WorkspaceLayout, results_workspace
-from fedorbit.artifacts.storage import ArtifactStore, atomic_write_json
+from fedorbit.artifacts.storage import ArtifactStore, atomic_write_bytes, atomic_write_json
 from fedorbit.domain.enums import ExperimentName
 from fedorbit.domain.records import ArtifactIdentifier
-from fedorbit.domain.serialization import StableJsonPayload
+from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.reporting.figures import EvidenceFigure
 from fedorbit.reporting.tables import EvidenceTable
 
@@ -25,6 +25,7 @@ class VerifiedEvidenceWriter:
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
         evidence: StableJsonPayload,
+        overwrite: bool = False,
     ) -> Path:
         try:
             self._store.resolve(artifact_id)
@@ -34,7 +35,15 @@ class VerifiedEvidenceWriter:
             ) from error
         workspace = results_workspace(self._layout, experiment)
         destination = workspace / f"{experiment.value}.evidence.json"
-        atomic_write_json(destination, evidence)
+        rendered = (stable_json(evidence) + "\n").encode("utf-8")
+        if destination.is_file():
+            if destination.read_bytes() == rendered:
+                return destination
+            if not overwrite:
+                raise EvidenceExportError(
+                    "evidence export already exists with different content; use --overwrite"
+                )
+        atomic_write_bytes(destination, rendered)
         return destination
 
     def write_table(

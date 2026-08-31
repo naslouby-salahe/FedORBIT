@@ -37,7 +37,6 @@ def report(
     experiment_name: str | None = typer.Argument(None),
     overwrite: bool = typer.Option(False, "--overwrite"),
 ) -> None:
-    del overwrite
     try:
         catalogue = build_catalogue()
         selected = (
@@ -65,6 +64,7 @@ def report(
                         dependency_fingerprint_sha256=manifest.dependency_fingerprint_sha256,
                     ),
                 ),
+                overwrite=overwrite,
             )
             typer.echo(str(destination))
             exported += 1

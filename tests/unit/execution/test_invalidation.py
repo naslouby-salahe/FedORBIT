@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
 from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.domain.enums import ArtifactState
+from fedorbit.domain.enums import ArtifactStage, ArtifactState
 from fedorbit.domain.records import (
     ArtifactFingerprint,
     ArtifactIdentifier,
@@ -57,19 +57,19 @@ def _manifest(
 
 
 def test_descendants_of_stage_follows_dependency_graph() -> None:
-    descendants = descendants_of_stage("raw")
-    assert "preprocessing" in descendants
-    assert "training" in descendants
-    assert "statistics" in descendants
-    assert "raw" not in descendants
+    descendants = descendants_of_stage(ArtifactStage.RAW)
+    assert ArtifactStage.PREPROCESSING in descendants
+    assert ArtifactStage.TRAINING in descendants
+    assert ArtifactStage.STATISTICS in descendants
+    assert ArtifactStage.RAW not in descendants
 
 
 def test_changed_stage_affects_producer() -> None:
-    assert changed_stage_affects("training", "raw")
-    assert changed_stage_affects("statistics", "training")
-    assert changed_stage_affects("reporting", "raw")
-    assert not changed_stage_affects("raw", "training")
-    assert not changed_stage_affects("preprocessing", "reporting")
+    assert changed_stage_affects(ArtifactStage.TRAINING, ArtifactStage.RAW)
+    assert changed_stage_affects(ArtifactStage.STATISTICS, ArtifactStage.TRAINING)
+    assert changed_stage_affects(ArtifactStage.REPORTING, ArtifactStage.RAW)
+    assert not changed_stage_affects(ArtifactStage.RAW, ArtifactStage.TRAINING)
+    assert not changed_stage_affects(ArtifactStage.PREPROCESSING, ArtifactStage.REPORTING)
 
 
 def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
@@ -84,7 +84,7 @@ def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
         _manifest(train_payload, "checkpoint", "training", "fp-train", ("pre-up",))
     )
     store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",)))
-    invalidated = SelectiveInvalidation(store).invalidate_stage("training")
+    invalidated = SelectiveInvalidation(store).invalidate_stage(ArtifactStage.TRAINING)
     assert len(invalidated) == 2
     remaining = {path.stem for path in store.manifest_dir().glob("*.json")}
     assert len(remaining) == 1
@@ -98,8 +98,8 @@ def test_invalidation_keeps_siblings_and_unrelated(tmp_path: Path) -> None:
     second = _manifest(training_b, "checkpoint", "training", "fp-b", ("pre-b",))
     store.write_reusable(first)
     store.write_reusable(second)
-    invalidated = SelectiveInvalidation(store).invalidate_descendants("pre-a")
-    assert invalidated == (first.artifact_id,)
+    invalidated = SelectiveInvalidation(store).invalidate_descendants(ArtifactIdentifier("pre-a"))
+    assert invalidated == (ArtifactIdentifier(first.artifact_id),)
     assert {path.stem for path in store.manifest_dir().glob("*.json")} == {second.artifact_id}
 
 
@@ -113,8 +113,13 @@ def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
     )
     store.write_reusable(mid_manifest)
     store.write_reusable(leaf_manifest)
-    invalidated = SelectiveInvalidation(store).invalidate_descendants("target-up")
-    assert set(invalidated) == {mid_manifest.artifact_id, leaf_manifest.artifact_id}
+    invalidated = SelectiveInvalidation(store).invalidate_descendants(
+        ArtifactIdentifier("target-up")
+    )
+    assert set(invalidated) == {
+        ArtifactIdentifier(mid_manifest.artifact_id),
+        ArtifactIdentifier(leaf_manifest.artifact_id),
+    }
     assert not list(store.manifest_dir().glob("*.json"))
 
 

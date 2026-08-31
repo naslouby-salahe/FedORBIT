@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
-from fedorbit.artifacts.provenance import STAGE_DEPENDENCIES, STAGES
+from fedorbit.artifacts.provenance import STAGE_DEPENDENCIES
 from fedorbit.artifacts.storage import ArtifactStore, StorageError
-from fedorbit.domain.enums import OverwritePolicy
+from fedorbit.domain.enums import ArtifactStage, OverwritePolicy
 from fedorbit.domain.records import (
     ArtifactIdentifier,
     ExecutionCell,
@@ -34,9 +34,9 @@ class CellDecision:
 
 @dataclass(frozen=True, slots=True)
 class StageRule:
-    stage: str
-    upstream_stages: tuple[str, ...]
-    downstream_stages: tuple[str, ...]
+    stage: ArtifactStage
+    upstream_stages: tuple[ArtifactStage, ...]
+    downstream_stages: tuple[ArtifactStage, ...]
 
 
 def stage_rules() -> tuple[StageRule, ...]:
@@ -50,15 +50,15 @@ def stage_rules() -> tuple[StageRule, ...]:
                 if stage in dependencies
             ),
         )
-        for stage in STAGES
+        for stage in ArtifactStage
     )
 
 
-def descendants_of_stage(stage: str) -> frozenset[str]:
+def descendants_of_stage(stage: ArtifactStage) -> frozenset[ArtifactStage]:
     rules = OrderedDict((rule.stage, rule) for rule in stage_rules())
     if stage not in rules:
         raise ReuseError(f"unknown stage: {stage}")
-    visited: set[str] = set()
+    visited: set[ArtifactStage] = set()
     frontier = list(rules[stage].downstream_stages)
     while frontier:
         current = frontier.pop()
@@ -69,7 +69,7 @@ def descendants_of_stage(stage: str) -> frozenset[str]:
     return frozenset(visited)
 
 
-def changed_stage_affects(producer_stage: str, changed_stage: str) -> bool:
+def changed_stage_affects(producer_stage: ArtifactStage, changed_stage: ArtifactStage) -> bool:
     return producer_stage == changed_stage or producer_stage in descendants_of_stage(changed_stage)
 
 
@@ -123,40 +123,43 @@ class SelectiveInvalidation:
 
     def invalidate_stage(
         self,
-        changed_stage: str,
-        changed_artifact_id: str | None = None,
-    ) -> tuple[str, ...]:
+        changed_stage: ArtifactStage,
+        changed_artifact_id: ArtifactIdentifier | None = None,
+    ) -> tuple[ArtifactIdentifier, ...]:
         affected = descendants_of_stage(changed_stage) | frozenset({changed_stage})
-        invalidated: list[str] = []
+        invalidated: list[ArtifactIdentifier] = []
         for manifest in self._store.all_manifests():
             if manifest.producer_stage not in affected:
                 continue
             if (
                 changed_artifact_id is not None
-                and changed_artifact_id not in manifest.upstream_artifact_ids
+                and changed_artifact_id.value not in manifest.upstream_artifact_ids
             ):
                 continue
             self._store.remove_manifest(manifest.artifact_id)
-            invalidated.append(manifest.artifact_id)
+            invalidated.append(ArtifactIdentifier(manifest.artifact_id))
         return tuple(invalidated)
 
-    def invalidate_descendants(self, upstream_artifact_id: str) -> tuple[str, ...]:
+    def invalidate_descendants(
+        self, upstream_artifact_id: ArtifactIdentifier
+    ) -> tuple[ArtifactIdentifier, ...]:
         manifests = self._store.all_manifests()
-        invalidated: list[str] = []
+        invalidated: list[ArtifactIdentifier] = []
         frontier = [upstream_artifact_id]
-        visited: set[str] = set()
+        visited: set[ArtifactIdentifier] = set()
         while frontier:
             current = frontier.pop()
             if current in visited:
                 continue
             visited.add(current)
             for manifest in manifests:
-                if current not in manifest.upstream_artifact_ids:
+                if current.value not in manifest.upstream_artifact_ids:
                     continue
-                if manifest.artifact_id in visited:
+                artifact_identifier = ArtifactIdentifier(manifest.artifact_id)
+                if artifact_identifier in visited:
                     continue
-                invalidated.append(manifest.artifact_id)
-                frontier.append(manifest.artifact_id)
+                invalidated.append(artifact_identifier)
+                frontier.append(artifact_identifier)
                 self._store.remove_manifest(manifest.artifact_id)
         return tuple(invalidated)
 

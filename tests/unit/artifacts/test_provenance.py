@@ -8,7 +8,7 @@ from fedorbit.artifacts.provenance import (
     runtime_fingerprint,
     stage_dependency_fingerprint,
 )
-from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
+from fedorbit.domain.enums import ArtifactStage, DatasetId, ExperimentName, TransferMethod
 from fedorbit.domain.records import DirectedPair, SemanticCell
 from fedorbit.experiments.cells import experiment_relevance
 
@@ -77,28 +77,28 @@ def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
 
 
 def test_runtime_fingerprint_is_stage_local() -> None:
-    training = runtime_fingerprint("training")
+    training = runtime_fingerprint(ArtifactStage.TRAINING)
     assert "torch" in training.components
     assert "torch-cuda" in training.components
-    preprocessing = runtime_fingerprint("preprocessing")
+    preprocessing = runtime_fingerprint(ArtifactStage.PREPROCESSING)
     assert preprocessing.digest != training.digest
     assert "matplotlib" not in preprocessing.components
 
 
 def test_runtime_fingerprint_excludes_plotting_dependencies() -> None:
-    for stage in ("evaluation", "reporting", "statistics"):
+    for stage in (ArtifactStage.EVALUATION, ArtifactStage.REPORTING, ArtifactStage.STATISTICS):
         assert "matplotlib" not in runtime_fingerprint(stage).components
 
 
 def test_runtime_fingerprint_unknown_stage_rejected() -> None:
-    with pytest.raises(ProvenanceError):
-        runtime_fingerprint("invented_stage")
+    with pytest.raises(ValueError):
+        ArtifactStage("invented_stage")
 
 
 def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     arguments = (
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
@@ -111,7 +111,7 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
 def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
@@ -119,7 +119,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         ("upstream-2",),
@@ -132,7 +132,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
 def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),
@@ -140,7 +140,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),
@@ -153,7 +153,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
 def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),
@@ -161,7 +161,7 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
         "fedorbit.artifacts.manifests",
     )
     changed = stage_dependency_fingerprint(
-        "training",
+        ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),

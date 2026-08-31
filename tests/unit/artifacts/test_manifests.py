@@ -20,7 +20,7 @@ from fedorbit.artifacts.manifests import (
 )
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.artifacts.validation import ArtifactValidationError
-from fedorbit.domain.enums import ArtifactState, TerminalState
+from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
 
 COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",
@@ -179,7 +179,9 @@ def test_completion_manifest_self_hash_excludes_own_field() -> None:
     self_hash = completion_manifest_self_hash(manifest)
     assert len(self_hash) == 64
     assert (
-        completion_manifest_self_hash(manifest.model_copy(update={"producer_stage": "training"}))
+        completion_manifest_self_hash(
+            manifest.model_copy(update={"producer_stage": ArtifactStage.TRAINING})
+        )
         != self_hash
     )
 

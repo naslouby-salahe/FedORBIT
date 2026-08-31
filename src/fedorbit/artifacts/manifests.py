@@ -10,7 +10,7 @@ from typing import cast
 from pydantic import Field
 
 from fedorbit.config.models import FrozenModel
-from fedorbit.domain.enums import ArtifactState, TerminalState
+from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
@@ -20,7 +20,7 @@ FINE_CONCEPT_FIELD = "fine_concept"
 class CompletionManifest(FrozenModel):
     schema_version: str
     semantic_experiment_coordinates: str
-    producer_stage: str
+    producer_stage: ArtifactStage
     terminal_state: TerminalState
     dependency_fingerprint_sha256: str
     upstream_artifact_ids: tuple[str, ...]
@@ -39,7 +39,7 @@ class ReusableArtifactManifest(FrozenModel):
     artifact_id: str
     artifact_type: str
     semantic_producer_coordinates: str
-    producer_stage: str
+    producer_stage: ArtifactStage
     dependency_fingerprint_sha256: str
     upstream_artifact_ids: tuple[str, ...]
     applicable_configuration_sha256: str
@@ -112,7 +112,7 @@ class SemanticCellManifest(FrozenModel):
     seed: int
     scientific_configuration_sha256: str
     dependency_fingerprint_sha256: str
-    producer_stage: str
+    producer_stage: ArtifactStage
 
 
 def eligibility_copy(

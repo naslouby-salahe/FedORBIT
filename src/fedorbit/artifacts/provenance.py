@@ -12,6 +12,7 @@ from typing import cast
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
+from fedorbit.domain.enums import ArtifactStage
 from fedorbit.domain.records import SemanticCell
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import environment_snapshot
@@ -19,55 +20,61 @@ from fedorbit.runtime.reproducibility import current_code_revision
 
 JsonValue = str | int | float | bool | None | list["JsonValue"] | Mapping[str, "JsonValue"]
 
-STAGES = (
-    "raw",
-    "preprocessing",
-    "eligibility",
-    "pilot_selection",
-    "training",
-    "scoring",
-    "response",
-    "target_importance",
-    "correspondence",
-    "confirmation",
-    "multi_source_selection",
-    "evaluation",
-    "statistics",
-    "reporting",
+STAGE_DEPENDENCIES: Mapping[ArtifactStage, tuple[ArtifactStage, ...]] = OrderedDict(
+    (
+        (ArtifactStage.RAW, ()),
+        (ArtifactStage.PREPROCESSING, (ArtifactStage.RAW,)),
+        (ArtifactStage.ELIGIBILITY, (ArtifactStage.PREPROCESSING,)),
+        (
+            ArtifactStage.PILOT_SELECTION,
+            (ArtifactStage.PREPROCESSING, ArtifactStage.ELIGIBILITY),
+        ),
+        (
+            ArtifactStage.TRAINING,
+            (
+                ArtifactStage.PREPROCESSING,
+                ArtifactStage.ELIGIBILITY,
+                ArtifactStage.PILOT_SELECTION,
+            ),
+        ),
+        (ArtifactStage.SCORING, (ArtifactStage.TRAINING, ArtifactStage.PREPROCESSING)),
+        (ArtifactStage.RESPONSE, (ArtifactStage.PREPROCESSING, ArtifactStage.SCORING)),
+        (
+            ArtifactStage.TARGET_IMPORTANCE,
+            (ArtifactStage.TRAINING, ArtifactStage.SCORING),
+        ),
+        (
+            ArtifactStage.CORRESPONDENCE,
+            (ArtifactStage.RESPONSE, ArtifactStage.TARGET_IMPORTANCE),
+        ),
+        (ArtifactStage.CONFIRMATION, (ArtifactStage.CORRESPONDENCE, ArtifactStage.RESPONSE)),
+        (
+            ArtifactStage.MULTI_SOURCE_SELECTION,
+            (ArtifactStage.CONFIRMATION, ArtifactStage.CORRESPONDENCE),
+        ),
+        (ArtifactStage.EVALUATION, (ArtifactStage.CONFIRMATION, ArtifactStage.SCORING)),
+        (ArtifactStage.STATISTICS, (ArtifactStage.EVALUATION,)),
+        (ArtifactStage.REPORTING, (ArtifactStage.STATISTICS,)),
+    )
 )
 
-STAGE_DEPENDENCIES: Mapping[str, tuple[str, ...]] = OrderedDict(
-    raw=(),
-    preprocessing=("raw",),
-    eligibility=("preprocessing",),
-    pilot_selection=("preprocessing", "eligibility"),
-    training=("preprocessing", "eligibility", "pilot_selection"),
-    scoring=("training", "preprocessing"),
-    response=("preprocessing", "scoring"),
-    target_importance=("training", "scoring"),
-    correspondence=("response", "target_importance"),
-    confirmation=("correspondence", "response"),
-    multi_source_selection=("confirmation", "correspondence"),
-    evaluation=("confirmation", "scoring"),
-    statistics=("evaluation",),
-    reporting=("statistics",),
-)
-
-RUNTIME_COMPONENTS: Mapping[str, tuple[str, ...]] = OrderedDict(
-    raw=("numpy", "pandas"),
-    preprocessing=("numpy", "pandas", "pyarrow", "scipy", "scikit-learn"),
-    eligibility=("numpy",),
-    pilot_selection=("numpy", "scipy"),
-    training=("torch", "numpy", "torch-cuda"),
-    scoring=("torch", "numpy"),
-    response=("numpy", "scipy", "torch"),
-    target_importance=("numpy", "torch"),
-    correspondence=("highspy", "pyscipopt", "numpy", "scipy"),
-    confirmation=("numpy", "scipy", "torch"),
-    multi_source_selection=("numpy", "scipy"),
-    evaluation=("numpy", "scipy", "scikit-learn"),
-    statistics=("numpy", "scipy"),
-    reporting=(),
+RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict(
+    (
+        (ArtifactStage.RAW, ("numpy", "pandas")),
+        (ArtifactStage.PREPROCESSING, ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn")),
+        (ArtifactStage.ELIGIBILITY, ("numpy",)),
+        (ArtifactStage.PILOT_SELECTION, ("numpy", "scipy")),
+        (ArtifactStage.TRAINING, ("torch", "numpy", "torch-cuda")),
+        (ArtifactStage.SCORING, ("torch", "numpy")),
+        (ArtifactStage.RESPONSE, ("numpy", "scipy", "torch")),
+        (ArtifactStage.TARGET_IMPORTANCE, ("numpy", "torch")),
+        (ArtifactStage.CORRESPONDENCE, ("highspy", "pyscipopt", "numpy", "scipy")),
+        (ArtifactStage.CONFIRMATION, ("numpy", "scipy", "torch")),
+        (ArtifactStage.MULTI_SOURCE_SELECTION, ("numpy", "scipy")),
+        (ArtifactStage.EVALUATION, ("numpy", "scipy", "scikit-learn")),
+        (ArtifactStage.STATISTICS, ("numpy", "scipy")),
+        (ArtifactStage.REPORTING, ()),
+    )
 )
 
 
@@ -134,10 +141,10 @@ def implementation_fingerprint(producer_module: str) -> str:
     return _module_source_digest(producer_module, set())
 
 
-def runtime_fingerprint(stage: str) -> RuntimeFingerprint:
+def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     if stage not in STAGE_DEPENDENCIES:
         raise ProvenanceError(f"unknown stage: {stage}")
-    components = RUNTIME_COMPONENTS.get(stage, ())
+    components = RUNTIME_COMPONENTS[stage]
     versions: list[tuple[str, str]] = []
     for distribution in components:
         if distribution == "torch-cuda":
@@ -198,7 +205,7 @@ def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
 
 
 def stage_dependency_fingerprint(
-    stage: str,
+    stage: ArtifactStage,
     cell: SemanticCell,
     relevance: frozenset[str],
     upstream_artifact_ids: tuple[str, ...],
@@ -209,7 +216,7 @@ def stage_dependency_fingerprint(
         cast(
             StableJsonPayload,
             OrderedDict(
-                stage=stage,
+                stage=stage.value,
                 semantic_coordinates=cell.identity_json(relevance),
                 upstream_artifact_ids=list(upstream_artifact_ids),
                 configuration_sha256=configuration_subset_digest(config_sections),

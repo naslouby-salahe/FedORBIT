@@ -175,6 +175,23 @@ class ArtifactType(StrEnum):
     OTHER = "other"
 
 
+class ArtifactStage(StrEnum):
+    RAW = "raw"
+    PREPROCESSING = "preprocessing"
+    ELIGIBILITY = "eligibility"
+    PILOT_SELECTION = "pilot_selection"
+    TRAINING = "training"
+    SCORING = "scoring"
+    RESPONSE = "response"
+    TARGET_IMPORTANCE = "target_importance"
+    CORRESPONDENCE = "correspondence"
+    CONFIRMATION = "confirmation"
+    MULTI_SOURCE_SELECTION = "multi_source_selection"
+    EVALUATION = "evaluation"
+    STATISTICS = "statistics"
+    REPORTING = "reporting"
+
+
 class SeedRole(StrEnum):
     PILOT = "pilot"
     CONFIRMATORY = "confirmatory"

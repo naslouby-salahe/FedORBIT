@@ -22,6 +22,8 @@ from fedorbit.evaluation.records import (
 )
 from fedorbit.evaluation.validation import (
     EvaluationValidationError,
+    MetricRecordCollection,
+    PredictionRecordCollection,
     validate_comparison_metadata,
     validate_metric_records,
     validate_prediction_records,
@@ -84,9 +86,11 @@ def test_prediction_semantic_identity_is_unique_per_condition_split_and_row() ->
     first = _prediction()
     second = first.model_copy(update={"condition": "alternate"})
     third = first.model_copy(update={"split": Split.VALID})
-    assert validate_prediction_records((first, second, third)) == (first, second, third)
+    assert validate_prediction_records(
+        PredictionRecordCollection((first, second, third))
+    ) == PredictionRecordCollection((first, second, third))
     with pytest.raises(EvaluationValidationError):
-        validate_prediction_records((first, first))
+        validate_prediction_records(PredictionRecordCollection((first, first)))
 
 
 def _metric(metric_value: float | None, valid: bool, invalid_reason: str | None) -> MetricRecord:
@@ -129,7 +133,9 @@ def test_metric_schema_has_exact_registered_fields() -> None:
 
 def test_metric_validity_contract() -> None:
     metric = _metric(0.4, True, None)
-    assert validate_metric_records((metric,)) == (metric,)
+    assert validate_metric_records(MetricRecordCollection((metric,))) == MetricRecordCollection(
+        (metric,)
+    )
     with pytest.raises(ValidationError):
         _metric(None, True, None)
 

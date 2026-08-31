@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from dataclasses import dataclass
 
 from fedorbit.evaluation.records import (
     MetricRecord,
@@ -14,10 +14,20 @@ class EvaluationValidationError(ValueError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class PredictionRecordCollection:
+    records: tuple[PredictionRecord, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MetricRecordCollection:
+    records: tuple[MetricRecord, ...]
+
+
 def validate_prediction_records(
-    records: Iterable[PredictionRecord],
-) -> tuple[PredictionRecord, ...]:
-    materialized = tuple(records)
+    records: PredictionRecordCollection,
+) -> PredictionRecordCollection:
+    materialized = records.records
     identities: set[tuple[str, str, str, str, int, str, str]] = set()
     for record in materialized:
         identity = (
@@ -32,11 +42,11 @@ def validate_prediction_records(
         if identity in identities:
             raise EvaluationValidationError("duplicate prediction semantic identity")
         identities.add(identity)
-    return materialized
+    return PredictionRecordCollection(materialized)
 
 
-def validate_metric_records(records: Iterable[MetricRecord]) -> tuple[MetricRecord, ...]:
-    materialized = tuple(records)
+def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection:
+    materialized = records.records
     identities: set[tuple[str, str, str, str, int, str]] = set()
     for record in materialized:
         identity = (
@@ -50,7 +60,7 @@ def validate_metric_records(records: Iterable[MetricRecord]) -> tuple[MetricReco
         if identity in identities:
             raise EvaluationValidationError("duplicate metric semantic identity")
         identities.add(identity)
-    return materialized
+    return MetricRecordCollection(materialized)
 
 
 def validate_comparison_metadata(

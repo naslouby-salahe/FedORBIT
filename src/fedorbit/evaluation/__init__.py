@@ -50,6 +50,8 @@ from fedorbit.evaluation.spearman import (
 )
 from fedorbit.evaluation.validation import (
     EvaluationValidationError,
+    MetricRecordCollection,
+    PredictionRecordCollection,
     validate_comparison_metadata,
     validate_metric_records,
     validate_prediction_records,
@@ -65,6 +67,8 @@ __all__ = [
     "EfficiencyRecord",
     "EvaluationValidationError",
     "MetricComputationError",
+    "MetricRecordCollection",
+    "PredictionRecordCollection",
     "Probability",
     "ProposalOutcomeTally",
     "ProposalRates",

@@ -3,74 +3,146 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Mapping
 
-from fedorbit.domain.enums import ExperimentName
+from fedorbit.domain.enums import ExperimentName, SemanticCoordinate
 
 
-def experiment_relevance(experiment: ExperimentName) -> frozenset[str]:
-    common = frozenset({"experiment", "seed"})
-    by_experiment: Mapping[ExperimentName, frozenset[str]] = OrderedDict(
+def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordinate]:
+    common = frozenset({SemanticCoordinate.EXPERIMENT, SemanticCoordinate.SEED})
+    by_experiment: Mapping[ExperimentName, frozenset[SemanticCoordinate]] = OrderedDict(
         (
             (
                 ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
-                frozenset({"experiment", "seed", "condition", "support"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.CONDITION,
+                        SemanticCoordinate.SUPPORT,
+                    }
+                ),
             ),
             (
                 ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
-                frozenset({"experiment", "seed", "dataset", "directed_pair"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                    }
+                ),
             ),
             (
                 ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
-                frozenset({"experiment", "dataset", "source_client", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.SOURCE_CLIENT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.MECHANISM_ABLATIONS,
                 frozenset(
                     {
-                        "experiment",
-                        "dataset",
-                        "directed_pair",
-                        "method",
-                        "support",
-                        "condition",
-                        "seed",
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.CONDITION,
+                        SemanticCoordinate.SEED,
                     }
                 ),
             ),
             (
                 ExperimentName.SPARSITY_AND_DENSE_FALLBACK,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER,
                 frozenset(
                     {
-                        "experiment",
-                        "dataset",
-                        "directed_pair",
-                        "method",
-                        "support",
-                        "condition",
-                        "seed",
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.CONDITION,
+                        SemanticCoordinate.SEED,
                     }
                 ),
             ),
@@ -78,45 +150,80 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[str]:
                 ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES,
                 frozenset(
                     {
-                        "experiment",
-                        "dataset",
-                        "directed_pair",
-                        "method",
-                        "support",
-                        "condition",
-                        "seed",
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.CONDITION,
+                        SemanticCoordinate.SEED,
                     }
                 ),
             ),
             (
                 ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION,
                 frozenset(
                     {
-                        "experiment",
-                        "dataset",
-                        "directed_pair",
-                        "method",
-                        "support",
-                        "condition",
-                        "seed",
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.CONDITION,
+                        SemanticCoordinate.SEED,
                     }
                 ),
             ),
             (
                 ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
             (
                 ExperimentName.SCALABILITY_AND_EFFICIENCY,
-                frozenset({"experiment", "dataset", "directed_pair", "method", "support", "seed"}),
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
+                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
             ),
         )
     )

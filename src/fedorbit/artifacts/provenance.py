@@ -12,7 +12,7 @@ from typing import cast
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.config.context import active_config
 from fedorbit.config.loading import repository_root
-from fedorbit.domain.enums import ArtifactStage
+from fedorbit.domain.enums import ArtifactStage, SemanticCoordinate
 from fedorbit.domain.records import SemanticCell
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 from fedorbit.runtime.environment import environment_snapshot
@@ -207,7 +207,7 @@ def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
 def stage_dependency_fingerprint(
     stage: ArtifactStage,
     cell: SemanticCell,
-    relevance: frozenset[str],
+    relevance: frozenset[SemanticCoordinate],
     upstream_artifact_ids: tuple[str, ...],
     config_sections: frozenset[str],
     producer_module: str,

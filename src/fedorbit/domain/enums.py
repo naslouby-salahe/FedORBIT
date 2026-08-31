@@ -192,6 +192,20 @@ class ArtifactStage(StrEnum):
     REPORTING = "reporting"
 
 
+class SemanticCoordinate(StrEnum):
+    """A dimension that may participate in an experiment artifact identity."""
+
+    EXPERIMENT = "experiment"
+    DATASET = "dataset"
+    SOURCE_CLIENT = "source_client"
+    TARGET_CLIENT = "target_client"
+    DIRECTED_PAIR = "directed_pair"
+    METHOD = "method"
+    CONDITION = "condition"
+    SUPPORT = "support"
+    SEED = "seed"
+
+
 class SeedRole(StrEnum):
     PILOT = "pilot"
     CONFIRMATORY = "confirmatory"

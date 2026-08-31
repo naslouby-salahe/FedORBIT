@@ -8,8 +8,19 @@ from fedorbit.artifacts.provenance import (
     runtime_fingerprint,
     stage_dependency_fingerprint,
 )
-from fedorbit.domain.enums import ArtifactStage, DatasetId, ExperimentName, TransferMethod
-from fedorbit.domain.records import DirectedPair, SemanticCell
+from fedorbit.domain.enums import (
+    ArtifactStage,
+    DatasetId,
+    ExperimentName,
+    SemanticCoordinate,
+    TransferMethod,
+)
+from fedorbit.domain.records import (
+    DirectedPair,
+    ExperimentSeed,
+    SemanticCell,
+    SupportSize,
+)
 from fedorbit.experiments.cells import experiment_relevance
 
 PAIR = DirectedPair(DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK)
@@ -17,8 +28,8 @@ PRIMARY_CELL = SemanticCell(
     experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
     directed_pair=PAIR,
     method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-    support=2,
-    seed=1103,
+    support=SupportSize(2),
+    seed=ExperimentSeed(1103),
 )
 
 
@@ -30,15 +41,15 @@ def test_semantic_identity_is_stable_and_seed_sensitive() -> None:
         experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         directed_pair=PAIR,
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-        support=2,
-        seed=5531,
+        support=SupportSize(2),
+        seed=ExperimentSeed(5531),
     )
     assert changed_seed.identity_json(relevance) != first
 
 
 def test_semantic_identity_excludes_irrelevant_dimensions() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
-    assert "condition" not in relevance
+    assert SemanticCoordinate.CONDITION not in relevance
     identity = PRIMARY_CELL.identity_json(relevance)
     assert "condition" not in identity
     assert "support" in identity
@@ -55,7 +66,7 @@ def test_identity_contains_no_nonscientific_identifiers() -> None:
 def test_relevance_covers_registered_experiments() -> None:
     for experiment in ExperimentName:
         relevance = experiment_relevance(experiment)
-        assert "experiment" in relevance
+        assert SemanticCoordinate.EXPERIMENT in relevance
         assert len(relevance) >= 2
 
 

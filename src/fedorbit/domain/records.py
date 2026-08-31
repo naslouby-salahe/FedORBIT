@@ -4,7 +4,12 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
-from fedorbit.domain.enums import DatasetId, ExperimentName, TransferMethod
+from fedorbit.domain.enums import (
+    DatasetId,
+    ExperimentName,
+    SemanticCoordinate,
+    TransferMethod,
+)
 from fedorbit.domain.serialization import stable_json
 
 
@@ -45,6 +50,33 @@ class SemanticCoordinates:
 
 
 @dataclass(frozen=True, slots=True)
+class ExperimentCondition:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value:
+            raise ValueError("experiment condition must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class SupportSize:
+    value: int
+
+    def __post_init__(self) -> None:
+        if self.value < 1:
+            raise ValueError("support size must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentSeed:
+    value: int
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.value < 2**32:
+            raise ValueError("experiment seed must be in the unsigned 32-bit range")
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionCell:
     coordinates: SemanticCoordinates
     artifact_identifier: ArtifactIdentifier
@@ -69,19 +101,19 @@ class SemanticCell:
     target_client: DatasetId | None = None
     directed_pair: DirectedPair | None = None
     method: TransferMethod | None = None
-    condition: str | None = None
-    support: int | None = None
-    seed: int | None = None
+    condition: ExperimentCondition | None = None
+    support: SupportSize | None = None
+    seed: ExperimentSeed | None = None
 
-    def identity_json(self, relevance: frozenset[str]) -> str:
+    def identity_json(self, relevance: frozenset[SemanticCoordinate]) -> str:
         present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
             dataset=self.dataset.value if self.dataset is not None else None,
             source_client=self.source_client.value if self.source_client is not None else None,
             target_client=self.target_client.value if self.target_client is not None else None,
             method=self.method.value if self.method is not None else None,
-            condition=self.condition,
-            support=self.support,
-            seed=self.seed,
+            condition=self.condition.value if self.condition is not None else None,
+            support=self.support.value if self.support is not None else None,
+            seed=self.seed.value if self.seed is not None else None,
         )
         if self.directed_pair is not None:
             present["directed_pair"] = [
@@ -92,7 +124,7 @@ class SemanticCell:
             experiment=self.experiment.value
         )
         for coordinate in relevance:
-            value = present.get(coordinate)
+            value = present.get(coordinate.value)
             if value is not None:
-                values[coordinate] = value
+                values[coordinate.value] = value
         return stable_json(values)

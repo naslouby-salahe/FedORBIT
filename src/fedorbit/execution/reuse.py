@@ -85,7 +85,7 @@ class ExecutionReuse:
     ) -> tuple[CellDecision, ...]:
         decisions: list[CellDecision] = []
         for cell in cells:
-            manifest = self._store.find_by_fingerprint(cell.dependency_fingerprint.value)
+            manifest = self._store.find_by_fingerprint(cell.dependency_fingerprint)
             if manifest is None or not manifest.payload_paths:
                 decisions.append(CellDecision(cell.coordinates, ExecutionAction.EXECUTE))
             elif (
@@ -102,7 +102,7 @@ class ExecutionReuse:
     def validate_existing(self, decisions: tuple[CellDecision, ...]) -> None:
         for decision in decisions:
             if decision.manifest is not None:
-                self._store.resolve(decision.manifest.artifact_id)
+                self._store.resolve(ArtifactIdentifier(decision.manifest.artifact_id))
 
     def stale_descendants(self, artifact_id: str) -> frozenset[str]:
         return frozenset(
@@ -114,7 +114,7 @@ class ExecutionReuse:
     def promote_completed(self, manifests: tuple[ReusableArtifactManifest, ...]) -> None:
         for manifest in manifests:
             self._store.write_reusable(manifest)
-            self._store.resolve(manifest.artifact_id)
+            self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
 
 
 class SelectiveInvalidation:
@@ -136,7 +136,7 @@ class SelectiveInvalidation:
                 and changed_artifact_id.value not in manifest.upstream_artifact_ids
             ):
                 continue
-            self._store.remove_manifest(manifest.artifact_id)
+            self._store.remove_manifest(ArtifactIdentifier(manifest.artifact_id))
             invalidated.append(ArtifactIdentifier(manifest.artifact_id))
         return tuple(invalidated)
 
@@ -160,13 +160,13 @@ class SelectiveInvalidation:
                     continue
                 invalidated.append(artifact_identifier)
                 frontier.append(artifact_identifier)
-                self._store.remove_manifest(manifest.artifact_id)
+                self._store.remove_manifest(artifact_identifier)
         return tuple(invalidated)
 
 
 def resolved_or_none(
     store: ArtifactStore,
-    artifact_id: str,
+    artifact_id: ArtifactIdentifier,
 ) -> ReusableArtifactManifest | None:
     try:
         return store.resolve(artifact_id)

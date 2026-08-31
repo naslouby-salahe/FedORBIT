@@ -141,4 +141,6 @@ def test_promote_completed_manifests_validates_before_reuse(tmp_path: Path) -> N
     manifest = _manifest(payload, fingerprint, artifact_type="response_packet")
     reuse = ExecutionReuse(store)
     reuse.promote_completed((manifest,))
-    assert store.resolve(manifest.artifact_id).artifact_id == manifest.artifact_id
+    assert (
+        store.resolve(ArtifactIdentifier(manifest.artifact_id)).artifact_id == manifest.artifact_id
+    )

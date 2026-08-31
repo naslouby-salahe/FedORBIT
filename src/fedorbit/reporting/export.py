@@ -5,6 +5,7 @@ from pathlib import Path
 from fedorbit.artifacts.paths import WorkspaceLayout, results_workspace
 from fedorbit.artifacts.storage import ArtifactStore, atomic_write_json
 from fedorbit.domain.enums import ExperimentName
+from fedorbit.domain.records import ArtifactIdentifier
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.reporting.figures import EvidenceFigure
 from fedorbit.reporting.tables import EvidenceTable
@@ -22,7 +23,7 @@ class VerifiedEvidenceWriter:
     def write(
         self,
         experiment: ExperimentName,
-        artifact_id: str,
+        artifact_id: ArtifactIdentifier,
         evidence: StableJsonPayload,
     ) -> Path:
         try:
@@ -39,7 +40,7 @@ class VerifiedEvidenceWriter:
     def write_table(
         self,
         experiment: ExperimentName,
-        artifact_id: str,
+        artifact_id: ArtifactIdentifier,
         table: EvidenceTable,
         name: str,
     ) -> Path:
@@ -51,7 +52,7 @@ class VerifiedEvidenceWriter:
     def write_figure(
         self,
         experiment: ExperimentName,
-        artifact_id: str,
+        artifact_id: ArtifactIdentifier,
         figure: EvidenceFigure,
         name: str,
     ) -> Path:

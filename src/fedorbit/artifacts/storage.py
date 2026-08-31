@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
+from fedorbit.domain.records import ArtifactFingerprint, ArtifactIdentifier
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 
@@ -42,8 +43,8 @@ class ArtifactStore:
     def root(self) -> Path:
         return self._root
 
-    def manifest_path(self, artifact_id: str) -> Path:
-        return self._manifests / f"{artifact_id}.json"
+    def manifest_path(self, artifact_id: ArtifactIdentifier) -> Path:
+        return self._manifests / f"{artifact_id.value}.json"
 
     def manifest_dir(self) -> Path:
         return self._manifests
@@ -53,30 +54,33 @@ class ArtifactStore:
 
     def write_reusable(self, manifest: ReusableArtifactManifest) -> None:
         atomic_write_json(
-            self.manifest_path(manifest.artifact_id), manifest.model_dump(mode="json")
+            self.manifest_path(ArtifactIdentifier(manifest.artifact_id)),
+            manifest.model_dump(mode="json"),
         )
 
-    def read_reusable(self, artifact_id: str) -> ReusableArtifactManifest:
+    def read_reusable(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest:
         path = self.manifest_path(artifact_id)
         if not path.is_file():
-            raise StorageError(f"no artifact manifest for {artifact_id}")
+            raise StorageError(f"no artifact manifest for {artifact_id.value}")
         return ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
-    def resolve(self, artifact_id: str) -> ReusableArtifactManifest:
+    def resolve(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest:
         from fedorbit.artifacts.validation import validate_reusable_artifact
 
         manifest = self.read_reusable(artifact_id)
         validate_reusable_artifact(manifest)
         return manifest
 
-    def find_by_fingerprint(self, fingerprint_sha256: str) -> ReusableArtifactManifest | None:
+    def find_by_fingerprint(
+        self, fingerprint_sha256: ArtifactFingerprint
+    ) -> ReusableArtifactManifest | None:
         if not self._manifests.is_dir():
             return None
         for path in sorted(self._manifests.glob("*.json")):
             manifest = ReusableArtifactManifest.model_validate_json(
                 path.read_text(encoding="utf-8")
             )
-            if manifest.dependency_fingerprint_sha256 != fingerprint_sha256:
+            if manifest.dependency_fingerprint_sha256 != fingerprint_sha256.value:
                 continue
             try:
                 from fedorbit.artifacts.validation import validate_reusable_artifact
@@ -87,7 +91,7 @@ class ArtifactStore:
             return manifest
         return None
 
-    def remove_manifest(self, artifact_id: str) -> None:
+    def remove_manifest(self, artifact_id: ArtifactIdentifier) -> None:
         self.manifest_path(artifact_id).unlink(missing_ok=True)
 
     def all_manifests(self) -> tuple[ReusableArtifactManifest, ...]:

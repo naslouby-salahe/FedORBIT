@@ -11,6 +11,7 @@ from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
 from fedorbit.domain.enums import ArtifactState, ExperimentName
+from fedorbit.domain.records import ArtifactIdentifier
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.reporting.export import VerifiedEvidenceWriter
@@ -24,7 +25,7 @@ def _verified_manifest(
         if experiment.value not in manifest.semantic_producer_coordinates:
             continue
         try:
-            resolved = store.resolve(manifest.artifact_id)
+            resolved = store.resolve(ArtifactIdentifier(manifest.artifact_id))
         except ValueError:
             continue
         if resolved.state == ArtifactState.COMPLETED:
@@ -54,7 +55,7 @@ def report(
                 continue
             destination = writer.write(
                 experiment,
-                manifest.artifact_id,
+                ArtifactIdentifier(manifest.artifact_id),
                 cast(
                     StableJsonPayload,
                     OrderedDict(

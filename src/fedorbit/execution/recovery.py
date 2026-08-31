@@ -28,7 +28,7 @@ class RecoveryBoundary:
         valid: list[ArtifactIdentifier] = []
         for manifest in self._store.all_manifests():
             try:
-                resolved = self._store.resolve(manifest.artifact_id)
+                resolved = self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
             except ValueError:
                 continue
             if resolved.state == ArtifactState.COMPLETED:

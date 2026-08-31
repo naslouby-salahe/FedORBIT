@@ -16,6 +16,7 @@ from fedorbit.artifacts.paths import (
 from fedorbit.artifacts.provenance import provenance_record
 from fedorbit.artifacts.storage import ArtifactStore, atomic_write_bytes, atomic_write_json
 from fedorbit.domain.enums import ArtifactState, ExperimentName
+from fedorbit.domain.records import ArtifactIdentifier
 from fedorbit.reporting.export import EvidenceExportError, VerifiedEvidenceWriter
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}
@@ -121,7 +122,7 @@ def test_evidence_writer_requires_verified_completed_artifact(tmp_path: Path) ->
     store.write_reusable(manifest)
     destination = VerifiedEvidenceWriter(store, layout).write(
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-        manifest.artifact_id,
+        ArtifactIdentifier(manifest.artifact_id),
         {"evidence": 1},
     )
     assert destination.exists()
@@ -138,7 +139,7 @@ def test_evidence_writer_rejects_unverified_artifact(tmp_path: Path) -> None:
     with pytest.raises(EvidenceExportError):
         VerifiedEvidenceWriter(store, layout).write(
             ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-            manifest.artifact_id,
+            ArtifactIdentifier(manifest.artifact_id),
             {"evidence": 1},
         )
 
@@ -154,6 +155,6 @@ def test_evidence_writer_rejects_missing_payload(tmp_path: Path) -> None:
     with pytest.raises(EvidenceExportError):
         VerifiedEvidenceWriter(store, layout).write(
             ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-            manifest.artifact_id,
+            ArtifactIdentifier(manifest.artifact_id),
             {"evidence": 1},
         )

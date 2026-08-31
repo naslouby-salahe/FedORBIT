@@ -6,6 +6,7 @@ from pathlib import Path
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.domain.enums import ArtifactState, ExperimentClassification, ExperimentName
+from fedorbit.domain.records import ArtifactIdentifier
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.runtime.environment import EnvironmentMismatchError, validate_environment
 
@@ -142,7 +143,7 @@ class ExecutionReadiness:
             if experiment.value not in manifest.semantic_producer_coordinates:
                 continue
             try:
-                return self._store.resolve(manifest.artifact_id)
+                return self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
             except ValueError:
                 continue
         return None

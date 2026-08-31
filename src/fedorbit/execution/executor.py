@@ -107,7 +107,7 @@ class ExecutionExecutor:
             if decision.action == ExecutionAction.REUSE:
                 if decision.manifest is None:
                     raise ExecutionError("reuse decision has no manifest")
-                manifest = self._store.resolve(decision.manifest.artifact_id)
+                manifest = self._store.resolve(ArtifactIdentifier(decision.manifest.artifact_id))
                 results.append(ExecutionResult(decision, manifest))
                 self._logger.record(
                     ExecutionLogEvent(
@@ -120,7 +120,7 @@ class ExecutionExecutor:
                 continue
             manifest = producer(decision)
             self._store.write_reusable(manifest)
-            validated = self._store.resolve(manifest.artifact_id)
+            validated = self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
             results.append(ExecutionResult(decision, validated))
             self._logger.record(
                 ExecutionLogEvent(

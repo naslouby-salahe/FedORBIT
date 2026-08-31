@@ -21,6 +21,7 @@ from fedorbit.artifacts.manifests import (
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.artifacts.validation import ArtifactValidationError
 from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
+from fedorbit.domain.records import ArtifactIdentifier
 
 COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",
@@ -168,10 +169,10 @@ def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -
         }
     )
     store.write_reusable(manifest)
-    assert store.resolve(manifest.artifact_id) == manifest
+    assert store.resolve(ArtifactIdentifier(manifest.artifact_id)) == manifest
     payload.write_bytes(b"corrupted")
     with pytest.raises(ArtifactValidationError):
-        store.resolve(manifest.artifact_id)
+        store.resolve(ArtifactIdentifier(manifest.artifact_id))
 
 
 def test_completion_manifest_self_hash_excludes_own_field() -> None:

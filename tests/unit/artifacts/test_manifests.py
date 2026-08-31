@@ -18,7 +18,7 @@ from fedorbit.artifacts.manifests import (
     eligibility_copy,
     file_sha256,
 )
-from fedorbit.artifacts.storage import ArtifactStore
+from fedorbit.artifacts.storage import ArtifactStore, StorageError
 from fedorbit.artifacts.validation import ArtifactValidationError
 from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
 from fedorbit.domain.records import ArtifactIdentifier
@@ -276,3 +276,54 @@ def test_oracle_eligibility_copy_requires_fine_concept() -> None:
 def test_semantic_cell_manifest_round_trips() -> None:
     manifest = SemanticCellManifest.model_validate(CELL_FIELDS)
     assert SemanticCellManifest.model_validate(manifest.model_dump(mode="json")) == manifest
+
+
+def test_completed_storage_records_matching_completion_last(tmp_path: Path) -> None:
+    payload = tmp_path / "payload.bin"
+    payload.write_bytes(b"payload")
+    completion = CompletionManifest.model_validate(
+        {**_completion_payload(), "completion_manifest_sha256": ""}
+    )
+    completion = completion.model_copy(
+        update={"completion_manifest_sha256": completion_manifest_self_hash(completion)}
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        {
+            **_reusable_payload(),
+            "artifact_id": artifact_id(
+                "prepared_split", COORDINATES, completion.dependency_fingerprint_sha256
+            ),
+            "producer_stage": completion.producer_stage,
+            "dependency_fingerprint_sha256": completion.dependency_fingerprint_sha256,
+            "payload_paths": (str(payload),),
+            "payload_sha256": file_sha256(payload),
+            "completion_manifest_sha256": completion.completion_manifest_sha256,
+        }
+    )
+    store = ArtifactStore(tmp_path / "outputs")
+    store.write_completed(manifest, completion)
+    assert store.read_completion(ArtifactIdentifier(manifest.artifact_id)) == completion
+
+
+def test_completed_storage_rejects_incompatible_completion(tmp_path: Path) -> None:
+    payload = tmp_path / "payload.bin"
+    payload.write_bytes(b"payload")
+    completion = CompletionManifest.model_validate(
+        {**_completion_payload(), "completion_manifest_sha256": ""}
+    )
+    completion = completion.model_copy(
+        update={"completion_manifest_sha256": completion_manifest_self_hash(completion)}
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        {
+            **_reusable_payload(),
+            "artifact_id": artifact_id("prepared_split", COORDINATES, "b" * 64),
+            "producer_stage": completion.producer_stage,
+            "dependency_fingerprint_sha256": "b" * 64,
+            "payload_paths": (str(payload),),
+            "payload_sha256": file_sha256(payload),
+            "completion_manifest_sha256": completion.completion_manifest_sha256,
+        }
+    )
+    with pytest.raises(StorageError, match="fingerprint"):
+        ArtifactStore(tmp_path / "outputs").write_completed(manifest, completion)

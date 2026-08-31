@@ -5,7 +5,9 @@ import os
 import tempfile
 from pathlib import Path
 
-from fedorbit.artifacts.manifests import ReusableArtifactManifest
+from fedorbit.artifacts.manifests import CompletionManifest, ReusableArtifactManifest
+from fedorbit.artifacts.validation import validate_completion_manifest, validate_reusable_artifact
+from fedorbit.domain.enums import TerminalState
 from fedorbit.domain.records import ArtifactFingerprint, ArtifactIdentifier
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
@@ -37,6 +39,7 @@ class ArtifactStore:
     def __init__(self, root: Path) -> None:
         self._root = root
         self._manifests = root / "manifests"
+        self._completions = root / "completions"
         self._staging = root / "staging"
 
     @property
@@ -49,6 +52,9 @@ class ArtifactStore:
     def manifest_dir(self) -> Path:
         return self._manifests
 
+    def completion_path(self, artifact_id: ArtifactIdentifier) -> Path:
+        return self._completions / f"{artifact_id.value}.json"
+
     def staging_dir(self) -> Path:
         return self._staging
 
@@ -58,11 +64,38 @@ class ArtifactStore:
             manifest.model_dump(mode="json"),
         )
 
+    def write_completed(
+        self,
+        manifest: ReusableArtifactManifest,
+        completion: CompletionManifest,
+    ) -> None:
+        validate_reusable_artifact(manifest)
+        validate_completion_manifest(completion)
+        if completion.terminal_state != TerminalState.COMPLETED:
+            raise StorageError("completion record must have a completed terminal state")
+        if completion.dependency_fingerprint_sha256 != manifest.dependency_fingerprint_sha256:
+            raise StorageError("completion record fingerprint does not match reusable manifest")
+        if completion.producer_stage != manifest.producer_stage:
+            raise StorageError("completion record stage does not match reusable manifest")
+        if completion.completion_manifest_sha256 != manifest.completion_manifest_sha256:
+            raise StorageError("completion record hash does not match reusable manifest")
+        self.write_reusable(manifest)
+        atomic_write_json(
+            self.completion_path(ArtifactIdentifier(manifest.artifact_id)),
+            completion.model_dump(mode="json"),
+        )
+
     def read_reusable(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest:
         path = self.manifest_path(artifact_id)
         if not path.is_file():
             raise StorageError(f"no artifact manifest for {artifact_id.value}")
         return ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def read_completion(self, artifact_id: ArtifactIdentifier) -> CompletionManifest:
+        path = self.completion_path(artifact_id)
+        if not path.is_file():
+            raise StorageError(f"no completion manifest for {artifact_id.value}")
+        return CompletionManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
     def resolve(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest:
         from fedorbit.artifacts.validation import validate_reusable_artifact

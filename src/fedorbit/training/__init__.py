@@ -10,7 +10,16 @@ from fedorbit.training.pilot import (
     run_base_model_pilot,
     select_pilot_configuration,
 )
-from fedorbit.training.scoring import ScoreArtifact, ScoreRow, ScoringError, score_model
+from fedorbit.training.scoring import (
+    LocalClassCount,
+    LocalClassIndex,
+    ScoreArtifact,
+    ScoreRow,
+    ScoreRowIndex,
+    ScoringError,
+    ScoringRequest,
+    score_model,
+)
 from fedorbit.training.trainer import (
     BaseCheckpoint,
     ModelParameterState,
@@ -26,6 +35,8 @@ from fedorbit.training.trainer import (
 __all__ = [
     "BaseCheckpoint",
     "ClassWeights",
+    "LocalClassCount",
+    "LocalClassIndex",
     "LossContractError",
     "ModelParameterState",
     "OptimizerState",
@@ -37,7 +48,9 @@ __all__ = [
     "RngState",
     "ScoreArtifact",
     "ScoreRow",
+    "ScoreRowIndex",
     "ScoringError",
+    "ScoringRequest",
     "SelectedHyperparameters",
     "TrainingError",
     "TrainingOutcome",

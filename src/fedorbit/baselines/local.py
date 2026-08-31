@@ -6,7 +6,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import ExactSparseSolverConfig
 from fedorbit.orbit.objective import (
     CurriculumAction,
     RobustActionProblem,
@@ -38,8 +37,8 @@ def _solve_support_lp(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
     objective_row: NDArray[np.float64],
-    settings: ExactSparseSolverConfig,
 ) -> CurriculumAction:
+    settings = active_config().solvers.exact_sparse
     import highspy
 
     columns = 1 + support.size
@@ -104,9 +103,7 @@ def optimize_against_fixed_matrix(
     ]
     candidates.extend(
         (objective_of(action), action)
-        for action in (
-            _solve_support_lp(problem, support, objective_row, settings) for support in supports
-        )
+        for action in (_solve_support_lp(problem, support, objective_row) for support in supports)
     )
     best_value = max(value for value, _ in candidates)
     rounding_precision = settings.action_tie_comparison_rounding_precision

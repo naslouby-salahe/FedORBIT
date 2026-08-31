@@ -10,7 +10,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import ExactSparseSolverConfig
 from fedorbit.orbit.correspondence import (
     ActiveImageMap,
     BlockCorrespondence,
@@ -268,7 +267,7 @@ def solve_support_master(
     scenarios: list[BlockCorrespondence] = [initial]
     iterations = 0
     while True:
-        master_result = run_support_master_lp(problem, support, scenario_rows, settings)
+        master_result = run_support_master_lp(problem, support, scenario_rows)
         z_value = master_result.robust_value
         alpha_values = master_result.action_coordinates
         iterations += 1
@@ -316,8 +315,8 @@ def run_support_master_lp(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
     scenario_rows: Sequence[NDArray[np.float64]],
-    settings: ExactSparseSolverConfig,
 ) -> SupportMasterLpResult:
+    settings = active_config().solvers.exact_sparse
     columns = 1 + support.size
     infinity = highspy.kHighsInf
     row_lower: list[float] = []

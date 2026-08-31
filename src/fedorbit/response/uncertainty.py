@@ -10,7 +10,6 @@ import numpy as np
 import torch
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import SourceResponseFinalConfig
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
@@ -225,7 +224,6 @@ def estimate_response_bands(
         standard_error_floor=final.response_standard_error_floor,
     )
     entries, useful_columns = _build_final_entries(
-        final,
         outcome_count,
         intervention_count,
         means,
@@ -249,13 +247,13 @@ def estimate_response_bands(
 
 
 def _build_final_entries(
-    final: SourceResponseFinalConfig,
     outcome_count: int,
     intervention_count: int,
     means: tuple[float, ...],
     standard_errors: tuple[float, ...],
     critical: float,
 ) -> tuple[list[FinalResponseEntry], set[int]]:
+    final = active_config().scientific.source_response_final
     entries: list[FinalResponseEntry] = []
     useful_columns: set[int] = set()
     for outcome in range(outcome_count):

@@ -9,7 +9,6 @@ from typing import cast
 import torch
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import SourceResponsePilotConfig
 from fedorbit.domain.serialization import StableJsonPayload
 from fedorbit.response.estimation import (
     ShadowData,
@@ -112,7 +111,6 @@ def _evaluate_candidate(
     replicate_count: int,
     seed: int,
 ) -> CandidateResult:
-    pilot = active_config().scientific.source_response_pilot
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
     full_values: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
@@ -176,8 +174,8 @@ def _evaluate_candidate(
                 schedule_seed,
             )
             for outcome_index in range(outcome_count):
-                full = _derivative(full_risks[outcome_index], full_settings.epsilon, pilot)
-                half = _derivative(half_risks[outcome_index], half_settings.epsilon, pilot)
+                full = _derivative(full_risks[outcome_index], full_settings.epsilon)
+                half = _derivative(half_risks[outcome_index], half_settings.epsilon)
                 if not math.isfinite(full) or not math.isfinite(half):
                     all_finite = False
                 entry_index = outcome_index * intervention_count + intervention_index
@@ -189,7 +187,6 @@ def _evaluate_candidate(
         for intervention_index in range(intervention_count):
             entry_index = outcome_index * intervention_count + intervention_index
             entry = _build_pilot_entry(
-                pilot,
                 outcome_index,
                 intervention_index,
                 tuple(full_values[entry_index]),
@@ -198,9 +195,9 @@ def _evaluate_candidate(
             if entry.useful:
                 useful_columns.add(intervention_index)
             entries.append(entry)
-    reasons = _eligibility_reasons(pilot, all_finite, entries, useful_columns)
+    reasons = _eligibility_reasons(all_finite, entries, useful_columns)
     useful_entries = tuple(entry for entry in entries if entry.useful)
-    score = _pilot_score(pilot, useful_entries)
+    score = _pilot_score(useful_entries)
     return CandidateResult(
         candidate,
         tuple(entries),
@@ -213,7 +210,6 @@ def _evaluate_candidate(
 def _derivative(
     risks: tuple[float, float, float],
     epsilon: float,
-    pilot: SourceResponsePilotConfig,
 ) -> float:
     positive, negative, baseline = risks
     if not all(math.isfinite(value) for value in risks):
@@ -223,17 +219,17 @@ def _derivative(
         negative,
         baseline,
         epsilon,
-        pilot.numerical_floor,
+        active_config().scientific.source_response_pilot.numerical_floor,
     )
 
 
 def _build_pilot_entry(
-    pilot: SourceResponsePilotConfig,
     outcome_index: int,
     intervention_index: int,
     full_values: tuple[float, ...],
     half_values: tuple[float, ...],
 ) -> PilotEntry:
+    pilot = active_config().scientific.source_response_pilot
     a_hat_full = statistics.fmean(full_values)
     a_hat_half = statistics.fmean(half_values)
     discrepancy = abs(a_hat_full - a_hat_half) / max(
@@ -255,11 +251,11 @@ def _build_pilot_entry(
 
 
 def _eligibility_reasons(
-    pilot: SourceResponsePilotConfig,
     all_finite: bool,
     entries: list[PilotEntry],
     useful_columns: set[int],
 ) -> list[str]:
+    pilot = active_config().scientific.source_response_pilot
     reasons: list[str] = []
     if not all_finite:
         reasons.append("non-finite shadow state or loss")
@@ -283,9 +279,9 @@ def _eligibility_reasons(
 
 
 def _pilot_score(
-    pilot: SourceResponsePilotConfig,
     useful_entries: tuple[PilotEntry, ...],
 ) -> float:
+    pilot = active_config().scientific.source_response_pilot
     if not useful_entries:
         return math.nan
     signal = statistics.median(

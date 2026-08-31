@@ -10,10 +10,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from fedorbit.config.context import active_config
-from fedorbit.config.models import (
-    DenseCcpSolverConfig,
-    ExactSparseSolverConfig,
-)
 from fedorbit.domain.enums import RngNamespace, TerminalState
 from fedorbit.orbit.correspondence import (
     BlockCorrespondence,
@@ -557,8 +553,8 @@ def _evaluate_projected_candidates(
 
 def _select_best_projected_candidate(
     candidates: list[ProjectedCandidate],
-    exact_settings: ExactSparseSolverConfig,
 ) -> ProjectedCandidate:
+    exact_settings = active_config().solvers.exact_sparse
     best_response = min(candidate.response_objective for candidate in candidates)
     tied = [
         candidate
@@ -581,8 +577,6 @@ class OuterIterationOutcome:
 
 def _classify_outer_iteration(
     problem: RobustActionProblem,
-    dense_settings: DenseCcpSolverConfig,
-    exact_settings: ExactSparseSolverConfig,
     scenarios: list[BlockCorrespondence],
     scenario_rows: list[NDArray[np.float64]],
     alpha: CurriculumAction,
@@ -590,6 +584,9 @@ def _classify_outer_iteration(
     master_objective: float,
     deadline: float,
 ) -> OuterIterationOutcome:
+    settings = active_config().solvers
+    dense_settings = settings.dense_ccp
+    exact_settings = settings.exact_sparse
     full_objective = evaluate_objective(alpha, correspondence)
     violation = master_objective - full_objective
     is_new = correspondence not in scenarios
@@ -656,7 +653,6 @@ def _run_dense_outer_loop(
 ) -> DenseOuterLoopResult:
     config = active_config()
     settings = config.solvers.dense_ccp
-    exact_settings = config.solvers.exact_sparse
     deadline = time.monotonic() + settings.wall_time_seconds
     layout = AssignmentVariableLayout.build(problem.blocks)
     actionable = tuple(problem.actionable_nodes())
@@ -672,7 +668,7 @@ def _run_dense_outer_loop(
     converged_heuristically = False
     terminal_state: TerminalState | None = None
     while True:
-        master_result = run_support_master_lp(problem, full_support, scenario_rows, exact_settings)
+        master_result = run_support_master_lp(problem, full_support, scenario_rows)
         z_value = master_result.robust_value
         alpha_values = master_result.action_coordinates
         selected_action = CurriculumAction(problem, alpha_values)
@@ -685,11 +681,9 @@ def _run_dense_outer_loop(
             terminal_state = TerminalState.TIME_LIMIT
         if terminal_state is not None or not candidates:
             break
-        best_candidate = _select_best_projected_candidate(candidates, exact_settings)
+        best_candidate = _select_best_projected_candidate(candidates)
         outcome = _classify_outer_iteration(
             problem,
-            settings,
-            exact_settings,
             scenarios,
             scenario_rows,
             selected_action,

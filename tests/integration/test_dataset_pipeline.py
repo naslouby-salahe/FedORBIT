@@ -3,7 +3,10 @@ from __future__ import annotations
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.ontology import transfer_eligibility
 from fedorbit.datasets.splitting import (
+    ChronologicalRowCount,
+    ChronologicalTimestamp,
     DuplicateGroupChronology,
+    DuplicateGroupId,
     assign_duplicate_groups_chronologically,
 )
 from fedorbit.domain.enums import Split
@@ -22,12 +25,22 @@ def test_dataset_support_and_chronology_contracts_share_authoritative_config() -
     assert eligibility.source_eligible and eligibility.target_eligible
     assignment = assign_duplicate_groups_chronologically(
         (
-            DuplicateGroupChronology("a", 1.0, 55),
-            DuplicateGroupChronology("b", 2.0, 15),
-            DuplicateGroupChronology("c", 3.0, 10),
-            DuplicateGroupChronology("d", 4.0, 10),
-            DuplicateGroupChronology("e", 5.0, 10),
+            DuplicateGroupChronology(
+                DuplicateGroupId("a"), ChronologicalTimestamp(1.0), ChronologicalRowCount(55)
+            ),
+            DuplicateGroupChronology(
+                DuplicateGroupId("b"), ChronologicalTimestamp(2.0), ChronologicalRowCount(15)
+            ),
+            DuplicateGroupChronology(
+                DuplicateGroupId("c"), ChronologicalTimestamp(3.0), ChronologicalRowCount(10)
+            ),
+            DuplicateGroupChronology(
+                DuplicateGroupId("d"), ChronologicalTimestamp(4.0), ChronologicalRowCount(10)
+            ),
+            DuplicateGroupChronology(
+                DuplicateGroupId("e"), ChronologicalTimestamp(5.0), ChronologicalRowCount(10)
+            ),
         ),
     )
-    assert assignment.split_of("a") == Split.TRAIN
-    assert assignment.split_of("e") == Split.TEST
+    assert assignment.split_of(DuplicateGroupId("a")) == Split.TRAIN
+    assert assignment.split_of(DuplicateGroupId("e")) == Split.TEST

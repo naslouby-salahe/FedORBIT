@@ -11,7 +11,10 @@ import numpy as np
 from fedorbit.config.context import active_config
 from fedorbit.datasets.common import AdapterSchema
 from fedorbit.datasets.splitting import (
+    ChronologicalRowCount,
+    ChronologicalTimestamp,
     DuplicateGroupChronology,
+    DuplicateGroupId,
     DuplicateGroupSplitAssignment,
     assign_duplicate_groups_chronologically,
 )
@@ -166,9 +169,9 @@ def normalize_training_rows(
 def assign_duplicate_groups(groups: DuplicateGroups) -> DuplicateGroupSplitAssignment:
     chronology = tuple(
         DuplicateGroupChronology(
-            group_sha256,
-            min(member.timestamp_fraction for member in members),
-            len(members),
+            DuplicateGroupId(group_sha256),
+            ChronologicalTimestamp(min(member.timestamp_fraction for member in members)),
+            ChronologicalRowCount(len(members)),
         )
         for group_sha256, members in groups.groups
     )

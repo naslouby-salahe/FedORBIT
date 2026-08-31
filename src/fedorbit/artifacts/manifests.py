@@ -10,7 +10,7 @@ from typing import cast
 from pydantic import Field
 
 from fedorbit.config.models import FrozenModel
-from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
+from fedorbit.domain.enums import ArtifactStage, ArtifactState, ArtifactType, TerminalState
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
 NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
@@ -37,7 +37,7 @@ class CompletionManifest(FrozenModel):
 
 class ReusableArtifactManifest(FrozenModel):
     artifact_id: str
-    artifact_type: str
+    artifact_type: ArtifactType
     semantic_producer_coordinates: str
     producer_stage: ArtifactStage
     dependency_fingerprint_sha256: str

@@ -112,8 +112,8 @@ class ExecutionExecutor:
                 self._logger.record(
                     ExecutionLogEvent(
                         occurred_at=datetime.now(UTC),
-                        cell_coordinates=decision.cell_coordinates.value,
-                        artifact_id=manifest.artifact_id,
+                        cell_coordinates=decision.cell_coordinates,
+                        artifact_id=ArtifactIdentifier(manifest.artifact_id),
                         state=ArtifactState.COMPLETED,
                     )
                 )
@@ -125,8 +125,8 @@ class ExecutionExecutor:
             self._logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
-                    cell_coordinates=decision.cell_coordinates.value,
-                    artifact_id=validated.artifact_id,
+                    cell_coordinates=decision.cell_coordinates,
+                    artifact_id=ArtifactIdentifier(validated.artifact_id),
                     state=ArtifactState.COMPLETED,
                 )
             )

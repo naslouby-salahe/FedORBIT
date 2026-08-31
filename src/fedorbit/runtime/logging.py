@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from fedorbit.domain.enums import ArtifactState
+from fedorbit.domain.records import ArtifactIdentifier, SemanticCoordinates
 
 
 @dataclass(frozen=True, slots=True)
 class ExecutionLogEvent:
     occurred_at: datetime
-    cell_coordinates: str
-    artifact_id: str | None
+    cell_coordinates: SemanticCoordinates
+    artifact_id: ArtifactIdentifier | None
     state: ArtifactState
 
 
@@ -25,8 +26,8 @@ class ExecutionLogger:
             "execution_event",
             extra=OrderedDict(
                 occurred_at=event.occurred_at.isoformat(),
-                cell_coordinates=event.cell_coordinates,
-                artifact_id=event.artifact_id,
+                cell_coordinates=event.cell_coordinates.value,
+                artifact_id=event.artifact_id.value if event.artifact_id is not None else None,
                 state=event.state.value,
             ),
         )

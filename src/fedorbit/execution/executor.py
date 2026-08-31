@@ -36,6 +36,7 @@ from fedorbit.execution.inventory import (
     inspect_raw_inventory,
     persist_raw_inventory,
 )
+from fedorbit.execution.primitive_validation import execute_primitive_validation
 from fedorbit.execution.recovery import RecoveryBoundary
 from fedorbit.execution.reuse import CellDecision, ExecutionAction, ExecutionReuse
 from fedorbit.experiments.catalogue import ExperimentDefinition
@@ -216,6 +217,9 @@ def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
 
 def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
+    if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
+        execute_primitive_validation(store, build_layout())
+        return
     reuse = ExecutionReuse(store)
     cells = tuple(
         ExecutionCell(

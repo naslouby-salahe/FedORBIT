@@ -8,6 +8,10 @@ from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.evaluation import (
     ClassEntropySet,
+    ClassF1,
+    ClassF1Set,
+    ClassRecall,
+    ClassRecallSet,
     ConfusionCounts,
     CrossEntropy,
     MetricComputationError,
@@ -110,10 +114,14 @@ def test_confusion_counts_partition_predictions(config: FedorbitConfig) -> None:
 
 def test_macro_f1_and_balanced_accuracy_are_class_means(config: FedorbitConfig) -> None:
     del config
-    assert macro_f1((0.8, 0.6, 1.0)) == pytest.approx(0.8)
-    assert balanced_accuracy((1.0, 0.5, 0.0)) == pytest.approx(0.5)
+    assert macro_f1(ClassF1Set((ClassF1(0.8), ClassF1(0.6), ClassF1(1.0)))).value == pytest.approx(
+        0.8
+    )
+    assert balanced_accuracy(
+        ClassRecallSet((ClassRecall(1.0), ClassRecall(0.5), ClassRecall(0.0)))
+    ).value == pytest.approx(0.5)
     with pytest.raises(MetricComputationError):
-        balanced_accuracy(())
+        ClassRecallSet(())
 
 
 def test_absolute_and_relative_solver_errors() -> None:

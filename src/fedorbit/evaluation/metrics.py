@@ -50,6 +50,34 @@ class ClassEntropySet:
 
 
 @dataclass(frozen=True, slots=True)
+class ClassF1:
+    value: float
+
+
+@dataclass(frozen=True, slots=True)
+class ClassF1Set:
+    values: tuple[ClassF1, ...]
+
+    def __post_init__(self) -> None:
+        if not self.values:
+            raise MetricComputationError("macro-F1 over an empty evaluation class set")
+
+
+@dataclass(frozen=True, slots=True)
+class ClassRecall:
+    value: float
+
+
+@dataclass(frozen=True, slots=True)
+class ClassRecallSet:
+    values: tuple[ClassRecall, ...]
+
+    def __post_init__(self) -> None:
+        if not self.values:
+            raise MetricComputationError("balanced accuracy over an empty evaluation class set")
+
+
+@dataclass(frozen=True, slots=True)
 class RelativeMacroCeGain:
     value: float | None
     absolute_difference: float
@@ -112,16 +140,12 @@ def f1_from_counts(true_positives: int, false_positives: int, false_negatives: i
     return 2 * precision_value * recall_value / denominator
 
 
-def macro_f1(per_class_f1: tuple[float, ...]) -> float:
-    if not per_class_f1:
-        raise MetricComputationError("macro-F1 over an empty evaluation class set")
-    return statistics.fmean(per_class_f1)
+def macro_f1(per_class_f1: ClassF1Set) -> ClassF1:
+    return ClassF1(statistics.fmean(value.value for value in per_class_f1.values))
 
 
-def balanced_accuracy(per_class_recall: tuple[float, ...]) -> float:
-    if not per_class_recall:
-        raise MetricComputationError("balanced accuracy over an empty evaluation class set")
-    return statistics.fmean(per_class_recall)
+def balanced_accuracy(per_class_recall: ClassRecallSet) -> ClassRecall:
+    return ClassRecall(statistics.fmean(value.value for value in per_class_recall.values))
 
 
 @dataclass(frozen=True, slots=True)

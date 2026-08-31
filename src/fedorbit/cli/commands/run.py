@@ -4,10 +4,10 @@ import typer
 
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import experiment_identifier
+from fedorbit.domain.enums import OverwritePolicy
 from fedorbit.execution.executor import (
     ExecutionError,
     ExperimentExecutionRequest,
-    OverwritePolicy,
     run_experiment,
 )
 from fedorbit.experiments.catalogue import build_catalogue

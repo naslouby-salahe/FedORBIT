@@ -18,6 +18,40 @@ class ArtifactPath:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactIdentifier:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value:
+            raise ValueError("artifact identifier must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactFingerprint:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value:
+            raise ValueError("artifact fingerprint must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticCoordinates:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value:
+            raise ValueError("semantic coordinates must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionCell:
+    coordinates: SemanticCoordinates
+    artifact_identifier: ArtifactIdentifier
+    dependency_fingerprint: ArtifactFingerprint
+
+
+@dataclass(frozen=True, slots=True)
 class DirectedPair:
     source: DatasetId
     target: DatasetId

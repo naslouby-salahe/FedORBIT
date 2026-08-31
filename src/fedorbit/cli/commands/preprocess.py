@@ -5,11 +5,10 @@ import typer
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.cli.parsing import dataset_identifier
 from fedorbit.config.context import active_config
-from fedorbit.domain.enums import DatasetId
+from fedorbit.domain.enums import DatasetId, OverwritePolicy
 from fedorbit.execution.executor import (
     DatasetPreparationRequest,
     ExecutionError,
-    OverwritePolicy,
     preprocess_datasets,
 )
 

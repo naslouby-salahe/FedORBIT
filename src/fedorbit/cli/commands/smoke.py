@@ -4,7 +4,8 @@ import typer
 
 from fedorbit.cli.errors import CliUsageError, exit_from_error
 from fedorbit.config.testing import load_smoke_config, load_tests_config
-from fedorbit.execution.executor import ExecutionError, OverwritePolicy, run_smoke_validation
+from fedorbit.domain.enums import OverwritePolicy
+from fedorbit.execution.executor import ExecutionError, run_smoke_validation
 
 
 def smoke(overwrite: bool = typer.Option(False, "--overwrite")) -> None:

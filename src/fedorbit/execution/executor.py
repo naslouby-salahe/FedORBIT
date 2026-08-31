@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.paths import build_layout
@@ -17,8 +16,20 @@ from fedorbit.datasets.inspection import (
     inspect_dataset,
     persist_dataset_observation,
 )
-from fedorbit.domain.enums import ArtifactState, DatasetId, ExperimentName, ScalabilityBlockPattern
-from fedorbit.domain.records import ArtifactPath
+from fedorbit.domain.enums import (
+    ArtifactState,
+    DatasetId,
+    ExperimentName,
+    OverwritePolicy,
+    ScalabilityBlockPattern,
+)
+from fedorbit.domain.records import (
+    ArtifactFingerprint,
+    ArtifactIdentifier,
+    ArtifactPath,
+    ExecutionCell,
+    SemanticCoordinates,
+)
 from fedorbit.execution.inventory import (
     RawInventoryPersistenceRequest,
     RawInventoryRequest,
@@ -48,19 +59,10 @@ class ExecutionError(ValueError):
     pass
 
 
-class OverwritePolicy(StrEnum):
-    REUSE = "reuse"
-    REPLACE = "replace"
-
-
 @dataclass(frozen=True, slots=True)
 class DatasetPreparationRequest:
     datasets: tuple[DatasetId, ...]
     overwrite_policy: OverwritePolicy
-
-    @property
-    def overwrite_requested(self) -> bool:
-        return self.overwrite_policy == OverwritePolicy.REPLACE
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,10 +70,6 @@ class ExperimentExecutionRequest:
     experiment: ExperimentName
     definition: ExperimentDefinition
     overwrite_policy: OverwritePolicy
-
-    @property
-    def overwrite_requested(self) -> bool:
-        return self.overwrite_policy == OverwritePolicy.REPLACE
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,7 +112,7 @@ class ExecutionExecutor:
                 self._logger.record(
                     ExecutionLogEvent(
                         occurred_at=datetime.now(UTC),
-                        cell_coordinates=decision.cell_coordinates,
+                        cell_coordinates=decision.cell_coordinates.value,
                         artifact_id=manifest.artifact_id,
                         state=ArtifactState.COMPLETED,
                     )
@@ -127,7 +125,7 @@ class ExecutionExecutor:
             self._logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
-                    cell_coordinates=decision.cell_coordinates,
+                    cell_coordinates=decision.cell_coordinates.value,
                     artifact_id=validated.artifact_id,
                     state=ArtifactState.COMPLETED,
                 )
@@ -139,7 +137,7 @@ def execution_store() -> ArtifactStore:
     return ArtifactStore(build_layout().execution_root)
 
 
-def _recover(store: ArtifactStore, cells: tuple[tuple[str, str], ...]) -> None:
+def _recover(store: ArtifactStore, cells: tuple[ExecutionCell, ...]) -> None:
     recovery = RecoveryBoundary(store)
     recovery.discard_interrupted_staging()
     recovery.next_resume(cells)
@@ -220,11 +218,18 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
     reuse = ExecutionReuse(store)
     cells = tuple(
-        (f"{request.experiment.value}:{seed}", f"cell-{request.experiment.value}-{seed}")
+        ExecutionCell(
+            SemanticCoordinates(f"{request.experiment.value}:{seed}"),
+            ArtifactIdentifier(f"cell-{request.experiment.value}-{seed}"),
+            ArtifactFingerprint(f"cell-{request.experiment.value}-{seed}"),
+        )
         for seed in request.definition.seeds
     )
     _recover(store, cells)
-    decisions = reuse.decide(cells, request.overwrite_requested)
+    decisions = reuse.decide(cells, request.overwrite_policy)
     reuse.validate_existing(decisions)
-    if any(decision.execute or decision.overwrite for decision in decisions):
+    if any(
+        decision.action in (ExecutionAction.EXECUTE, ExecutionAction.OVERWRITE)
+        for decision in decisions
+    ):
         raise ExecutionError("registered experiment execution has no completed producer")

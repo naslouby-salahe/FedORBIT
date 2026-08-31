@@ -133,6 +133,11 @@ class ArtifactState(StrEnum):
     BLOCKED = "Blocked"
 
 
+class OverwritePolicy(StrEnum):
+    REUSE = "reuse"
+    REPLACE = "replace"
+
+
 class TerminalState(StrEnum):
     COMPLETED = "Completed"
     FAILED_INFRASTRUCTURE = "Failed / Infrastructure Failure"

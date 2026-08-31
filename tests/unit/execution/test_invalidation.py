@@ -5,6 +5,12 @@ from pathlib import Path
 from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
 from fedorbit.artifacts.storage import ArtifactStore
 from fedorbit.domain.enums import ArtifactState
+from fedorbit.domain.records import (
+    ArtifactFingerprint,
+    ArtifactIdentifier,
+    ExecutionCell,
+    SemanticCoordinates,
+)
 from fedorbit.execution.recovery import RecoveryBoundary
 from fedorbit.execution.reuse import (
     SelectiveInvalidation,
@@ -119,13 +125,25 @@ def test_recovery_boundary_finds_first_incomplete_cell(tmp_path: Path) -> None:
     store.write_reusable(manifest)
     record = RecoveryBoundary(store).next_resume(
         (
-            ("cell-1", manifest.artifact_id),
-            ("cell-2", "fp-missing"),
-            ("cell-3", "fp-missing"),
+            ExecutionCell(
+                SemanticCoordinates("cell-1"),
+                ArtifactIdentifier(manifest.artifact_id),
+                ArtifactFingerprint("fp-ok"),
+            ),
+            ExecutionCell(
+                SemanticCoordinates("cell-2"),
+                ArtifactIdentifier("fp-missing"),
+                ArtifactFingerprint("fp-missing"),
+            ),
+            ExecutionCell(
+                SemanticCoordinates("cell-3"),
+                ArtifactIdentifier("fp-missing"),
+                ArtifactFingerprint("fp-missing"),
+            ),
         )
     )
-    assert record.next_resume_coordinates == "cell-2"
-    assert "fp-missing" not in set(record.valid_artifact_ids)
+    assert record.next_resume_coordinates == SemanticCoordinates("cell-2")
+    assert ArtifactIdentifier("fp-missing") not in set(record.valid_artifact_ids)
 
 
 def test_recovery_boundary_all_valid(tmp_path: Path) -> None:
@@ -133,7 +151,15 @@ def test_recovery_boundary_all_valid(tmp_path: Path) -> None:
     payload = _payload(tmp_path, "ok.pt")
     manifest = _manifest(payload, "checkpoint", "training", "fp-ok")
     store.write_reusable(manifest)
-    record = RecoveryBoundary(store).next_resume((("cell-1", manifest.artifact_id),))
+    record = RecoveryBoundary(store).next_resume(
+        (
+            ExecutionCell(
+                SemanticCoordinates("cell-1"),
+                ArtifactIdentifier(manifest.artifact_id),
+                ArtifactFingerprint("fp-ok"),
+            ),
+        )
+    )
     assert record.next_resume_coordinates is None
 
 

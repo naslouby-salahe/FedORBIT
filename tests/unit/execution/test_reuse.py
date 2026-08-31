@@ -9,10 +9,24 @@ from fedorbit.artifacts.manifests import (
     file_sha256,
 )
 from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.domain.enums import ArtifactState
-from fedorbit.execution.reuse import ExecutionReuse
+from fedorbit.domain.enums import ArtifactState, OverwritePolicy
+from fedorbit.domain.records import (
+    ArtifactFingerprint,
+    ArtifactIdentifier,
+    ExecutionCell,
+    SemanticCoordinates,
+)
+from fedorbit.execution.reuse import ExecutionAction, ExecutionReuse
 
 COORDINATES = {"experiment": "Preprocessing", "dataset": "edge_iiotset_network"}
+
+
+def _cell(coordinates: str, fingerprint: str) -> ExecutionCell:
+    return ExecutionCell(
+        SemanticCoordinates(coordinates),
+        ArtifactIdentifier(fingerprint),
+        ArtifactFingerprint(fingerprint),
+    )
 
 
 def _payload(tmp_path: Path, name: str, content: bytes) -> Path:
@@ -53,9 +67,9 @@ def test_identical_fingerprint_is_reused_without_overwrite(tmp_path: Path) -> No
     store.write_reusable(_manifest(payload, fingerprint))
     reuse = ExecutionReuse(store)
 
-    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
+    decisions = reuse.decide((_cell("split-cell", fingerprint),), OverwritePolicy.REUSE)
     assert len(decisions) == 1
-    assert decisions[0].reuse
+    assert decisions[0].action == ExecutionAction.REUSE
     assert decisions[0].manifest is not None
 
 
@@ -63,8 +77,8 @@ def test_missing_artifact_is_executed(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     reuse = ExecutionReuse(store)
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
-    assert decisions[0].execute
+    decisions = reuse.decide((_cell("split-cell", fingerprint),), OverwritePolicy.REUSE)
+    assert decisions[0].action == ExecutionAction.EXECUTE
 
 
 def test_overwrite_flag_forces_recompute(tmp_path: Path) -> None:
@@ -73,8 +87,8 @@ def test_overwrite_flag_forces_recompute(tmp_path: Path) -> None:
     fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
     store.write_reusable(_manifest(payload, fingerprint))
     reuse = ExecutionReuse(store)
-    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=True)
-    assert decisions[0].overwrite
+    decisions = reuse.decide((_cell("split-cell", fingerprint),), OverwritePolicy.REPLACE)
+    assert decisions[0].action == ExecutionAction.OVERWRITE
 
 
 def test_stale_descendant_is_overwritten(tmp_path: Path) -> None:
@@ -85,11 +99,11 @@ def test_stale_descendant_is_overwritten(tmp_path: Path) -> None:
     store.write_reusable(manifest)
     reuse = ExecutionReuse(store)
     decisions = reuse.decide(
-        (("derived-cell", fingerprint),),
-        overwrite=False,
-        stale_artifact_ids=frozenset({manifest.artifact_id}),
+        (_cell("derived-cell", fingerprint),),
+        OverwritePolicy.REUSE,
+        stale_artifact_ids=frozenset({ArtifactIdentifier(manifest.artifact_id)}),
     )
-    assert decisions[0].overwrite
+    assert decisions[0].action == ExecutionAction.OVERWRITE
 
 
 def test_corrupted_payload_is_not_reused(tmp_path: Path) -> None:
@@ -100,8 +114,8 @@ def test_corrupted_payload_is_not_reused(tmp_path: Path) -> None:
     store.write_reusable(manifest)
     payload.write_bytes(b"corrupted")
     reuse = ExecutionReuse(store)
-    decisions = reuse.decide((("split-cell", fingerprint),), overwrite=False)
-    assert decisions[0].execute
+    decisions = reuse.decide((_cell("split-cell", fingerprint),), OverwritePolicy.REUSE)
+    assert decisions[0].action == ExecutionAction.EXECUTE
 
 
 def test_stale_descendants_detected_via_upstream_ids(tmp_path: Path) -> None:

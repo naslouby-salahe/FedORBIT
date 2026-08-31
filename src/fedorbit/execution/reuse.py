@@ -7,6 +7,12 @@ from enum import StrEnum
 from fedorbit.artifacts.manifests import ReusableArtifactManifest
 from fedorbit.artifacts.provenance import STAGE_DEPENDENCIES, STAGES
 from fedorbit.artifacts.storage import ArtifactStore, StorageError
+from fedorbit.domain.enums import OverwritePolicy
+from fedorbit.domain.records import (
+    ArtifactIdentifier,
+    ExecutionCell,
+    SemanticCoordinates,
+)
 
 
 class ReuseError(ValueError):
@@ -21,21 +27,9 @@ class ExecutionAction(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CellDecision:
-    cell_coordinates: str
+    cell_coordinates: SemanticCoordinates
     action: ExecutionAction
     manifest: ReusableArtifactManifest | None = None
-
-    @property
-    def reuse(self) -> bool:
-        return self.action == ExecutionAction.REUSE
-
-    @property
-    def overwrite(self) -> bool:
-        return self.action == ExecutionAction.OVERWRITE
-
-    @property
-    def execute(self) -> bool:
-        return self.action == ExecutionAction.EXECUTE
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,19 +79,24 @@ class ExecutionReuse:
 
     def decide(
         self,
-        cells: tuple[tuple[str, str], ...],
-        overwrite: bool,
-        stale_artifact_ids: frozenset[str] = frozenset(),
+        cells: tuple[ExecutionCell, ...],
+        overwrite_policy: OverwritePolicy,
+        stale_artifact_ids: frozenset[ArtifactIdentifier] = frozenset(),
     ) -> tuple[CellDecision, ...]:
         decisions: list[CellDecision] = []
-        for coordinates, fingerprint in cells:
-            manifest = self._store.find_by_fingerprint(fingerprint)
+        for cell in cells:
+            manifest = self._store.find_by_fingerprint(cell.dependency_fingerprint.value)
             if manifest is None or not manifest.payload_paths:
-                decisions.append(CellDecision(coordinates, ExecutionAction.EXECUTE))
-            elif overwrite or manifest.artifact_id in stale_artifact_ids:
-                decisions.append(CellDecision(coordinates, ExecutionAction.OVERWRITE, manifest))
+                decisions.append(CellDecision(cell.coordinates, ExecutionAction.EXECUTE))
+            elif (
+                overwrite_policy == OverwritePolicy.REPLACE
+                or ArtifactIdentifier(manifest.artifact_id) in stale_artifact_ids
+            ):
+                decisions.append(
+                    CellDecision(cell.coordinates, ExecutionAction.OVERWRITE, manifest)
+                )
             else:
-                decisions.append(CellDecision(coordinates, ExecutionAction.REUSE, manifest))
+                decisions.append(CellDecision(cell.coordinates, ExecutionAction.REUSE, manifest))
         return tuple(decisions)
 
     def validate_existing(self, decisions: tuple[CellDecision, ...]) -> None:

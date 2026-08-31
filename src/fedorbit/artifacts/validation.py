@@ -41,6 +41,24 @@ def validate_completion_manifest(manifest: CompletionManifest) -> None:
         raise ArtifactValidationError("completion manifest self-hash mismatch")
 
 
+def validate_completed_artifact(
+    manifest: ReusableArtifactManifest,
+    completion: CompletionManifest,
+) -> None:
+    validate_reusable_artifact(manifest)
+    validate_completion_manifest(completion)
+    if completion.terminal_state.value != ArtifactState.COMPLETED.value:
+        raise ArtifactValidationError("completion record is not completed")
+    if completion.dependency_fingerprint_sha256 != manifest.dependency_fingerprint_sha256:
+        raise ArtifactValidationError(
+            "completion record fingerprint does not match reusable manifest"
+        )
+    if completion.producer_stage != manifest.producer_stage:
+        raise ArtifactValidationError("completion record stage does not match reusable manifest")
+    if completion.completion_manifest_sha256 != manifest.completion_manifest_sha256:
+        raise ArtifactValidationError("completion record hash does not match reusable manifest")
+
+
 def validate_upstream_lineage(
     manifest: ReusableArtifactManifest,
     available_artifact_ids: frozenset[str],

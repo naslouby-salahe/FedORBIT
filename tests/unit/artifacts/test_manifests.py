@@ -298,11 +298,16 @@ def test_completed_storage_records_matching_completion_last(tmp_path: Path) -> N
             "payload_paths": (str(payload),),
             "payload_sha256": file_sha256(payload),
             "completion_manifest_sha256": completion.completion_manifest_sha256,
+            "completion_required": True,
         }
     )
     store = ArtifactStore(tmp_path / "outputs")
     store.write_completed(manifest, completion)
     assert store.read_completion(ArtifactIdentifier(manifest.artifact_id)) == completion
+    assert store.resolve(ArtifactIdentifier(manifest.artifact_id)) == manifest
+    store.completion_path(ArtifactIdentifier(manifest.artifact_id)).unlink()
+    with pytest.raises(StorageError, match="no completion manifest"):
+        store.resolve(ArtifactIdentifier(manifest.artifact_id))
 
 
 def test_completed_storage_rejects_incompatible_completion(tmp_path: Path) -> None:
@@ -323,6 +328,7 @@ def test_completed_storage_rejects_incompatible_completion(tmp_path: Path) -> No
             "payload_paths": (str(payload),),
             "payload_sha256": file_sha256(payload),
             "completion_manifest_sha256": completion.completion_manifest_sha256,
+            "completion_required": True,
         }
     )
     with pytest.raises(StorageError, match="fingerprint"):

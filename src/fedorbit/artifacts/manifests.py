@@ -51,6 +51,7 @@ class ReusableArtifactManifest(FrozenModel):
     created_git_commit: str
     created_environment_sha256: str
     state: ArtifactState
+    completion_required: bool = False
     completion_manifest_sha256: str
 
 

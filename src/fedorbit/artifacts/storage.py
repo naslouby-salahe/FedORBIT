@@ -6,8 +6,7 @@ import tempfile
 from pathlib import Path
 
 from fedorbit.artifacts.manifests import CompletionManifest, ReusableArtifactManifest
-from fedorbit.artifacts.validation import validate_completion_manifest, validate_reusable_artifact
-from fedorbit.domain.enums import TerminalState
+from fedorbit.artifacts.validation import validate_completed_artifact, validate_reusable_artifact
 from fedorbit.domain.records import ArtifactFingerprint, ArtifactIdentifier
 from fedorbit.domain.serialization import StableJsonPayload, stable_json
 
@@ -69,16 +68,12 @@ class ArtifactStore:
         manifest: ReusableArtifactManifest,
         completion: CompletionManifest,
     ) -> None:
-        validate_reusable_artifact(manifest)
-        validate_completion_manifest(completion)
-        if completion.terminal_state != TerminalState.COMPLETED:
-            raise StorageError("completion record must have a completed terminal state")
-        if completion.dependency_fingerprint_sha256 != manifest.dependency_fingerprint_sha256:
-            raise StorageError("completion record fingerprint does not match reusable manifest")
-        if completion.producer_stage != manifest.producer_stage:
-            raise StorageError("completion record stage does not match reusable manifest")
-        if completion.completion_manifest_sha256 != manifest.completion_manifest_sha256:
-            raise StorageError("completion record hash does not match reusable manifest")
+        if not manifest.completion_required:
+            raise StorageError("completed artifacts must require a completion record")
+        try:
+            validate_completed_artifact(manifest, completion)
+        except ValueError as error:
+            raise StorageError(str(error)) from error
         self.write_reusable(manifest)
         atomic_write_json(
             self.completion_path(ArtifactIdentifier(manifest.artifact_id)),
@@ -98,10 +93,13 @@ class ArtifactStore:
         return CompletionManifest.model_validate_json(path.read_text(encoding="utf-8"))
 
     def resolve(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest:
-        from fedorbit.artifacts.validation import validate_reusable_artifact
-
         manifest = self.read_reusable(artifact_id)
         validate_reusable_artifact(manifest)
+        if manifest.completion_required:
+            try:
+                validate_completed_artifact(manifest, self.read_completion(artifact_id))
+            except ValueError as error:
+                raise StorageError(str(error)) from error
         return manifest
 
     def find_by_fingerprint(
@@ -116,9 +114,7 @@ class ArtifactStore:
             if manifest.dependency_fingerprint_sha256 != fingerprint_sha256.value:
                 continue
             try:
-                from fedorbit.artifacts.validation import validate_reusable_artifact
-
-                validate_reusable_artifact(manifest)
+                self.resolve(ArtifactIdentifier(manifest.artifact_id))
             except ValueError:
                 return None
             return manifest
@@ -126,6 +122,7 @@ class ArtifactStore:
 
     def remove_manifest(self, artifact_id: ArtifactIdentifier) -> None:
         self.manifest_path(artifact_id).unlink(missing_ok=True)
+        self.completion_path(artifact_id).unlink(missing_ok=True)
 
     def all_manifests(self) -> tuple[ReusableArtifactManifest, ...]:
         if not self._manifests.is_dir():

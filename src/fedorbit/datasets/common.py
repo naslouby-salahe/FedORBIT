@@ -335,38 +335,44 @@ _AMBIGUOUS_EDGE_TIME = re.compile(r"^\d{4} \d{2}:\d{2}:\d{2}\.\d{1,9}$")
 
 
 def inspect_dataset(request: DatasetInspectionRequest) -> DatasetObservation:
-    path = _selected_path(request)
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        columns = tuple(reader.fieldnames or ())
-        if not columns:
-            raise DatasetInspectionError(f"empty selected table: {path}")
-        labels = _labels_for(request.dataset)
-        timestamp_field = (
-            active_config().scientific.datasets.clients[request.dataset].expected_timestamp_field
-        )
-        class_counts: Counter[str] = Counter()
-        binary_counts: Counter[str] = Counter()
-        event_time_tally = EventTimeTally()
-        rows = 0
-        inconsistent = 0
-        for row in reader:
-            rows += 1
-            multiclass = row.get(labels.multiclass_field)
-            binary = row.get(labels.binary_field)
-            if multiclass is None or binary is None:
-                raise DatasetInspectionError("selected table row is missing a required label field")
-            class_counts[multiclass] += 1
-            binary_counts[binary] += 1
-            if _binary_label_disagrees(multiclass, binary):
-                inconsistent += 1
-            if timestamp_field in columns:
-                timestamp = row.get(timestamp_field)
-                if timestamp is None:
+    paths = _selected_paths(request)
+    labels = _labels_for(request.dataset)
+    timestamp_field = (
+        active_config().scientific.datasets.clients[request.dataset].expected_timestamp_field
+    )
+    class_counts: Counter[str] = Counter()
+    binary_counts: Counter[str] = Counter()
+    event_time_tally = EventTimeTally()
+    rows = 0
+    inconsistent = 0
+    per_file_columns: list[tuple[str, ...]] = []
+    for path in paths:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            observed_columns = tuple(reader.fieldnames or ())
+            if not observed_columns:
+                raise DatasetInspectionError(f"empty selected table: {path}")
+            per_file_columns.append(observed_columns)
+            for row in reader:
+                rows += 1
+                multiclass = row.get(labels.multiclass_field)
+                binary = row.get(labels.binary_field)
+                if multiclass is None or binary is None:
                     raise DatasetInspectionError(
-                        "selected table row is missing its event-time field"
+                        "selected table row is missing a required label field"
                     )
-                event_time_tally.observe(timestamp.strip())
+                class_counts[multiclass] += 1
+                binary_counts[binary] += 1
+                if _binary_label_disagrees(multiclass, binary):
+                    inconsistent += 1
+                if timestamp_field in observed_columns:
+                    timestamp = row.get(timestamp_field)
+                    if timestamp is None:
+                        raise DatasetInspectionError(
+                            "selected table row is missing its event-time field"
+                        )
+                    event_time_tally.observe(timestamp.strip())
+    columns = reconcile_component_columns(tuple(per_file_columns))
     return DatasetObservation(
         dataset=request.dataset,
         row_count=rows,
@@ -455,17 +461,42 @@ def _labels_for(dataset: DatasetId) -> LabelFields:
     return LabelFields("type", "label")
 
 
-def _selected_path(request: DatasetInspectionRequest) -> Path:
+def reconcile_component_columns(
+    columns_by_file: tuple[tuple[str, ...], ...],
+) -> tuple[str, ...]:
+    if not columns_by_file:
+        raise DatasetInspectionError("no selected component table")
+    canonical = list(columns_by_file[0])
+    for columns in columns_by_file[1:]:
+        current = set(columns)
+        canonical_set = set(canonical)
+        divergent = [
+            column
+            for column in (*canonical, *columns)
+            if (column not in current or column not in canonical_set)
+            and role_for_field(column) == FieldRole.BEHAVIORAL_CATEGORICAL
+        ]
+        if divergent:
+            raise DatasetInspectionError(
+                f"component telemetry schema diverges on behavioral column {divergent[0]!r}"
+            )
+        canonical = [column for column in canonical if column in current]
+    return tuple(canonical)
+
+
+def _selected_paths(request: DatasetInspectionRequest) -> tuple[Path, ...]:
     from fedorbit.datasets.edge_iiotset.loader import discover_edge_tabular_files
     from fedorbit.datasets.ton_iot.components import component_for
     from fedorbit.datasets.ton_iot.loader import discover_ton_iot_component_files
 
     if request.dataset == DatasetId.EDGE_IIOTSET_NETWORK:
-        return discover_edge_tabular_files(request.raw_root / RawDatasetDirectory.EDGE_IIOTSET)[0]
+        edge_root = request.raw_root / RawDatasetDirectory.EDGE_IIOTSET
+        edge_files = discover_edge_tabular_files(edge_root)
+        return (edge_files[0],)
     return discover_ton_iot_component_files(
         request.raw_root / RawDatasetDirectory.TON_IOT,
         component_for(request.dataset),
-    )[0]
+    )
 
 
 def _binary_label_disagrees(multiclass: str, binary: str) -> bool:

@@ -34,12 +34,14 @@ def discover_ton_iot_component_files(
 ) -> tuple[Path, ...]:
     if not raw_root.is_dir():
         raise FileNotFoundError(raw_root)
-    selected = raw_root / component.relative_path
-    if not selected.is_file():
+    selected = tuple(raw_root / relative_path for relative_path in component.relative_paths)
+    missing = tuple(path for path in selected if not path.is_file())
+    if missing:
         raise TonIotLoaderError(
-            f"selected ToN-IoT component table is absent for {component.component_name}: {selected}"
+            "selected ToN-IoT component table is absent for "
+            f"{component.component_name}: {missing[0]}"
         )
-    return (selected,)
+    return selected
 
 
 def inspect_ton_iot_component_files(
@@ -64,12 +66,10 @@ def inspect_ton_iot_component_files(
                 columns,
             )
         )
-    expected_columns = set(inspected[0].columns)
-    for file in inspected[1:]:
-        if set(file.columns) != expected_columns:
-            message = (
-                f"feature-name set differs within component {component.component_name}: "
-                f"{file.relative_path}"
-            )
-            raise TonIotLoaderError(message)
+    from fedorbit.datasets.common import DatasetInspectionError, reconcile_component_columns
+
+    try:
+        reconcile_component_columns(tuple(file.columns for file in inspected))
+    except DatasetInspectionError as exc:
+        raise TonIotLoaderError(str(exc)) from exc
     return tuple(inspected)

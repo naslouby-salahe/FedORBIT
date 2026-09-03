@@ -11,24 +11,30 @@ from fedorbit.types import DatasetId
 class TonIotComponent:
     dataset_id: DatasetId
     component_name: str
-    relative_path: str
+    relative_paths: tuple[str, ...]
 
 
 TON_COMPONENTS = (
     TonIotComponent(
         DatasetId.TON_IOT_WINDOWS10_HOST,
         "windows10_host",
-        "Train_Test_datasets/Train_Test_Windows_dataset/Train_Test_Windows_10.csv",
+        ("Processed_datasets/Processed_Windows_dataset/windows10_dataset.csv",),
     ),
     TonIotComponent(
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
         "linux_process",
-        "Train_Test_datasets/Train_Test_Linux_dataset/Train_Test_Linux_process.csv",
+        (
+            "Processed_datasets/Processed_Linux_dataset/Linux_process_1.csv",
+            "Processed_datasets/Processed_Linux_dataset/Linux_process_2.csv",
+        ),
     ),
     TonIotComponent(
         DatasetId.TON_IOT_NETWORK,
         "network",
-        "Train_Test_datasets/Train_Test_Network_dataset/train_test_network.csv",
+        tuple(
+            f"Processed_datasets/Processed_Network_dataset/Network_dataset_{index}.csv"
+            for index in range(1, 24)
+        ),
     ),
 )
 

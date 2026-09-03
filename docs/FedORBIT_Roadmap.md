@@ -510,7 +510,7 @@ The source documentation establishes Edge-IIoTset as network-derived IoT/IIoT te
 
 Edge-IIoTset Network Client:
 
-* use official tabular Edge-IIoTset traffic records;
+* retain official tabular Edge-IIoTset traffic records only for optional external robustness work;
 * expected event-time semantic field: `frame.time` or release-equivalent event timestamp;
 * binary and multiclass label fields are builder-only and removed from model input.
 
@@ -518,17 +518,18 @@ ToN-IoT Windows 10 Host Client:
 
 * use only the Windows 10 host telemetry component;
 * Windows 7 records are excluded;
+* select `Processed_datasets/Processed_Windows_dataset/windows10_dataset.csv`;
 * expected event-time semantic field: `ts` or release-equivalent timestamp.
 
 ToN-IoT Linux Process Host Client:
 
-* use only Linux process telemetry;
-* Linux disk and memory tables are excluded from this client to keep one explicit local schema;
+* use `Linux_process_1.csv` and `Linux_process_2.csv` from `Processed_datasets/Processed_Linux_dataset` as one explicit process-telemetry client;
+* Linux disk and memory tables are excluded;
 * expected event-time semantic field: `ts` or release-equivalent timestamp.
 
 ToN-IoT Network Client:
 
-* use only the ToN_IoT network-flow component;
+* use the numbered `Network_dataset_*.csv` files from `Processed_datasets/Processed_Network_dataset` as one explicit network-flow client;
 * expected event-time semantic field: `ts` or release-equivalent timestamp.
 
 A dataset adapter may accept a release-equivalent renamed timestamp column only when:
@@ -1618,7 +1619,7 @@ while destroying row/column procedural geometry.
 
 Uses the hidden benchmark or synthetic exact correspondence and otherwise the same action, confirmation, and assimilation budgets.
 
-Oracle information may not influence non-oracle fitting, pilot selection, or claim-bearing method execution.
+Oracle information may not influence non-oracle fitting, pilot selection, or evidence-bearing method execution.
 
 ## 4.20 Target importance definition
 
@@ -1808,7 +1809,7 @@ Confirmation Safety
 
 No global correction is performed across these scientifically distinct families.
 
-No unregistered confirmatory contrast may be added after the first claim-bearing TEST outcome is opened.
+No unregistered confirmatory contrast may be added after the first evidence-bearing TEST outcome is opened.
 
 ## 4.25 Claim/materiality criteria
 
@@ -1816,20 +1817,20 @@ No unregistered confirmatory contrast may be added after the first claim-bearing
 
 Supported only when:
 
-1. at least the configured required number of the four primary directed pairs have mean relative macro-CE gain vs Local-Only at least `scientific.materiality.realized_relative_macro_ce`;
+1. at least four of the six primary directed pairs have mean relative macro-CE gain vs Local-Only at least `scientific.materiality.realized_relative_macro_ce`;
 2. each successful pair has Holm-adjusted $p$ below the configured claim threshold;
 3. each successful pair has BCa lower bound strictly greater than the configured zero boundary;
 4. no primary pair has mean gain at or below `scientific.materiality.harmful_transfer_relative_macro_ce_gain`;
-5. the equal-pair mean of the four pair means is at least `scientific.materiality.realized_relative_macro_ce`;
+5. the equal-pair mean of the six pair means is at least `scientific.materiality.realized_relative_macro_ce`;
 6. all contributing runs satisfy strict-resource validation.
 
-The configured required successful-pair count, Holm threshold, and BCa boundary are under `scientific.claim_criteria.strict_cross_telemetry_utility`. The materiality and harm thresholds are shared scientific materiality values rather than duplicated claim-specific configuration.
+The configured required successful-pair count, Holm threshold, and BCa boundary are under `scientific.evaluation_criteria.strict_cross_telemetry_utility`. The materiality and harm thresholds are shared scientific materiality values rather than duplicated claim-specific configuration.
 
-If exactly one primary pair is removed from claim scope before principal outcome inspection by the Dataset, Client, and Strict-Resource Validation rules, full-scope `Supported` is unavailable. The only reduced-scope positive state is the `Conditional` state in Section 16.1: the three remaining pairs replace “four primary pairs” only for the equal-pair mean and no-harm checks, while all three must individually satisfy the successful-pair materiality, Holm, BCa, and strict-resource criteria. No other denominator reduction is permitted.
+If any primary pair is removed from scope before principal outcome inspection by the Dataset, Client, and Strict-Resource Validation rules, full-scope `Supported` is unavailable. No reduced-scope positive state is permitted.
 
 ### External source value vs Local-SIR
 
-Uses the same materiality, no-material-harm, Holm, CI, equal-pair, and one-pair pre-outcome reduced-scope structure versus Local-SIR, with its configured required successful-pair count, Holm threshold, and BCa boundary under `scientific.claim_criteria.external_source_value_vs_local_sir`.
+Uses the same materiality, no-material-harm, Holm, CI, equal-pair, and one-pair pre-outcome reduced-scope structure versus Local-SIR, with its configured required successful-pair count, Holm threshold, and BCa boundary under `scientific.evaluation_criteria.external_source_value_vs_local_sir`.
 
 ### Coupling mechanism
 
@@ -1837,7 +1838,7 @@ Requires all of:
 
 1. the configured theorem zero/strict classification accuracy on the controlled designed family;
 2. at least the configured valid-packet fraction have coupling gap at least `scientific.materiality.coupling_objective_units`;
-3. at least the configured number of the four primary pairs have mean gap at least `scientific.materiality.coupling_objective_units` with Holm-adjusted $p$ below the configured coupling claim threshold;
+3. at least three of the six primary pairs have mean gap at least `scientific.materiality.coupling_objective_units` with Holm-adjusted $p$ below the configured coupling threshold;
 4. coupling destruction does not satisfy the registered mechanism-retention condition below.
 
 For primary pair \(p\), let \(\bar G^{full}_p\) and \(\bar G^{destroyed}_p\) be the seed-mean TEST relative macro-CE gains versus the identical Local-Only reference. Define
@@ -1852,7 +1853,7 @@ only when \(\bar G^{full}_p\gt 0\); otherwise `Retention_p = NA`. A pair is a **
 1. the Full-vs-Coupling-Destroyed TOST contrast for that pair establishes equivalence after Holm correction in the `Mechanism Ablations` family; and
 2. \(Retention_p\ge\texttt{scientific.claim＿criteria.coupling＿mechanism.destruction＿positive＿gain＿retention＿minimum}\).
 
-The registered mechanism-retention condition is present when at least `scientific.claim_criteria.coupling_mechanism.primary_pairs_with_material_mean_gap_required` primary pairs are mechanism-retention pairs. `NA` retention values never count toward this condition.
+The registered mechanism-retention condition is present when at least `scientific.evaluation_criteria.coupling_mechanism.primary_pairs_with_material_mean_gap_required` primary pairs are mechanism-retention pairs. `NA` retention values never count toward this condition.
 
 ### Sparse operational relevance
 
@@ -1882,7 +1883,7 @@ $$
 
 The claim requires:
 
-1. at least 3 of 4 primary pairs satisfy $ARR\ge0.02$ or $RRR\ge0.30$;
+1. at least four of the six primary directed pairs satisfy $ARR\ge0.02$ or $RRR\ge0.30$;
 2. those qualifying pairs have mean coverage loss $\le0.20$;
 3. no primary pair has harmful-rate worsening $\gt 0.02$;
 4. no primary pair loses more than 0.20 coverage;
@@ -1905,7 +1906,7 @@ Full training executions are timed once per scientific cell. Training is not rep
 
 ## 4.27 Environment configuration
 
-Dependency version identifiers are configuration data. The resolved-lockfile requirement and the prohibition on dependency upgrades once claim-bearing confirmatory execution has begun are fixed reproducibility rules.
+Dependency version identifiers are configuration data. The resolved-lockfile requirement and the prohibition on dependency upgrades once evidence-bearing confirmatory execution has begun are fixed reproducibility rules.
 
 The implementation environment is fixed to:
 
@@ -1928,7 +1929,7 @@ The implementation environment is fixed to:
 
 The repository must contain a fully resolved lockfile containing transitive package versions and package hashes.
 
-No dependency upgrade is permitted after the first claim-bearing confirmatory cell has begun execution.
+No dependency upgrade is permitted after the first evidence-bearing confirmatory cell has begun execution.
 
 ## 4.28 Reporting specification
 
@@ -1949,31 +1950,11 @@ Figures always use unrounded source values.
 
 ## 4.29 Test and smoke execution configuration
 
-`configs/tests.yml` and `configs/smoke.yml` contain only nonclaim execution-fixture controls. Their keys may not shadow or override any key under `scientific`, `solvers`, `generators`, `experiments`, `runtime`, `environment`, or `reporting` in `configs/fedorbit.yaml`.
-
-`configs/tests.yml` is exactly:
-
-```yaml
-fixture_seed: 0
-synthetic_instances_per_case: 3
-tiny_rows_per_class: 64
-tiny_optimizer_steps: 2
-```
-
-`configs/smoke.yml` is exactly:
-
-```yaml
-fixture_seed: 0
-synthetic_instances_per_case: 2
-tiny_rows_per_class: 64
-tiny_optimizer_steps: 2
-```
-
-These values control only synthetic/tiny test fixtures and test-runtime truncation. They never alter production data, registered scientific cells, model architecture, production optimizer horizons, seeds, thresholds, support, metrics, or claim decisions. Test/smoke artifacts are isolated from claim-bearing artifact namespaces and cannot be reused by production experiments.
+`configs/fedorbit.yaml` is the sole YAML configuration authority. Tests and smoke execution consume its typed configuration and may restrict workload only through typed execution plans; they never redefine scientific values, registered cells, model architecture, horizons, seeds, thresholds, support, or metrics.
 
 # Configuration YAML
 
-Production scientific execution uses one authoritative configuration file: `configs/fedorbit.yaml`. The contents below are complete and authoritative for configuration data only. `configs/tests.yml` and `configs/smoke.yml` are isolated deterministic configurations for automated tests and the smoke workflow; they do not define, override, or amend claim-bearing scientific configuration. Fixed scientific and execution behavior is defined in the corresponding roadmap sections and must not be re-encoded as YAML prose, formulas, references, or procedural strings.
+Production scientific execution uses one authoritative configuration file: `configs/fedorbit.yaml`. The contents below are complete and authoritative for configuration data only. Fixed scientific and execution behavior is defined in the corresponding roadmap sections and must not be re-encoded as YAML prose, formulas, references, or procedural strings.
 
 ```yaml
 scientific:
@@ -2008,7 +1989,7 @@ scientific:
   datasets:
     clients:
       edge_iiotset_network:
-        role: primary
+        role: external
         source: Edge-IIoTset
         component: "network/IoT traffic"
         expected_timestamp_field: "frame.time"
@@ -2023,30 +2004,26 @@ scientific:
         component: "Linux process telemetry"
         expected_timestamp_field: "ts"
       ton_iot_network:
-        role: secondary
+        role: primary
         source: ToN_IoT
         component: "network-flow telemetry"
         expected_timestamp_field: "ts"
     timestamp_alias_acceptance:
       retained_row_parse_success_minimum: 0.999
     primary_directed_pairs:
-    - source: edge_iiotset_network
-      target: ton_iot_windows10_host
     - source: ton_iot_windows10_host
-      target: edge_iiotset_network
-    - source: edge_iiotset_network
       target: ton_iot_linux_process_host
     - source: ton_iot_linux_process_host
-      target: edge_iiotset_network
-    secondary_directed_pairs:
-    - source: ton_iot_network
       target: ton_iot_windows10_host
     - source: ton_iot_windows10_host
       target: ton_iot_network
     - source: ton_iot_network
-      target: ton_iot_linux_process_host
+      target: ton_iot_windows10_host
     - source: ton_iot_linux_process_host
       target: ton_iot_network
+    - source: ton_iot_network
+      target: ton_iot_linux_process_host
+    secondary_directed_pairs: []
     local_prediction_normal_label: Normal
 
   split:
@@ -2143,28 +2120,28 @@ scientific:
     tost_alpha_per_one_sided_test: 0.05
     spearman_minimum_valid_points: 5
     mcnemar_exact_to_asymptotic_discordant_pair_switch: 25
-  claim_criteria:
+  evaluation_criteria:
     strict_cross_telemetry_utility:
-      successful_primary_pairs_required: 3
+      successful_primary_pairs_required: 4
       holm_adjusted_p_maximum: 0.05
       bca_lower_bound_strictly_greater_than: 0.0
     external_source_value_vs_local_sir:
-      successful_primary_pairs_required: 3
+      successful_primary_pairs_required: 4
       holm_adjusted_p_maximum: 0.05
       bca_lower_bound_strictly_greater_than: 0.0
     coupling_mechanism:
       theorem_zero_strict_classification_accuracy_required: 1.0
       real_packet_fraction_with_material_gap_minimum: 0.25
-      primary_pairs_with_material_mean_gap_required: 2
+      primary_pairs_with_material_mean_gap_required: 3
       holm_adjusted_p_maximum: 0.05
       destruction_positive_gain_retention_minimum: 0.90
     sparse_operational_relevance:
       compared_sparse_support: 3
       dense_minus_sparse_gain_maximum: 0.01
       valid_unit_fraction_required: 0.75
-      primary_pairs_with_useful_gain_required: 2
+      primary_pairs_with_useful_gain_required: 3
     confirmation_safety:
-      qualifying_primary_pairs_required: 3
+      qualifying_primary_pairs_required: 4
       absolute_risk_reduction_minimum: 0.02
       relative_risk_reduction_minimum: 0.30
       qualifying_pair_coverage_loss_maximum: 0.20
@@ -2317,9 +2294,9 @@ experiments:
     - "Exact-Map Oracle"
   multi_source_selection_validation:
     targets:
-    - edge_iiotset_network
     - ton_iot_windows10_host
     - ton_iot_linux_process_host
+    - ton_iot_network
   mechanism_ablations:
     methods:
     - "FedORBIT Exact-Sparse Solver"
@@ -2630,37 +2607,35 @@ Dataset/component identifiers, directed-pair lists, split boundaries, preprocess
 
 ## 6.1 Real benchmark clients
 
-Primary benchmark client identities are telemetry-domain proxies, not claims of independent real organizations:
+Primary benchmark client identities are telemetry-domain proxies, not independent real organizations:
 
-* Edge-IIoTset Network Client;
 * ToN-IoT Windows 10 Host Client;
-* ToN-IoT Linux Process Host Client.
-
-Secondary client:
-
+* ToN-IoT Linux Process Host Client;
 * ToN-IoT Network Client.
+
+External-only client:
+
+* Edge-IIoTset Network Client, retained solely for a separately configured robustness extension after a valid event-time release is supplied.
 
 ## 6.2 Primary directed pairs
 
 Exactly:
 
 ```text
-Edge-IIoTset Network → ToN-IoT Windows 10 Host
-ToN-IoT Windows 10 Host → Edge-IIoTset Network
-Edge-IIoTset Network → ToN-IoT Linux Process Host
-ToN-IoT Linux Process Host → Edge-IIoTset Network
+ToN-IoT Windows 10 Host → ToN-IoT Linux Process Host
+ToN-IoT Linux Process Host → ToN-IoT Windows 10 Host
+ToN-IoT Windows 10 Host → ToN-IoT Network
+ToN-IoT Network → ToN-IoT Windows 10 Host
+ToN-IoT Linux Process Host → ToN-IoT Network
+ToN-IoT Network → ToN-IoT Linux Process Host
 ```
 
 ## 6.3 Secondary directed pairs
 
-Exactly:
-
-```text
-ToN-IoT Network → ToN-IoT Windows 10 Host
-ToN-IoT Windows 10 Host → ToN-IoT Network
-ToN-IoT Network → ToN-IoT Linux Process Host
-ToN-IoT Linux Process Host → ToN-IoT Network
-```
+No secondary directed pairs are preregistered. Edge-IIoTset is not part of the
+confirmatory campaign because its selected table does not provide a uniquely resolvable
+event time. A future external extension requires an independently valid timestamped
+release and a separately documented analysis plan.
 
 ## 6.4 Candidate hidden transfer ontology
 
@@ -2843,15 +2818,14 @@ selected Edge table is also Invalid Data for the chronological protocol in Secti
 preprocessing records that validation result and does not use file order, row order, or
 an inferred date.
 
-The selected ToN-IoT release tables are `Train_Test_Windows_dataset/Train_Test_Windows_10.csv`
-(21,104 rows, 126 columns), `Train_Test_Linux_dataset/Train_Test_Linux_process.csv`
-(90,112 rows, 16 columns), and `Train_Test_Network_dataset/train_test_network.csv`
-(211,043 rows, 44 columns). Each contains the required `label` and `type` fields, but
-none contains `ts` or another uniquely resolvable event-time field. Consequently these
-three available selected tables are Invalid Data for the chronological protocol in
-Section 6.8. Preprocessing must record that validation result and must not substitute
-file order, row order, or an inferred timestamp; principal training and evaluation are
-blocked until releases containing the required event-time fields are supplied.
+The former `Train_Test_*` selections are not used: their lack of `ts` makes them
+unsuitable for chronological splitting. The primary inputs are the ToN-IoT Processed
+Windows 10, Linux process, and numbered network tables named in Section 4.4. They are
+not present in this checkout as of 2026-08-30, so no row count, timestamp range, or
+chronology result is asserted here. On acquisition, preprocessing must verify `ts` for
+every selected file, require a single consistent schema within each logical client, and
+record the observed parse result. It must not fall back to file order, row order, or an
+inferred timestamp.
 
 # 7. Local Models and Procedural-Response Estimation
 
@@ -3383,7 +3357,7 @@ $$
 
 `RRR` is NA when the no-confirm harmful rate is zero.
 
-Pair-level `Coverage_confirm`, `Coverage_noConfirm`, `CoverageLoss`, `harmRate_confirm`, and `harmRate_noConfirm` are arithmetic means of their valid seed-level values. Project-level equal-pair harm rates and coverage losses are arithmetic means of the four primary pair means; a primary pair without the configured minimum valid paired seeds makes the full-scope confirmation claim unavailable rather than changing the denominator. Equal-pair `ARR` is the difference of the equal-pair no-confirm and confirm harmful rates. Equal-pair `RRR` is computed from those equal-pair harmful rates, not by averaging pair-specific RRR values, and is `NA` when the equal-pair no-confirm harmful rate is zero.
+Pair-level `Coverage_confirm`, `Coverage_noConfirm`, `CoverageLoss`, `harmRate_confirm`, and `harmRate_noConfirm` are arithmetic means of their valid seed-level values. Project-level equal-pair harm rates and coverage losses are arithmetic means of the six primary pair means; a primary pair without the configured minimum valid paired seeds makes the full-scope confirmation result unavailable rather than changing the denominator. Equal-pair `ARR` is the difference of the equal-pair no-confirm and confirm harmful rates. Equal-pair `RRR` is computed from those equal-pair harmful rates, not by averaging pair-specific RRR values, and is `NA` when the equal-pair no-confirm harmful rate is zero.
 
 `Beneficial Rejected Rate` is registered only for the single-source `Target Confirmation and Portability` experiment, where each rejected principal proposal has an exact paired `FedORBIT Without Confirmation` cell using that same source/action:
 
@@ -3554,7 +3528,7 @@ Multiplicity is applied only to the following predeclared pair-specific contrast
 
 ### Primary Transfer vs Local-Only
 
-Exactly four potential contrasts, one per primary directed pair:
+Exactly six potential contrasts, one per primary directed pair:
 
 ```text
 FedORBIT Exact-Sparse Solver vs Local-Only — TEST relative macro-CE gain
@@ -3564,7 +3538,7 @@ The tested seed-level quantity is \(G_{CE}(\mathrm{FedORBIT},\mathrm{Local\text{
 
 ### External Source vs Local-SIR
 
-Exactly eight potential contrasts, two per primary directed pair:
+Exactly twelve potential contrasts, two per primary directed pair:
 
 ```text
 FedORBIT Exact-Sparse Solver vs Local-SIR — TEST relative macro-CE gain superiority
@@ -3575,7 +3549,7 @@ The superiority contrast uses the registered two-sided exact sign-flip p-value f
 
 ### Coupling Mechanism
 
-Exactly four potential contrasts, one per primary directed pair:
+Exactly six potential contrasts, one per primary directed pair:
 
 ```text
 Exact correspondence orbit vs Matched-Resource Rectangular — robust coupling value gap
@@ -3585,7 +3559,7 @@ The seed-level tested quantity is \(G_{\rm coupling}\) and the superiority null 
 
 ### Point-Correspondence Safety
 
-Exactly eight potential contrasts, two per primary directed pair:
+Exactly twelve potential contrasts, two per primary directed pair:
 
 ```text
 FedORBIT Exact-Sparse Solver vs Point-Correspondence Commitment — TEST relative macro-CE difference
@@ -3596,7 +3570,7 @@ The first uses the registered two-sided exact sign-flip p-value. The second uses
 
 ### Mechanism Ablations
 
-Exactly eight claim-bearing multiplicity-controlled contrasts, two per primary directed pair:
+Exactly twelve evidence-bearing multiplicity-controlled contrasts, two per primary directed pair:
 
 ```text
 FedORBIT Exact-Sparse Solver vs Coupling-Destroyed FedORBIT — TEST relative macro-CE difference
@@ -3607,7 +3581,7 @@ The difference contrast uses the registered two-sided exact sign-flip p-value. T
 
 ### Sparsity Sensitivity
 
-Exactly twelve potential contrasts: for each primary directed pair,
+Exactly eighteen potential contrasts: for each primary directed pair,
 
 ```text
 exact sparse s=1 vs exact sparse s=2
@@ -3619,7 +3593,7 @@ The seed-level quantity is TEST relative macro-CE difference under the common Lo
 
 ### Confirmation Safety
 
-Exactly four potential contrasts, one per primary directed pair:
+Exactly six potential contrasts, one per primary directed pair:
 
 ```text
 FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with confirmation — harmful-transfer rate difference
@@ -3627,7 +3601,7 @@ FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with confirmation 
 
 The seed-level statistic is `harmRate_noConfirm - harmRate_confirm`; positive values favor confirmation.
 
-For every family, Holm family size is the number of the explicitly enumerated p-value inputs above that have enough valid paired seeds to be tested. A superiority p-value and a TOST `p_equiv` listed for the same pair are two distinct Holm inputs. Missing inputs are recorded with their reason and are not assigned p-values. Holm ties follow Section 4.23. No unlisted contrast may be inserted into a family after claim-bearing TEST access begins.
+For every family, Holm family size is the number of the explicitly enumerated p-value inputs above that have enough valid paired seeds to be tested. A superiority p-value and a TOST `p_equiv` listed for the same pair are two distinct Holm inputs. Missing inputs are recorded with their reason and are not assigned p-values. Holm ties follow Section 4.23. No unlisted contrast may be inserted into a family after evidence-bearing TEST access begins.
 
 # 14. Synthetic and Controlled Generator Contract
 
@@ -4066,9 +4040,9 @@ Pass:
 
 Covers:
 
-* all four real clients;
-* four primary pairs;
-* four secondary pairs;
+* three primary real clients and one external-only client;
+* six primary pairs;
+* no secondary pairs;
 * all confirmatory seeds.
 
 Pass requirements:
@@ -4314,7 +4288,7 @@ Every fixture must respect the registered map bound.
 
 Pairs:
 
-* all four primary directed pairs.
+* all six primary directed pairs.
 
 Seeds:
 
@@ -4339,7 +4313,7 @@ Principal support:
 Planned cells before deterministic data invalidations:
 
 $$
-4\times10\times7=280.
+6\times10\times7=420.
 $$
 
 Primary outcome:
@@ -4355,15 +4329,14 @@ TEST remains sealed until the pre-TEST decision contract passes.
 Targets:
 
 ```text
-Edge-IIoTset Network Client
 ToN-IoT Windows 10 Host Client
 ToN-IoT Linux Process Host Client
+ToN-IoT Network Client
 ```
 
 Candidate sources:
 
 * every other primary client;
-* ToN network when strict-valid;
 * no more than the configured maximum.
 
 Seeds:
@@ -4406,7 +4379,7 @@ Local-SIR
 Derived condition cells before identity reuse:
 
 $$
-4\times10\times8=320.
+6\times10\times8=480.
 $$
 
 Already valid semantic cells are reused rather than duplicated.
@@ -4427,13 +4400,13 @@ dense CCP
 Primary pair-seed units:
 
 $$
-4\times10.
+6\times10.
 $$
 
 Derived cells:
 
 ```text
-160
+240
 ```
 
 Principal $s=2$ cells are reused when already complete.
@@ -4444,8 +4417,7 @@ Principal $s=2$ cells are reused when already complete.
 
 Pairs:
 
-* four primary;
-* four secondary where valid.
+* six primary.
 
 Methods:
 
@@ -4457,10 +4429,10 @@ FedORBIT Without Confirmation
 Derived planned cells:
 
 $$
-8\times10\times2=160.
+6\times10\times2=120.
 $$
 
-Primary claim uses the four primary pairs only.
+The confirmatory analysis uses the six primary pairs only.
 
 ## Secondary Cross-Modality Generalization
 
@@ -4468,7 +4440,7 @@ Primary claim uses the four primary pairs only.
 
 Pairs:
 
-* all four secondary directed pairs.
+* no pairs are preregistered while Edge-IIoTset remains external-only.
 
 Methods:
 
@@ -4483,7 +4455,7 @@ FedORBIT Exact-Sparse Solver
 Derived planned cells:
 
 ```text
-200
+0
 ```
 
 This is secondary within-ToN-suite evidence and cannot independently establish cross-dataset generalization.
@@ -4650,7 +4622,7 @@ $$
 Human public-resource audit:
 
 * two independent researchers;
-* four primary directed pairs;
+* six primary directed pairs;
 * exactly 60 minutes per researcher per pair;
 * access to public dataset documentation, published label descriptions, exposed coarse groups, and the strict-interface resource list;
 * no oracle mapping artifact, oracle comparison output, or precomputed source-target fine-map table during the timed assessment.
@@ -4790,9 +4762,9 @@ Performs:
 * materiality;
 * completeness checks.
 
-The synthesis consumes the currently valid claim-bearing metric artifacts under their dependency fingerprints. Re-running synthesis with unchanged inputs reuses the existing statistical artifacts; changed metric/statistical dependencies invalidate only the affected statistical descendants.
+The synthesis consumes the currently valid evidence-bearing metric artifacts under their dependency fingerprints. Re-running synthesis with unchanged inputs reuses the existing statistical artifacts; changed metric/statistical dependencies invalidate only the affected statistical descendants.
 
-## Claim-Evidence Adjudication
+## Evidence Classification
 
 **Classification:** FINAL EVIDENCE.
 
@@ -4800,11 +4772,11 @@ Inputs:
 
 * completed valid registered results;
 * completed verified statistical synthesis;
-* claim catalogue.
+* evidence criteria.
 
 Outputs:
 
-* one claim state;
+* one evidence status;
 * permitted manuscript scope;
 * forbidden extrapolations;
 * supporting artifact references.
@@ -4819,20 +4791,20 @@ The Experiment Catalogue is executed through the shared artifact stages defined 
 | --- | --- | --- | --- |
 | Mathematical Primitive Validation | registered hand fixtures, primitive implementation, deterministic seeds | primitive-validation results, fixture serialization checks, pass/fail completion manifest | blocks every experiment; reused as the primitive prerequisite until its own dependencies change |
 | Exact Sparse Theorem Exhaustive Validation | primitive-validation pass, exact-separator generator contract, block/support coordinates, confirmatory seeds | generated instances, exhaustive-orbit truth, generic-QAP comparison, correspondence certificates, exactness metrics | exact-sparse solver benchmark, synthetic/real mechanism experiments, principal solver use |
-| Coupling and Map-Bound Validation | primitive-validation pass, coupling generator contract, map-bound fixtures, confirmatory seeds | coupling instances, structural zero/strict labels, exact coupling values, map-bound validation results | synthetic coupling mechanism, map-value diagnostics, claim adjudication |
+| Coupling and Map-Bound Validation | primitive-validation pass, coupling generator contract, map-bound fixtures, confirmatory seeds | coupling instances, structural zero/strict labels, exact coupling values, map-bound validation results | synthetic coupling mechanism, map-value diagnostics, evidence classification |
 | Dataset, Client, and Strict-Resource Validation | raw manifests, prepared splits, preprocessors, processed splits, local-class manifests, transfer-eligibility manifests, strict-resource rules | pair-seed validity manifest, exclusions, resource-access validation, dataset/client validation results | every real-data pilot, packet, transfer, confirmation, generalization, ablation, and real timing experiment |
 | Base-Model Hyperparameter Pilot | valid prepared client data, TRAIN/VALID processed splits, model family, pilot grid, pilot seeds | pilot checkpoints and VALID metrics, deterministic hyperparameter-selection artifact, confirmatory base checkpoints with optimizer/RNG state | source-response pilot/final packets, target importance, confirmations, local references, all real-data methods |
 | Source-Response Estimator Pilot | selected base-model pilot artifacts, source TRAIN/META data, transfer eligibility, response candidate grid and paired schedules | candidate response diagnostics, eligibility results, selected response-estimator configuration per source client/model family | final source-response packet construction |
 | Final Source-Response Band Validation | confirmatory source checkpoints, selected response-estimator artifact, source TRAIN/META data, transfer-node manifest, response schedules | paired replicate artifacts, simultaneous-band artifacts, final anonymous source-response packets, stability metrics | real-packet coupling, principal transfer, multi-source selection, ablations, sparsity/dense, secondary generalization, boundaries, real solver timing |
-| Baseline and Oracle Correctness Validation | primitive prerequisite, validation fixtures, strict-resource matrix, tractable packets/instances, registered baseline and oracle implementations | baseline correctness certificates, oracle ACL validation, deterministic replay results | claim-bearing baseline comparisons and principal transfer |
+| Baseline and Oracle Correctness Validation | primitive prerequisite, validation fixtures, strict-resource matrix, tractable packets/instances, registered baseline and oracle implementations | baseline correctness certificates, oracle ACL validation, deterministic replay results | evidence-bearing baseline comparisons and principal transfer |
 | Exact-Sparse Solver Benchmark | theorem-validation artifacts, synthetic instances, registered solvers; valid real response packets for real-packet timing rows | solver result/certificate artifacts, truth-availability records, runtime/memory/counter metrics | exactness/structure claims, scalability synthesis, solver result tables/figures |
-| Synthetic Coupling-Mechanism Validation | validated coupling instances, exact orbit solver, rectangular baseline, coupling-destroyed construction | per-instance coupling metrics and mechanism decisions | coupling mechanism statistics, figures, claim adjudication |
-| Real-Packet Coupling-Mechanism Validation | valid real response packets, corresponding target-importance artifacts, pair eligibility, exact/rectangular solvers | per-pair-seed fixed-action/robust coupling metrics | coupling mechanism statistics, mechanism figures, claim adjudication |
+| Synthetic Coupling-Mechanism Validation | validated coupling instances, exact orbit solver, rectangular baseline, coupling-destroyed construction | per-instance coupling metrics and mechanism decisions | coupling mechanism statistics, figures, evidence classification |
+| Real-Packet Coupling-Mechanism Validation | valid real response packets, corresponding target-importance artifacts, pair eligibility, exact/rectangular solvers | per-pair-seed fixed-action/robust coupling metrics | coupling mechanism statistics, mechanism figures, evidence classification |
 | Common Action Under Unidentified Map | common-action generator fixtures, exact solver, map-value routines | fixture actions, admissible-map diagnostics, robust/exact-map values | map-identifiability/action-certifiability evidence |
 | Robust Compromise Under Unidentified Map | robust-compromise generator fixtures, exact solver, map-value routines | robust-compromise actions and values, map-conditioned optimum diagnostics | map-identifiability/action-certifiability evidence |
 | Map-Dependent Action Boundary | map-dependent fixtures, exact solver, map-value routines | map-dependent actions, abstention/compromise outcomes, map-value metrics | failure-boundary evidence and claim restrictions |
-| Exact Map-Value Bound Validation | zero/high map-value fixtures, exact solver, orbit-radius implementation | exact map-action values, orbit-radius bounds, validation metrics | map-value-bound figure and claim adjudication |
-| Primary Strict Cross-Telemetry Transfer | valid pair-seed manifest, source packet, source/target checkpoints, target importance, registered baseline/oracle validation, action solver, confirmation rules, processed TRAIN/META/CONFIRM/TEST splits | method action/proposal artifacts, confirmation decisions, live-assimilation checkpoints where applicable, canonical TEST prediction artifacts, metric rows, cell completion manifests | statistical synthesis, ablations, confirmation analysis, reporting, claim adjudication |
+| Exact Map-Value Bound Validation | zero/high map-value fixtures, exact solver, orbit-radius implementation | exact map-action values, orbit-radius bounds, validation metrics | map-value-bound figure and evidence classification |
+| Primary Strict Cross-Telemetry Transfer | valid pair-seed manifest, source packet, source/target checkpoints, target importance, registered baseline/oracle validation, action solver, confirmation rules, processed TRAIN/META/CONFIRM/TEST splits | method action/proposal artifacts, confirmation decisions, live-assimilation checkpoints where applicable, canonical TEST prediction artifacts, metric rows, cell completion manifests | statistical synthesis, ablations, confirmation analysis, reporting, evidence classification |
 | Multi-Source Selection Validation | all valid candidate source packets for each target, target checkpoint/importance, proposal solver artifacts, confirmation machinery | ranked proposal lists, sequential confirmation traces, selected-source/no-source decisions, resulting state artifacts | multi-source diagnostics and manuscript evidence |
 | Mechanism Ablations | shared principal pair-seed inputs, response packets, target artifacts, and any already-valid identical method cells from principal transfer | only ablation-specific method/condition actions, confirmations, predictions, metrics, plus references to reused identical cells | ablation statistics/table and mechanism claims |
 | Sparsity and Dense Fallback | shared response packets, target checkpoints/importance, confirmation/evaluation inputs, sparse/dense solver configs; completed principal `s=2` cells when identical | `s=1`, `s=3`, dense-specific actions/results and reused references to `s=2`; runtime/memory and realized-utility metrics | sparsity/dense statistics, table, utility-efficiency figure |
@@ -4842,14 +4814,14 @@ The Experiment Catalogue is executed through the shared artifact stages defined 
 | Weak-Signal, Support, and Heterogeneity Boundaries | primary response packets/checkpoints plus perturbation definitions; for target-support conditions, deterministically subsampled TRAIN/META/CONFIRM data and rebuilt target training/downstream artifacts | perturbation-specific packets or derived packet views, rebuilt target checkpoints only for support-fraction conditions, actions, confirmations, predictions, metrics | failure-boundary synthesis/table/figure |
 | Map-Availability Applicability Audit | primary packets, Point-Correspondence Commitment and Generic Exact QAP recovery implementations, strict-interface resource list, fixed human-audit protocol | packet-only recovery attempts, checksum-recorded human audit submissions, oracle comparison after both timed submissions are completed | applicability wording and claim boundaries |
 | Scalability and Efficiency | scalability generator instances, registered solvers, timing protocol; valid real response packets for real timing cells | timing repetitions, runtime/memory/counter artifacts, timeout/resource-limit states, exactness status | scalability statistics/table/figure and operational-structure claim |
-| Statistical Synthesis | only completed verified metric/comparison inputs from the registered experiments | paired contrasts, BCa intervals, randomization tests, Holm results, equivalence/materiality results, completeness state | claim adjudication and manuscript tables/figures |
-| Claim-Evidence Adjudication | completed valid registered results, verified statistical synthesis, claim catalogue, kill/simplification rules | final claim-state artifact, permitted scope, forbidden extrapolations, evidence references | `fedorbit report` and manuscript evidence only |
+| Statistical Synthesis | only completed verified metric/comparison inputs from the registered experiments | paired contrasts, BCa intervals, randomization tests, Holm results, equivalence/materiality results, completeness state | evidence classification and manuscript tables/figures |
+| Evidence Classification | completed valid registered results, verified statistical synthesis, evidence criteria, kill/simplification rules | final evidence-classification artifact, permitted scope, forbidden extrapolations, evidence references | `fedorbit report` and manuscript evidence only |
 
 Repeated experiment membership does not duplicate a scientific artifact. If two experiment cells require the same prepared split, checkpoint, prediction, response packet, target-importance vector, solver result, confirmation input, or other immutable artifact under the same dependency fingerprint, both cells reference that artifact. Experiment-specific manifests record the reference rather than copying or recomputing the payload.
 
-# 16. Claim Catalogue
+# 16. Evidence Criteria
 
-The allowed claim states are fixed by this section and are not configurable.
+The allowed evidence statuss are fixed by this section and are not configurable.
 
 Allowed final states:
 
@@ -4868,15 +4840,15 @@ Not Tested
 | Exact Sparse Separator Exactness                | zero reproducible mismatch above exactness tolerance in every truth-available required case | any reproducible mismatch or invalid certificate                     | theorem assumptions and tested sparse supports                |
 | Joint Correspondence Avoids Rectangular Pessimism          | authoritative coupling criteria passes                                                          | real/synthetic mechanism criteria fails or destruction retains mechanism | declared orbit/packet regimes                                 |
 | Action Certification Without Fine-Map Identification | controlled common-action and robust-compromise worlds exist; map bound valid                | map recovery always required or bound violation                      | controlled/theorem regime                                     |
-| Strict Cross-Telemetry Transfer Utility        | authoritative primary 3-of-4 rule                                                           | utility or strict-resource criteria fails                                | four primary benchmark directions under masked fine semantics |
-| Value of External Procedural Evidence        | authoritative 3-of-4 rule vs Local-SIR                                                      | Local-SIR equivalent/superior under the registered criteria                             | four primary directions                                       |
+| Strict Cross-Telemetry Transfer Utility        | authoritative primary 4-of-6 rule                                                           | utility or strict-resource criteria fails                                | six primary benchmark directions under masked fine semantics |
+| Value of External Procedural Evidence        | authoritative 4-of-6 rule vs Local-SIR                                                      | Local-SIR equivalent/superior under the registered criteria                             | six primary directions                                       |
 | Operational Relevance of Sparse Support       | authoritative sparse criteria                                                                   | dense sparse-irrelevance rule                                        | tested support/action ranges                                  |
 | Target Confirmation Safety               | authoritative confirmation criteria                                                             | safety/coverage criteria fails                                           | tested pairs and confirmation budget                          |
 | Sparse Solver Work-Structure Agreement | exact counters plus efficiency trend                                                        | counter mismatch or approximation required                           | measured problem sizes/hardware                               |
 
-## 16.1 Mechanical claim-state adjudication
+## 16.1 Mechanical evidence-status adjudication
 
-Claim state is assigned from completed registered evidence only. The following precedence is mandatory:
+Evidence status is assigned from completed registered evidence only. The following precedence is mandatory:
 
 1. `Not Tested` when required experiments have no scientifically interpretable completed evidence because they were not executed or were blocked before producing the endpoints needed by the claim.
 2. `Not Supported` when an explicit claim failure rule, falsification condition, or claim-negating kill/simplification rule fires.
@@ -4965,7 +4937,7 @@ Both therefore have roadmap complexity count 5; no subjective code-size, line-co
 
 For each primary pair, let the seed-level comparison quantity be `G_CE(FedORBIT Exact-Sparse Solver, Local-SIR)`, so positive values favor FedORBIT. `Local-SIR Equivalent` means the registered FedORBIT-vs-Local-SIR TOST contrast establishes equivalence after Holm correction in the `External Source vs Local-SIR` family. `Local-SIR Superior` means the pair-mean comparison quantity is no greater than `-scientific.materiality.realized_relative_macro_ce`, the paired two-sided superiority contrast is Holm-significant in that family, and the paired BCa upper bound is strictly below zero.
 
-**Trigger:** the external-procedural-evidence support rule fails and at least `scientific.claim_criteria.external_source_value_vs_local_sir.successful_primary_pairs_required` primary pairs are `Local-SIR Equivalent` or `Local-SIR Superior`, with no remaining valid primary pair showing a material, Holm-significant, BCa-supported FedORBIT advantage over Local-SIR.
+**Trigger:** the external-procedural-evidence support rule fails and at least `scientific.evaluation_criteria.external_source_value_vs_local_sir.successful_primary_pairs_required` primary pairs are `Local-SIR Equivalent` or `Local-SIR Superior`, with no remaining valid primary pair showing a material, Holm-significant, BCa-supported FedORBIT advantage over Local-SIR.
 
 **Consequence:** remove the external-source-value claim.
 
@@ -5070,7 +5042,7 @@ Correct execution with an unfavorable scientific outcome remains:
 Completed
 ```
 
-Claim adjudication determines the scientific state.
+Evidence classification determines the scientific state.
 
 ## 18.4 Scientific boundary
 
@@ -5120,519 +5092,25 @@ The cell produces its numerical diagnostics, failure reason, completed-support r
 
 ## 19.1 Repository implementation contract
 
-The implementation must provide a typed mirror of the scientific contract and separate the data, model, response, correspondence, solver, experiment, metric, statistical, reporting, and provenance responsibilities sufficiently to enforce this roadmap.
-
-The typed scientific configuration is an implementation mirror, not an independent authority. CI must serialize it and fail if it diverges from the roadmap-maintained expected scientific-contract snapshot.
-
-No ad-hoc YAML, TOML, environment variable, notebook setting, or other scientific override mechanism is permitted. `configs/tests.yml` and `configs/smoke.yml` are confined to automated test and smoke execution and cannot override the production scientific contract in `configs/fedorbit.yaml`.
-
-The repository must contain:
-
-* a fully resolved dependency lock with transitive versions and package hashes;
-* tests covering scientific primitives, leakage/resource isolation, solver correctness, deterministic execution, schemas, artifact validity, selective invalidation, recovery, and CLI behavior;
-* immutable raw-data exposed through `data/raw` and generated-artifact areas under `outputs/` and `results/` satisfying the lineage contracts below.
-
-The repository commit identifies the implementation revision for provenance, but the repository commit hash alone is never an artifact-validity key. Reuse and invalidation are governed by the stage-specific dependency fingerprints in Sections 20 and 21.
-
-Required repository layout:
+FedORBIT uses one non-compatibility architecture. `configs/fedorbit.yaml` is the sole YAML configuration authority. `outputs/` holds generated scientific artifacts; `results/` holds terminal exports only.
 
 ```text
-project/
-│
-├── README.md                                      # Documents FedORBIT's scope, setup, public CLI workflows, experiment execution, artifact policy, and reproducibility procedure.
-├── pyproject.toml                                 # Defines package metadata, dependencies, the fedorbit CLI entry point, and linting, typing, and test-tool configuration.
-├── uv.lock                                        # Locks the complete transitive Python dependency environment and package hashes required for reproducible execution.
-├── noxfile.py                                     # Defines repeatable lint, type-check, unit, scientific, integration, architecture, and smoke-test sessions.
-├── Makefile                                       # Provides concise developer and operator commands that delegate to the public CLI and repository quality tooling.
-├── .gitignore                                     # Excludes generated outputs, caches, local environments, temporary files, and other machine-specific state.
-│
-├── configs/
-│   ├── fedorbit.yaml                              # Sole production YAML containing the roadmap-defined numerical parameters, thresholds, seeds, experiment grids, paths, and runtime limits.
-│   ├── tests.yml                                  # Provides a small deterministic configuration used exclusively by automated tests.
-│   └── smoke.yml                                  # Provides the minimal scientifically valid configuration used by the smoke workflow.
-│
-├── data/
-│   └── raw -> /external/datasets                  # SYMLINK — immutable external raw datasets; no generated material is written under data/.
-│
-├── outputs/                                       # Complete generated computational workspace; reusable or downstream-required artifacts remain here and are normally Git-ignored.
-│   │
-│   ├── preprocessing/                             # Project-wide dataset preparation products that are scientifically reusable across compatible experiments.
-│   │   ├── inventories/                           # Raw-file identities, SHA-256 inventories, observed schemas, timestamps, counts, and dataset-component manifests.
-│   │   ├── validation/                            # Dataset validity, leakage, duplicate-conflict, timestamp-alias, feature-quality, and preparation validation artifacts.
-│   │   ├── prepared/                              # Canonically cleaned rows, canonicalized values, duplicate groups, and other reusable prepared-data material.
-│   │   ├── splits/                                # Duplicate-safe chronological TRAIN/META/VALID/CONFIRM/TEST split artifacts and split manifests.
-│   │   ├── features/                              # Fitted TRAIN-only preprocessors, feature metadata, encoded matrices, and processed split artifacts.
-│   │   └── metadata/                              # Local-class manifests, transfer eligibility, coarse-group membership, actionable-node state, and null-padding metadata.
-│   │
-│   ├── artifacts/                                 # Project-wide reusable artifacts whose dependency fingerprints permit scientifically valid cross-experiment reuse.
-│   │   ├── models/                                # Pilot models, selected hyperparameters, confirmatory base checkpoints, optimizer states, and RNG checkpoint state.
-│   │   ├── scores/                                # Canonical reusable probability, prediction, loss, risk, META, VALID, CONFIRM, and TEST score artifacts.
-│   │   ├── fitted/                                # Reusable fitted scientific objects such as selected response estimators and final procedural-response packets.
-│   │   ├── baselines/                             # Canonical reusable Local-Only and other reference artifacts when their scientific dependencies are identical across experiments.
-│   │   └── derived/                               # Reusable target importance, target-local diagnostics, rectangular minima, exhaustive-orbit, and other deterministic derived artifacts.
-│   │
-│   ├── experiments/
-│   │   └── <descriptive-experiment-name>/         # Computational workspace for one registered roadmap experiment; shared project-wide artifacts are referenced rather than duplicated.
-│   │       │
-│   │       ├── artifacts/
-│   │       │   ├── fitted/                        # Experiment-owned actions, correspondences, solver certificates, source selections, confirmation decisions, and fitted scientific state.
-│   │       │   ├── predictions/                   # Heavy experiment-specific prediction/probability outputs that must never be promoted into results/.
-│   │       │   └── derived/                       # Experiment-specific mechanism quantities, orbit diagnostics, perturbation outputs, and other derived arrays or records.
-│   │       │
-│   │       ├── evaluations/
-│   │       │   ├── records/                       # Detailed per-cell/per-class evaluation records and other heavy canonical metric inputs.
-│   │       │   ├── comparisons/                   # Complete paired method/reference comparison records before manuscript-facing reduction.
-│   │       │   └── aggregates/                    # Verified computational aggregates used as inputs to experiment metrics and statistics.
-│   │       │
-│   │       ├── metrics/
-│   │       │   ├── per_seed/                      # Canonical seed-level predictive, mechanism, confirmation, solver, and efficiency metrics.
-│   │       │   ├── per_condition/                 # Metrics aggregated within registered experiment conditions while retaining scientific condition identity.
-│   │       │   └── aggregate/                     # Final verified experiment-level metric aggregates consumed by analysis and reporting.
-│   │       │
-│   │       ├── statistics/
-│   │       │   ├── tests/                         # Exact sign-flip, McNemar, TOST, and other registered statistical-test outputs.
-│   │       │   ├── confidence_intervals/          # Paired BCa and other roadmap-defined confidence-interval outputs; heavy bootstrap draws remain computational artifacts.
-│   │       │   ├── effects/                       # Mean/median paired differences, equivalence decisions, materiality decisions, and effect summaries.
-│   │       │   └── multiplicity/                  # Raw and Holm-adjusted inferential results for the experiment's registered multiplicity families.
-│   │       │
-│   │       ├── checkpoints/
-│   │       │   ├── training/                      # Experiment-owned mutable model states such as confirmation shadows and accepted live-assimilation checkpoints.
-│   │       │   └── execution/                     # Restartable computational state required for safe continuation of long solver or experiment execution where applicable.
-│   │       │
-│   │       ├── diagnostics/
-│   │       │   ├── scientific/                    # Strict-resource, map, coupling, response-stability, confirmation, boundary, and mechanism diagnostics.
-│   │       │   ├── numerical/                     # Solver residuals, exactness checks, integrality diagnostics, tolerance checks, and numerical validation records.
-│   │       │   └── runtime/                       # Timing, memory, CUDA usage, optimizer-step counts, timeout, and resource-limit measurements.
-│   │       │
-│   │       ├── logs/
-│   │       │   ├── execution/                     # Structured logs for successful and in-progress experiment execution.
-│   │       │   └── failures/                      # Infrastructure, validation, solver-limit, and recovery logs retained for technical audit without becoming scientific evidence.
-│   │       │
-│   │       └── provenance/
-│   │           ├── configuration/                 # Scientific configuration hashes, semantic-cell coordinates and applicable configuration subsets.
-│   │           ├── data/                          # Raw, split, preprocessing, eligibility, checkpoint, packet, and consumed-artifact lineage hashes.
-│   │           ├── seeds/                         # Root seeds, namespace-derived seeds, schedule seeds, and deterministic RNG lineage.
-│   │           ├── code/                          # Git revision plus stage-local producer and transitive scientific-code fingerprints.
-│   │           ├── environment/                   # Full environment digest, OS/build, CPU, GPU, RAM, CUDA, driver, and solver/runtime information.
-│   │           └── dependencies/                  # Upstream artifact IDs, dependency fingerprints, completion manifests, schemas, checksums, and dependency-lock identity.
-│   │
-│   └── cache/                                     # Disposable acceleration and temporary-work material; nothing here can establish scientific completion or manuscript evidence.
-│       ├── preprocessing/                         # Recomputable parsing, serialization, and preprocessing acceleration caches.
-│       ├── models/                                # Recomputable model-loading or model-construction caches that are not canonical checkpoints.
-│       ├── evaluation/                            # Recomputable evaluation acceleration caches that are never authoritative metric artifacts.
-│       ├── analysis/                              # Recomputable analysis acceleration material such as temporary bootstrap or matrix-work buffers.
-│       └── staging/                               # Temporary atomic-write staging only; incomplete/interrupted work is disposable and is promoted only after validation, checksum, and completion requirements succeed.
-│
-├── results/                                       # Terminal compact manuscript-facing evidence only; scientific producers never read from this tree.
-│   │
-│   ├── experiments/
-│   │   └── <descriptive-experiment-name>/         # Compact exports belonging to one completed and verified registered experiment.
-│   │       ├── figures/
-│   │       │   ├── main/                          # Main-manuscript figures derived exclusively from verified outputs/ artifacts.
-│   │       │   └── supplementary/                 # Supplementary experiment figures derived from the same verified scientific artifacts.
-│   │       ├── tables/
-│   │       │   ├── main/                          # Main-manuscript experiment tables in compact machine-readable/publication formats.
-│   │       │   └── supplementary/                 # Supplementary experiment tables and compact supporting tabulations.
-│   │       ├── metrics/
-│   │       │   ├── primary/                       # Compact values for the experiment's registered primary scientific endpoints.
-│   │       │   ├── secondary/                     # Compact registered secondary and diagnostic endpoint summaries appropriate for manuscript evidence.
-│   │       │   └── summary/                       # Small experiment-level metric summaries linked to canonical outputs/ lineage.
-│   │       └── statistics/
-│   │           ├── tests/                         # Compact final statistical-test results used by manuscript claims and tables.
-│   │           ├── confidence_intervals/          # Compact final confidence intervals without resample-level bootstrap material.
-│   │           ├── effects/                       # Compact effect, materiality, equivalence, and paired-difference summaries.
-│   │           └── multiplicity/                  # Compact final multiplicity-family decisions and corrected p-values.
-│   │
-│   └── project_summary/                           # Cross-experiment manuscript evidence assembled only after verified statistical synthesis and claim adjudication.
-│       ├── figures/
-│       │   ├── main/                              # Final cross-experiment manuscript figures required by the roadmap.
-│       │   └── supplementary/                     # Cross-experiment supplementary figures.
-│       ├── tables/
-│       │   ├── main/                              # Required final protocol, experiment, primary-results, solver, confirmation, scalability, and claim-support tables.
-│       │   └── supplementary/                     # Compact supplementary tables derived from verified experiment evidence.
-│       ├── metrics/
-│       │   ├── primary/                           # Final project-level primary scientific summaries used for the registered claims.
-│       │   └── summary/                           # Compact project-wide metric and machine-readable claim-state summaries.
-│       ├── statistics/
-│       │   ├── comparisons/                       # Final verified cross-method and cross-experiment paired-comparison summaries.
-│       │   ├── confidence_intervals/              # Final verified project-level confidence intervals.
-│       │   ├── effects/                           # Final verified materiality, equivalence, safety, and effect summaries.
-│       │   └── multiplicity/                      # Final verified registered-family Holm corrections and statistical decisions.
-│       └── reproducibility/
-│           ├── configuration/                     # Compact final scientific-configuration snapshot and configuration hashes.
-│           ├── datasets/                          # Compact raw/prepared/split/eligibility lineage hashes required to trace manuscript evidence.
-│           ├── seeds/                             # Confirmatory, pilot, synthetic, bootstrap, and derived-seed specifications needed for reproducibility.
-│           ├── software/                          # Compact dependency-lock, Git, environment, CUDA, solver, and producer-code identity summaries.
-│           └── execution/                         # Compact claim-bearing completion, artifact-reference, checksum, and execution-lineage summaries.
-│
-├── docs/
-│   └── Roadmap.md                                 # Human-maintained authoritative FedORBIT scientific and implementation specification; application code never rewrites it.
-│
-├── src/
-│   └── fedorbit/
-│       ├── __init__.py                            # Declares the FedORBIT package and exposes only intentional package-level metadata.
-│       │
-│       ├── domain/
-│       │   ├── __init__.py                        # Exposes shared typed scientific identities and records used across package boundaries.
-│       │   ├── enums.py                           # Defines descriptive enums for datasets, clients, splits, methods, experiments, solvers, artifact states, and claim states.
-│       │   └── records.py                         # Defines small immutable semantic-coordinate, client, pair, transfer-node, action, and other cross-cutting scientific records.
-│       │
-│       ├── config/
-│       │   ├── __init__.py                        # Exposes the validated typed configuration API.
-│       │   ├── models.py                          # Defines the typed implementation mirror of the complete supported fedorbit.yaml scientific configuration.
-│       │   ├── loading.py                         # Loads fedorbit.yaml and produces the immutable validated configuration consumed by execution.
-│       │   └── validation.py                      # Enforces locked grids, values, allowed combinations, scientific constraints, and configuration/YAML contract validity.
-│       │
-│       ├── datasets/
-│       │   ├── __init__.py                        # Exposes supported dataset implementations and common preparation operations.
-│       │   ├── common.py                          # Owns meaningful cross-dataset records and common adapter behavior without hiding dataset-specific scientific rules.
-│       │   ├── row_normalization.py               # Implements missing-token normalization, float64 row hashing, NFC strings, Arrow row serialization, duplicate hashing, and conflicting-duplicate detection.
-│       │   ├── splitting.py                       # Implements duplicate-group-preserving chronological TRAIN/META/VALID/CONFIRM/TEST assignment.
-│       │   ├── preprocessing.py                   # Implements TRAIN-only quality filtering, imputation, robust scaling, missing indicators, categorical vocabularies, one-hot encoding, and constant-feature removal.
-│       │   ├── ontology.py                        # Owns coarse semantic groups, transfer concepts, source/target eligibility, actionability, pseudonymous node ordering, and explicit null-node padding.
-│       │   │
-│       │   ├── edge_iiotset/
-│       │   │   ├── __init__.py                    # Exposes the Edge-IIoTset network-client dataset implementation.
-│       │   │   ├── loader.py                      # Discovers and parses official Edge-IIoTset tabular network/IoT traffic records deterministically.
-│       │   │   ├── schema.py                      # Defines Edge-IIoTset labels, timestamp semantics, feature order/types, forbidden identities, and the seven-field leakage safeguard.
-│       │   │   └── validation.py                  # Validates Edge-IIoTset raw structure, timestamp aliases, label consistency, retained rows, leakage safeguards, and dataset-specific invariants.
-│       │   │
-│       │   └── ton_iot/
-│       │       ├── __init__.py                    # Exposes the registered ToN-IoT Windows 10 host, Linux process host, and network clients.
-│       │       ├── loader.py                      # Loads only roadmap-permitted ToN-IoT component records from immutable raw files.
-│       │       ├── components.py                  # Defines the three distinct ToN-IoT client/component selections, exclusions, timestamp semantics, and local modality identities.
-│       │       └── validation.py                  # Validates component schemas, timestamp aliases, labels, forbidden identity fields, and ToN-IoT-specific data requirements.
-│       │
-│       ├── models/
-│       │   ├── __init__.py                        # Exposes the two roadmap-defined classifier families.
-│       │   ├── network_classifier.py              # Implements the exact network/flow Linear-LayerNorm-GELU architecture and its locked Xavier initialization semantics.
-│       │   └── host_classifier.py                 # Implements the exact host Linear-ReLU-BatchNorm architecture and its locked Kaiming initialization semantics.
-│       │
-│       ├── training/
-│       │   ├── __init__.py                        # Exposes base-model training, pilot selection, and canonical scoring.
-│       │   ├── losses.py                          # Implements normalized local TRAIN class weights, weighted loss inputs, and intervention/curriculum multipliers without post-renormalization.
-│       │   ├── trainer.py                         # Runs AdamW training, deterministic shuffling, clipping, VALID evaluation, early stopping, checkpoint selection, and checkpoint-state restoration.
-│       │   ├── pilot.py                           # Executes the registered learning-rate/weight-decay/dropout grid and applies the deterministic per-client pilot selection rule.
-│       │   └── scoring.py                         # Produces canonical class probabilities, losses, risks, predictions, and split-scoped score artifacts from a fixed checkpoint.
-│       │
-│       ├── response/
-│       │   ├── __init__.py                        # Exposes source procedural-response estimation and final packet construction.
-│       │   ├── pilot.py                           # Evaluates intervention magnitude/horizon candidates using the registered linearity, sign-agreement, usefulness, score, and tie rules.
-│       │   ├── estimation.py                      # Executes paired positive/negative common-random-number shadows and computes directed procedural-response estimates.
-│       │   ├── uncertainty.py                     # Computes response standard errors and the registered paired max-|t| bootstrap simultaneous uncertainty bands.
-│       │   └── packet.py                          # Builds, anonymizes, validates, and serializes the strict-interface source procedural-response packet and its support metadata.
-│       │
-│       ├── strict_interface/
-│       │   ├── __init__.py                        # Exposes enforcement of FedORBIT's strict no-common-interface information regime.
-│       │   ├── resources.py                       # Defines the exact resources available to each registered method and corresponding method-readable resource manifests.
-│       │   ├── anonymity.py                       # Creates and validates anonymous fine-node identities while preventing forbidden fine-label correspondence leakage.
-│       │   └── validation.py                      # Enforces strict-resource access, access traces, oracle separation, forbidden information flow, and predecision TEST isolation.
-│       │
-│       ├── orbit/
-│       │   ├── __init__.py                        # Exposes the block-constrained correspondence-orbit scientific primitives.
-│       │   ├── correspondence.py                  # Constructs admissible blockwise bijections, permutation representations, active-image assignments, orbit enumeration, and deterministic map ordering.
-│       │   ├── objective.py                       # Implements J(α;P), sparse/dense action sets, robust pre-map/post-map values, action costs, and deterministic action tie handling.
-│       │   ├── rectangular.py                     # Constructs entrywise rectangular bounds and computes rectangular robust values and fixed-action/optimized coupling quantities.
-│       │   └── diagnostics.py                     # Computes coupling gaps, map value, orbit radius, action certifiability, map identifiability, and related mechanism diagnostics.
-│       │
-│       ├── solvers/
-│       │   ├── __init__.py                        # Exposes the principal, comparator, and dense-fallback optimization implementations.
-│       │   ├── assignment.py                      # Solves deterministic blockwise linear-assignment subproblems with the roadmap-defined lexical tie behavior.
-│       │   ├── exact_sparse.py                    # Implements the FedORBIT Exact-Sparse Solver using support enumeration, active-image separation, LAP decomposition, master cuts, and exact stopping rules.
-│       │   ├── exact_qap.py                       # Implements the Generic Exact QAP comparator using the locked SCIP binary-assignment and RLT/McCormick formulation.
-│       │   ├── dense_ccp.py                       # Implements the explicitly non-exact Dense-CCP relaxation/heuristic, deterministic starts, penalties, projection, and diagnostic bounds.
-│       │   └── certificates.py                    # Constructs and verifies permutation, objective, correspondence, exactness, active-image, LAP-count, and solver-work certificates.
-│       │
-│       ├── transfer/
-│       │   ├── __init__.py                        # Exposes target-state construction, robust curriculum selection, confirmation, and live assimilation.
-│       │   ├── target_state.py                    # Builds target META risk, nonnegative importance, actionable-node state, and matched target-local response diagnostics.
-│       │   ├── curriculum.py                      # Defines feasible curriculum actions, support limits, coordinate caps, costs, weight multipliers, and deterministic application semantics.
-│       │   ├── selection.py                       # Ranks positive source proposals and performs the roadmap-defined deterministic sequential multi-source selection procedure.
-│       │   ├── confirmation.py                    # Runs paired CONFIRM shadows, hierarchical bootstrap gain bounds, proposal acceptance, and confirmation safety records.
-│       │   └── assimilation.py                    # Returns to the clean pre-confirm state, applies accepted curriculum weights, performs live assimilation, and refreshes target META state.
-│       │
-│       ├── baselines/
-│       │   ├── __init__.py                        # Exposes every registered non-oracle comparison method through descriptive roadmap names.
-│       │   ├── local.py                           # Implements Local-Only and matched-resource Local-SIR using only permitted target-local information and compute budgets.
-│       │   ├── summaries.py                       # Implements Coarse Block-Mean, Coarse Block-Min, Orbit-Mean, and Matched-Resource Rectangular summary baselines.
-│       │   └── correspondence.py                  # Implements Point-Correspondence Commitment and Coupling-Destroyed FedORBIT conditions without leaking oracle mappings.
-│       │
-│       ├── oracle/
-│       │   ├── __init__.py                        # Exposes oracle-only functionality while keeping it unreachable from strict-interface methods.
-│       │   ├── mapping.py                         # Constructs benchmark fine-concept truth mappings and oracle namespace records used only where the roadmap explicitly permits them.
-│       │   └── methods.py                         # Implements Exact-Map Oracle and exhaustive truth calculations for validation, mechanism, and applicability experiments.
-│       │
-│       ├── synthetic/
-│       │   ├── __init__.py                        # Exposes deterministic controlled-world generators registered by the experiment catalogue.
-│       │   ├── generators.py                      # Provides common PCG64-based float64 construction helpers for blocks, matrices, weights, supports, actions, costs, and rejection sampling.
-│       │   ├── exactness.py                       # Generates exhaustive-truth sparse-separator instances used for theorem and exactness validation.
-│       │   ├── mechanisms.py                      # Generates coupling, common-action, robust-compromise, map-dependent-action, and map-bound controlled worlds.
-│       │   └── scalability.py                     # Generates the registered K/block/support scaling instances and predicted work-structure quantities.
-│       │
-│       ├── experiments/
-│       │   ├── __init__.py                        # Exposes the registered experiment catalogue and semantic-cell expansion API.
-│       │   ├── catalogue.py                       # Defines every roadmap experiment, classification, datasets/pairs, registered methods, conditions, prerequisites, outputs, and claim relationships.
-│       │   ├── cells.py                           # Expands experiment definitions into deterministic semantic coordinates over pair, method, condition, support, and seed.
-│       │   ├── conditions.py                      # Implements registered perturbations, mechanism ablations, semantic partitions, support regimes, sparse/dense sensitivities, and boundary conditions.
-│       │   └── validation.py                      # Enforces experiment prerequisites, pair eligibility, baseline fairness, strict-resource validity, cell completeness, and allowed scientific combinations.
-│       │
-│       ├── evaluation/
-│       │   ├── __init__.py                        # Exposes the single registered evaluation library used by every experiment and reporting consumer.
-│       │   ├── records.py                         # Defines typed prediction, metric, paired-comparison, confirmation, solver, and efficiency records matching the machine-readable contracts.
-│       │   ├── metrics.py                         # Implements class CE, macro CE, relative gain, precision/recall/F1, balanced accuracy, mechanism, solver, confirmation, and efficiency metrics exactly once.
-│       │   └── validation.py                      # Rejects malformed evaluation inputs, zero-class cells, unavailable relative metrics, invalid class sets, and other metric-contract violations.
-│       │
-│       ├── analysis/
-│       │   ├── __init__.py                        # Exposes registered statistical synthesis, method comparisons, and mechanical claim adjudication.
-│       │   ├── statistics.py                      # Implements exact sign-flip tests, paired BCa intervals, McNemar switching, TOST equivalence, Holm correction, and deterministic statistical metadata.
-│       │   ├── comparisons.py                     # Builds valid seed-paired contrasts, materiality decisions, confirmation-safety comparisons, cross-experiment synthesis inputs, and completeness checks.
-│       │
-│       ├── artifacts/
-│       │   ├── __init__.py                        # Exposes canonical paths, manifests, storage, provenance, and validation for outputs/ and results/.
-│       │   ├── paths.py                           # Resolves preprocessing, reusable-artifact, experiment, cache/staging, and terminal verified-result destinations defined by the repository contract.
-│       │   ├── manifests.py                       # Defines dataset, transfer-eligibility, semantic-cell, completion, reusable-artifact, and compact export manifests and their schemas.
-│       │   ├── storage.py                         # Performs atomic payload writes through outputs/cache/staging/, validates checksums/completion, and promotes only validated completed artifacts.
-│       │   ├── provenance.py                      # Captures dependency fingerprints, Git/code, configuration, data, seed, environment, solver, resource-access, and upstream-lineage provenance.
-│       │   └── validation.py                      # Validates manifests, schemas, checksums, completion state, dependency fingerprints, upstream validity, compatibility, and safe artifact reusability.
-│       │
-│       ├── execution/
-│       │   ├── __init__.py                        # Exposes semantic planning, idempotent execution, reuse/invalidation, and recovery behavior.
-│       │   ├── planner.py                         # Builds experiment dependency plans, semantic cells, data-qualified exclusions, stale descendants, reusable ancestors, and the nearest valid resume boundary.
-│       │   ├── executor.py                        # Executes only missing or invalidated producers, validates every result, atomically promotes staged work, and writes completion state last.
-│       │   ├── reuse.py                           # Implements stage-specific dependency fingerprints, canonical artifact reuse, parent-change detection, and selective descendant invalidation.
-│       │   └── recovery.py                        # Handles allowed infrastructure retries, interrupted execution, disposes incomplete staging content, blocks invalid descendants, and resumes from the nearest valid boundary.
-│       │
-│       ├── runtime/
-│       │   ├── __init__.py                        # Exposes the intentionally small runtime-support surface.
-│       │   ├── determinism.py                     # Derives and applies Python/NumPy/PyTorch/solver seeds and enforces the registered deterministic-kernel and ordering contract.
-│       │   ├── environment.py                     # Validates Python/dependency/solver/CUDA/hardware requirements and records numerically material and full forensic environment fingerprints.
-│       │   └── logging.py                         # Configures structured execution logging and binds semantic experiment coordinates without owning scientific state.
-│       │
-│       ├── reporting/
-│       │   ├── __init__.py                        # Exposes terminal manuscript-facing export functionality without owning or recomputing scientific computation.
-│       │   ├── tables.py                          # Renders required experiment and project-summary tables from completed verified outputs/ metric/statistical/claim artifacts.
-│       │   ├── figures.py                         # Renders required main and supplementary figures from unrounded verified outputs/ values without reimplementing metrics or statistics.
-│       │   └── export.py                          # Verifies completed outputs/ dependencies and materializes compact results/ evidence and reproducibility metadata without generating prose or Markdown.
-│       │
-│       └── cli/
-│           ├── __init__.py                        # Exposes the public FedORBIT command-line package.
-│           ├── main.py                            # Creates the top-level Typer application and registers exactly the public commands permitted by the roadmap.
-│           └── commands/
-│               ├── __init__.py                    # Exposes the individual public command implementations.
-│               ├── doctor.py                      # Read-only validation of environment, raw-data readiness, dependencies, solvers, deserialization compatibility, and project state.
-│               ├── preprocess.py                  # Builds or selectively reconstructs raw inventories, validation artifacts, prepared data, splits, fitted preprocessing, and eligibility/null-padding metadata.
-│               ├── plan.py                        # Read-only derivation of semantic cells, dependencies, reusable artifacts, stale/blocked descendants, exclusions, and resume boundaries.
-│               ├── smoke.py                       # Runs isolated primitive, tiny-model, packet, strict-interface, idempotency, crash-recovery, and nonclaim end-to-end checks without opening principal TEST outcomes.
-│               ├── run.py                         # Executes a registered experiment and unresolved prerequisites with strict reuse, validation, resource, provenance, and semantic-overwrite rules.
-│               ├── status.py                      # Read-only inspection of Missing, Running, Completed, Failed, Invalid, Stale, and Blocked experiment/artifact states and their first changed dependency.
-│               └── report.py                      # Terminal export of verified results/ evidence only; performs no training, scoring, optimization, confirmation, metric computation, or statistical recomputation.
-│
-└── tests/
-    ├── conftest.py
-    │
-    ├── architecture/
-    │   ├── test_dependency_boundaries.py
-    │   │   — Enforces allowed dependency directions between architectural layers and prevents architectural responsibility violations.
-    │   │
-    │   ├── test_public_type_boundaries.py
-    │   │   — Ensures public, domain, and application APIs use explicit meaningful types rather than loosely typed interfaces or inappropriate raw primitives.
-    │   │
-    │   ├── test_no_any_dict_object.py
-    │   │   — Rejects inappropriate use of Any, object, and anonymous dict-based domain/configuration/artifact payloads, except narrowly justified external-library boundaries.
-    │   │
-    │   ├── test_no_primitive_leaks.py
-    │   │   — Detects inappropriate str/int/float/bool/list/dict primitives crossing domain or architectural boundaries, including primitive public inputs and outputs where meaningful domain types should be used.
-    │   │
-    │   ├── test_no_hardcoded_values.py
-    │   │   — Detects hardcoded scientific, experimental, statistical, dataset, seed, threshold, algorithm, protocol, and other governed values outside their authoritative owner.
-    │   │
-    │   ├── test_configuration_ownership.py
-    │   │   — Ensures configuration values have one authoritative owner and are not repeated or copied into constants, implementation code, CLI defaults, tests, or parallel configuration structures.
-    │   │
-    │   ├── test_no_duplicate_constants.py
-    │   │   — Detects duplicate constants and equivalent independently maintained values across the repository.
-    │   │
-    │   ├── test_dead_code.py
-    │   │   — Detects dead, unused, unreachable, obsolete, and superseded production modules, classes, functions, methods, constants, and other symbols.
-    │   │
-    │   ├── test_enum_integrity.py
-    │   │   — Detects unused enums and ensures authoritative enums are actually used rather than being bypassed by equivalent free-form strings or duplicate identities.
-    │   │
-    │   ├── test_no_test_only_production_code.py
-    │   │   — Detects production code that exists or is referenced only for tests and has no legitimate production use.
-    │   │
-    │   ├── test_no_redirects_shims_reexports.py
-    │   │   — Rejects obsolete redirect modules, compatibility shims, legacy aliases, transitional wrappers, and unnecessary re-export-only modules.
-    │   │
-    │   ├── test_naming_policy.py
-    │   │   — Enforces descriptive names for modules, classes, functions, methods, variables, and parameters; rejects vague, generic, strange, misleading, or unjustifiably short names and abbreviations.
-    │   │
-    │   ├── test_canonical_vocabulary.py
-    │   │   — Enforces canonical project, scientific, algorithm, dataset, policy, experiment, artifact, and architectural terminology and rejects stale aliases, obsolete terminology, opaque names, and artificial version naming.
-    │   │
-    │   ├── test_no_comments_or_docstrings.py
-    │   │   — Rejects Python source comments and module/class/function/method docstrings.
-    │   │
-    │   ├── test_no_todos_or_temporary_code.py
-    │   │   — Rejects TODO, FIXME, HACK, XXX, commented-out implementations, temporary markers, unfinished code residue, and similar development leftovers.
-    │   │
-    │   ├── test_static_typing.py
-    │   │   — Runs repository-wide strict Pyright across production and tests so Pyright/Pylance-visible typing violations fail the test suite.
-    │   │
-    │   ├── test_code_quality.py
-    │   │   — Enforces Ruff formatting and linting so unformatted or lint-invalid Python code cannot remain in the repository.
-    │   │
-    │   └── test_dependency_hygiene.py
-    │       — Enforces dependency hygiene and detects unused, missing, or incorrectly declared dependencies.
-    │
-    ├── unit/
-    │   ├── config/
-    │   │   ├── test_loading.py
-    │   │   └── test_validation.py
-    │   ├── datasets/
-    │   │   ├── edge_iiotset/
-    │   │   │   ├── test_loader.py
-    │   │   │   ├── test_schema.py
-    │   │   │   └── test_validation.py
-    │   │   ├── ton_iot/
-    │   │   │   ├── test_loader.py
-    │   │   │   ├── test_components.py
-    │   │   │   └── test_validation.py
-    │   │   ├── test_canonicalization.py
-    │   │   ├── test_splitting.py
-    │   │   ├── test_preprocessing.py
-    │   │   └── test_ontology.py
-    │   ├── models/
-    │   │   ├── test_network_classifier.py
-    │   │   └── test_host_classifier.py
-    │   ├── training/
-    │   │   ├── test_losses.py
-    │   │   ├── test_trainer.py
-    │   │   ├── test_pilot.py
-    │   │   └── test_scoring.py
-    │   ├── response/
-    │   │   ├── test_pilot.py
-    │   │   ├── test_estimation.py
-    │   │   ├── test_uncertainty.py
-    │   │   └── test_packet.py
-    │   ├── strict_interface/
-    │   │   ├── test_resources.py
-    │   │   ├── test_anonymity.py
-    │   │   └── test_validation.py
-    │   ├── orbit/
-    │   │   ├── test_correspondence.py
-    │   │   ├── test_objective.py
-    │   │   ├── test_rectangular.py
-    │   │   └── test_diagnostics.py
-    │   ├── solvers/
-    │   │   ├── test_assignment.py
-    │   │   ├── test_exact_sparse.py
-    │   │   ├── test_exact_qap.py
-    │   │   ├── test_dense_ccp.py
-    │   │   └── test_certificates.py
-    │   ├── transfer/
-    │   │   ├── test_target_state.py
-    │   │   ├── test_curriculum.py
-    │   │   ├── test_selection.py
-    │   │   ├── test_confirmation.py
-    │   │   └── test_assimilation.py
-    │   ├── baselines/
-    │   │   ├── test_local.py
-    │   │   ├── test_summaries.py
-    │   │   └── test_correspondence.py
-    │   ├── oracle/
-    │   │   ├── test_mapping.py
-    │   │   └── test_methods.py
-    │   ├── synthetic/
-    │   │   ├── test_generators.py
-    │   │   ├── test_exactness.py
-    │   │   ├── test_mechanisms.py
-    │   │   └── test_scalability.py
-    │   ├── experiments/
-    │   │   ├── test_catalogue.py
-    │   │   ├── test_cells.py
-    │   │   ├── test_conditions.py
-    │   │   └── test_validation.py
-    │   ├── evaluation/
-    │   │   ├── test_records.py
-    │   │   ├── test_metrics.py
-    │   │   └── test_validation.py
-    │   ├── analysis/
-    │   │   ├── test_statistics.py
-    │   │   ├── test_comparisons.py
-    │   ├── artifacts/
-    │   │   ├── test_paths.py
-    │   │   ├── test_manifests.py
-    │   │   ├── test_storage.py
-    │   │   ├── test_provenance.py
-    │   │   └── test_validation.py
-    │   ├── execution/
-    │   │   ├── test_planner.py
-    │   │   ├── test_executor.py
-    │   │   ├── test_reuse.py
-    │   │   └── test_recovery.py
-    │   ├── runtime/
-    │   │   ├── test_determinism.py
-    │   │   └── test_environment.py
-    │   ├── reporting/
-    │   │   ├── test_tables.py
-    │   │   ├── test_figures.py
-    │   │   └── test_export.py
-    │   └── cli/
-    │       ├── test_doctor.py
-    │       ├── test_preprocess.py
-    │       ├── test_plan.py
-    │       ├── test_smoke_command.py
-    │       ├── test_run.py
-    │       ├── test_status.py
-    │       └── test_report.py
-    │
-    ├── scientific/
-    │   ├── test_mathematical_primitives.py
-    │   ├── test_data_invariants.py
-    │   ├── test_strict_information_interface.py
-    │   ├── test_exact_sparse_theorem.py
-    │   ├── test_joint_correspondence.py
-    │   ├── test_action_certification.py
-    │   ├── test_baseline_fairness.py
-    │   ├── test_response_estimation_contract.py
-    │   ├── test_confirmation_protocol.py
-    │   ├── test_test_access_isolation.py
-    │   ├── test_experiment_contracts.py
-    │   ├── test_statistical_contracts.py
-    │   ├── test_claim_boundaries.py
-    │   └── test_failure_semantics.py
-    │
-    ├── integration/
-    │   ├── datasets/
-    │   │   ├── test_edge_iiotset_pipeline.py
-    │   │   └── test_ton_iot_pipeline.py
-    │   ├── training/
-    │   │   └── test_pilot_checkpoint_scoring.py
-    │   ├── response/
-    │   │   └── test_checkpoint_to_response_packet.py
-    │   ├── solvers/
-    │   │   └── test_packet_to_robust_action.py
-    │   ├── transfer/
-    │   │   └── test_action_confirmation_assimilation.py
-    │   ├── execution/
-    │   │   ├── test_artifact_reuse.py
-    │   │   ├── test_selective_invalidation.py
-    │   │   └── test_recovery.py
-    │   ├── analysis/
-    │   └── reporting/
-    │       └── test_verified_results_export.py
-    │
-    ├── e2e/
-    │   ├── test_preprocess_plan_smoke.py
-    │   ├── test_run_status_report.py
-    │   ├── test_reuse_and_recovery.py
-    │   └── test_claim_evidence_pipeline.py
-    │
-    └── smoke/
-        └── test_smoke.py
+src/fedorbit/
+├── __init__.py, types.py, interface.py, oracle.py, reporting.py, cli.py
+├── config/{__init__,models,loading,validation}.py
+├── datasets/{__init__,common,preprocessing,splitting,ontology}.py
+├── datasets/edge_iiotset/{__init__,loader,schema,validation}.py
+├── datasets/ton_iot/{__init__,loader,components,validation}.py
+├── learning/{__init__,models,training,pilot,scoring}.py
+├── response/{__init__,pilot,estimation,uncertainty,packet}.py
+├── optimization/{__init__,correspondence,objective,diagnostics,assignment,exact_sparse,exact_qap,dense_ccp,certificates}.py
+├── methods/{__init__,target,confirmation,assimilation,baselines}.py
+├── experiments/{__init__,catalogue,cells,synthetic}.py
+├── analysis/{__init__,records,metrics,comparisons,statistics}.py
+└── infrastructure/{__init__,workspace,manifests,provenance,planner,execution,reuse,runtime,environment,failures}.py
 ```
 
+Dataset adapters remain separate under `datasets/edge_iiotset/` and `datasets/ton_iot/`. There are no legacy package redirects or compatibility imports. `run` owns all applicable computational outputs; `report` consumes completed verified artifacts only and exports terminal evidence under `results/`.
 ## 19.2 Public CLI
 
 Executable:
@@ -5698,7 +5176,7 @@ Command semantics:
 * `doctor` is read-only. It validates the current environment, raw-data readiness, dependency availability, deserialization/solver compatibility, and project state. It reports incompatibilities but does not invalidate already completed artifacts merely because the current working tree or current environment differs from the environment that produced them.
 * `preprocess` deterministically constructs dataset-level raw manifests, cleaned data, duplicate-safe splits, fitted preprocessors, processed splits, local-class manifests, transfer-eligibility manifests, and null-padding artifacts from immutable raw data. With no dataset name, all registered datasets are resolved independently. Matching valid artifacts are reused. Only the selected dataset's stale preparation descendants are reconstructed.
 * `plan` is read-only. It derives the experiment dependency graph, semantic cells, reusable artifacts, stale or blocked descendants, data-qualified exclusions, and next valid resume boundary directly from the Experiment Catalogue and artifact manifests. It performs no scientific computation.
-* `smoke` runs primitive, tiny-model, packet, firewall, semantic-idempotency, crash-recovery, and nonclaim end-to-end checks without inspecting principal TEST outcomes. Its artifacts are isolated from claim-bearing execution.
+* `smoke` runs primitive, tiny-model, packet, firewall, semantic-idempotency, crash-recovery, and non-evidence end-to-end checks without inspecting principal TEST outcomes. Its artifacts are isolated from evidence-bearing execution.
 * `run EXPERIMENT` resolves the requested experiment and all prerequisites, validates existing artifacts by dependency fingerprint, reuses compatible shared artifacts, reconstructs only stale or missing dependencies, executes remaining experiment-owned cells, computes registered cell-level predictions/metrics and any experiment-local registered analysis, validates schemas/resources/provenance, and writes completion state last. Cross-experiment confirmatory synthesis remains owned by Statistical Synthesis.
 * `status` is read-only. It exposes Missing, Running, Completed, Failed, Invalid, Stale, and Blocked states; for stale artifacts it reports the first changed dependency and the nearest reusable ancestor.
 * `report` performs no training, scoring, optimization, confirmation, metric recomputation, or statistical recomputation. It consumes only completed verified analysis/evidence artifacts and materializes manuscript-facing tables, figures, and evidence exports.
@@ -5856,8 +5334,8 @@ There is no FedORBIT calibration/threshold artifact. Accordingly, a generic "cal
 | confirmation rule, confirmation schedule, acceptance bound, live-assimilation implementation | affected confirmation decisions, multi-source selected-source decisions where confirmation participates, accepted live checkpoints, TEST predictions/metrics/statistics/reporting | already-valid proposal/action artifacts whose solver dependencies are unchanged |
 | TEST scoring/evaluation implementation | affected TEST prediction artifacts when scoring changed; affected metrics and later descendants | pre-TEST checkpoints, packets, actions, confirmation decisions |
 | metric definition/code or evaluation class-set definition | affected metric rows, paired comparisons/statistics, tables/figures/claim evidence | predictions/scores, checkpoints, packets, actions |
-| statistical test, BCa/randomization/equivalence/materiality implementation or multiplicity family | affected statistical synthesis, claim adjudication, statistical tables/figures | metrics and every upstream scientific artifact |
-| claim catalogue, kill/simplification rule, claim adjudication code | claim-state/evidence artifacts and report surfaces that consume them | statistical results and upstream computation |
+| statistical test, BCa/randomization/equivalence/materiality implementation or multiplicity family | affected statistical synthesis, evidence classification, statistical tables/figures | metrics and every upstream scientific artifact |
+| evidence criteria, kill/simplification rule, evidence classification code | evidence-classification artifacts and report surfaces that consume them | statistical results and upstream computation |
 | table/figure/report layout, labels, formatting, rendering code | only affected reporting exports | any scientific artifact, metric, or statistical result |
 | README, prose documentation outside the scientific-contract snapshot, comments, tests, CI, logging, developer tooling, unused code | nothing scientific unless the change also alters a registered producer dependency | all completed scientific artifacts |
 
@@ -6056,7 +5534,7 @@ The exact leaf path may include human-readable semantic coordinates and a depend
 
 `results/experiments/<descriptive-experiment-name>/` contains compact manuscript-facing evidence for one completed and verified registered experiment.
 
-`results/project_summary/` contains cross-experiment manuscript evidence and reproducibility summaries assembled only after verified synthesis and claim adjudication.
+`results/project_summary/` contains cross-experiment manuscript evidence and reproducibility summaries assembled only after verified synthesis and evidence classification.
 
 `results/` may contain only completed, verified compact evidence. Failed, invalid, stale, debug, cache, temporary, or development-only artifacts are forbidden there.
 
@@ -6085,8 +5563,8 @@ Shared artifact ownership is by canonical producer stage, not by consuming exper
 | confirmation replicate / decision / live-assimilation checkpoint | confirmation stage | TEST scoring and safety analysis |
 | TEST prediction artifact | canonical scoring stage after final method state | metric computation |
 | metric artifact | registered metric library | statistical synthesis, descriptive tables |
-| paired/statistical result | Statistical Synthesis | claim adjudication, tables, figures |
-| claim-state artifact | Claim-Evidence Adjudication | evidence export |
+| paired/statistical result | Statistical Synthesis | evidence classification, tables, figures |
+| evidence-classification artifact | Evidence Classification | evidence export |
 | table/figure/metric/statistical/reproducibility export | `fedorbit report` | manuscript only |
 
 An artifact lifecycle is:
@@ -6131,7 +5609,7 @@ A cache hit is valid only when the dependency fingerprint, payload checksums, sc
 
 ## 21.4 Provenance versus validity
 
-Every claim-bearing result remains traceable to:
+Every evidence-bearing result remains traceable to:
 
 * semantic experiment coordinates;
 * clean Git commit that produced each artifact;
@@ -6443,7 +5921,7 @@ If any scientific input referenced by an active table, figure, metric summary, s
 
 ## 23.2 Required figures
 
-* Real Transfer-Gain Forest Plot — Y: four primary directed pairs. X: paired mean relative macro-CE gain vs local. Show BCa interval, zero, and +0.01 materiality references.
+* Real Transfer-Gain Forest Plot — Y: six primary directed pairs. X: paired mean relative macro-CE gain vs local. Show BCa interval, zero, and +0.01 materiality references.
 * Baseline Paired-Difference Plot — comparators: Local-SIR, Matched-Resource Rectangular, Point-Correspondence Commitment. Show seed-level paired differences by pair; no pooled cross-pair inferential annotation.
 * Coupling-Gap Phase Figure — factors: compatibility, response heterogeneity, asymmetry, response sparsity, support; overlay predicted structural zero/strict state.
 * Predicted vs Realized Transfer Figure — X: certified robust predicted value. Y: TEST relative macro-CE gain. Facet by pair; annotate descriptive Spearman rho and n where eligible.
@@ -6460,7 +5938,7 @@ If any scientific input referenced by an active table, figure, metric summary, s
 * model/training tables consume the authoritative configuration plus selected-hyperparameter and checkpoint manifests, never TEST outcomes;
 * primary/generalization/ablation/confirmation/boundary tables consume completed metric and statistical artifacts for their exact registered cells;
 * solver/scalability tables consume completed solver/timing/certificate artifacts;
-* claim support consumes only verified statistical synthesis plus final claim adjudication;
+* claim support consumes only verified statistical synthesis plus final evidence classification;
 * figures consume the same verified source artifacts as their corresponding tables and never recompute a metric or statistical test.
 
 A change to a table or figure renderer cannot make any scientific ancestor stale.
@@ -6512,7 +5990,7 @@ environment diagnosis
 → map applicability audit
 → scalability/efficiency
 → statistical synthesis
-→ claim adjudication
+→ evidence classification
 → manuscript evidence export
 ```
 
@@ -6522,9 +6000,9 @@ The executor derives dependencies from this pipeline, the Experiment Catalogue, 
 
 # 25. Reproducibility Contract
 
-Reproducibility is established by the semantic execution, artifact, provenance, deterministic RNG, environment, and statistical contracts in this roadmap. No separate duplicate execution phase is required to make a completed claim-bearing artifact scientifically valid.
+Reproducibility is established by the semantic execution, artifact, provenance, deterministic RNG, environment, and statistical contracts in this roadmap. No separate duplicate execution phase is required to make a completed evidence-bearing artifact scientifically valid.
 
-Every claim-bearing result must be traceable through the complete lineage required by Sections 20 and 21, including:
+Every evidence-bearing result must be traceable through the complete lineage required by Sections 20 and 21, including:
 
 * authoritative scientific configuration identity;
 * immutable raw-data identity and actual observed adapter/schema manifest;
@@ -6538,9 +6016,9 @@ Every claim-bearing result must be traceable through the complete lineage requir
 
 A rerun of the same semantic cell with the same valid dependency fingerprint is the same scientific cell and reuses its valid artifact. A changed scientific dependency creates a stale descendant relation and requires recomputation only from the nearest changed dependency boundary under Section 20.
 
-After claim-bearing TEST outcomes have been opened, no scientific definition, numerical threshold, seed set, baseline, experiment membership, metric, statistical test, multiplicity family, or claim criterion may be changed **because of** the observed outcome. A legitimate correction discovered independently of favorable/unfavorable results is made in the authoritative roadmap/implementation contract, changes the applicable dependency fingerprint, and invalidates all affected descendants for deterministic recomputation. Unaffected artifacts remain valid.
+After evidence-bearing TEST outcomes have been opened, no scientific definition, numerical threshold, seed set, baseline, experiment membership, metric, statistical test, multiplicity family, or claim criterion may be changed **because of** the observed outcome. A legitimate correction discovered independently of favorable/unfavorable results is made in the authoritative roadmap/implementation contract, changes the applicable dependency fingerprint, and invalidates all affected descendants for deterministic recomputation. Unaffected artifacts remain valid.
 
-Statistical synthesis consumes only currently valid completed metric/comparison artifacts. Claim adjudication consumes only the corresponding verified statistical synthesis and registered claim rules. Reporting consumes only those verified outputs and never becomes a scientific input.
+Statistical synthesis consumes only currently valid completed metric/comparison artifacts. Evidence classification consumes only the corresponding verified statistical synthesis and registered claim rules. Reporting consumes only those verified outputs and never becomes a scientific input.
 
 A result is reproducible only when its complete lineage validates. An incompatible implementation, environment component that is materially fingerprinted for that stage, raw dataset, selected pre-TEST artifact, experiment catalogue, statistical specification, or claim criterion cannot silently replace the artifact under the same active identity.
 

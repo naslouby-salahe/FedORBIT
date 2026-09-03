@@ -15,6 +15,7 @@ from pydantic import JsonValue
 class ClientRole(StrEnum):
     PRIMARY = "primary"
     SECONDARY = "secondary"
+    EXTERNAL = "external"
     SOURCE = "source"
     TARGET = "target"
 

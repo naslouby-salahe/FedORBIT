@@ -89,5 +89,5 @@ def test_selected_release_is_inspected_without_assuming_documented_chronology() 
         DatasetId.TON_IOT_NETWORK,
     ):
         observed = inspect_dataset(DatasetInspectionRequest(dataset, RAW_ROOT))
-        assert observed.event_time.state == ChronologyValidationState.MISSING_FIELD
-        assert not observed.valid_for_chronological_preprocessing
+        assert observed.event_time.state == ChronologyValidationState.VALID
+        assert observed.valid_for_chronological_preprocessing

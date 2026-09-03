@@ -129,48 +129,48 @@ def _validate_datasets(config: FedorbitConfig) -> None:
         _require(pair.target in registered, f"unknown target client in pair {pair}")
         _require(pair.source != pair.target, f"self-pair is not a directed pair: {pair}")
     _require(
-        len(datasets.primary_directed_pairs) == 4,
-        "exactly four primary directed pairs are registered",
+        len(datasets.primary_directed_pairs) == 6,
+        "exactly six primary directed ToN-IoT pairs are registered",
     )
     _require(
-        len(datasets.secondary_directed_pairs) == 4,
-        "exactly four secondary directed pairs are registered",
+        len(datasets.secondary_directed_pairs) == 0,
+        "no secondary pairs are registered while Edge-IIoTset is external-only",
     )
     primary_sources = {pair.source for pair in datasets.primary_directed_pairs}
     primary_targets = {pair.target for pair in datasets.primary_directed_pairs}
     _require(
         primary_sources
         == {
-            DatasetId.EDGE_IIOTSET_NETWORK,
             DatasetId.TON_IOT_WINDOWS10_HOST,
             DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_NETWORK,
         },
         "primary directed pairs must involve exactly the three primary clients",
     )
     _require(
         primary_targets
         == {
-            DatasetId.EDGE_IIOTSET_NETWORK,
             DatasetId.TON_IOT_WINDOWS10_HOST,
             DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_NETWORK,
         },
         "primary directed pairs must target exactly the three primary clients",
     )
     _require(
-        DatasetId.TON_IOT_NETWORK not in primary_sources
-        and DatasetId.TON_IOT_NETWORK not in primary_targets,
-        "the secondary network client must not appear in primary directed pairs",
+        DatasetId.EDGE_IIOTSET_NETWORK not in primary_sources
+        and DatasetId.EDGE_IIOTSET_NETWORK not in primary_targets,
+        "the external Edge-IIoTset client must not appear in primary directed pairs",
     )
     roles = OrderedDict((client_id, client.role) for client_id, client in datasets.clients.items())
     _require(
-        roles[DatasetId.EDGE_IIOTSET_NETWORK].value == ClientRole.PRIMARY.value
-        and roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == ClientRole.PRIMARY.value
+        roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == ClientRole.PRIMARY.value
         and roles[DatasetId.TON_IOT_LINUX_PROCESS_HOST].value == ClientRole.PRIMARY.value,
-        "the three primary benchmark clients must have role primary",
+        "the ToN-IoT host clients must have role primary",
     )
     _require(
-        roles[DatasetId.TON_IOT_NETWORK].value == ClientRole.SECONDARY.value,
-        "the network client must have role secondary",
+        roles[DatasetId.TON_IOT_NETWORK].value == ClientRole.PRIMARY.value
+        and roles[DatasetId.EDGE_IIOTSET_NETWORK].value == ClientRole.EXTERNAL.value,
+        "the ToN-IoT network client must be primary and Edge-IIoTset external",
     )
 
 
@@ -274,7 +274,7 @@ def _validate_statistics(config: FedorbitConfig) -> None:
 
 def _validate_evaluation_criteria(config: FedorbitConfig) -> None:
     criteria = config.scientific.evaluation_criteria
-    primary_pair_count = 4
+    primary_pair_count = len(config.scientific.datasets.primary_directed_pairs)
     _require(
         criteria.strict_cross_telemetry_utility.successful_primary_pairs_required
         <= primary_pair_count,

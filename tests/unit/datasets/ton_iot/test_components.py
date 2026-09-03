@@ -15,8 +15,9 @@ def test_ton_iot_component_registry_is_exact() -> None:
         DatasetId.TON_IOT_NETWORK,
     )
     linux = component_for(DatasetId.TON_IOT_LINUX_PROCESS_HOST)
-    assert linux.relative_path == (
-        "Train_Test_datasets/Train_Test_Linux_dataset/Train_Test_Linux_process.csv"
+    assert linux.relative_paths == (
+        "Processed_datasets/Processed_Linux_dataset/Linux_process_1.csv",
+        "Processed_datasets/Processed_Linux_dataset/Linux_process_2.csv",
     )
 
 

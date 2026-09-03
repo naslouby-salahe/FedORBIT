@@ -30,7 +30,7 @@ scientific:
   datasets:
     clients:
       edge_iiotset_network:
-        role: primary
+        role: external
         source: Edge-IIoTset
         component: "network/IoT traffic"
         expected_timestamp_field: "frame.time"
@@ -45,30 +45,26 @@ scientific:
         component: "Linux process telemetry"
         expected_timestamp_field: "ts"
       ton_iot_network:
-        role: secondary
+        role: primary
         source: ToN_IoT
         component: "network-flow telemetry"
         expected_timestamp_field: "ts"
     timestamp_alias_acceptance:
       retained_row_parse_success_minimum: 0.999
     primary_directed_pairs:
-    - source: edge_iiotset_network
-      target: ton_iot_windows10_host
     - source: ton_iot_windows10_host
-      target: edge_iiotset_network
-    - source: edge_iiotset_network
       target: ton_iot_linux_process_host
     - source: ton_iot_linux_process_host
-      target: edge_iiotset_network
-    secondary_directed_pairs:
-    - source: ton_iot_network
       target: ton_iot_windows10_host
     - source: ton_iot_windows10_host
       target: ton_iot_network
     - source: ton_iot_network
-      target: ton_iot_linux_process_host
+      target: ton_iot_windows10_host
     - source: ton_iot_linux_process_host
       target: ton_iot_network
+    - source: ton_iot_network
+      target: ton_iot_linux_process_host
+    secondary_directed_pairs: []
     local_prediction_normal_label: Normal
 
   split:
@@ -167,26 +163,26 @@ scientific:
     mcnemar_exact_to_asymptotic_discordant_pair_switch: 25
   evaluation_criteria:
     strict_cross_telemetry_utility:
-      successful_primary_pairs_required: 3
+      successful_primary_pairs_required: 4
       holm_adjusted_p_maximum: 0.05
       bca_lower_bound_strictly_greater_than: 0.0
     external_source_value_vs_local_sir:
-      successful_primary_pairs_required: 3
+      successful_primary_pairs_required: 4
       holm_adjusted_p_maximum: 0.05
       bca_lower_bound_strictly_greater_than: 0.0
     coupling_mechanism:
       theorem_zero_strict_classification_accuracy_required: 1.0
       real_packet_fraction_with_material_gap_minimum: 0.25
-      primary_pairs_with_material_mean_gap_required: 2
+      primary_pairs_with_material_mean_gap_required: 3
       holm_adjusted_p_maximum: 0.05
       destruction_positive_gain_retention_minimum: 0.90
     sparse_operational_relevance:
       compared_sparse_support: 3
       dense_minus_sparse_gain_maximum: 0.01
       valid_unit_fraction_required: 0.75
-      primary_pairs_with_useful_gain_required: 2
+      primary_pairs_with_useful_gain_required: 3
     confirmation_safety:
-      qualifying_primary_pairs_required: 3
+      qualifying_primary_pairs_required: 4
       absolute_risk_reduction_minimum: 0.02
       relative_risk_reduction_minimum: 0.30
       qualifying_pair_coverage_loss_maximum: 0.20
@@ -339,9 +335,9 @@ experiments:
     - "Exact-Map Oracle"
   multi_source_selection_validation:
     targets:
-    - edge_iiotset_network
     - ton_iot_windows10_host
     - ton_iot_linux_process_host
+    - ton_iot_network
   mechanism_ablations:
     methods:
     - "FedORBIT Exact-Sparse Solver"

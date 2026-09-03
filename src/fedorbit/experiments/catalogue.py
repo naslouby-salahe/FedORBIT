@@ -12,8 +12,8 @@ from fedorbit.experiments.cells import (
 )
 from fedorbit.types import ExperimentClassification, ExperimentName, TransferMethod
 
-_PRIMARY_PAIRS_LABEL = "four primary directed pairs"
-_SECONDARY_PAIRS_LABEL = "four secondary directed pairs"
+_PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs"
+_SECONDARY_PAIRS_LABEL = "optional external directed pairs"
 
 
 def _experiment_name(name: ExperimentName) -> str:
@@ -141,15 +141,18 @@ def build_catalogue() -> ExperimentCatalogue:
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
     )
 
-    client_count = len(config.scientific.datasets.clients)
+    primary_client_count = sum(
+        client.role.value == "primary"
+        for client in config.scientific.datasets.clients.values()
+    )
     catalogue[ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION] = definition(
         ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION,
         ExperimentClassification.VALIDATION,
         (),
-        ("all primary and secondary pairs",),
+        ("all primary directed ToN-IoT pairs",),
         (),
         confirmatory_seeds,
-        client_count * (primary_pair_count + secondary_pair_count) * len(confirmatory_seeds),
+        primary_client_count * primary_pair_count * len(confirmatory_seeds),
         ("raw manifests",),
     )
 
@@ -158,8 +161,8 @@ def build_catalogue() -> ExperimentCatalogue:
         * len(config.scientific.base_model_pilot.weight_decays)
         * len(config.scientific.base_model_pilot.dropouts)
     )
-    pilot_fits = client_count * pilot_configs * len(pilot_seeds)
-    confirmatory_checkpoints = client_count * len(confirmatory_seeds)
+    pilot_fits = primary_client_count * pilot_configs * len(pilot_seeds)
+    confirmatory_checkpoints = primary_client_count * len(confirmatory_seeds)
     catalogue[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT] = definition(
         ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
         ExperimentClassification.EXPLORATORY,
@@ -181,14 +184,14 @@ def build_catalogue() -> ExperimentCatalogue:
         (),
         (),
         pilot_seeds,
-        client_count * len(pilot_seeds) * response_candidates,
+        primary_client_count * len(pilot_seeds) * response_candidates,
         (
             _experiment_name(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT),
             _experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),
         ),
     )
 
-    planned_packets = client_count * len(confirmatory_seeds)
+    planned_packets = primary_client_count * len(confirmatory_seeds)
     catalogue[ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION] = definition(
         ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION,
         ExperimentClassification.VALIDATION,
@@ -377,7 +380,7 @@ def build_catalogue() -> ExperimentCatalogue:
         ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY,
         ExperimentClassification.CONFIRMATORY_SAFETY,
         confirmation_methods,
-        ("primary and secondary pairs",),
+        ("primary directed ToN-IoT pairs",),
         (),
         confirmatory_seeds,
         (primary_pair_count + secondary_pair_count)

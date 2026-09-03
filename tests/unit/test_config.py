@@ -131,16 +131,20 @@ def test_nominal_alpha_is_derived_not_configured() -> None:
 
 def test_evaluation_criteria_locked(fedorbit_config: FedorbitConfig) -> None:
     criteria = fedorbit_config.scientific.evaluation_criteria
-    assert criteria.strict_cross_telemetry_utility.successful_primary_pairs_required == 3
+    assert criteria.strict_cross_telemetry_utility.successful_primary_pairs_required == 4
     assert criteria.strict_cross_telemetry_utility.holm_adjusted_p_maximum == 0.05
+    assert criteria.external_source_value_vs_local_sir.successful_primary_pairs_required == 4
     assert criteria.coupling_mechanism.theorem_zero_strict_classification_accuracy_required == 1.0
     assert criteria.coupling_mechanism.real_packet_fraction_with_material_gap_minimum == 0.25
     assert criteria.coupling_mechanism.destruction_positive_gain_retention_minimum == 0.9
+    assert criteria.coupling_mechanism.primary_pairs_with_material_mean_gap_required == 3
     assert criteria.sparse_operational_relevance.compared_sparse_support == 3
     assert criteria.sparse_operational_relevance.valid_unit_fraction_required == 0.75
+    assert criteria.sparse_operational_relevance.primary_pairs_with_useful_gain_required == 3
     assert criteria.confirmation_safety.absolute_risk_reduction_minimum == 0.02
     assert criteria.confirmation_safety.relative_risk_reduction_minimum == 0.30
     assert criteria.confirmation_safety.pair_coverage_loss_maximum == 0.20
+    assert criteria.confirmation_safety.qualifying_primary_pairs_required == 4
 
 
 def test_solver_parameters_locked(fedorbit_config: FedorbitConfig) -> None:
@@ -274,14 +278,14 @@ def test_rejects_self_pair(mutable_config: ConfigDocument) -> None:
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_secondary_client_in_primary_pair(mutable_config: ConfigDocument) -> None:
+def test_rejects_external_client_in_primary_pair(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value(
         "scientific",
         "datasets",
         "primary_directed_pairs",
         0,
         "target",
-        value="ton_iot_network",
+        value="edge_iiotset_network",
     )
     _expect_contract_error(mutable_config)
 
@@ -370,13 +374,15 @@ def test_rejects_missing_primary_pair(mutable_config: ConfigDocument) -> None:
     _expect_contract_error(mutable_config)
 
 
-def test_rejects_claim_requiring_five_pairs(mutable_config: ConfigDocument) -> None:
+def test_rejects_confirmation_threshold_above_primary_pair_count(
+    mutable_config: ConfigDocument,
+) -> None:
     mutable_config.set_value(
         "scientific",
         "evaluation_criteria",
         "strict_cross_telemetry_utility",
         "successful_primary_pairs_required",
-        value=5,
+        value=7,
     )
     _expect_contract_error(mutable_config)
 

@@ -47,10 +47,12 @@ def test_primary_transfer_derived_cells(
 ) -> None:
     definition = catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     expected = (
-        4 * 10 * len(fedorbit_config.experiments.primary_strict_cross_telemetry_transfer.methods)
+        len(fedorbit_config.scientific.datasets.primary_directed_pairs)
+        * 10
+        * len(fedorbit_config.experiments.primary_strict_cross_telemetry_transfer.methods)
     )
     assert definition.derived_planned_cells == expected
-    assert definition.derived_planned_cells == 280
+    assert definition.derived_planned_cells == 420
 
 
 def test_theorem_validation_derived_cells(
@@ -72,38 +74,38 @@ def test_mechanism_ablations_derived_cells(
     fedorbit_config: FedorbitConfig,
 ) -> None:
     definition = catalogue.definition(ExperimentName.MECHANISM_ABLATIONS)
-    assert definition.derived_planned_cells == 4 * 10 * len(
+    assert definition.derived_planned_cells == 6 * 10 * len(
         fedorbit_config.experiments.mechanism_ablations.methods
     )
-    assert definition.derived_planned_cells == 320
+    assert definition.derived_planned_cells == 480
 
 
 def test_sparsity_and_dense_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SPARSITY_AND_DENSE_FALLBACK)
-    assert definition.derived_planned_cells == 160
+    assert definition.derived_planned_cells == 240
 
 
 def test_confirmation_portability_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY)
-    assert definition.derived_planned_cells == 160
+    assert definition.derived_planned_cells == 120
 
 
 def test_secondary_generalization_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION)
-    assert definition.derived_planned_cells == 200
+    assert definition.derived_planned_cells == 0
 
 
 def test_semantic_frontier_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER)
-    assert definition.derived_planned_cells == 480
+    assert definition.derived_planned_cells == 720
 
 
 def test_weak_signal_boundaries_derived_cells(
@@ -112,21 +114,21 @@ def test_weak_signal_boundaries_derived_cells(
     definition = catalogue.definition(
         ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES
     )
-    assert definition.derived_planned_cells == 1800
+    assert definition.derived_planned_cells == 2700
 
 
 def test_scalability_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY)
-    assert definition.derived_planned_cells == 1120 + 120
+    assert definition.derived_planned_cells == 1120 + 90
 
 
 def test_map_audit_recovery_attempts(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT)
-    assert definition.derived_planned_cells == 80
+    assert definition.derived_planned_cells == 120
 
 
 def test_multi_source_target_decisions(
@@ -180,21 +182,21 @@ def test_pilot_uses_pilot_seeds(
 ) -> None:
     pilot = catalogue.definition(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
     assert fedorbit_config.scientific.randomness.pilot_seeds == (101, 202, 303)
-    assert pilot.derived_planned_cells == 144 + 40
+    assert pilot.derived_planned_cells == 108 + 30
 
 
 def test_source_response_pilot_candidate_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
-    assert definition.derived_planned_cells == 108
+    assert definition.derived_planned_cells == 81
 
 
 def test_final_packets_planned(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
-    assert definition.derived_planned_cells == 40
+    assert definition.derived_planned_cells == 30
 
 
 def test_baseline_validation_seeds(
@@ -202,7 +204,7 @@ def test_baseline_validation_seeds(
 ) -> None:
     definition = catalogue.definition(ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION)
     assert definition.seeds == (1103, 5531)
-    assert definition.derived_planned_cells == 8
+    assert definition.derived_planned_cells == 12
 
 
 def test_semantic_frontier_partitions_registered(

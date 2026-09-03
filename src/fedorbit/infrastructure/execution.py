@@ -98,6 +98,7 @@ from fedorbit.types import (
     ArtifactPath,
     ArtifactStage,
     ArtifactState,
+    ClientRole,
     CoarseGroup,
     DatasetId,
     ExecutionCell,
@@ -504,8 +505,13 @@ _SYNTHETIC_EXPERIMENTS = frozenset(
 
 def _chronology_block_reasons() -> OrderedDict[str, str]:
     raw_root = repository_root() / "data" / "raw"
+    primary_datasets = tuple(
+        dataset
+        for dataset, client in active_config().scientific.datasets.clients.items()
+        if client.role == ClientRole.PRIMARY
+    )
     observations = tuple(
-        inspect_dataset(DatasetInspectionRequest(dataset, raw_root)) for dataset in DatasetId
+        inspect_dataset(DatasetInspectionRequest(dataset, raw_root)) for dataset in primary_datasets
     )
     return OrderedDict(
         (observation.dataset.value, observation.event_time.reason)

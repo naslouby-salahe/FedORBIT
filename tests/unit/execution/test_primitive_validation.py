@@ -24,3 +24,6 @@ def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path
     assert payload["lower_bound_not_above_upper_bound"]
     assert manifest.semantic_producer_coordinates == completion.semantic_experiment_coordinates
     assert "mathematical-primitive-validation" in Path(manifest.payload_paths[0]).parts
+    reused = execute_primitive_validation(store, layout)
+    assert reused.artifact_id == manifest.artifact_id
+    assert len(store.all_manifests()) == 1

@@ -457,7 +457,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
     layout = build_layout()
     if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
-        execute_primitive_validation(store, layout)
+        execute_primitive_validation(store, layout, request.overwrite_policy)
         return
     if request.experiment in _SYNTHETIC_EXPERIMENTS:
         execute_synthetic_experiment(store, layout, request)
@@ -550,6 +550,10 @@ def execute_synthetic_experiment(
         _CONFIGURATION_SECTIONS,
         _PRODUCER_MODULE,
     )
+    if request.overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
     payload = _synthetic_experiment_payload(
         request.experiment, pattern, RandomSeed(seed.value), fingerprint
     )
@@ -682,7 +686,9 @@ _PRODUCER_MODULE = "fedorbit.infrastructure.execution"
 
 
 def execute_primitive_validation(
-    store: ArtifactStore, layout: WorkspaceLayout
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    overwrite_policy: OverwritePolicy = OverwritePolicy.REUSE,
 ) -> ReusableArtifactManifest:
     configuration = active_config()
     seed = ExperimentSeed(0)
@@ -697,6 +703,10 @@ def execute_primitive_validation(
         _CONFIGURATION_SECTIONS,
         _PRODUCER_MODULE,
     )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
     payload_path = _payload_path(layout, fingerprint)
     payload = _validation_payload(
         configuration.generators.exact_separator_theorem.block_patterns[0]

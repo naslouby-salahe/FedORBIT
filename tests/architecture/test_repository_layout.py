@@ -221,13 +221,16 @@ def test_no_markdown_planning_documents_in_repo_root() -> None:
 def test_no_generated_workspaces_committed() -> None:
     for workspace in ("outputs", "results"):
         tracked = subprocess.run(
-            ["git", "ls-files", "--error-unmatch", workspace],
+            ["git", "ls-files", workspace],
             cwd=REPOSITORY_ROOT,
             check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
         )
-        assert tracked.returncode != 0, f"generated workspace is committed: {workspace}"
+        generated = tuple(
+            path for path in tracked.stdout.splitlines() if Path(path).name != ".gitkeep"
+        )
+        assert not generated, f"generated workspace content is committed: {generated}"
 
 
 def test_no_temp_planning_directory() -> None:

@@ -7,9 +7,18 @@ from dataclasses import dataclass, fields
 import numpy as np
 import torch
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.enums import ClientRole, CoarseGroup, DatasetId
-from fedorbit.domain.serialization import stable_json
+from fedorbit.config.loading import active_config
+from fedorbit.interface import (
+    AnonymityCoordinate,
+    AnonymityCoordinateEntry,
+    anonymous_node_order,
+    validate_anonymous_node_ids,
+    validate_exact_fields,
+    validate_rfc3339_utc,
+    validate_sha256,
+)
+from fedorbit.learning.pilot import create_classifier
+from fedorbit.learning.training import BaseCheckpoint, ClassWeights
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData, ResponseCandidate
 from fedorbit.response.uncertainty import (
@@ -17,20 +26,7 @@ from fedorbit.response.uncertainty import (
     FinalResponseEstimate,
     estimate_final_response,
 )
-from fedorbit.strict_interface.anonymity import (
-    AnonymityCoordinate,
-    AnonymityCoordinateEntry,
-    anonymous_node_order,
-)
-from fedorbit.strict_interface.validation import (
-    validate_anonymous_node_ids,
-    validate_exact_fields,
-    validate_rfc3339_utc,
-    validate_sha256,
-)
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.pilot import create_classifier
-from fedorbit.training.trainer import BaseCheckpoint
+from fedorbit.types import ClientRole, CoarseGroup, DatasetId, stable_json
 
 RESPONSE_PACKET_SCHEMA = "source-response-packet/v1"
 PACKET_PERMITTED_FIELDS = frozenset(

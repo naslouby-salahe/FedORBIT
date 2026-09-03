@@ -31,55 +31,51 @@ ALLOWED_ROOT_ENTRIES = {
 }
 
 PACKAGE_LAYERS: dict[str, int] = {
-    "domain": 0,
+    "types": 0,
     "config": 1,
-    "runtime": 2,
-    "artifacts": 2,
     "datasets": 3,
-    "models": 3,
-    "strict_interface": 3,
+    "learning": 3,
+    "interface": 3,
     "oracle": 4,
-    "synthetic": 3,
-    "training": 4,
     "response": 4,
-    "orbit": 4,
-    "solvers": 4,
-    "baselines": 4,
-    "transfer": 4,
-    "evaluation": 4,
+    "optimization": 4,
+    "methods": 4,
     "experiments": 5,
-    "analysis": 5,
-    "execution": 6,
+    "analysis": 3,
+    "infrastructure": 6,
     "reporting": 7,
     "cli": 8,
+}
+
+MODULE_LAYERS: dict[str, int] = {
+    "infrastructure.environment": 2,
+    "infrastructure.failures": 2,
+    "infrastructure.runtime": 2,
+    "infrastructure.execution": 6,
+    "infrastructure.manifests": 6,
+    "infrastructure.planner": 6,
+    "infrastructure.provenance": 6,
+    "infrastructure.reuse": 6,
+    "infrastructure.workspace": 6,
 }
 
 FORBIDDEN_EDGES: dict[str, frozenset[str]] = {
     "reporting": frozenset(
         {
             "datasets",
-            "models",
-            "strict_interface",
+            "learning",
+            "interface",
             "oracle",
-            "synthetic",
-            "training",
             "response",
-            "orbit",
-            "solvers",
-            "baselines",
-            "transfer",
-            "evaluation",
+            "optimization",
+            "methods",
             "experiments",
-            "analysis",
-            "execution",
             "cli",
         }
     ),
-    "execution": frozenset({"reporting", "cli"}),
-    "artifacts": frozenset({"reporting", "cli", "execution", "analysis", "experiments"}),
-    "runtime": frozenset({"cli", "reporting", "execution"}),
-    "config": frozenset({"cli", "reporting", "execution", "artifacts", "runtime"}),
-    "domain": frozenset(PACKAGE_LAYERS.keys()) - {"domain"},
+    "infrastructure": frozenset({"reporting", "cli"}),
+    "config": frozenset({"cli", "reporting", "infrastructure"}),
+    "types": frozenset(PACKAGE_LAYERS.keys()) - {"types"},
 }
 
 VAGUE_MODULE_NAMES = {
@@ -186,7 +182,7 @@ LOCKED_VALUE_CONSTANT_PATTERN = {
     "PROBABILITY_LOG_FLOOR",
 }
 
-BOUNDARY_PACKAGES = frozenset({"domain", "config", "artifacts", "reporting", "cli"})
+BOUNDARY_PACKAGES = frozenset({"types", "config", "infrastructure", "reporting", "cli"})
 
 TODO_MARKERS = ("TODO", "FIXME", "HACK", "XXX")
 
@@ -220,6 +216,10 @@ def package_of(module_name: str) -> str:
     return parts[0]
 
 
+def layer_of(module_name: str) -> int:
+    return MODULE_LAYERS.get(module_name, PACKAGE_LAYERS[package_of(module_name)])
+
+
 def parse_module(path: Path) -> ast.Module:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     return tree
@@ -235,7 +235,7 @@ def import_edges(path: Path) -> tuple[ImportEdge, ...]:
                 target = alias.name
                 if target == "fedorbit" or target.startswith("fedorbit."):
                     parts = target.split(".")
-                    target_package = parts[1] if len(parts) > 1 else "fedorbit"
+                    target_package = ".".join(parts[1:3]) if len(parts) > 2 else parts[1]
                     edges.append(ImportEdge(module, target_package, node.lineno))
         elif (
             isinstance(node, ast.ImportFrom)
@@ -243,7 +243,7 @@ def import_edges(path: Path) -> tuple[ImportEdge, ...]:
             and (node.module == "fedorbit" or node.module.startswith("fedorbit."))
         ):
             parts = node.module.split(".")
-            target_package = parts[1] if len(parts) > 1 else "fedorbit"
+            target_package = ".".join(parts[1:3]) if len(parts) > 2 else parts[1]
             edges.append(ImportEdge(module, target_package, node.lineno))
     return tuple(edges)
 

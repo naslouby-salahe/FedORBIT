@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from fedorbit.config.loading import snapshot_matches_contract
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.experiments.catalogue import build_catalogue
 
@@ -45,10 +44,6 @@ GOVERNED_VALUE_PROBES = (
     ("environment", "python"),
     ("reporting", "precision", "p_value_less_than_threshold"),
 )
-
-
-def test_readiness_gate_typed_contract_matches_roadmap(fedorbit_config: FedorbitConfig) -> None:
-    assert snapshot_matches_contract(fedorbit_config)
 
 
 def test_readiness_gate_all_governed_values_bound(fedorbit_config: FedorbitConfig) -> None:

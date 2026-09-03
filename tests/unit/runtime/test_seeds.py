@@ -5,9 +5,7 @@ import hashlib
 import pytest
 import torch
 
-from fedorbit.domain.enums import RngNamespace
-from fedorbit.domain.serialization import StableSerializationError, stable_json
-from fedorbit.runtime.seeds import (
+from fedorbit.infrastructure.runtime import (
     SEED32_MODULUS,
     DerivedSeed,
     NumpyGeneratorRequest,
@@ -25,6 +23,7 @@ from fedorbit.runtime.seeds import (
     statistical_bootstrap_stream,
     torch_generator,
 )
+from fedorbit.types import RngNamespace, StableSerializationError, stable_json
 
 FIXED_COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",

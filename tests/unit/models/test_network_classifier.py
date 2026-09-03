@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from fedorbit.models.network_classifier import NetworkFlowClassifier
+from fedorbit.learning.models import NetworkFlowClassifier
 
 
 def test_network_classifier_contract() -> None:

@@ -10,7 +10,7 @@ from fedorbit.datasets.ton_iot.validation import (
     validate_ton_iot_label_consistency,
     validate_ton_iot_schema,
 )
-from fedorbit.domain.enums import DatasetId
+from fedorbit.types import DatasetId
 
 
 def test_ton_schema_validation_matches_selected_component() -> None:

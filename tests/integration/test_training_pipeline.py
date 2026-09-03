@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from fedorbit.models.network_classifier import NetworkFlowClassifier
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import SelectedHyperparameters, train_base_model
+from fedorbit.learning.models import NetworkFlowClassifier
+from fedorbit.learning.training import ClassWeights, SelectedHyperparameters, train_base_model
 
 
 def test_training_pipeline_produces_complete_checkpoint() -> None:

@@ -4,7 +4,7 @@ import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.transfer.optimizer_budget import (
+from fedorbit.methods.target import (
     BudgetCategory,
     OptimizerBudgetError,
     TargetOptimizerStepLedger,

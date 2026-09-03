@@ -5,7 +5,7 @@ import pytest
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.common import DatasetSchemaError, FieldRole
 from fedorbit.datasets.ton_iot.components import TON_COMPONENTS, component_for, ton_iot_adapter
-from fedorbit.domain.enums import DatasetId
+from fedorbit.types import DatasetId
 
 
 def test_ton_iot_component_registry_is_exact() -> None:

@@ -21,30 +21,17 @@ REQUIRED_ROOT_FILES = {
 }
 
 REQUIRED_PACKAGE_DIRECTORIES = {
-    "src/fedorbit/domain",
     "src/fedorbit/config",
     "src/fedorbit/datasets",
     "src/fedorbit/datasets/edge_iiotset",
     "src/fedorbit/datasets/ton_iot",
-    "src/fedorbit/models",
-    "src/fedorbit/training",
+    "src/fedorbit/learning",
     "src/fedorbit/response",
-    "src/fedorbit/strict_interface",
-    "src/fedorbit/orbit",
-    "src/fedorbit/solvers",
-    "src/fedorbit/transfer",
-    "src/fedorbit/baselines",
-    "src/fedorbit/oracle",
-    "src/fedorbit/synthetic",
+    "src/fedorbit/optimization",
+    "src/fedorbit/methods",
     "src/fedorbit/experiments",
-    "src/fedorbit/evaluation",
     "src/fedorbit/analysis",
-    "src/fedorbit/artifacts",
-    "src/fedorbit/execution",
-    "src/fedorbit/runtime",
-    "src/fedorbit/reporting",
-    "src/fedorbit/cli",
-    "src/fedorbit/cli/commands",
+    "src/fedorbit/infrastructure",
 }
 
 REQUIRED_TEST_DIRECTORIES = {
@@ -60,20 +47,73 @@ REQUIRED_TEST_DIRECTORIES = {
 
 REQUIRED_CONFIG_FILES = {
     "configs/fedorbit.yaml",
-    "configs/tests.yml",
-    "configs/smoke.yml",
-    "configs/scientific_contract_snapshot.json",
+}
+
+REQUIRED_SOURCE_FILES = {
+    "src/fedorbit/types.py",
+    "src/fedorbit/interface.py",
+    "src/fedorbit/oracle.py",
+    "src/fedorbit/reporting.py",
+    "src/fedorbit/cli.py",
+    "src/fedorbit/config/loading.py",
+    "src/fedorbit/config/models.py",
+    "src/fedorbit/config/validation.py",
+    "src/fedorbit/datasets/common.py",
+    "src/fedorbit/datasets/preprocessing.py",
+    "src/fedorbit/datasets/splitting.py",
+    "src/fedorbit/datasets/ontology.py",
+    "src/fedorbit/datasets/edge_iiotset/loader.py",
+    "src/fedorbit/datasets/edge_iiotset/schema.py",
+    "src/fedorbit/datasets/edge_iiotset/validation.py",
+    "src/fedorbit/datasets/ton_iot/loader.py",
+    "src/fedorbit/datasets/ton_iot/components.py",
+    "src/fedorbit/datasets/ton_iot/validation.py",
+    "src/fedorbit/learning/models.py",
+    "src/fedorbit/learning/pilot.py",
+    "src/fedorbit/learning/scoring.py",
+    "src/fedorbit/learning/training.py",
+    "src/fedorbit/response/pilot.py",
+    "src/fedorbit/response/estimation.py",
+    "src/fedorbit/response/uncertainty.py",
+    "src/fedorbit/response/packet.py",
+    "src/fedorbit/optimization/correspondence.py",
+    "src/fedorbit/optimization/objective.py",
+    "src/fedorbit/optimization/diagnostics.py",
+    "src/fedorbit/optimization/assignment.py",
+    "src/fedorbit/optimization/exact_sparse.py",
+    "src/fedorbit/optimization/exact_qap.py",
+    "src/fedorbit/optimization/dense_ccp.py",
+    "src/fedorbit/optimization/certificates.py",
+    "src/fedorbit/methods/target.py",
+    "src/fedorbit/methods/confirmation.py",
+    "src/fedorbit/methods/assimilation.py",
+    "src/fedorbit/methods/baselines.py",
+    "src/fedorbit/experiments/catalogue.py",
+    "src/fedorbit/experiments/cells.py",
+    "src/fedorbit/experiments/synthetic.py",
+    "src/fedorbit/analysis/records.py",
+    "src/fedorbit/analysis/metrics.py",
+    "src/fedorbit/analysis/comparisons.py",
+    "src/fedorbit/analysis/statistics.py",
+    "src/fedorbit/infrastructure/workspace.py",
+    "src/fedorbit/infrastructure/manifests.py",
+    "src/fedorbit/infrastructure/provenance.py",
+    "src/fedorbit/infrastructure/planner.py",
+    "src/fedorbit/infrastructure/reuse.py",
+    "src/fedorbit/infrastructure/execution.py",
+    "src/fedorbit/infrastructure/runtime.py",
+    "src/fedorbit/infrastructure/environment.py",
+    "src/fedorbit/infrastructure/failures.py",
 }
 
 REQUIRED_SYNTHETIC_MODULES = {
-    "src/fedorbit/synthetic/generators.py",
-    "src/fedorbit/synthetic/exactness.py",
-    "src/fedorbit/synthetic/mechanisms.py",
-    "src/fedorbit/synthetic/scalability.py",
+    "src/fedorbit/experiments/synthetic.py",
 }
 
 REQUIRED_TRANSFER_MODULES = {
-    "src/fedorbit/transfer/curriculum.py",
+    "src/fedorbit/methods/target.py",
+    "src/fedorbit/methods/confirmation.py",
+    "src/fedorbit/methods/assimilation.py",
 }
 
 
@@ -134,6 +174,13 @@ def test_required_config_files_exist() -> None:
         relative for relative in REQUIRED_CONFIG_FILES if not (REPOSITORY_ROOT / relative).is_file()
     }
     assert not missing, f"missing required config files: {sorted(missing)}"
+
+
+def test_target_source_files_exist() -> None:
+    missing = {
+        relative for relative in REQUIRED_SOURCE_FILES if not (REPOSITORY_ROOT / relative).is_file()
+    }
+    assert not missing, f"missing target source files: {sorted(missing)}"
 
 
 def test_roadmap_required_synthetic_modules_exist() -> None:
@@ -211,7 +258,7 @@ def test_no_scratch_or_cache_directories_in_source_tree() -> None:
 def test_configs_directory_contains_only_contract_files() -> None:
     configs = REPOSITORY_ROOT / "configs"
     actual = {path.name for path in configs.iterdir() if path.is_file()}
-    expected = {"fedorbit.yaml", "tests.yml", "smoke.yml", "scientific_contract_snapshot.json"}
+    expected = {"fedorbit.yaml"}
     assert actual == expected, f"unexpected config files: {actual - expected}"
 
 

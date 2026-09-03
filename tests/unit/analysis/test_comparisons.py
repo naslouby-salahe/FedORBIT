@@ -16,7 +16,7 @@ from fedorbit.analysis.comparisons import (
 )
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import MultiplicityFamily, Split, TransferMethod
+from fedorbit.types import MultiplicityFamily, Split, TransferMethod
 
 
 @pytest.fixture

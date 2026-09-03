@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import torch
 
-from fedorbit.config.context import active_config
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import (
+from fedorbit.config.loading import active_config
+from fedorbit.learning.training import (
+    ClassWeights,
     ModelParameterState,
     OptimizerState,
     RngState,

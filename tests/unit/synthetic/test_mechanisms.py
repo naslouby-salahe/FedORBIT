@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from fedorbit.runtime.seeds import RandomSeed
-from fedorbit.synthetic.mechanisms import (
+from fedorbit.experiments.synthetic import (
     UnresolvedMapWorldKind,
     UnresolvedMapWorldRequest,
     generate_unresolved_map_world,
 )
+from fedorbit.infrastructure.runtime import RandomSeed
 
 
 def test_common_action_world_is_block_constant_and_weight_normalized() -> None:

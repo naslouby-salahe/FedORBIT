@@ -13,7 +13,7 @@ from tests.architecture.scan import (
 
 
 def test_no_production_function_used_only_from_tests() -> None:
-    console_script_modules = {"fedorbit.cli.main"}
+    console_script_modules = {"fedorbit.cli"}
     production_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in SRC_ROOT.rglob("*.py")

@@ -49,7 +49,6 @@ def test_yaml_contains_no_block_scalar_procedures() -> None:
     assert ">" not in text.replace(">=", "").replace("->", "")
 
 
-def test_snapshot_is_stored_outside_yaml() -> None:
+def test_no_scientific_contract_snapshot_exists() -> None:
     snapshot = repository_root() / "configs" / "scientific_contract_snapshot.json"
-    assert snapshot.suffix == ".json"
-    assert "observed" not in snapshot.read_text(encoding="utf-8").lower()
+    assert not snapshot.exists()

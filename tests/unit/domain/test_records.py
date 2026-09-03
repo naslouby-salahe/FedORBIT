@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.domain.records import ArtifactPath
+from fedorbit.types import ArtifactPath
 
 
 def test_artifact_path_requires_absolute_location() -> None:

@@ -4,7 +4,7 @@ import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.transfer.target_state import (
+from fedorbit.methods.target import (
     TargetImportanceError,
     TransferNodeRisk,
     build_target_importance,
@@ -98,9 +98,9 @@ def test_construction_is_deterministic_and_sorted() -> None:
 def test_importance_feeds_robust_action_problem() -> None:
     import numpy as np
 
-    from fedorbit.domain.enums import CoarseGroup
-    from fedorbit.orbit.correspondence import build_padded_block_structure
-    from fedorbit.orbit.objective import RobustActionProblem, build_robust_action_problem
+    from fedorbit.optimization.correspondence import build_padded_block_structure
+    from fedorbit.optimization.objective import RobustActionProblem, build_robust_action_problem
+    from fedorbit.types import CoarseGroup
 
     importance = build_target_importance(_risks())
     blocks = build_padded_block_structure(

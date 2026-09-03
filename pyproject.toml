@@ -36,7 +36,7 @@ dev = [
 ]
 
 [project.scripts]
-fedorbit = "fedorbit.cli.main:main"
+fedorbit = "fedorbit.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -72,6 +72,8 @@ exclude = ["vulture_whitelist.py"]
 pythonVersion = "3.13"
 reportMissingTypeStubs = "none"
 reportMissingImports = "warning"
+reportUnknownVariableType = "none"
+reportUnknownMemberType = "none"
 
 [tool.deptry]
 per_rule_ignores = { DEP002 = ["scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }

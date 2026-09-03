@@ -3,8 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fedorbit.baselines import (
+from fedorbit.methods.baselines import (
+    ComparatorResources,
+    FairnessViolationError,
     FixedMatrixActionSolution,
+    assert_identical_resources,
+    assert_registered_method_name,
     coarse_block_mean_matrix,
     coarse_block_min_matrix,
     committed_map_action,
@@ -13,19 +17,13 @@ from fedorbit.baselines import (
     optimize_against_fixed_matrix,
     orbit_mean_matrix,
 )
-from fedorbit.baselines.fairness import (
-    ComparatorResources,
-    FairnessViolationError,
-    assert_identical_resources,
-    assert_registered_method_name,
-)
-from fedorbit.domain.enums import CoarseGroup, DatasetId, TransferMethod
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.objective import CurriculumAction, RobustActionProblem
-from fedorbit.solvers.exact_sparse import solve_robust_action
+from fedorbit.optimization.exact_sparse import solve_robust_action
+from fedorbit.optimization.objective import CurriculumAction, RobustActionProblem
+from fedorbit.types import CoarseGroup, DatasetId, TransferMethod
 
 
 def _problem(seed: int) -> RobustActionProblem:

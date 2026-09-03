@@ -4,16 +4,16 @@ import pytest
 import torch
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.pilot import (
+from fedorbit.learning.pilot import (
     REFERENCE_LEARNING_RATE,
     PilotConfiguration,
     PilotFitResult,
     pilot_grid,
     select_pilot_configuration,
 )
-from fedorbit.training.trainer import (
+from fedorbit.learning.training import (
     BaseCheckpoint,
+    ClassWeights,
     ModelParameterState,
     OptimizerState,
     RngState,

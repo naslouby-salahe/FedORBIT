@@ -5,9 +5,9 @@ import math
 import pytest
 import torch
 
-from fedorbit.models.network_classifier import NetworkFlowClassifier
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import (
+from fedorbit.learning.models import NetworkFlowClassifier
+from fedorbit.learning.training import (
+    ClassWeights,
     SelectedHyperparameters,
     macro_cross_entropy,
     make_adamw,

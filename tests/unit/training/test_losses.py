@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from fedorbit.training.losses import (
+from fedorbit.learning.training import (
     ClassWeights,
     LossContractError,
     minibatch_objective,

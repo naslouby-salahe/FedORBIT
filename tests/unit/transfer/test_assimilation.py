@@ -4,10 +4,9 @@ import pytest
 import torch
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.models.network_classifier import NetworkFlowClassifier
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import make_adamw
-from fedorbit.transfer.assimilation import (
+from fedorbit.learning.models import NetworkFlowClassifier
+from fedorbit.learning.training import ClassWeights, make_adamw
+from fedorbit.methods.assimilation import (
     AssimilationCoordinates,
     AssimilationError,
     PreConfirmTargetState,
@@ -16,8 +15,8 @@ from fedorbit.transfer.assimilation import (
     capture_pre_confirm_pair,
     settle_rejected_proposal,
 )
-from fedorbit.transfer.assimilation import TestOpeningRuleError as OpeningRuleError
-from fedorbit.transfer.curriculum import CurriculumMultipliers
+from fedorbit.methods.assimilation import TestOpeningRuleError as OpeningRuleError
+from fedorbit.methods.target import CurriculumMultipliers
 
 
 def _model_and_optimizer() -> tuple[NetworkFlowClassifier, torch.optim.AdamW]:

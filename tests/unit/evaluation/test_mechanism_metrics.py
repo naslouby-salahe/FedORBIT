@@ -5,22 +5,22 @@ import math
 import numpy as np
 import pytest
 
+from fedorbit.analysis.comparisons import SpearmanError, descriptive_spearman
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.evaluation.spearman import SpearmanError, descriptive_spearman
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.diagnostics import (
+from fedorbit.optimization.diagnostics import (
     analytic_orbit_mean,
     map_value_diagnostics,
 )
-from fedorbit.orbit.objective import (
+from fedorbit.optimization.objective import (
     CurriculumAction,
     RobustActionProblem,
 )
+from fedorbit.types import CoarseGroup
 
 
 def _problem(seed: int) -> RobustActionProblem:
@@ -76,7 +76,7 @@ def test_orbit_radius_computation_matches_enumerated_maximum() -> None:
         float(np.linalg.norm(correspondence.permute_response_matrix(matrix) - mean, ord=2))
         for correspondence in enumerate_block_permutations(problem.blocks)
     )
-    from fedorbit.orbit.diagnostics import orbit_radius_2_norm
+    from fedorbit.optimization.diagnostics import orbit_radius_2_norm
 
     assert orbit_radius_2_norm(problem.blocks, matrix).radius == pytest.approx(brute)
 

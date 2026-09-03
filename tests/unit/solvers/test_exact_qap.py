@@ -3,25 +3,24 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fedorbit.config.context import configured
-from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.config.loading import configured, load_fedorbit_config
+from fedorbit.optimization.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.objective import (
-    CurriculumAction,
-    RobustActionProblem,
-    evaluate_objective,
-)
-from fedorbit.solvers.exact_qap import (
+from fedorbit.optimization.exact_qap import (
     QapUncertifiedError,
     fixed_action_worst_correspondence_qap,
     point_correspondence_commitment,
     solve_robust_action_qap,
 )
-from fedorbit.solvers.exact_sparse import solve_robust_action
+from fedorbit.optimization.exact_sparse import solve_robust_action
+from fedorbit.optimization.objective import (
+    CurriculumAction,
+    RobustActionProblem,
+    evaluate_objective,
+)
+from fedorbit.types import CoarseGroup
 
 
 def _two_block_problem(seed: int) -> RobustActionProblem:

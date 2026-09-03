@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
-import unicodedata
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
+from functools import cache
 from pathlib import Path
 
 import yaml
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.config.validation import validate_cross_field_contract
+
+_bound_config: ContextVar[FedorbitConfig | None] = ContextVar("fedorbit_config", default=None)
 
 
 def repository_root() -> Path:
@@ -36,6 +40,25 @@ def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
     return config
 
 
+@cache
+def application_config() -> FedorbitConfig:
+    return load_fedorbit_config()
+
+
+def active_config() -> FedorbitConfig:
+    bound = _bound_config.get()
+    return bound if bound is not None else application_config()
+
+
+@contextmanager
+def configured(config: FedorbitConfig) -> Generator[None]:
+    token: Token[FedorbitConfig | None] = _bound_config.set(config)
+    try:
+        yield
+    finally:
+        _bound_config.reset(token)
+
+
 def stable_json(config: FedorbitConfig) -> str:
     payload = config.model_dump(mode="json")
     return json.dumps(
@@ -44,22 +67,3 @@ def stable_json(config: FedorbitConfig) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
-
-
-def contract_snapshot_path() -> Path:
-    return repository_root() / "configs" / "scientific_contract_snapshot.json"
-
-
-def snapshot_matches_contract(config: FedorbitConfig) -> bool:
-    snapshot = contract_snapshot_path()
-    if not snapshot.is_file():
-        return False
-    expected = snapshot.read_text(encoding="utf-8").strip()
-    return stable_json(config) == expected
-
-
-def write_contract_snapshot(config: FedorbitConfig) -> Path:
-    snapshot = contract_snapshot_path()
-    rendered = unicodedata.normalize("NFC", stable_json(config)) + "\n"
-    snapshot.write_text(rendered, encoding="utf-8")
-    return snapshot

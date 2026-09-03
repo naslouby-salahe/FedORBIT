@@ -4,16 +4,11 @@ import numpy as np
 import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.objective import (
-    CurriculumAction,
-    RobustActionProblem,
-)
-from fedorbit.solvers.dense_ccp import (
+from fedorbit.optimization.dense_ccp import (
     AssignmentVariableKey,
     AssignmentVariableLayout,
     DenseCcpError,
@@ -28,6 +23,11 @@ from fedorbit.solvers.dense_ccp import (
     response_only_objective,
     solve_dense_ccp,
 )
+from fedorbit.optimization.objective import (
+    CurriculumAction,
+    RobustActionProblem,
+)
+from fedorbit.types import CoarseGroup
 
 
 def _two_block_problem(seed: int) -> RobustActionProblem:

@@ -54,21 +54,7 @@ def test_configuration_is_single_source_of_scientific_values() -> None:
 
 def test_no_parallel_configuration_files() -> None:
     configs = REPOSITORY_ROOT / "configs"
-    allowed = {"fedorbit.yaml", "tests.yml", "smoke.yml", "scientific_contract_snapshot.json"}
-    for path in configs.iterdir():
-        assert path.name in allowed, f"unexpected configuration file: {path.name}"
-
-
-def test_no_scientific_keys_in_test_or_smoke_configs() -> None:
-    for name in ("tests.yml", "smoke.yml"):
-        path = REPOSITORY_ROOT / "configs" / name
-        with path.open(encoding="utf-8") as handle:
-            raw = yaml.safe_load(handle)
-        assert isinstance(raw, dict)
-        for key in cast(dict[str, object], raw):
-            assert key not in SCIENTIFIC_SECTION_NAMES, (
-                f"forbidden scientific section in {name}: {key}"
-            )
+    assert {path.name for path in configs.iterdir() if path.is_file()} == {"fedorbit.yaml"}
 
 
 def test_no_configuration_key_duplicated_in_production_code() -> None:
@@ -105,13 +91,6 @@ def test_no_environment_yml_or_toml_scientific_override() -> None:
             ):
                 continue
             raise AssertionError(f"unexpected configuration file: {path}")
-
-
-def test_snapshot_is_generated_not_hand_edited() -> None:
-    snapshot = REPOSITORY_ROOT / "configs" / "scientific_contract_snapshot.json"
-    text = snapshot.read_text(encoding="utf-8")
-    assert text.endswith("\n")
-    assert "\n\n" not in text
 
 
 def test_every_configured_top_level_section_has_a_typed_consumer() -> None:

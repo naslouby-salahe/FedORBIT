@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
-from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.domain.enums import ArtifactState, ExperimentName
-from fedorbit.execution.planner import (
+from fedorbit.infrastructure.execution import ArtifactStore
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id, file_sha256
+from fedorbit.infrastructure.planner import (
     EXECUTION_LAYERS,
     PROGRAMME_PREREQUISITES,
     ExecutionReadiness,
     layer_index,
 )
+from fedorbit.types import ArtifactState, ExperimentName
 
 COORDINATES = {"experiment": "Mathematical Primitive Validation"}
 

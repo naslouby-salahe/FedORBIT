@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict
 
-from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
+from fedorbit.types import ClientRole, DatasetId, TransferMethod
 
 
 class FrozenModel(BaseModel):
@@ -635,7 +635,7 @@ class FedorbitConfig(FrozenModel):
 
 
 def nominal_alpha() -> float:
-    from fedorbit.config.context import active_config
+    from fedorbit.config.loading import active_config
 
     return round(1.0 - active_config().scientific.statistics.confidence_level, 10)
 
@@ -655,7 +655,7 @@ def _append_registered_method(
 
 
 def all_registered_methods() -> tuple[TransferMethod, ...]:
-    from fedorbit.config.context import active_config
+    from fedorbit.config.loading import active_config
 
     config = active_config()
     experiment_configs: tuple[
@@ -691,6 +691,6 @@ def all_registered_methods() -> tuple[TransferMethod, ...]:
 
 
 def registered_client_ids() -> tuple[DatasetId, ...]:
-    from fedorbit.config.context import active_config
+    from fedorbit.config.loading import active_config
 
     return tuple(active_config().scientific.datasets.clients.keys())

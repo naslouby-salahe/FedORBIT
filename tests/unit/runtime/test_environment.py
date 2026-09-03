@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.runtime.environment import (
+from fedorbit.infrastructure.environment import (
     DEPENDENCY_SPECS,
     environment_snapshot,
     reference_gpu_matches,
@@ -51,7 +51,7 @@ def test_lockfile_validates_hashes_and_versions() -> None:
 
 
 def test_lockfile_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr("fedorbit.runtime.environment.repository_root", lambda: tmp_path)
+    monkeypatch.setattr("fedorbit.infrastructure.environment.repository_root", lambda: tmp_path)
     with pytest.raises(FileNotFoundError):
         validate_lockfile()
 

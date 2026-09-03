@@ -32,7 +32,7 @@ def test_vulture_whitelist_is_committed() -> None:
 
 
 def test_no_production_module_referenced_only_by_tests() -> None:
-    console_script_modules = {"fedorbit.cli.main"}
+    console_script_modules = {"fedorbit.cli"}
     production_modules = [
         relative_module(path) for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts
     ]

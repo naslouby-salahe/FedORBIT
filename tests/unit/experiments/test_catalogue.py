@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import ExperimentName, TransferMethod
 from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
+from fedorbit.types import ExperimentName, TransferMethod
 
 
 @pytest.fixture(scope="module")

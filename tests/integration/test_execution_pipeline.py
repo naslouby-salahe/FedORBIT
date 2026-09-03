@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedorbit.execution.planner import build_plan
+from fedorbit.infrastructure.planner import build_plan
 
 
 def test_execution_plan_exposes_complete_registered_catalogue() -> None:

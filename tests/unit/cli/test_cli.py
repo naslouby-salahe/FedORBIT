@@ -3,10 +3,15 @@ from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
 
-from fedorbit.cli.errors import EXIT_RUNTIME, EXIT_USAGE, CliUsageError
-from fedorbit.cli.main import app
-from fedorbit.cli.parsing import dataset_identifier, experiment_identifier
-from fedorbit.domain.enums import ExperimentName
+from fedorbit.cli import (
+    EXIT_OK,
+    EXIT_USAGE,
+    CliUsageError,
+    app,
+    dataset_identifier,
+    experiment_identifier,
+)
+from fedorbit.types import ExperimentName
 
 runner = CliRunner()
 
@@ -121,7 +126,7 @@ def test_preprocess_accepts_overwrite_flag() -> None:
 
 def test_run_accepts_registered_experiment() -> None:
     result = runner.invoke(app, ["run", "Mathematical Primitive Validation"])
-    assert result.exit_code == EXIT_RUNTIME
+    assert result.exit_code == EXIT_OK
 
 
 def test_smoke_accepts_overwrite_flag() -> None:

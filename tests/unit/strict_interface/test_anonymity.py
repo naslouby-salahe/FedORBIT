@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fedorbit.domain.enums import ClientRole, CoarseGroup
-from fedorbit.strict_interface.anonymity import (
+from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
     anonymous_node_order,
 )
+from fedorbit.types import ClientRole, CoarseGroup
 
 
 def _coordinate(name: str, value: str) -> AnonymityCoordinate:

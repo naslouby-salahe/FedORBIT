@@ -10,7 +10,7 @@ from fedorbit.datasets.ton_iot.loader import (
     discover_ton_iot_component_files,
     inspect_ton_iot_component_files,
 )
-from fedorbit.domain.enums import DatasetId
+from fedorbit.types import DatasetId
 
 
 def _write_csv(path: Path, header: str = "ts,label,type") -> None:

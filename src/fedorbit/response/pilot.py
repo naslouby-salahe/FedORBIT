@@ -8,17 +8,21 @@ from typing import cast
 
 import torch
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.serialization import StableJsonPayload
+from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.runtime import (
+    RandomSeed,
+    RngNamespace,
+    SeedDerivationRequest,
+    derive_seed32,
+)
+from fedorbit.learning.training import BaseCheckpoint, ClassWeights
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
     paired_shadow_derivative,
     run_shadow_pair,
 )
-from fedorbit.runtime.seeds import RandomSeed, RngNamespace, SeedDerivationRequest, derive_seed32
-from fedorbit.training.losses import ClassWeights
-from fedorbit.training.trainer import BaseCheckpoint
+from fedorbit.types import StableJsonPayload
 
 
 @dataclass(frozen=True, slots=True)

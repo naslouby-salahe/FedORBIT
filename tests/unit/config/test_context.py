@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedorbit.config.context import active_config, application_config, configured
+from fedorbit.config.loading import active_config, application_config, configured
 from fedorbit.config.models import FedorbitConfig
 
 

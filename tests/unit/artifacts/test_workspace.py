@@ -4,8 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
-from fedorbit.artifacts.paths import (
+from fedorbit.analysis.records import MetricDirection, MetricRecord
+from fedorbit.infrastructure.execution import ArtifactStore, atomic_write_bytes, atomic_write_json
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id, file_sha256
+from fedorbit.infrastructure.provenance import provenance_record
+from fedorbit.infrastructure.workspace import (
     WorkspaceError,
     build_layout,
     enforce_workspace_boundary,
@@ -13,11 +16,14 @@ from fedorbit.artifacts.paths import (
     leaf_path,
     results_workspace,
 )
-from fedorbit.artifacts.provenance import provenance_record
-from fedorbit.artifacts.storage import ArtifactStore, atomic_write_bytes, atomic_write_json
-from fedorbit.domain.enums import ArtifactState, ExperimentName
-from fedorbit.domain.records import ArtifactIdentifier
-from fedorbit.reporting.export import EvidenceExportError, VerifiedEvidenceWriter
+from fedorbit.reporting import EvidenceExportError, VerifiedEvidenceWriter
+from fedorbit.types import (
+    ArtifactIdentifier,
+    ArtifactState,
+    ExperimentName,
+    MetricId,
+    TransferMethod,
+)
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}
 
@@ -150,6 +156,58 @@ def test_evidence_writer_reuses_matching_export_without_overwriting(tmp_path: Pa
         )
         == destination
     )
+
+
+def test_evidence_writer_exports_validated_metric_record(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(tmp_path)
+    metric = MetricRecord(
+        experiment=ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
+        pair="synthetic",
+        method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        condition="generated",
+        seed=1103,
+        metric_name=MetricId.ACTIVE_IMAGE_CANDIDATES,
+        metric_value=2.0,
+        metric_unit="count",
+        direction=MetricDirection.DESCRIPTIVE,
+        evaluation_class_set_sha256="a" * 64,
+        input_artifact_ids=("synthetic-generator",),
+        dependency_fingerprint_sha256="b" * 64,
+        valid=True,
+        invalid_reason=None,
+    )
+    payload = tmp_path / "metric.json"
+    atomic_write_json(payload, {"metric_record": metric.model_dump(mode="json")})
+    manifest = _manifest(payload, "fp-metric")
+    store.write_reusable(manifest)
+
+    paths = VerifiedEvidenceWriter(store, layout).write_metric_exports(
+        ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
+        ArtifactIdentifier(manifest.artifact_id),
+    )
+
+    assert tuple(path.name for path in paths) == (
+        "summary.json",
+        "metric_records.csv",
+        "metric_records.tex",
+    )
+    assert paths[0].read_text(encoding="utf-8").startswith("{")
+    assert "Active-Image Candidates" in paths[1].read_text(encoding="utf-8")
+
+    summary_paths = VerifiedEvidenceWriter(store, layout).write_project_summary(
+        (manifest,),
+        (metric,),
+    )
+
+    assert tuple(path.name for path in summary_paths) == (
+        "experiments.csv",
+        "evidence_summary.csv",
+        "summary.json",
+        "scientific_configuration.json",
+        "execution.json",
+    )
+    assert "Active-Image Candidates" in summary_paths[1].read_text(encoding="utf-8")
 
 
 def test_evidence_writer_requires_explicit_overwrite_for_changed_export(tmp_path: Path) -> None:

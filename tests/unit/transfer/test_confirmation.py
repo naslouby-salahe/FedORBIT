@@ -5,7 +5,7 @@ import torch
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.transfer.confirmation import (
+from fedorbit.methods.confirmation import (
     ConfirmationError,
     ConfirmReplicateOutcomes,
     confirmation_decision,

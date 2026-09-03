@@ -4,9 +4,7 @@ import math
 
 import pytest
 
-from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.config.models import FedorbitConfig
-from fedorbit.evaluation import (
+from fedorbit.analysis.metrics import (
     ClassEntropySet,
     ClassF1,
     ClassF1Set,
@@ -42,6 +40,8 @@ from fedorbit.evaluation import (
     relative_objective_error,
     seed_harm_rate,
 )
+from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.config.models import FedorbitConfig
 
 
 @pytest.fixture
@@ -167,7 +167,7 @@ def test_harm_indicators_use_configured_thresholds() -> None:
 
 
 def test_arr_rrr_definitions_and_na_rules() -> None:
-    from fedorbit.evaluation import relative_risk_reduction
+    from fedorbit.analysis.metrics import relative_risk_reduction
 
     arr = absolute_risk_reduction(harm_rate_no_confirm=0.5, harm_rate_confirm=0.2)
     assert arr == pytest.approx(0.3)

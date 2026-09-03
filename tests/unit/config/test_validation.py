@@ -6,7 +6,7 @@ from tests.typed_access import ConfigDocument
 
 from fedorbit.config.models import FedorbitConfig, nominal_alpha
 from fedorbit.config.validation import ConfigurationContractError, validate_cross_field_contract
-from fedorbit.domain.enums import TransferMethod
+from fedorbit.types import TransferMethod
 
 
 def _validate_raw(config: ConfigDocument) -> FedorbitConfig:

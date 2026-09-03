@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from fedorbit.models.host_classifier import HostClassifier
+from fedorbit.learning.models import HostClassifier
 
 
 def test_host_classifier_contract() -> None:

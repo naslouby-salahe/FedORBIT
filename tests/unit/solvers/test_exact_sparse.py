@@ -4,26 +4,29 @@ import numpy as np
 import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.certificates import (
+    SeparatorWorkCertificate,
+    verify_exactness_certificate,
+)
+from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     BlockNodeCounts,
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.objective import (
-    CurriculumAction,
-    RobustActionProblem,
-    enumerate_support_coordinate_sets,
-    evaluate_objective,
-)
-from fedorbit.solvers.certificates import SeparatorWorkCertificate, verify_exactness_certificate
-from fedorbit.solvers.exact_sparse import (
+from fedorbit.optimization.exact_sparse import (
     RobustActionSolution,
     SparseMasterNonConvergenceError,
     fixed_action_worst_correspondence,
     solve_robust_action,
 )
+from fedorbit.optimization.objective import (
+    CurriculumAction,
+    RobustActionProblem,
+    enumerate_support_coordinate_sets,
+    evaluate_objective,
+)
+from fedorbit.types import CoarseGroup
 
 
 def _two_block_problem(seed: int) -> RobustActionProblem:

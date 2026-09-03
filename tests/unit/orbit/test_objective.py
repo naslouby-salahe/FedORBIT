@@ -4,14 +4,13 @@ import numpy as np
 import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     PaddedBlockStructure,
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.objective import (
+from fedorbit.optimization.objective import (
     ActionSpaceError,
     CertifiedActionCandidate,
     CurriculumAction,
@@ -33,6 +32,7 @@ from fedorbit.orbit.objective import (
     zero_action,
     zero_action_objective,
 )
+from fedorbit.types import CoarseGroup
 
 
 def _single_block() -> PaddedBlockStructure:

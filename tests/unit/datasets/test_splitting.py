@@ -15,7 +15,7 @@ from fedorbit.datasets.splitting import (
     interval_edges,
     split_for_duplicate_group,
 )
-from fedorbit.domain.enums import Split
+from fedorbit.types import Split
 
 
 def test_split_intervals_exact_from_config() -> None:

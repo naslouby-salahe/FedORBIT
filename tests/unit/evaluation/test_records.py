@@ -3,30 +3,28 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from fedorbit.domain.enums import (
+from fedorbit.analysis.records import (
+    ComparisonDecision,
+    EvaluationValidationError,
+    MetricDirection,
+    MetricRecord,
+    MetricRecordCollection,
+    PairedComparisonRecord,
+    PredictionRecord,
+    PredictionRecordCollection,
+    StatisticalAlternative,
+    StatisticalExactness,
+    StatisticalMetadataRecord,
+    validate_comparison_metadata,
+    validate_metric_records,
+    validate_prediction_records,
+)
+from fedorbit.types import (
     ExperimentName,
     MetricId,
     MultiplicityFamily,
     Split,
     TransferMethod,
-)
-from fedorbit.evaluation.records import (
-    ComparisonDecision,
-    MetricDirection,
-    MetricRecord,
-    PairedComparisonRecord,
-    PredictionRecord,
-    StatisticalAlternative,
-    StatisticalExactness,
-    StatisticalMetadataRecord,
-)
-from fedorbit.evaluation.validation import (
-    EvaluationValidationError,
-    MetricRecordCollection,
-    PredictionRecordCollection,
-    validate_comparison_metadata,
-    validate_metric_records,
-    validate_prediction_records,
 )
 
 SHA = "a" * 64

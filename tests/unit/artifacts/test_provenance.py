@@ -2,26 +2,24 @@ from __future__ import annotations
 
 import pytest
 
-from fedorbit.artifacts.provenance import (
+from fedorbit.experiments.cells import experiment_relevance
+from fedorbit.infrastructure.provenance import (
     ProvenanceError,
     implementation_fingerprint,
     runtime_fingerprint,
     stage_dependency_fingerprint,
 )
-from fedorbit.domain.enums import (
+from fedorbit.types import (
     ArtifactStage,
     DatasetId,
-    ExperimentName,
-    SemanticCoordinate,
-    TransferMethod,
-)
-from fedorbit.domain.records import (
     DirectedPair,
+    ExperimentName,
     ExperimentSeed,
     SemanticCell,
+    SemanticCoordinate,
     SupportSize,
+    TransferMethod,
 )
-from fedorbit.experiments.cells import experiment_relevance
 
 PAIR = DirectedPair(DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK)
 PRIMARY_CELL = SemanticCell(
@@ -71,14 +69,14 @@ def test_relevance_covers_registered_experiments() -> None:
 
 
 def test_implementation_fingerprint_is_stage_local() -> None:
-    baseline = implementation_fingerprint("fedorbit.artifacts.manifests")
-    assert implementation_fingerprint("fedorbit.artifacts.manifests") == baseline
+    baseline = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    assert implementation_fingerprint("fedorbit.infrastructure.manifests") == baseline
     assert implementation_fingerprint("fedorbit.config.loading") != baseline
 
 
 def test_implementation_fingerprint_follows_transitive_imports() -> None:
-    producer = implementation_fingerprint("fedorbit.artifacts.manifests")
-    consumer = implementation_fingerprint("fedorbit.execution.reuse")
+    producer = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    consumer = implementation_fingerprint("fedorbit.infrastructure.reuse")
     assert producer != consumer
 
 
@@ -114,7 +112,7 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         relevance,
         ("upstream-1",),
         frozenset({"models", "generators"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     assert stage_dependency_fingerprint(*arguments) == stage_dependency_fingerprint(*arguments)
 
@@ -127,7 +125,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         ("upstream-1",),
         frozenset({"models"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -135,7 +133,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         ("upstream-2",),
         frozenset({"models"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     assert changed != base
 
@@ -148,7 +146,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -156,7 +154,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({"models", "generators"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     assert changed != base
 
@@ -169,7 +167,7 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.artifacts.manifests",
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -177,6 +175,6 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.execution.reuse",
+        "fedorbit.infrastructure.reuse",
     )
     assert changed != base

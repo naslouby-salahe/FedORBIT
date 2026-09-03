@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from fedorbit.domain.enums import ClientRole
-from fedorbit.strict_interface.resources import (
+from fedorbit.interface import (
     ResourceKind,
     StrictResourcePolicy,
     StrictResourceViolationError,
 )
+from fedorbit.types import ClientRole
 
 
 def test_source_resource_whitelist() -> None:

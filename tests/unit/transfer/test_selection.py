@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from fedorbit.config.context import configured
-from fedorbit.config.loading import load_fedorbit_config
-from fedorbit.transfer.selection import (
+from fedorbit.config.loading import configured, load_fedorbit_config
+from fedorbit.methods.target import (
     SelectionError,
     SourceProposal,
     rank_source_proposals,

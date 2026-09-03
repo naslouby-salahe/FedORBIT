@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from fedorbit.runtime.determinism import (
+from fedorbit.infrastructure.runtime import (
     PrincipalDeterminismError,
     apply_deterministic_backend,
     assert_float32_training,
@@ -12,7 +12,7 @@ from fedorbit.runtime.determinism import (
     require_cuda,
     synchronize_cuda,
 )
-from fedorbit.runtime.determinism import (
+from fedorbit.infrastructure.runtime import (
     test_determinism as cpu_test_determinism,
 )
 

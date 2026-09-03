@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from fedorbit.artifacts.manifests import (
+from fedorbit.infrastructure.execution import ArtifactStore, StorageError
+from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     DatasetManifest,
     EligibilityCopyKind,
@@ -18,10 +19,8 @@ from fedorbit.artifacts.manifests import (
     eligibility_copy,
     file_sha256,
 )
-from fedorbit.artifacts.storage import ArtifactStore, StorageError
-from fedorbit.artifacts.validation import ArtifactValidationError
-from fedorbit.domain.enums import ArtifactStage, ArtifactState, TerminalState
-from fedorbit.domain.records import ArtifactIdentifier
+from fedorbit.infrastructure.reuse import ArtifactValidationError
+from fedorbit.types import ArtifactIdentifier, ArtifactStage, ArtifactState, TerminalState
 
 COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",

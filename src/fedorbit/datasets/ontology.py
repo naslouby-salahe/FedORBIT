@@ -6,8 +6,8 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
+from fedorbit.config.loading import active_config
+from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept
 
 NORMAL_LABEL = "normal"
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)

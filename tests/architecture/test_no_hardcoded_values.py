@@ -219,7 +219,7 @@ def _config_string_values() -> frozenset[str]:
 def test_no_governed_config_strings_literalized_in_production() -> None:
     governed = _config_string_values()
     for path in iter_source_files():
-        if path.name == "enums.py":
+        if path.name == "types.py":
             continue
         tree = parse_module(path)
         dict_key_nodes = {

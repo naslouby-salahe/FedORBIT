@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.enums import Split
+from fedorbit.config.loading import active_config
+from fedorbit.types import Split
 
 
 class SplitError(ValueError):

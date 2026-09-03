@@ -3,12 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.certificates import build_rectangular_hull
+from fedorbit.optimization.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.orbit.diagnostics import (
+from fedorbit.optimization.diagnostics import (
     MapValueDiagnostics,
     analytic_orbit_mean,
     coupling_upper_bound_diagnostic,
@@ -16,13 +16,13 @@ from fedorbit.orbit.diagnostics import (
     map_value_diagnostics,
     orbit_radius_2_norm,
 )
-from fedorbit.orbit.objective import (
+from fedorbit.optimization.objective import (
     ActionSpaceError,
     CurriculumAction,
     RobustActionProblem,
     zero_action,
 )
-from fedorbit.orbit.rectangular import build_rectangular_hull
+from fedorbit.types import CoarseGroup
 
 
 def _problem_with(

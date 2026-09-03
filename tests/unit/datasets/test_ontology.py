@@ -10,7 +10,7 @@ from fedorbit.datasets.ontology import (
     transfer_concept_for,
     transfer_eligibility,
 )
-from fedorbit.domain.enums import CoarseGroup, DatasetId, OracleTransferConcept
+from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept
 
 
 def test_label_row_normalization_is_fixed() -> None:

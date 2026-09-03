@@ -9,8 +9,14 @@ from typing import cast
 import numpy as np
 import torch
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.serialization import StableJsonPayload
+from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.runtime import (
+    RandomSeed,
+    RngNamespace,
+    SeedDerivationRequest,
+    derive_seed32,
+)
+from fedorbit.learning.training import BaseCheckpoint
 from fedorbit.response.estimation import (
     ShadowData,
     ShadowSettings,
@@ -18,8 +24,7 @@ from fedorbit.response.estimation import (
     run_shadow_pair,
 )
 from fedorbit.response.pilot import PilotData
-from fedorbit.runtime.seeds import RandomSeed, RngNamespace, SeedDerivationRequest, derive_seed32
-from fedorbit.training.trainer import BaseCheckpoint
+from fedorbit.types import StableJsonPayload
 
 
 class ResponseUncertaintyError(ValueError):

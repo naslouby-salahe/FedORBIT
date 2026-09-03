@@ -3,11 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.runtime.seeds import RandomSeed
-from fedorbit.synthetic.exactness import (
+from fedorbit.experiments.synthetic import (
     ExactSeparatorInstanceRequest,
     generate_exact_separator_instance,
 )
+from fedorbit.infrastructure.runtime import RandomSeed
 
 
 def test_exact_separator_generation_is_deterministic() -> None:

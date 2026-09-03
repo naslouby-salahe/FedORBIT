@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.datasets.inspection import (
+from fedorbit.datasets.common import (
     ChronologyValidationState,
     DatasetInspectionRequest,
     inspect_dataset,
 )
-from fedorbit.domain.enums import DatasetId
+from fedorbit.types import DatasetId
 
 RAW_ROOT = Path(__file__).resolve().parents[2] / "data" / "raw"
 

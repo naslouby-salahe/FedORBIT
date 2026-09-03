@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fedorbit.solvers.assignment import (
+from fedorbit.optimization.assignment import (
     AssignmentError,
     solve_minimum_cost_assignment,
 )

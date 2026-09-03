@@ -5,8 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from fedorbit.domain.enums import CoarseGroup
-from fedorbit.orbit.correspondence import (
+from fedorbit.optimization.correspondence import (
     ActiveImageMap,
     BlockCorrespondence,
     BlockNodeCounts,
@@ -20,6 +19,7 @@ from fedorbit.orbit.correspondence import (
     falling_factorial,
     support_per_block,
 )
+from fedorbit.types import CoarseGroup
 
 
 def _two_by_three_blocks() -> PaddedBlockStructure:

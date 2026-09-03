@@ -2,20 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fedorbit.artifacts.manifests import ReusableArtifactManifest, artifact_id, file_sha256
-from fedorbit.artifacts.storage import ArtifactStore
-from fedorbit.domain.enums import ArtifactStage, ArtifactState
-from fedorbit.domain.records import (
-    ArtifactFingerprint,
-    ArtifactIdentifier,
-    ExecutionCell,
-    SemanticCoordinates,
-)
-from fedorbit.execution.recovery import RecoveryBoundary
-from fedorbit.execution.reuse import (
+from fedorbit.infrastructure.execution import ArtifactStore, RecoveryBoundary
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id, file_sha256
+from fedorbit.infrastructure.reuse import (
     SelectiveInvalidation,
     changed_stage_affects,
     descendants_of_stage,
+)
+from fedorbit.types import (
+    ArtifactFingerprint,
+    ArtifactIdentifier,
+    ArtifactStage,
+    ArtifactState,
+    ExecutionCell,
+    SemanticCoordinates,
 )
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}

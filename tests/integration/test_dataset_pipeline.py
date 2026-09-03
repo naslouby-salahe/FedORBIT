@@ -9,7 +9,7 @@ from fedorbit.datasets.splitting import (
     DuplicateGroupId,
     assign_duplicate_groups_chronologically,
 )
-from fedorbit.domain.enums import Split
+from fedorbit.types import Split
 
 
 def test_dataset_support_and_chronology_contracts_share_authoritative_config() -> None:

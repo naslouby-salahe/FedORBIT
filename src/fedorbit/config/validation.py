@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import ClientRole, DatasetId, TransferMethod
+from fedorbit.types import ClientRole, DatasetId, TransferMethod
 
 
 class ConfigurationContractError(ValueError):

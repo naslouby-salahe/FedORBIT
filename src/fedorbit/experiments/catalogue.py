@@ -4,13 +4,13 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.enums import ExperimentClassification, ExperimentName, TransferMethod
-from fedorbit.experiments.conditions import (
+from fedorbit.config.loading import active_config
+from fedorbit.experiments.cells import (
     ConditionLabel,
     RegisteredCondition,
     RegisteredConditions,
 )
+from fedorbit.types import ExperimentClassification, ExperimentName, TransferMethod
 
 _PRIMARY_PAIRS_LABEL = "four primary directed pairs"
 _SECONDARY_PAIRS_LABEL = "four secondary directed pairs"
@@ -483,7 +483,32 @@ def build_catalogue() -> ExperimentCatalogue:
     )
 
     completed = ExperimentCatalogue(catalogue)
-    from fedorbit.experiments.validation import validate_catalogue
+    from fedorbit.experiments.catalogue import validate_catalogue
 
     validate_catalogue(completed)
     return completed
+
+
+class ExperimentValidationError(ValueError):
+    pass
+
+
+def validate_catalogue(catalogue: ExperimentCatalogue) -> None:
+    registered = catalogue.registered_names()
+    if set(registered) != set(ExperimentName):
+        raise ExperimentValidationError("catalogue must define every registered experiment")
+    if len(registered) != len(set(registered)):
+        raise ExperimentValidationError("catalogue registers an experiment more than once")
+    for definition in (catalogue.definition(name) for name in registered):
+        if definition.derived_planned_cells < 0:
+            raise ExperimentValidationError(
+                f"experiment has negative planned cell count: {definition.name.value}"
+            )
+        if definition.derived_planned_cells > 0 and not definition.seeds:
+            raise ExperimentValidationError(
+                f"executable experiment has no registered seeds: {definition.name.value}"
+            )
+        if any(not prerequisite for prerequisite in definition.prerequisites):
+            raise ExperimentValidationError(
+                f"experiment has an empty prerequisite: {definition.name.value}"
+            )

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from fedorbit.config.context import active_config
-from fedorbit.domain.enums import ScalabilityBlockPattern
-from fedorbit.runtime.seeds import RandomSeed
-from fedorbit.synthetic.scalability import (
+from fedorbit.config.loading import active_config
+from fedorbit.experiments.synthetic import (
     ScalabilityInstanceRequest,
     generate_scalability_instance,
 )
+from fedorbit.infrastructure.runtime import RandomSeed
+from fedorbit.types import ScalabilityBlockPattern
 
 
 def test_balanced_scalability_instance_uses_roadmap_support_and_weights() -> None:

@@ -8,7 +8,7 @@ import pytest
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.common import ObservedColumnSamples
 from fedorbit.datasets.edge_iiotset.schema import edge_iiotset_adapter
-from fedorbit.datasets.row_normalization import (
+from fedorbit.datasets.preprocessing import (
     NormalizedFeatureVector,
     NormalizedRow,
     RowNormalizationError,

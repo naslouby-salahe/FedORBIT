@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from fedorbit.config.context import configured
+from fedorbit.config.loading import configured
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.runtime.environment import environment_snapshot
-from fedorbit.runtime.reproducibility import (
+from fedorbit.infrastructure.environment import environment_snapshot
+from fedorbit.infrastructure.runtime import (
     IncompatibleIdentityError,
     build_reproducibility_identity,
     compatible,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import MetricId
+from fedorbit.types import MetricId
 
 
 def test_multi_source_ranking_coefficients_locked(fedorbit_config: FedorbitConfig) -> None:

@@ -3,8 +3,7 @@ from __future__ import annotations
 import pytest
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.domain.enums import FailureCategory, TerminalState
-from fedorbit.runtime.failures import (
+from fedorbit.infrastructure.failures import (
     CertificateNotProducedError,
     ConfigurationMismatchError,
     ConflictingDuplicatesError,
@@ -27,6 +26,7 @@ from fedorbit.runtime.failures import (
     solver_limit_outcome,
     validation_failure_outcome,
 )
+from fedorbit.types import FailureCategory, TerminalState
 
 
 def test_infrastructure_failures_classified() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from fedorbit.training.scoring import LocalClassCount, ScoringRequest, score_model
+from fedorbit.learning.scoring import LocalClassCount, ScoringRequest, score_model
 
 
 def test_score_model_builds_typed_score_artifact() -> None:

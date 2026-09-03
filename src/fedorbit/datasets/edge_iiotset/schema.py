@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from fedorbit.config.context import active_config
+from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
-from fedorbit.domain.enums import DatasetId
+from fedorbit.types import DatasetId
 
 EDGE_EXCLUSIONS = frozenset(
     {

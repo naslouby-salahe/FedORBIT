@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from fedorbit.cli.main import app
+from fedorbit.cli import app
 
 
 def test_cli_plan_and_status_workflow() -> None:

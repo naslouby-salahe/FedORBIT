@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from fedorbit.solvers.assignment import solve_minimum_cost_assignment
+from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 
 
 def test_solver_pipeline_returns_lexicographic_optimum_under_tie() -> None:

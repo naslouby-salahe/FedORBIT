@@ -55,7 +55,7 @@ def test_no_typing_object_usage() -> None:
 
 
 def test_no_generic_dict_models_for_domain_concepts() -> None:
-    domain_modules = ("fedorbit.domain", "fedorbit.config")
+    domain_modules = ("fedorbit.types", "fedorbit.config")
     for path in iter_source_files():
         module = relative_module(path)
         if not module.startswith(domain_modules):

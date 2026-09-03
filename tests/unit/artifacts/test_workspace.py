@@ -191,9 +191,13 @@ def test_evidence_writer_exports_validated_metric_record(tmp_path: Path) -> None
         "summary.json",
         "metric_records.csv",
         "metric_records.tex",
+        "metric_value.svg",
+        "metric_value.pdf",
     )
     assert paths[0].read_text(encoding="utf-8").startswith("{")
     assert "Active-Image Candidates" in paths[1].read_text(encoding="utf-8")
+    assert "Active-Image Candidates" in paths[3].read_text(encoding="utf-8")
+    assert paths[4].read_bytes().startswith(b"%PDF-1.4")
 
     summary_paths = VerifiedEvidenceWriter(store, layout).write_project_summary(
         (manifest,),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
 from collections import OrderedDict
@@ -162,7 +163,29 @@ class VerifiedEvidenceWriter:
         )
         atomic_write_bytes(csv_path, _csv_bytes(columns, (row,)))
         atomic_write_bytes(tex_path, _tex_bytes(columns, (row,)))
-        return (summary, csv_path, tex_path)
+        figure_paths = self.write_metric_figure(experiment, artifact_id, metric)
+        return (summary, csv_path, tex_path, *figure_paths)
+
+    def write_metric_figure(
+        self,
+        experiment: ExperimentName,
+        artifact_id: ArtifactIdentifier,
+        metric: MetricRecord,
+    ) -> tuple[Path, Path]:
+        self._store.resolve(artifact_id)
+        if metric.metric_value is None:
+            raise EvidenceExportError("metric figure requires a valid finite metric value")
+        destination = (
+            results_workspace(self._layout, experiment)
+            / "figures"
+            / _experiment_main_figure_directory()
+        )
+        label = f"{metric.metric_name.value}: {metric.metric_value:g} {metric.metric_unit}"
+        svg_path = destination / "metric_value.svg"
+        pdf_path = destination / "metric_value.pdf"
+        atomic_write_bytes(svg_path, _metric_svg_bytes(label, metric.metric_value))
+        atomic_write_bytes(pdf_path, _metric_pdf_bytes(label, metric.metric_value))
+        return (svg_path, pdf_path)
 
     def write_project_summary(
         self,
@@ -321,6 +344,10 @@ def _experiment_supplementary_table_directory() -> str:
     return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.tables[-1]
 
 
+def _experiment_main_figure_directory() -> str:
+    return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.figures[0]
+
+
 def _project_main_table_directory() -> str:
     return active_config().runtime.artifact_layout.project_summary_subdirectories.tables[0]
 
@@ -333,3 +360,57 @@ def _project_execution_reproducibility_directory() -> str:
     return active_config().runtime.artifact_layout.project_summary_subdirectories.reproducibility[
         -1
     ]
+
+
+def _metric_svg_bytes(label: str, value: float) -> bytes:
+    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4))
+    text = html.escape(label)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180" '
+        'viewBox="0 0 480 180"><rect width="480" height="180" fill="white"/>'
+        f'<text x="40" y="45" font-family="sans-serif" font-size="18">{text}</text>'
+        '<line x1="40" y1="130" x2="440" y2="130" stroke="black"/>'
+        f'<rect x="40" y="80" width="{bar_width:g}" height="50" fill="#2a6fbb"/>'
+        "</svg>\n"
+    )
+    return svg.encode("utf-8")
+
+
+def _metric_pdf_bytes(label: str, value: float) -> bytes:
+    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4))
+    escaped = label.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = (
+        f"BT /F1 14 Tf 40 150 Td ({escaped}) Tj ET\n"
+        "0.16 0.44 0.73 rg\n"
+        f"40 70 {bar_width:g} 40 re f\n"
+        "0 0 0 RG\n40 70 m 440 70 l S\n"
+    ).encode("ascii", errors="replace")
+    objects = (
+        b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n",
+        b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n",
+        (
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 480 180]"
+            b"/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n"
+        ),
+        b"4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n",
+        b"5 0 obj<</Length "
+        + str(len(stream)).encode("ascii")
+        + b">>stream\n"
+        + stream
+        + b"endstream\nendobj\n",
+    )
+    document = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = [0]
+    for item in objects:
+        offsets.append(len(document))
+        document.extend(item)
+    xref_offset = len(document)
+    document.extend(f"xref\n0 {len(offsets)}\n0000000000 65535 f \n".encode("ascii"))
+    for offset in offsets[1:]:
+        document.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    document.extend(
+        f"trailer<</Size {len(offsets)}/Root 1 0 R>>\nstartxref\n{xref_offset}\n%%EOF\n".encode(
+            "ascii"
+        )
+    )
+    return bytes(document)

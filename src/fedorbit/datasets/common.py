@@ -7,6 +7,7 @@ import re
 from collections import Counter, OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import cast
@@ -373,7 +374,7 @@ def inspect_dataset(request: DatasetInspectionRequest) -> DatasetObservation:
         local_class_counts=_sorted_counts(class_counts),
         binary_label_counts=_sorted_counts(binary_counts),
         inconsistent_binary_label_rows=inconsistent,
-        event_time=_inspect_event_time(timestamp_field, columns, event_time_tally, inconsistent),
+        event_time=inspect_event_time(timestamp_field, columns, event_time_tally, inconsistent),
     )
 
 
@@ -418,10 +419,34 @@ class LabelFields:
 class EventTimeTally:
     observed_row_count: int = 0
     timestamp_pattern_row_count: int = 0
+    resolvable_row_count: int = 0
 
     def observe(self, value: str) -> None:
         self.observed_row_count += 1
-        self.timestamp_pattern_row_count += int(_AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None)
+        ambiguous = _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None
+        resolvable = _is_resolvable_event_time(value)
+        self.timestamp_pattern_row_count += int(ambiguous or resolvable)
+        self.resolvable_row_count += int(resolvable)
+
+
+def _is_resolvable_event_time(value: str) -> bool:
+    if _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None:
+        return False
+    try:
+        epoch_seconds = float(value)
+    except ValueError:
+        epoch_seconds = None
+    if epoch_seconds is not None:
+        try:
+            timestamp = datetime.fromtimestamp(epoch_seconds, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return False
+        return 2000 <= timestamp.year <= 2100
+    try:
+        datetime.fromisoformat(value.removesuffix("Z") + "+00:00" if value.endswith("Z") else value)
+    except ValueError:
+        return False
+    return True
 
 
 def _labels_for(dataset: DatasetId) -> LabelFields:
@@ -454,7 +479,7 @@ def _sorted_counts(counts: Counter[str]) -> tuple[LabelCount, ...]:
     return tuple(LabelCount(label, count) for label, count in sorted(counts.items()))
 
 
-def _inspect_event_time(
+def inspect_event_time(
     field: str,
     columns: tuple[str, ...],
     tally: EventTimeTally,
@@ -488,6 +513,15 @@ def _inspect_event_time(
             unusable_rows,
             ChronologyValidationState.UNPARSEABLE_EVENT_TIME,
             "some event-time cells are not timestamp-shaped after CSV parsing",
+        )
+    if tally.resolvable_row_count == rows:
+        return EventTimeInspection(
+            field,
+            rows,
+            tally.timestamp_pattern_row_count,
+            0,
+            ChronologyValidationState.VALID,
+            "all event-time cells are uniquely resolvable",
         )
     if tally.timestamp_pattern_row_count:
         return EventTimeInspection(

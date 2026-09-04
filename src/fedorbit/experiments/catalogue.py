@@ -10,6 +10,7 @@ from fedorbit.experiments.cells import (
     RegisteredCondition,
     RegisteredConditions,
 )
+from fedorbit.experiments.synthetic import eligible_coupling_support_sizes
 from fedorbit.types import (
     ClientRole,
     ExperimentClassification,
@@ -127,13 +128,20 @@ def build_catalogue() -> ExperimentCatalogue:
         (_experiment_name(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION),),
     )
 
+    coupling_compatibility_support_pairs = sum(
+        len(
+            eligible_coupling_support_sizes(
+                compatibility, config.generators.coupling_structure.supports
+            )
+        )
+        for compatibility in config.generators.coupling_structure.compatibility
+    )
     coupling_factorial = (
-        len(config.generators.coupling_structure.compatibility)
+        coupling_compatibility_support_pairs
         * len(config.generators.coupling_structure.response_heterogeneity)
         * len(config.generators.coupling_structure.directed_asymmetry)
         * len(config.generators.coupling_structure.response_sparsity)
         * len(config.generators.coupling_structure.block_patterns)
-        * len(config.generators.coupling_structure.supports)
         * len(confirmatory_seeds)
     )
     catalogue[ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION] = definition(

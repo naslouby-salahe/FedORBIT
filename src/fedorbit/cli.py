@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from pathlib import Path
 from typing import NoReturn, cast
@@ -297,7 +298,24 @@ app.command("status")(status)
 app.command("report")(report)
 
 
+_EXECUTION_LOG_FORMAT = (
+    "%(asctime)s %(experiment)s stage=%(stage)s state=%(state)s "
+    "cell=%(cell_coordinates)s dataset=%(dataset)s seed=%(seed)s "
+    "elapsed=%(elapsed_seconds)s %(reuse_decision)s"
+)
+
+
+def _configure_execution_logging() -> None:
+    execution_logger = logging.getLogger("fedorbit.execution")
+    execution_logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(_EXECUTION_LOG_FORMAT))
+    execution_logger.addHandler(handler)
+    execution_logger.propagate = False
+
+
 def main() -> None:
+    _configure_execution_logging()
     raise SystemExit(app())
 
 

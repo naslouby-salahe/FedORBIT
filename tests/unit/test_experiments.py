@@ -66,7 +66,7 @@ def test_coupling_validation_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION)
-    assert definition.derived_planned_cells == 4860
+    assert definition.derived_planned_cells == 4050
 
 
 def test_mechanism_ablations_derived_cells(

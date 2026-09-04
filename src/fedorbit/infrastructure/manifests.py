@@ -127,6 +127,22 @@ class SemanticCellManifest(FrozenModel):
     scientific_configuration_sha256: str
     dependency_fingerprint_sha256: str
     producer_stage: ArtifactStage
+    upstream_artifact_ids: tuple[str, ...]
+    dataset_manifest_sha256: str
+    split_sha256: str
+    preprocessing_sha256: str
+    source_checkpoint_sha256: str
+    response_packet_sha256: str
+    target_checkpoint_sha256: str
+    importance_vector_sha256: str
+    resource_manifest_sha256: str
+    relevant_code_sha256: str
+    material_runtime_sha256: str
+    git_commit: str
+    git_dirty: bool
+    environment_sha256: str
+    state: ArtifactState
+    state_reason: str | None = None
 
 
 def eligibility_copy(

@@ -3779,7 +3779,11 @@ Define:
 * `jointly_realizable`: intersection of every positive-weight active-term minimizer set is nonempty;
 * `incompatible`: that intersection is empty and fixed-action rectangularization gap exceeds $10^{-6}$.
 
-Use rejection sampling until the requested structural class is obtained.
+At support 1, exactly one active term is positive-weight, so the "intersection of every positive-weight active-term minimizer set" is that single (nonempty) set itself. `incompatible` is therefore mathematically unreachable at support 1 for every choice of the other factors: the requested-class check can never succeed regardless of how many candidates are drawn. `incompatible` instances are generated only for registered supports of at least 2; the support-1 slice is excluded from the empirical grid entirely (Section 15) rather than attempted and recorded as a failure. `jointly_realizable` continues to use every registered support, support 1 included.
+
+`incompatible` instances continue to use rejection sampling until the requested structural class is obtained: this is reliable in practice for every reachable (compatibility, support) pair because a genuinely empty minimizer-set intersection with a strict positive rectangularization gap is not a rare event under the registered factor ranges.
+
+`jointly_realizable` instances at support 2 or 3 use constructive conditioning instead of pure rejection sampling, because empirically the naive rejection rate is too low at low heterogeneity/asymmetry to be reliable within the attempt budget (observed: some cells require tens of thousands of draws to succeed by chance alone). After drawing the unconstrained matrix, applying asymmetry, heterogeneity, and deterministic sparsity exactly as specified above, the identity correspondence is deterministically forced into the intersection: for each active support column in turn, if the identity correspondence is not already a (tied-)minimizer for that column, every entry of that column retained by the deterministic sparsity mask is shifted down by a uniform, importance-weighted amount just sufficient to make the identity correspondence the (tied-)minimizer for that column, without touching entries the sparsity mask zeroed. Because active support columns in the same coarse block can share the same underlying matrix entries under different correspondences, this is applied as a bounded fixed-point iteration (at most 100 rounds) across all active columns until every one is simultaneously satisfied. If a column has no sparsity-retained entries to shift, or the fixed point does not converge within the iteration budget, that specific random draw is abandoned and a fresh draw is attempted (the residual stochastic step), bounded by the same maximum-attempts budget below. The realized classification is always independently reverified against the exact definitions above before an instance is returned; construction failure is never silently treated as success.
 
 Maximum attempts per generated instance:
 
@@ -3787,7 +3791,7 @@ Maximum attempts per generated instance:
 10,000
 ```
 
-Failure to construct the requested class is Generator Failure and blocks the corresponding designed-family experiment rather than silently weakening the criterion.
+Failure to construct a reachable requested class within the attempt budget is Generator Failure and blocks the corresponding designed-family experiment rather than silently weakening the criterion.
 
 ## 14.4 Common-action unresolved-map generator
 
@@ -4023,13 +4027,13 @@ Pass:
 
 **Classification:** Validation.
 
-Uses the complete coupling generator factorial.
+Uses the complete coupling generator factorial, restricted to mathematically reachable (compatibility, support) pairs. A single active support node always yields a one-element active-term minimizer-set family, whose "intersection" is that set itself and therefore always nonempty; consequently `incompatible` is never reachable at support 1 (Section 14.3), and only registered supports of at least 2 are generated for `incompatible`. `jointly_realizable` continues to use every registered support.
 
 Derived instance count:
 
 $$
-2\times3\times3\times3\times3\times3\times10 =
-4,860.
+(3+2)\times3\times3\times3\times3\times10 =
+4,050.
 $$
 
 Pass:
@@ -4189,7 +4193,7 @@ All valid primary real response packets are additionally benchmarked.
 
 **Classification:** Confirmatory mechanism.
 
-Uses the same 4,860 designed coupling instances.
+Uses the same 4,050 designed coupling instances.
 
 Methods:
 

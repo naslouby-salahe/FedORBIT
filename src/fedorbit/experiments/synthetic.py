@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import itertools
+import math
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -20,7 +21,10 @@ from fedorbit.optimization.correspondence import (
     build_padded_block_structure,
     enumerate_block_permutations,
 )
-from fedorbit.optimization.diagnostics import fixed_action_rectangularization_gap
+from fedorbit.optimization.diagnostics import (
+    fixed_action_rectangularization_gap,
+    map_value_diagnostics,
+)
 from fedorbit.optimization.exact_sparse import solve_robust_action
 from fedorbit.optimization.objective import (
     CurriculumAction,
@@ -269,8 +273,12 @@ def _world_is_accepted(
 ) -> bool:
     problem = _unresolved_map_problem(pattern, response, importance)
     orbit = list(enumerate_block_permutations(problem.blocks))
+    tolerance = active_config().solvers.exact_sparse.exact_validation_absolute_tolerance
     if world_kind == UnresolvedMapWorldKind.COMMON_ACTION:
-        return solve_robust_action(problem).certified_robust_value > 0.0
+        solution = solve_robust_action(problem)
+        candidates = (solution.selected_action, zero_action(problem))
+        map_value_diagnostics(candidates, problem, orbit, tolerance)
+        return solution.certified_robust_value > 0.0
     per_map_winners = tuple(
         _map_conditioned_winner(problem, correspondence) for correspondence in orbit
     )
@@ -279,6 +287,7 @@ def _world_is_accepted(
         *per_map_winners,
         zero_action(problem),
     )
+    map_value_diagnostics(candidates, problem, orbit, tolerance)
     if world_kind == UnresolvedMapWorldKind.ROBUST_COMPROMISE:
         configuration = active_config().generators.robust_compromise_unresolved_map
         threshold = configuration.robust_pre_map_value_strictly_greater_than
@@ -511,6 +520,73 @@ def _active_term_minimizer_sets(
     return tuple(minimizer_sets)
 
 
+MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION = 2
+
+
+def eligible_coupling_support_sizes(
+    compatibility: CouplingCompatibility, registered_support_sizes: tuple[int, ...]
+) -> tuple[int, ...]:
+    if compatibility == CouplingCompatibility.INCOMPATIBLE:
+        return tuple(
+            support
+            for support in registered_support_sizes
+            if support >= MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION
+        )
+    return registered_support_sizes
+
+
+_JOINT_REALIZABILITY_MAX_ITERATIONS = 100
+
+
+def _joint_realizability_column_shift(
+    q: np.ndarray,
+    keep_mask: frozenset[tuple[int, int]],
+    importance: np.ndarray,
+    column: int,
+    delta: float,
+) -> bool:
+    kept_rows = [row for row in range(q.shape[0]) if (row, column) in keep_mask]
+    if not kept_rows:
+        return False
+    weight = float(sum(importance[row] for row in kept_rows))
+    if weight <= 0.0:
+        return False
+    shift = delta / weight
+    for row in kept_rows:
+        q[row, column] -= shift
+    return True
+
+
+def _enforce_joint_realizability(
+    active_nodes: tuple[int, ...],
+    orbit: Sequence[BlockCorrespondence],
+    q: np.ndarray,
+    importance: np.ndarray,
+    keep_mask: frozenset[tuple[int, int]],
+    tie_tolerance: float,
+) -> bool:
+    identity_images = tuple(range(q.shape[0]))
+    for _ in range(_JOINT_REALIZABILITY_MAX_ITERATIONS):
+        converged = True
+        for column in active_nodes:
+            best = math.inf
+            identity_value = 0.0
+            for correspondence in orbit:
+                value = float(importance @ q[correspondence.images, correspondence.images[column]])
+                best = min(best, value)
+                if correspondence.images == identity_images:
+                    identity_value = value
+            if identity_value <= best + tie_tolerance:
+                continue
+            delta = identity_value - best + tie_tolerance / 2
+            if not _joint_realizability_column_shift(q, keep_mask, importance, column, delta):
+                return False
+            converged = False
+        if converged:
+            return True
+    return False
+
+
 def _classify_coupling(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
@@ -534,6 +610,12 @@ def _classify_coupling(
 
 def generate_coupling_instance(request: CouplingInstanceRequest) -> CouplingInstance:
     configuration = active_config().generators.coupling_structure
+    if request.support_size not in eligible_coupling_support_sizes(
+        request.compatibility, configuration.supports
+    ):
+        raise CouplingGenerationError(
+            f"support size {request.support_size} cannot realize {request.compatibility.value}"
+        )
     groups = tuple(CoarseGroup)[: len(request.block_pattern)]
     counts = OrderedDict(
         (group, size) for group, size in zip(groups, request.block_pattern, strict=True)
@@ -561,6 +643,13 @@ def generate_coupling_instance(request: CouplingInstanceRequest) -> CouplingInst
         q = _apply_deterministic_sparsity(q, keep_mask)
         importance = _gamma_normalized_importance(random, size)
         active_action = _draw_support_restricted_action(random, size, request.support_size)
+        if request.compatibility == CouplingCompatibility.JOINTLY_REALIZABLE:
+            tie_tolerance = active_config().solvers.exact_sparse.lap_objective_tie_tolerance
+            active_nodes = tuple(int(node) for node in np.flatnonzero(active_action))
+            if not _enforce_joint_realizability(
+                active_nodes, orbit, q, importance, keep_mask, tie_tolerance
+            ):
+                continue
         problem = build_robust_action_problem(blocks, q, q, importance, tuple(range(size)))
         alpha = CurriculumAction(problem=problem, coordinates=active_action)
         hull = build_rectangular_hull(blocks, q, q)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from collections import OrderedDict, defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -66,6 +67,23 @@ class SplitTensors:
 
 
 @dataclass(frozen=True, slots=True)
+class RawFileProvenance:
+    path: str
+    sha256: str
+    row_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetProvenance:
+    component: str
+    raw_files: tuple[RawFileProvenance, ...]
+    accepted_timestamp_column: str
+    timestamp_range: tuple[float, float]
+    duplicate_group_count: int
+    conflicting_duplicate_group_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class MaterializedClient:
     dataset: DatasetId
     schema: AdapterSchema
@@ -74,11 +92,23 @@ class MaterializedClient:
     splits: Mapping[Split, SplitTensors]
     feature_quality: FeatureQualityReport
     class_row_counts: Mapping[str, Mapping[Split, int]]
+    provenance: DatasetProvenance
 
 
-def _read_component_rows(paths: tuple[Path, ...]) -> tuple[tuple[str, ...], list[dict[str, str]]]:
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _read_component_rows(
+    paths: tuple[Path, ...],
+) -> tuple[tuple[str, ...], list[dict[str, str]], tuple[RawFileProvenance, ...]]:
     frames: list[pd.DataFrame] = []
     per_file_columns: list[tuple[str, ...]] = []
+    raw_files: list[RawFileProvenance] = []
     for path in paths:
         frame = pd.read_csv(
             path,
@@ -93,6 +123,7 @@ def _read_component_rows(paths: tuple[Path, ...]) -> tuple[tuple[str, ...], list
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
         frames.append(frame)
+        raw_files.append(RawFileProvenance(str(path), _file_sha256(path), len(frame)))
     columns = reconcile_component_columns(tuple(per_file_columns))
     combined = pd.concat(
         [frame.reindex(columns=list(columns)) for frame in frames],
@@ -103,7 +134,7 @@ def _read_component_rows(paths: tuple[Path, ...]) -> tuple[tuple[str, ...], list
         for column in columns
     ]
     rows = [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)]
-    return columns, rows
+    return columns, rows, tuple(raw_files)
 
 
 class _LazyColumnSamples(Mapping[str, tuple[str, ...]]):
@@ -195,35 +226,50 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
     return LocalClassManifest(tuple(retained), excluded)
 
 
+@dataclass(frozen=True, slots=True)
+class SplitAssignmentResult:
+    buckets: Mapping[Split, tuple[NormalizedRow, ...]]
+    duplicate_group_count: int
+    conflicting_duplicate_group_count: int
+
+
 def _assign_splits(
     schema: AdapterSchema,
     rows: tuple[NormalizedRow, ...],
     manifest: LocalClassManifest,
-) -> dict[Split, list[NormalizedRow]]:
+) -> SplitAssignmentResult:
     buckets: dict[Split, list[NormalizedRow]] = OrderedDict((split, []) for split in Split)
     by_class: defaultdict[str, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
         if row.label in manifest.class_names:
             by_class[row.label].append(row)
+    duplicate_group_count = 0
+    conflicting_duplicate_group_count = 0
     for class_rows in by_class.values():
         normalized = normalize_and_split_training_rows(schema, tuple(class_rows))
         for group_sha256, members in normalized.duplicate_groups.groups:
+            duplicate_group_count += 1
+            if len({member.label for member in members}) > 1:
+                conflicting_duplicate_group_count += 1
             split = normalized.split_assignment.split_of(DuplicateGroupId(group_sha256))
             if split is None:
                 raise MaterializationError("duplicate group received no split assignment")
             buckets[split].extend(members)
-    return buckets
+    frozen_buckets = OrderedDict((split, tuple(rows)) for split, rows in buckets.items())
+    return SplitAssignmentResult(
+        frozen_buckets, duplicate_group_count, conflicting_duplicate_group_count
+    )
 
 
-def _numeric_array(rows: list[NormalizedRow], column: str) -> np.ndarray:
+def _numeric_array(rows: Sequence[NormalizedRow], column: str) -> np.ndarray:
     return np.array([row.features.value_of(column) for row in rows], dtype=object)
 
 
-def _categorical_array(rows: list[NormalizedRow], column: str) -> tuple[str, ...]:
+def _categorical_array(rows: Sequence[NormalizedRow], column: str) -> tuple[str, ...]:
     return tuple(str(row.features.value_of(column)) for row in rows)
 
 
-def _missing_indicator(rows: list[NormalizedRow], column: str) -> np.ndarray:
+def _missing_indicator(rows: Sequence[NormalizedRow], column: str) -> np.ndarray:
     indicator = np.zeros(len(rows), dtype=np.float32)
     for index, row in enumerate(rows):
         value = row.features.value_of(column)
@@ -259,13 +305,27 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
     component = component_for(dataset)
     paths = discover_ton_iot_component_files(raw_root / RawDatasetDirectory.TON_IOT, component)
     require_safe_memory_budget(dataset, paths)
-    columns, raw_rows = _read_component_rows(paths)
+    columns, raw_rows, raw_files = _read_component_rows(paths)
     schema = _resolve_schema(dataset, columns, raw_rows)
     rows = _build_normalized_rows(schema, raw_rows)
     del raw_rows
+    assert schema.timestamp_column is not None
+    timestamp_range = (
+        min(row.timestamp_fraction for row in rows),
+        max(row.timestamp_fraction for row in rows),
+    )
     manifest = _retained_local_classes(rows)
-    buckets = _assign_splits(schema, rows, manifest)
+    split_result = _assign_splits(schema, rows, manifest)
+    buckets = split_result.buckets
     del rows
+    provenance = DatasetProvenance(
+        component=component.component_name,
+        raw_files=raw_files,
+        accepted_timestamp_column=schema.timestamp_column,
+        timestamp_range=timestamp_range,
+        duplicate_group_count=split_result.duplicate_group_count,
+        conflicting_duplicate_group_count=split_result.conflicting_duplicate_group_count,
+    )
     class_row_counts = OrderedDict(
         (
             label,
@@ -365,6 +425,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         splits=splits,
         feature_quality=quality,
         class_row_counts=class_row_counts,
+        provenance=provenance,
     )
 
 

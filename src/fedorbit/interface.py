@@ -247,6 +247,86 @@ def validate_sha256(value: str, field_name: str) -> None:
         raise StrictResourceViolationError(f"{field_name} is not a lowercase SHA-256 digest")
 
 
+def validate_disjoint_feature_namespaces(
+    source_feature_names: frozenset[str],
+    target_feature_names: frozenset[str],
+) -> None:
+    overlap = source_feature_names & target_feature_names
+    if overlap:
+        raise StrictResourceViolationError(
+            f"source and target feature namespaces are not disjoint: {sorted(overlap)}"
+        )
+
+
+def validate_no_cross_client_entity_ids(
+    source_entity_ids: frozenset[str],
+    target_entity_ids: frozenset[str],
+) -> None:
+    overlap = source_entity_ids & target_entity_ids
+    if overlap:
+        raise StrictResourceViolationError(f"cross-client entity IDs present: {sorted(overlap)}")
+
+
+def validate_no_cross_client_timestamp_pairing(
+    source_timestamps: frozenset[str],
+    target_timestamps: frozenset[str],
+) -> None:
+    overlap = source_timestamps & target_timestamps
+    if overlap:
+        raise StrictResourceViolationError(
+            f"cross-client timestamp pairing present: {sorted(overlap)}"
+        )
+
+
+def validate_oracle_acl_isolation(
+    cell_is_oracle_validation_context: bool,
+    oracle_information_accessed: bool,
+) -> None:
+    if oracle_information_accessed and not cell_is_oracle_validation_context:
+        raise StrictResourceViolationError(
+            "oracle-only information accessed outside an oracle validation context"
+        )
+
+
+def validate_resource_manifest_equality(
+    declared_resources: frozenset[ResourceKind],
+    catalogue_resources: frozenset[ResourceKind],
+) -> None:
+    unexpected = declared_resources - catalogue_resources
+    missing = catalogue_resources - declared_resources
+    if unexpected or missing:
+        raise StrictResourceViolationError(
+            "resource manifest disagrees with the method catalogue; "
+            f"unexpected={sorted(r.value for r in unexpected)}, "
+            f"missing={sorted(r.value for r in missing)}"
+        )
+
+
+def static_leakage_scan(
+    serialized_payload: bytes,
+    forbidden_terms: frozenset[str],
+) -> tuple[str, ...]:
+    lowered = serialized_payload.decode("utf-8", errors="replace").lower()
+    return tuple(sorted(term for term in forbidden_terms if term.lower() in lowered))
+
+
+def validate_static_leakage_scan(
+    serialized_payload: bytes,
+    forbidden_terms: frozenset[str],
+) -> None:
+    findings = static_leakage_scan(serialized_payload, forbidden_terms)
+    if findings:
+        raise StrictResourceViolationError(f"static leakage scan found forbidden terms: {findings}")
+
+
+def validate_dynamic_access_log_scan(trace: AccessTrace) -> None:
+    policy = StrictResourcePolicy()
+    for event in trace.events:
+        policy.assert_role_allowed(
+            event.role, event.resource, transfer_finalized=event.transfer_finalized
+        )
+
+
 def validate_rfc3339_utc(value: str) -> None:
     if not value.endswith("Z"):
         raise StrictResourceViolationError("technical creation timestamp must be RFC 3339 UTC")

@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,21 +35,33 @@ from fedorbit.datasets.materialization import (
     MaterializationError,
     MaterializedClient,
     materialize_client,
+    transfer_concept_groups,
 )
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.synthetic import (
+    CouplingGenerationError,
+    CouplingInstanceRequest,
     ExactSeparatorInstanceRequest,
+    MechanismGenerationError,
     ScalabilityInstanceRequest,
     UnresolvedMapWorldKind,
     UnresolvedMapWorldRequest,
+    eligible_coupling_support_sizes,
+    generate_coupling_instance,
     generate_exact_separator_instance,
     generate_scalability_instance,
     generate_unresolved_map_world,
 )
 from fedorbit.infrastructure.environment import environment_snapshot
+from fedorbit.infrastructure.failures import (
+    InfrastructureFailureError,
+    RetryPolicy,
+    classify_failure,
+)
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
+    DatasetManifest,
     ReusableArtifactManifest,
     artifact_id,
     completion_manifest_self_hash,
@@ -99,6 +111,7 @@ from fedorbit.learning.training import BaseCheckpoint, ClassWeights, train_base_
 from fedorbit.methods.assimilation import capture_pre_confirm_pair
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.certificates import (
+    build_rectangular_hull,
     verify_correspondence_certificate,
     verify_exactness_certificate,
 )
@@ -109,6 +122,7 @@ from fedorbit.optimization.correspondence import (
     enumerate_block_permutations,
 )
 from fedorbit.optimization.dense_ccp import solve_dense_ccp
+from fedorbit.optimization.diagnostics import fixed_action_rectangularization_gap
 from fedorbit.optimization.exact_sparse import fixed_action_worst_correspondence
 from fedorbit.optimization.objective import (
     CurriculumAction,
@@ -127,6 +141,7 @@ from fedorbit.types import (
     ArtifactType,
     ClientRole,
     CoarseGroup,
+    CouplingCompatibility,
     DatasetId,
     ExecutionCell,
     ExperimentName,
@@ -483,20 +498,61 @@ def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
         raise ExecutionError("pre-confirm snapshots have inconsistent parameter counts")
 
 
+def _execute_producer_with_retry(producer: Callable[[], ReusableArtifactManifest | None]) -> None:
+    policy = RetryPolicy(
+        active_config().runtime.failure_handling.retries_after_initial_infrastructure_failure
+    )
+    logger = execution_logger()
+    attempt = 0
+    while True:
+        try:
+            producer()
+            return
+        except InfrastructureFailureError as error:
+            classification = classify_failure(error)
+            decision = policy.decide(attempt, classification)
+            logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=SemanticCoordinates("infrastructure-retry"),
+                    artifact_id=None,
+                    state=ArtifactState.RUNNING if decision.retry else ArtifactState.FAILED,
+                    reuse_decision=(
+                        f"attempt {attempt + 1}: {type(error).__name__}: {error} -> "
+                        f"{'retry' if decision.retry else 'exhausted'}"
+                    ),
+                )
+            )
+            if not decision.retry:
+                raise ExecutionError(
+                    f"infrastructure failure exhausted retries: {error}"
+                ) from error
+            attempt += 1
+
+
 def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
     layout = build_layout()
     if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
-        execute_primitive_validation(store, layout, request.overwrite_policy)
+        _execute_producer_with_retry(
+            lambda: execute_primitive_validation(store, layout, request.overwrite_policy)
+        )
         return
     if request.experiment == ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION:
-        execute_exact_sparse_theorem_exhaustive_validation(store, layout, request)
+        _execute_producer_with_retry(
+            lambda: execute_exact_sparse_theorem_exhaustive_validation(store, layout, request)
+        )
+        return
+    if request.experiment == ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION:
+        _execute_producer_with_retry(
+            lambda: execute_coupling_and_map_bound_validation(store, layout, request)
+        )
         return
     if request.experiment in _SYNTHETIC_EXPERIMENTS:
-        execute_synthetic_experiment(store, layout, request)
+        _execute_producer_with_retry(lambda: execute_synthetic_experiment(store, layout, request))
         return
     if request.experiment == ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT:
-        execute_base_model_pilot(store, layout, request)
+        _execute_producer_with_retry(lambda: execute_base_model_pilot(store, layout, request))
         return
     blocked = _chronology_block_reasons()
     if blocked:
@@ -523,7 +579,6 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
 
 _SYNTHETIC_EXPERIMENTS = frozenset(
     {
-        ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
         ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION,
         ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
         ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION,
@@ -789,6 +844,204 @@ def _theorem_exhaustive_validation_cell(
     )
 
 
+_COUPLING_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
+_COUPLING_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+
+
+def execute_coupling_and_map_bound_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> ReusableArtifactManifest:
+    seed = ExperimentSeed(request.definition.seeds[0])
+    return _persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        seed,
+        _coupling_and_map_bound_validation_payload,
+        _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
+        _COUPLING_VALIDATION_PRODUCER_MODULE,
+        "coupling-and-map-bound-validation",
+    )
+
+
+def _coupling_and_map_bound_validation_payload(fingerprint: str) -> StableJsonPayload:
+    coupling_config = active_config().generators.coupling_structure
+    seeds = active_config().scientific.randomness.confirmatory_seeds
+    incompatible_gap_threshold = coupling_config.incompatible_fixed_action_gap_strictly_greater_than
+    experiment = ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION
+    logger = execution_logger()
+    total_cells = sum(
+        len(eligible_coupling_support_sizes(compatibility, coupling_config.supports))
+        * len(coupling_config.response_heterogeneity)
+        * len(coupling_config.directed_asymmetry)
+        * len(coupling_config.response_sparsity)
+        * len(coupling_config.block_patterns)
+        for compatibility in coupling_config.compatibility
+    )
+    total_planned = total_cells * len(seeds)
+    started_at = time.monotonic()
+    total_generated = 0
+    total_generation_failures = 0
+    total_incompatible_gap_failures = 0
+    cells_started = 0
+    for compatibility in coupling_config.compatibility:
+        eligible_supports = eligible_coupling_support_sizes(compatibility, coupling_config.supports)
+        for support in eligible_supports:
+            for heterogeneity in coupling_config.response_heterogeneity:
+                for asymmetry in coupling_config.directed_asymmetry:
+                    for sparsity in coupling_config.response_sparsity:
+                        for block_pattern in coupling_config.block_patterns:
+                            cells_started += 1
+                            logger.record(
+                                ExecutionLogEvent(
+                                    occurred_at=datetime.now(UTC),
+                                    cell_coordinates=SemanticCoordinates(
+                                        f"{experiment.value}:{compatibility.value}:{support}:"
+                                        f"{heterogeneity}:{asymmetry}:{sparsity}:{block_pattern}"
+                                    ),
+                                    artifact_id=None,
+                                    state=ArtifactState.RUNNING,
+                                    stage=ArtifactStage.EVALUATION.value,
+                                    experiment=experiment.value,
+                                    elapsed_seconds=time.monotonic() - started_at,
+                                    reuse_decision=(
+                                        f"{cells_started}/{total_cells} cells, "
+                                        f"{total_generated}/{total_planned} instances, "
+                                        f"{total_generation_failures} generation failures"
+                                    ),
+                                )
+                            )
+                            for seed in seeds:
+                                generated, gap_failed = _coupling_validation_instance(
+                                    compatibility,
+                                    heterogeneity,
+                                    asymmetry,
+                                    sparsity,
+                                    block_pattern,
+                                    support,
+                                    seed,
+                                    incompatible_gap_threshold,
+                                )
+                                total_generated += 1
+                                if not generated:
+                                    total_generation_failures += 1
+                                elif gap_failed:
+                                    total_incompatible_gap_failures += 1
+    logger.record(
+        ExecutionLogEvent(
+            occurred_at=datetime.now(UTC),
+            cell_coordinates=SemanticCoordinates(f"{experiment.value}:map_bound_fixtures"),
+            artifact_id=None,
+            state=ArtifactState.RUNNING,
+            stage=ArtifactStage.EVALUATION.value,
+            experiment=experiment.value,
+            elapsed_seconds=time.monotonic() - started_at,
+        )
+    )
+    map_bound_results = _map_bound_fixture_results(seeds)
+    logger.record(
+        ExecutionLogEvent(
+            occurred_at=datetime.now(UTC),
+            cell_coordinates=SemanticCoordinates(f"{experiment.value}"),
+            artifact_id=None,
+            state=ArtifactState.COMPLETED,
+            stage=ArtifactStage.EVALUATION.value,
+            experiment=experiment.value,
+            elapsed_seconds=time.monotonic() - started_at,
+            reuse_decision=(
+                f"{total_generated}/{total_planned} instances, "
+                f"{total_generation_failures} generation failures, "
+                f"{total_incompatible_gap_failures} gap failures"
+            ),
+        )
+    )
+    return cast(
+        StableJsonPayload,
+        OrderedDict(
+            experiment=ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION.value,
+            dependency_fingerprint_sha256=fingerprint,
+            total_instances=total_generated,
+            total_generation_failures=total_generation_failures,
+            total_incompatible_gap_failures=total_incompatible_gap_failures,
+            map_bound_fixtures=map_bound_results,
+        ),
+    )
+
+
+def _coupling_validation_instance(
+    compatibility: CouplingCompatibility,
+    heterogeneity: float,
+    asymmetry: float,
+    sparsity: float,
+    block_pattern: tuple[int, ...],
+    support: int,
+    seed: RandomSeed,
+    incompatible_gap_threshold: float,
+) -> tuple[bool, bool]:
+    request = CouplingInstanceRequest(
+        compatibility=compatibility,
+        response_heterogeneity=heterogeneity,
+        directed_asymmetry=asymmetry,
+        response_sparsity=sparsity,
+        block_pattern=tuple(block_pattern),
+        support_size=support,
+        seed=seed,
+        instance_index=0,
+    )
+    try:
+        instance = generate_coupling_instance(request)
+    except CouplingGenerationError:
+        return (False, False)
+    if compatibility != CouplingCompatibility.INCOMPATIBLE:
+        return (True, False)
+    groups = tuple(CoarseGroup)[: len(instance.block_pattern)]
+    counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
+    blocks = build_padded_block_structure(groups, counts, counts)
+    orbit = tuple(enumerate_block_permutations(blocks))
+    problem = build_robust_action_problem(
+        blocks,
+        instance.lower_response_matrix,
+        instance.lower_response_matrix,
+        instance.target_importance,
+        tuple(range(sum(instance.block_pattern))),
+    )
+    alpha = CurriculumAction(problem=problem, coordinates=instance.active_action)
+    hull = build_rectangular_hull(
+        blocks, instance.lower_response_matrix, instance.lower_response_matrix
+    )
+    gap = fixed_action_rectangularization_gap(alpha, orbit, hull.lower_bounds)
+    return (True, not gap > incompatible_gap_threshold)
+
+
+def _map_bound_fixture_results(seeds: tuple[RandomSeed, ...]) -> StableJsonPayload:
+    zero_map_value_failures = 0
+    high_map_value_failures = 0
+    for seed in seeds:
+        try:
+            generate_unresolved_map_world(
+                UnresolvedMapWorldRequest(UnresolvedMapWorldKind.COMMON_ACTION, seed)
+            )
+        except MechanismGenerationError:
+            zero_map_value_failures += 1
+        try:
+            generate_unresolved_map_world(
+                UnresolvedMapWorldRequest(UnresolvedMapWorldKind.MAP_DEPENDENT, seed)
+            )
+        except MechanismGenerationError:
+            high_map_value_failures += 1
+    return cast(
+        StableJsonPayload,
+        OrderedDict(
+            zero_map_value_fixtures=len(seeds),
+            zero_map_value_failures=zero_map_value_failures,
+            high_map_value_fixtures=len(seeds),
+            high_map_value_failures=high_map_value_failures,
+        ),
+    )
+
+
 def _synthetic_experiment_payload(
     experiment: ExperimentName,
     pattern: tuple[int, ...],
@@ -866,6 +1119,85 @@ _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({"models"})
 _BASE_MODEL_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
 
 
+def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
+    provenance = materialized.provenance
+    raw_files = tuple(entry.path for entry in provenance.raw_files)
+    raw_sha256 = hashlib.sha256(
+        ",".join(f"{entry.path}:{entry.sha256}" for entry in provenance.raw_files).encode("utf-8")
+    ).hexdigest()
+    raw_counts = OrderedDict((entry.path, entry.row_count) for entry in provenance.raw_files)
+    adapter_feature_roles = OrderedDict(
+        (column, materialized.schema.role_of(column).value)
+        for column in materialized.schema.feature_order
+    )
+    local_class_counts = OrderedDict(
+        (label, sum(counts.values())) for label, counts in materialized.class_row_counts.items()
+    )
+    transfer_candidate_counts: Mapping[str, int] = OrderedDict(
+        (str(group.concept.value), group.train_support)
+        for group in transfer_concept_groups(materialized.dataset, materialized)
+    )
+    feature_quality = cast(
+        Mapping[str, str | int | float | bool | None],
+        OrderedDict(
+            dropped_feature_count=materialized.feature_quality.dropped_feature_count,
+            candidate_count_before_filtering=(
+                materialized.feature_quality.candidate_count_before_filtering
+            ),
+            client_invalid=materialized.feature_quality.client_invalid,
+            client_invalid_reason=materialized.feature_quality.client_invalid_reason,
+        ),
+    )
+    dependency_fingerprint_sha256 = hashlib.sha256(
+        f"{raw_sha256}|{','.join(materialized.schema.feature_order)}".encode()
+    ).hexdigest()
+    return DatasetManifest.model_validate(
+        OrderedDict(
+            dataset=materialized.dataset,
+            component=provenance.component,
+            raw_files=raw_files,
+            raw_sha256=raw_sha256,
+            raw_counts=raw_counts,
+            schema="1.0",
+            adapter_feature_order=materialized.schema.feature_order,
+            adapter_feature_roles=adapter_feature_roles,
+            accepted_schema_aliases=(provenance.accepted_timestamp_column,),
+            adapter_adaptations=(),
+            timestamp_field=provenance.accepted_timestamp_column,
+            timestamp_range=(
+                str(provenance.timestamp_range[0]),
+                str(provenance.timestamp_range[1]),
+            ),
+            duplicate_counts=OrderedDict(total=provenance.duplicate_group_count),
+            conflicting_duplicate_counts=OrderedDict(
+                total=provenance.conflicting_duplicate_group_count
+            ),
+            local_class_counts=local_class_counts,
+            transfer_candidate_counts=transfer_candidate_counts,
+            feature_quality=feature_quality,
+            preprocessing_state="materialized",
+            dependency_fingerprint_sha256=dependency_fingerprint_sha256,
+            producer_code_sha256=implementation_fingerprint("fedorbit.datasets.materialization"),
+        )
+    )
+
+
+def persist_dataset_manifest(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    dataset: DatasetId,
+    manifest: DatasetManifest,
+) -> Path:
+    destination = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"dataset-manifest.{dataset.value}.json"
+    )
+    atomic_write_json(destination, cast(StableJsonPayload, manifest.model_dump(mode="json")))
+    return destination
+
+
 def _persist_client_invalid(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
@@ -938,6 +1270,7 @@ def execute_base_model_pilot(
                 elapsed_seconds=time.monotonic() - materialize_started_at,
             )
         )
+        persist_dataset_manifest(layout, experiment, dataset, build_dataset_manifest(materialized))
         _execute_client_base_model_pilot(
             store,
             layout,

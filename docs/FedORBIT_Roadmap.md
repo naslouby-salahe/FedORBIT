@@ -875,7 +875,9 @@ Pilot paired schedules per candidate:
 8
 ```
 
-Each candidate is also repeated at half its intervention magnitude with the same replicate schedules. For each magnitude separately, pilot replicate derivatives, \(\hat A_{ba}\), and \(SE_{ba}\) use the same paired-shadow derivative, arithmetic-mean estimator, and `ddof=1` standard-error equations as Section 4.12, with the pilot replicate count and candidate horizon.
+Each candidate is also repeated at half its intervention magnitude with the same replicate schedules.
+
+Each of the client's three pilot checkpoints (Section 4.9) independently supplies its own 8 paired replicate schedules per candidate, starting its shadows from that checkpoint's own parameters, optimizer state, and RNG state. Before computing \(\hat A_{ba}\), \(SE_{ba}\), the discrepancy \(D_{ba}\), usefulness, sign agreement, and the pilot score \(Q\) below, the 8 replicate-level derivative estimates \(A_r(b,a;\epsilon)\) from all three pilot checkpoints are pooled into one combined set of 24 replicates per candidate per magnitude. Eligibility and selection for the client's source-response configuration are computed once from this pooled 24-replicate set, not separately per pilot checkpoint and then reconciled. This mirrors the pooling already used for base-model pilot selection (Section 4.9), and is standard practice for treating a candidate configuration's performance as one distribution estimated over all repeated runs rather than as several independent point estimates. For each magnitude separately, pilot replicate derivatives, \(\hat A_{ba}\), and \(SE_{ba}\) use the same paired-shadow derivative, arithmetic-mean estimator, and `ddof=1` standard-error equations as Section 4.12, with the pooled pilot replicate count (24) and candidate horizon.
 
 Eligibility constants:
 

@@ -200,6 +200,31 @@ class CouplingCompatibility(StrEnum):
     INCOMPATIBLE = "incompatible"
 
 
+class EvidenceStatus(StrEnum):
+    SUPPORTED = "Supported"
+    PARTIALLY_SUPPORTED = "Partially Supported"
+    MECHANISM_ONLY = "Mechanism Only"
+    CONDITIONAL = "Conditional"
+    NULL_RESULT = "Null Result"
+    NOT_SUPPORTED = "Not Supported"
+    NOT_TESTED = "Not Tested"
+
+
+class EvidenceProposition(StrEnum):
+    EXACT_SPARSE_SEPARATOR_EXACTNESS = "Exact Sparse Separator Exactness"
+    JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM = (
+        "Joint Correspondence Avoids Rectangular Pessimism"
+    )
+    ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION = (
+        "Action Certification Without Fine-Map Identification"
+    )
+    STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY = "Strict Cross-Telemetry Transfer Utility"
+    VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE = "Value of External Procedural Evidence"
+    OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT = "Operational Relevance of Sparse Support"
+    TARGET_CONFIRMATION_SAFETY = "Target Confirmation Safety"
+    SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT = "Sparse Solver Work-Structure Agreement"
+
+
 class ArtifactState(StrEnum):
     MISSING = "Missing"
     RUNNING = "Running"

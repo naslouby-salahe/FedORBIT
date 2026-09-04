@@ -4,6 +4,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -87,7 +88,7 @@ def _read_component_rows(paths: tuple[Path, ...]) -> tuple[tuple[str, ...], list
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed = tuple(frame.columns)
+        observed: tuple[str, ...] = tuple(cast(str, column) for column in frame.columns)
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
@@ -97,7 +98,10 @@ def _read_component_rows(paths: tuple[Path, ...]) -> tuple[tuple[str, ...], list
         [frame.reindex(columns=list(columns)) for frame in frames],
         ignore_index=True,
     )
-    column_arrays = [combined[column].to_numpy(dtype=object) for column in columns]
+    column_arrays: list[list[str]] = [
+        [cast(str, value) for value in combined[column].to_numpy(dtype=object)]
+        for column in columns
+    ]
     rows = [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)]
     return columns, rows
 

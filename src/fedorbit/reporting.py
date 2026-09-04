@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from fedorbit.analysis.evidence import EvidenceClassificationInputs, classify_all_propositions
 from fedorbit.analysis.records import MetricRecord
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.execution import ArtifactStore, atomic_write_bytes, atomic_write_json
@@ -274,6 +275,20 @@ class VerifiedEvidenceWriter:
             ),
         )
         return (experiments, evidence_summary, metrics_summary, configuration, execution)
+
+    def write_evidence_classification_table(
+        self,
+        inputs: EvidenceClassificationInputs,
+    ) -> tuple[Path, Path]:
+        statuses = classify_all_propositions(inputs)
+        columns = ("proposition", "status")
+        rows = tuple((proposition.value, status.value) for proposition, status in statuses.items())
+        destination = self._layout.project_summary / "tables" / _project_main_table_directory()
+        csv_path = destination / "evidence_classification.csv"
+        tex_path = destination / "evidence_classification.tex"
+        atomic_write_bytes(csv_path, _csv_bytes(columns, rows))
+        atomic_write_bytes(tex_path, _tex_bytes(columns, rows))
+        return (csv_path, tex_path)
 
     def write_figure(
         self,

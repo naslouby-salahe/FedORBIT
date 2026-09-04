@@ -70,6 +70,7 @@ class ExactSeparatorInstanceRequest:
     block_pattern: tuple[int, ...]
     seed: RandomSeed
     active_support_size: SupportCount = 1
+    instance_index: int = 0
 
     def __post_init__(self) -> None:
         if not self.block_pattern or any(size < 1 for size in self.block_pattern):
@@ -94,7 +95,12 @@ def generate_exact_separator_instance(
     generator_config = active_config().generators.exact_separator_theorem
     coordinates = cast(
         StableJsonPayload,
-        OrderedDict(generator="exact_separator_theorem", block_pattern=list(request.block_pattern)),
+        OrderedDict(
+            generator="exact_separator_theorem",
+            block_pattern=list(request.block_pattern),
+            active_support_size=request.active_support_size,
+            instance_index=request.instance_index,
+        ),
     )
     random = create_float64_random_stream(
         SyntheticRandomRequest(request.seed, coordinates)

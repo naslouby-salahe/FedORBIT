@@ -98,12 +98,23 @@ from fedorbit.learning.scoring import LocalClassCount, ScoringRequest, score_mod
 from fedorbit.learning.training import BaseCheckpoint, ClassWeights, train_base_model
 from fedorbit.methods.assimilation import capture_pre_confirm_pair
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
-from fedorbit.optimization.correspondence import build_padded_block_structure
+from fedorbit.optimization.certificates import (
+    verify_correspondence_certificate,
+    verify_exactness_certificate,
+)
+from fedorbit.optimization.correspondence import (
+    BlockCorrespondence,
+    PaddedBlockStructure,
+    build_padded_block_structure,
+    enumerate_block_permutations,
+)
 from fedorbit.optimization.dense_ccp import solve_dense_ccp
 from fedorbit.optimization.exact_sparse import fixed_action_worst_correspondence
 from fedorbit.optimization.objective import (
+    CurriculumAction,
     build_robust_action_problem,
     curriculum_action_from_entries,
+    evaluate_objective,
 )
 from fedorbit.response.packet import build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
@@ -478,6 +489,9 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
         execute_primitive_validation(store, layout, request.overwrite_policy)
         return
+    if request.experiment == ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION:
+        execute_exact_sparse_theorem_exhaustive_validation(store, layout, request)
+        return
     if request.experiment in _SYNTHETIC_EXPERIMENTS:
         execute_synthetic_experiment(store, layout, request)
         return
@@ -509,7 +523,6 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
 
 _SYNTHETIC_EXPERIMENTS = frozenset(
     {
-        ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
         ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
         ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION,
         ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
@@ -559,13 +572,16 @@ def _persist_blocked_experiment(
     atomic_write_json(destination / "blocked.json", payload)
 
 
-def execute_synthetic_experiment(
+def _persist_synthetic_experiment_payload(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
+    seed: ExperimentSeed,
+    payload_builder: Callable[[str], StableJsonPayload],
+    configuration_sections: frozenset[str],
+    producer_module: str,
+    artifact_name: str,
 ) -> ReusableArtifactManifest:
-    pattern = active_config().generators.exact_separator_theorem.block_patterns[3]
-    seed = ExperimentSeed(request.definition.seeds[0])
     cell = SemanticCell(experiment=request.experiment, seed=seed)
     relevance = experiment_relevance(request.experiment)
     coordinates = cell.identity_json(relevance)
@@ -574,24 +590,24 @@ def execute_synthetic_experiment(
         cell,
         relevance,
         (),
-        _CONFIGURATION_SECTIONS,
-        _PRODUCER_MODULE,
+        configuration_sections,
+        producer_module,
     )
     if request.overwrite_policy == OverwritePolicy.REUSE:
         existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
         if existing is not None:
             return existing
-    payload = _synthetic_experiment_payload(request.experiment, pattern, seed.value, fingerprint)
+    payload = payload_builder(fingerprint)
     payload_path = (
         experiment_workspace(layout, request.experiment)
         / "artifacts"
         / "derived"
-        / f"synthetic-validation.{fingerprint[:16]}.json"
+        / f"{artifact_name}.{fingerprint[:16]}.json"
     )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = configuration_subset_digest(_CONFIGURATION_SECTIONS)
-    code_sha256 = implementation_fingerprint(_PRODUCER_MODULE)
+    configuration_sha256 = configuration_subset_digest(configuration_sections)
+    code_sha256 = implementation_fingerprint(producer_module)
     runtime_sha256 = runtime_fingerprint(ArtifactStage.EVALUATION).sha256
     completion = _completion(
         coordinates,
@@ -625,6 +641,152 @@ def execute_synthetic_experiment(
     )
     store.write_completed(manifest, completion)
     return manifest
+
+
+def execute_synthetic_experiment(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> ReusableArtifactManifest:
+    pattern = active_config().generators.exact_separator_theorem.block_patterns[3]
+    seed = ExperimentSeed(request.definition.seeds[0])
+    return _persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        seed,
+        lambda fingerprint: _synthetic_experiment_payload(
+            request.experiment, pattern, seed.value, fingerprint
+        ),
+        _CONFIGURATION_SECTIONS,
+        _PRODUCER_MODULE,
+        "synthetic-validation",
+    )
+
+
+_THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
+_THEOREM_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+
+
+def execute_exact_sparse_theorem_exhaustive_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> ReusableArtifactManifest:
+    seed = ExperimentSeed(request.definition.seeds[0])
+    return _persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        seed,
+        _theorem_exhaustive_validation_payload,
+        _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+        _THEOREM_VALIDATION_PRODUCER_MODULE,
+        "theorem-exhaustive-validation",
+    )
+
+
+def _theorem_exhaustive_validation_payload(fingerprint: str) -> StableJsonPayload:
+    generator_config = active_config().generators.exact_separator_theorem
+    solver_config = active_config().solvers.exact_sparse
+    seeds = active_config().scientific.randomness.confirmatory_seeds
+    instances_per_seed = generator_config.generated_instances_per_block_pattern_support_seed_cell
+    cell_records: list[StableJsonPayload] = []
+    for pattern in generator_config.block_patterns:
+        total_nodes = sum(pattern)
+        groups = tuple(CoarseGroup)[: len(pattern)]
+        counts = OrderedDict(zip(groups, pattern, strict=True))
+        blocks = build_padded_block_structure(groups, counts, counts)
+        orbit = tuple(enumerate_block_permutations(blocks))
+        for support in generator_config.supports:
+            if support > total_nodes:
+                continue
+            cell_records.append(
+                _theorem_exhaustive_validation_cell(
+                    pattern,
+                    support,
+                    seeds,
+                    instances_per_seed,
+                    blocks,
+                    orbit,
+                    solver_config.lap_objective_tie_tolerance,
+                    solver_config.action_tie_tolerance,
+                    solver_config.exact_validation_absolute_tolerance,
+                )
+            )
+    generated_instances = len(seeds) * instances_per_seed
+    return cast(
+        StableJsonPayload,
+        OrderedDict(
+            experiment=ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION.value,
+            dependency_fingerprint_sha256=fingerprint,
+            total_cells=len(cell_records),
+            generated_instances_per_cell=generated_instances,
+            total_instances=len(cell_records) * generated_instances,
+            cells=cell_records,
+        ),
+    )
+
+
+def _theorem_exhaustive_validation_cell(
+    pattern: tuple[int, ...],
+    support: int,
+    seeds: tuple[RandomSeed, ...],
+    instances_per_seed: int,
+    blocks: PaddedBlockStructure,
+    orbit: tuple[BlockCorrespondence, ...],
+    lap_objective_tie_tolerance: float,
+    action_tie_tolerance: float,
+    exact_validation_absolute_tolerance: float,
+) -> StableJsonPayload:
+    total_nodes = sum(pattern)
+    max_absolute_objective_error = 0.0
+    wrong_minima_count = 0
+    invalid_certificate_count = 0
+    for seed in seeds:
+        for instance_index in range(instances_per_seed):
+            instance = generate_exact_separator_instance(
+                ExactSeparatorInstanceRequest(pattern, seed, support, instance_index)
+            )
+            problem = build_robust_action_problem(
+                blocks,
+                instance.lower_response_matrix,
+                instance.upper_response_matrix,
+                instance.target_importance / instance.target_importance.sum(),
+                tuple(range(total_nodes)),
+            )
+            action = CurriculumAction(problem=problem, coordinates=instance.active_action)
+            outcome = fixed_action_worst_correspondence(
+                problem, action, lap_objective_tie_tolerance, action_tie_tolerance
+            )
+            exhaustive_truth = min(
+                evaluate_objective(action, correspondence) for correspondence in orbit
+            )
+            error = abs(outcome.separator_objective - exhaustive_truth)
+            max_absolute_objective_error = max(max_absolute_objective_error, error)
+            if not verify_exactness_certificate(
+                outcome.separator_objective, exhaustive_truth, exact_validation_absolute_tolerance
+            ):
+                wrong_minima_count += 1
+            if not verify_correspondence_certificate(
+                outcome.worst_correspondence,
+                outcome.separator_objective,
+                action,
+                exact_validation_absolute_tolerance,
+            ):
+                invalid_certificate_count += 1
+    return cast(
+        StableJsonPayload,
+        OrderedDict(
+            block_pattern=list(pattern),
+            support=support,
+            seeds=list(seeds),
+            generated_instances=len(seeds) * instances_per_seed,
+            max_absolute_objective_error=max_absolute_objective_error,
+            wrong_minima_count=wrong_minima_count,
+            invalid_certificate_count=invalid_certificate_count,
+        ),
+    )
 
 
 def _synthetic_experiment_payload(

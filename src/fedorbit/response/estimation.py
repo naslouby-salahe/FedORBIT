@@ -16,6 +16,18 @@ from fedorbit.learning.training import (
     make_adamw,
     optimizer_step,
 )
+from fedorbit.types import (
+    BatchSize,
+    Coefficient,
+    Floor,
+    Index,
+    InterventionMagnitude,
+    LearningRate,
+    RandomSeed,
+    SampleCount,
+    StepCount,
+    WeightDecay,
+)
 
 
 class ResponseEstimationError(ValueError):
@@ -35,17 +47,17 @@ class ShadowData:
 
 @dataclass(frozen=True, slots=True)
 class ShadowSettings:
-    epsilon: float
-    horizon: int
-    learning_rate: float
-    weight_decay: float
+    epsilon: InterventionMagnitude
+    horizon: StepCount
+    learning_rate: LearningRate
+    weight_decay: WeightDecay
 
 
 def native_class_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
-    class_index: int,
-    probability_log_floor: float,
+    class_index: Index,
+    probability_log_floor: Floor,
 ) -> float:
     class_examples = targets == class_index
     if not bool(class_examples.any()):
@@ -61,8 +73,8 @@ def native_class_cross_entropy(
 def equal_native_class_risk(
     logits: torch.Tensor,
     targets: torch.Tensor,
-    native_classes: tuple[int, ...],
-    probability_log_floor: float,
+    native_classes: tuple[Index, ...],
+    probability_log_floor: Floor,
 ) -> float:
     risks = tuple(
         native_class_cross_entropy(logits, targets, class_index, probability_log_floor)
@@ -74,8 +86,8 @@ def equal_native_class_risk(
 
 
 def shadow_batch_schedule(
-    train_size: int,
-    batch_size: int,
+    train_size: SampleCount,
+    batch_size: BatchSize,
     rng: torch.Generator,
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
@@ -94,11 +106,11 @@ def shadow_batch_schedule(
 
 
 def paired_shadow_derivative(
-    positive_risk: float,
-    negative_risk: float,
-    baseline_risk: float,
-    epsilon: float,
-    denominator_floor: float,
+    positive_risk: Coefficient,
+    negative_risk: Coefficient,
+    baseline_risk: Coefficient,
+    epsilon: InterventionMagnitude,
+    denominator_floor: Floor,
 ) -> float:
     if epsilon <= 0.0:
         raise ResponseEstimationError("intervention magnitude must be positive")
@@ -114,7 +126,7 @@ def run_shadow_pair(
     base_rng_state: RngState,
     data: ShadowData,
     settings: ShadowSettings,
-    schedule_seed: int,
+    schedule_seed: RandomSeed,
 ) -> tuple[tuple[float, float, float], ...]:
     config = active_config()
     batch_size = config.scientific.training.batch_size

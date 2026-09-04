@@ -14,7 +14,17 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.types import RngNamespace, StableJsonPayload
+from fedorbit.types import (
+    EpochCount,
+    Floor,
+    Fraction,
+    Index,
+    LearningRate,
+    RngNamespace,
+    Score,
+    StableJsonPayload,
+    WeightDecay,
+)
 
 
 class LossContractError(ValueError):
@@ -65,7 +75,7 @@ def per_example_weighted_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
     class_weights: ClassWeights,
-    probability_log_floor: float,
+    probability_log_floor: Floor,
     multipliers: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if logits.ndim != 2 or targets.ndim != 1 or logits.shape[0] != targets.shape[0]:
@@ -82,7 +92,7 @@ def minibatch_objective(
     logits: torch.Tensor,
     targets: torch.Tensor,
     class_weights: ClassWeights,
-    probability_log_floor: float,
+    probability_log_floor: Floor,
     multipliers: torch.Tensor | None = None,
 ) -> torch.Tensor:
     losses = per_example_weighted_cross_entropy(
@@ -185,15 +195,15 @@ class RngState:
 
 @dataclass(frozen=True, slots=True)
 class SelectedHyperparameters:
-    learning_rate: float
-    weight_decay: float
-    dropout_probability: float
+    learning_rate: LearningRate
+    weight_decay: WeightDecay
+    dropout_probability: Fraction
 
 
 @dataclass(frozen=True, slots=True)
 class BaseCheckpoint:
-    epoch: int
-    valid_macro_cross_entropy: float
+    epoch: Index
+    valid_macro_cross_entropy: Score
     state_dict: ModelParameterState
     optimizer_state: OptimizerState
     rng_state: RngState
@@ -210,7 +220,7 @@ class BaseCheckpoint:
 @dataclass(frozen=True, slots=True)
 class TrainingOutcome:
     checkpoint: BaseCheckpoint
-    completed_epochs: int
+    completed_epochs: EpochCount
 
     @property
     def epoch(self) -> int:
@@ -224,7 +234,7 @@ class TrainingOutcome:
 def macro_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
-    probability_log_floor: float,
+    probability_log_floor: Floor,
 ) -> float:
     if logits.ndim != 2 or targets.ndim != 1 or logits.shape[0] != targets.shape[0]:
         raise TrainingError("logits and targets have incompatible shapes")
@@ -244,8 +254,8 @@ def macro_cross_entropy(
 
 def make_adamw(
     model: nn.Module,
-    learning_rate: float,
-    weight_decay: float,
+    learning_rate: LearningRate,
+    weight_decay: WeightDecay,
 ) -> torch.optim.AdamW:
     adamw = active_config().scientific.training.adamw
     return torch.optim.AdamW(
@@ -261,7 +271,7 @@ def make_adamw(
     )
 
 
-def _seed_training_rng(epoch_seed: int, device: torch.device) -> None:
+def _seed_training_rng(epoch_seed: RandomSeed, device: torch.device) -> None:
     cpu_state = torch.Generator().manual_seed(epoch_seed).get_state()
     torch.set_rng_state(cpu_state)
     if device.type != "cuda":
@@ -280,7 +290,7 @@ def train_base_model(
     valid_features: torch.Tensor,
     valid_targets: torch.Tensor,
     class_weights: ClassWeights,
-    seed: int,
+    seed: RandomSeed,
     selected_hyperparameters: SelectedHyperparameters,
 ) -> TrainingOutcome:
     config = active_config()
@@ -314,11 +324,11 @@ def train_base_model(
     for epoch in range(training.maximum_epochs):
         epoch_seed = derive_seed32(
             SeedDerivationRequest(
-                RandomSeed(seed),
+                seed,
                 RngNamespace.TRAIN_EPOCH_SHUFFLE,
                 cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)),
             )
-        ).value
+        )
         generator = torch.Generator().manual_seed(epoch_seed)
         loader = DataLoader(
             TensorDataset(train_features, train_targets),

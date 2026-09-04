@@ -5,6 +5,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -29,6 +30,11 @@ from fedorbit.datasets.common import (
     DatasetObservationPersistenceRequest,
     inspect_dataset,
     persist_dataset_observation,
+)
+from fedorbit.datasets.materialization import (
+    MaterializationError,
+    MaterializedClient,
+    materialize_client,
 )
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.experiments.cells import experiment_relevance
@@ -68,6 +74,7 @@ from fedorbit.infrastructure.runtime import (
     RandomSeed,
     current_code_revision,
     execution_logger,
+    principal_determinism,
 )
 from fedorbit.infrastructure.workspace import (
     RawDuplicateReportRequest,
@@ -80,7 +87,15 @@ from fedorbit.infrastructure.workspace import (
     persist_raw_duplicate_report,
     persist_raw_inventory,
 )
+from fedorbit.learning.checkpoints import save_base_checkpoint
+from fedorbit.learning.pilot import (
+    PilotData,
+    create_classifier,
+    run_base_model_pilot,
+    select_pilot_configuration,
+)
 from fedorbit.learning.scoring import LocalClassCount, ScoringRequest, score_model
+from fedorbit.learning.training import BaseCheckpoint, ClassWeights, train_base_model
 from fedorbit.methods.assimilation import capture_pre_confirm_pair
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.correspondence import build_padded_block_structure
@@ -98,6 +113,7 @@ from fedorbit.types import (
     ArtifactPath,
     ArtifactStage,
     ArtifactState,
+    ArtifactType,
     ClientRole,
     CoarseGroup,
     DatasetId,
@@ -108,7 +124,9 @@ from fedorbit.types import (
     OverwritePolicy,
     ScalabilityBlockPattern,
     SemanticCell,
+    SemanticCoordinate,
     SemanticCoordinates,
+    Split,
     StableJsonPayload,
     TerminalState,
     TransferMethod,
@@ -412,7 +430,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
 
 def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
     del overwrite_policy
-    seed = RandomSeed(active_config().scientific.randomness.pilot_seeds[0])
+    seed = active_config().scientific.randomness.pilot_seeds[0]
     exact = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 2), seed))
     if exact.lower_response_matrix.shape != (4, 4):
         raise ExecutionError("synthetic exactness smoke instance has an invalid matrix shape")
@@ -462,6 +480,9 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         return
     if request.experiment in _SYNTHETIC_EXPERIMENTS:
         execute_synthetic_experiment(store, layout, request)
+        return
+    if request.experiment == ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT:
+        execute_base_model_pilot(store, layout, request)
         return
     blocked = _chronology_block_reasons()
     if blocked:
@@ -560,9 +581,7 @@ def execute_synthetic_experiment(
         existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
         if existing is not None:
             return existing
-    payload = _synthetic_experiment_payload(
-        request.experiment, pattern, RandomSeed(seed.value), fingerprint
-    )
+    payload = _synthetic_experiment_payload(request.experiment, pattern, seed.value, fingerprint)
     payload_path = (
         experiment_workspace(layout, request.experiment)
         / "artifacts"
@@ -639,7 +658,7 @@ def _synthetic_experiment_payload(
         pair="synthetic",
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         condition="generated",
-        seed=seed.value,
+        seed=seed,
         metric_name=MetricId.ACTIVE_IMAGE_CANDIDATES,
         metric_value=float(outcome.active_image_candidates),
         metric_unit="count",
@@ -653,12 +672,12 @@ def _synthetic_experiment_payload(
     validate_metric_records(MetricRecordCollection((metric,)))
     dense = None
     if experiment == ExperimentName.SPARSITY_AND_DENSE_FALLBACK:
-        dense = solve_dense_ccp(problem, seed.value, experiment.value)
+        dense = solve_dense_ccp(problem, seed, experiment.value)
     return cast(
         StableJsonPayload,
         OrderedDict(
             experiment=experiment.value,
-            seed=seed.value,
+            seed=seed,
             block_pattern=list(pattern),
             response_shape=list(instance.lower_response_matrix.shape),
             separator_objective=outcome.separator_objective,
@@ -679,6 +698,336 @@ def _synthetic_experiment_payload(
             ),
         ),
     )
+
+
+_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({"models"})
+_BASE_MODEL_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+
+
+def _persist_client_invalid(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    dataset: DatasetId,
+    reason: str,
+) -> None:
+    destination = experiment_workspace(layout, experiment) / "artifacts" / "derived"
+    payload = cast(
+        StableJsonPayload,
+        OrderedDict(
+            experiment=experiment.value,
+            dataset=dataset.value,
+            state=ArtifactState.INVALID.value,
+            reason=reason,
+        ),
+    )
+    atomic_write_json(destination / f"{dataset.value}-invalid.json", payload)
+
+
+def execute_base_model_pilot(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    experiment = request.experiment
+    relevance = experiment_relevance(experiment)
+    raw_root = repository_root() / "data" / "raw"
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    device = torch.device("cuda")
+    logger = execution_logger()
+    for dataset in active_config().scientific.datasets.clients:
+        logger.record(
+            ExecutionLogEvent(
+                occurred_at=datetime.now(UTC),
+                cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
+                artifact_id=None,
+                state=ArtifactState.RUNNING,
+                stage=ArtifactStage.PREPROCESSING.value,
+                experiment=experiment.value,
+                dataset=dataset.value,
+            )
+        )
+        materialize_started_at = time.monotonic()
+        try:
+            materialized = materialize_client(dataset, raw_root)
+        except MaterializationError as error:
+            _persist_client_invalid(layout, experiment, dataset, str(error))
+            logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
+                    artifact_id=None,
+                    state=ArtifactState.INVALID,
+                    stage=ArtifactStage.PREPROCESSING.value,
+                    experiment=experiment.value,
+                    dataset=dataset.value,
+                    elapsed_seconds=time.monotonic() - materialize_started_at,
+                )
+            )
+            continue
+        logger.record(
+            ExecutionLogEvent(
+                occurred_at=datetime.now(UTC),
+                cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
+                artifact_id=None,
+                state=ArtifactState.COMPLETED,
+                stage=ArtifactStage.PREPROCESSING.value,
+                experiment=experiment.value,
+                dataset=dataset.value,
+                elapsed_seconds=time.monotonic() - materialize_started_at,
+            )
+        )
+        _execute_client_base_model_pilot(
+            store,
+            layout,
+            experiment,
+            relevance,
+            dataset,
+            materialized,
+            confirmatory_seeds,
+            request.overwrite_policy,
+            device,
+            logger,
+        )
+
+
+def _execute_client_base_model_pilot(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    relevance: frozenset[SemanticCoordinate],
+    dataset: DatasetId,
+    materialized: MaterializedClient,
+    confirmatory_seeds: tuple[int, ...],
+    overwrite_policy: OverwritePolicy,
+    device: torch.device,
+    logger: ExecutionLogger,
+) -> None:
+    train = materialized.splits[Split.TRAIN]
+    valid = materialized.splits[Split.VALID]
+    n_classes = materialized.class_manifest.class_count
+    pilot_data = PilotData(train.features, train.targets, valid.features, valid.targets, n_classes)
+    class_weights = ClassWeights.from_targets(train.targets, n_classes)
+    with principal_determinism():
+        pilot_started_at = time.monotonic()
+        logger.record(
+            ExecutionLogEvent(
+                occurred_at=datetime.now(UTC),
+                cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
+                artifact_id=None,
+                state=ArtifactState.RUNNING,
+                stage=ArtifactStage.PILOT_SELECTION.value,
+                experiment=experiment.value,
+                dataset=dataset.value,
+            )
+        )
+        pilot_results = run_base_model_pilot(pilot_data, dataset, device)
+        selection = select_pilot_configuration(pilot_results)
+        logger.record(
+            ExecutionLogEvent(
+                occurred_at=datetime.now(UTC),
+                cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
+                artifact_id=None,
+                state=ArtifactState.COMPLETED,
+                stage=ArtifactStage.PILOT_SELECTION.value,
+                experiment=experiment.value,
+                dataset=dataset.value,
+                elapsed_seconds=time.monotonic() - pilot_started_at,
+            )
+        )
+        for pilot_result in pilot_results:
+            if pilot_result.configuration != selection.configuration:
+                continue
+            _persist_base_checkpoint(
+                store,
+                layout,
+                experiment,
+                relevance,
+                dataset,
+                pilot_result.seed,
+                pilot_result.outcome.checkpoint,
+                ArtifactStage.PILOT_SELECTION,
+                "pilot",
+                overwrite_policy,
+            )
+        for seed_index, seed in enumerate(confirmatory_seeds):
+            checkpoint_coordinates = SemanticCoordinates(
+                f"{experiment.value}:{dataset.value}:confirmatory:{seed}"
+            )
+            checkpoint_cell = SemanticCell(
+                experiment=experiment,
+                dataset=dataset,
+                source_client=dataset,
+                seed=ExperimentSeed(seed),
+            )
+            fingerprint = stage_dependency_fingerprint(
+                ArtifactStage.TRAINING,
+                checkpoint_cell,
+                relevance,
+                (),
+                _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
+                _BASE_MODEL_PILOT_PRODUCER_MODULE,
+            )
+            if overwrite_policy == OverwritePolicy.REUSE:
+                existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+                if existing is not None:
+                    logger.record(
+                        ExecutionLogEvent(
+                            occurred_at=datetime.now(UTC),
+                            cell_coordinates=checkpoint_coordinates,
+                            artifact_id=ArtifactIdentifier(existing.artifact_id),
+                            state=ArtifactState.COMPLETED,
+                            stage=ArtifactStage.TRAINING.value,
+                            experiment=experiment.value,
+                            dataset=dataset.value,
+                            seed=seed,
+                            reuse_decision="reused",
+                        )
+                    )
+                    continue
+            logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=checkpoint_coordinates,
+                    artifact_id=None,
+                    state=ArtifactState.RUNNING,
+                    stage=ArtifactStage.TRAINING.value,
+                    experiment=experiment.value,
+                    dataset=dataset.value,
+                    seed=seed,
+                    reuse_decision=(
+                        f"{seed_index + 1}/{len(confirmatory_seeds)} confirmatory checkpoints"
+                    ),
+                )
+            )
+            checkpoint_started_at = time.monotonic()
+            model = create_classifier(
+                dataset,
+                train.features.shape[1],
+                n_classes,
+                selection.configuration.dropout,
+                seed,
+                device,
+            )
+            outcome = train_base_model(
+                model,
+                train.features,
+                train.targets,
+                valid.features,
+                valid.targets,
+                class_weights,
+                seed,
+                selection.configuration.hyperparameters(),
+            )
+            _persist_base_checkpoint(
+                store,
+                layout,
+                experiment,
+                relevance,
+                dataset,
+                seed,
+                outcome.checkpoint,
+                ArtifactStage.TRAINING,
+                "training",
+                overwrite_policy,
+            )
+            logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=checkpoint_coordinates,
+                    artifact_id=None,
+                    state=ArtifactState.COMPLETED,
+                    stage=ArtifactStage.TRAINING.value,
+                    experiment=experiment.value,
+                    dataset=dataset.value,
+                    seed=seed,
+                    elapsed_seconds=time.monotonic() - checkpoint_started_at,
+                )
+            )
+
+
+def _persist_base_checkpoint(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    relevance: frozenset[SemanticCoordinate],
+    dataset: DatasetId,
+    seed: int,
+    checkpoint: BaseCheckpoint,
+    stage: ArtifactStage,
+    directory_segment: str,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    checkpoint_cell = SemanticCell(
+        experiment=experiment,
+        dataset=dataset,
+        source_client=dataset,
+        seed=ExperimentSeed(seed),
+    )
+    coordinates = checkpoint_cell.identity_json(relevance)
+    fingerprint = stage_dependency_fingerprint(
+        stage,
+        checkpoint_cell,
+        relevance,
+        (),
+        _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
+        _BASE_MODEL_PILOT_PRODUCER_MODULE,
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "checkpoints"
+        / directory_segment
+        / dataset.value
+        / f"seed-{seed}"
+        / "checkpoint.pt"
+    )
+    save_base_checkpoint(checkpoint, payload_path)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = configuration_subset_digest(_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
+    code_sha256 = implementation_fingerprint(_BASE_MODEL_PILOT_PRODUCER_MODULE)
+    runtime_sha256 = runtime_fingerprint(stage).sha256
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        payload_path,
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=stage,
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                "checkpoint",
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(coordinates=coordinates, payload_sha256=payload_sha256),
+                ),
+                fingerprint,
+            ),
+            artifact_type=ArtifactType.CHECKPOINT,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=stage,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=(),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
 
 
 class PrimitiveValidationError(ValueError):
@@ -766,7 +1115,7 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path:
 
 
 def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload:
-    source_seed = RandomSeed(active_config().scientific.randomness.pilot_seeds[0])
+    source_seed = active_config().scientific.randomness.pilot_seeds[0]
     instance = generate_exact_separator_instance(
         ExactSeparatorInstanceRequest(block_pattern, source_seed)
     )
@@ -787,7 +1136,7 @@ def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload:
         StableJsonPayload,
         OrderedDict(
             block_pattern=list(block_pattern),
-            seed=source_seed.value,
+            seed=source_seed,
             response_shape=list(instance.lower_response_matrix.shape),
             lower_bound_not_above_upper_bound=True,
             assignment_is_bijective=True,
@@ -820,15 +1169,17 @@ def _completion(
     configuration_sha256: str,
     code_sha256: str,
     runtime_sha256: str,
+    stage: ArtifactStage = _STAGE,
+    upstream_artifact_ids: tuple[str, ...] = (),
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(
             schema_version="1.0",
             semantic_experiment_coordinates=coordinates,
-            producer_stage=_STAGE,
+            producer_stage=stage,
             terminal_state=TerminalState.COMPLETED,
             dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=(),
+            upstream_artifact_ids=upstream_artifact_ids,
             mandatory_artifact_paths=(str(payload_path),),
             mandatory_artifact_sha256=payload_sha256,
             scientific_configuration_sha256=configuration_sha256,

@@ -15,6 +15,7 @@ from fedorbit.optimization.correspondence import (
     PaddedBlockStructure,
     support_per_block,
 )
+from fedorbit.types import Budget, Coefficient, Score, SupportCount, Tolerance
 
 
 class ActionSpaceError(ValueError):
@@ -29,8 +30,8 @@ class RobustActionProblem:
     target_importance: NDArray[np.float64]
     coordinate_caps: NDArray[np.float64]
     linear_costs: NDArray[np.float64]
-    total_budget: float
-    principal_support: int
+    total_budget: Budget
+    principal_support: SupportCount
 
     def __post_init__(self) -> None:
         size = self.blocks.total_padded_nodes
@@ -102,7 +103,7 @@ class CurriculumAction:
     def is_within_budget(self) -> bool:
         return bool(float(np.sum(self.coordinates)) <= self.problem.total_budget + 0.0)
 
-    def is_support_limited(self, support_limit: int) -> bool:
+    def is_support_limited(self, support_limit: SupportCount) -> bool:
         return self.realized_support_size <= support_limit
 
 
@@ -274,14 +275,18 @@ def enumerate_support_coordinate_sets(
     return tuple(sets)
 
 
-def rounded_action_vector(alpha: CurriculumAction, rounding_precision: float) -> tuple[float, ...]:
+def rounded_action_vector(
+    alpha: CurriculumAction, rounding_precision: Tolerance
+) -> tuple[float, ...]:
     if rounding_precision <= 0.0:
         raise ActionSpaceError("action tie comparison rounding precision must be positive")
     decimals = max(0, round(-math.log10(rounding_precision)))
     return tuple(float(value) for value in np.round(alpha.coordinates, decimals))
 
 
-def actions_tied_within_tolerance(left: float, right: float, tolerance: float) -> bool:
+def actions_tied_within_tolerance(
+    left: Coefficient, right: Coefficient, tolerance: Tolerance
+) -> bool:
     if tolerance < 0.0:
         raise ActionSpaceError("tie tolerance must be nonnegative")
     return abs(left - right) <= tolerance
@@ -289,8 +294,8 @@ def actions_tied_within_tolerance(left: float, right: float, tolerance: float) -
 
 @dataclass(frozen=True, slots=True, order=True)
 class CertifiedActionOrderingKey:
-    negated_certified_value: float
-    realized_support_size: int
+    negated_certified_value: Score
+    realized_support_size: SupportCount
     target_node_sequence: tuple[int, ...]
     rounded_coordinates: tuple[float, ...]
 
@@ -298,10 +303,12 @@ class CertifiedActionOrderingKey:
 @dataclass(frozen=True, slots=True)
 class CertifiedActionCandidate:
     action: CurriculumAction
-    certified_robust_value: float
+    certified_robust_value: Score
     target_node_sequence: tuple[int, ...]
 
-    def deterministic_ordering_key(self, rounding_precision: float) -> CertifiedActionOrderingKey:
+    def deterministic_ordering_key(
+        self, rounding_precision: Tolerance
+    ) -> CertifiedActionOrderingKey:
         return CertifiedActionOrderingKey(
             negated_certified_value=-self.certified_robust_value,
             realized_support_size=self.action.realized_support_size,
@@ -312,8 +319,8 @@ class CertifiedActionCandidate:
 
 def select_deterministic_candidate(
     candidates: Sequence[CertifiedActionCandidate],
-    tie_tolerance: float,
-    rounding_precision: float,
+    tie_tolerance: Tolerance,
+    rounding_precision: Tolerance,
 ) -> CertifiedActionCandidate | None:
     if not candidates:
         return None

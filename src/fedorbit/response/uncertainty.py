@@ -24,7 +24,14 @@ from fedorbit.response.estimation import (
     run_shadow_pair,
 )
 from fedorbit.response.pilot import PilotData
-from fedorbit.types import StableJsonPayload
+from fedorbit.types import (
+    Coefficient,
+    ConceptCount,
+    Estimate,
+    Index,
+    StableJsonPayload,
+    StandardError,
+)
 
 
 class ResponseUncertaintyError(ValueError):
@@ -33,27 +40,27 @@ class ResponseUncertaintyError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class FinalResponseEntry:
-    outcome_index: int
-    intervention_index: int
-    a_hat: float
-    standard_error: float
-    lower: float
-    upper: float
+    outcome_index: Index
+    intervention_index: Index
+    a_hat: Estimate
+    standard_error: StandardError
+    lower: Estimate
+    upper: Estimate
     useful: bool
 
 
 @dataclass(frozen=True, slots=True)
 class FinalResponseEstimate:
     entries: tuple[FinalResponseEntry, ...]
-    critical_value: float
-    useful_intervention_columns: int
-    median_band_width_ratio: float
+    critical_value: Estimate
+    useful_intervention_columns: ConceptCount
+    median_band_width_ratio: Coefficient
     stability_rule_passed: bool
 
 
 def max_t_critical_value(
     entry_derivatives: tuple[tuple[float, ...], ...],
-    seed: int,
+    seed: RandomSeed,
     resamples: int | None = None,
     confidence_level: float | None = None,
     standard_error_floor: float | None = None,
@@ -84,7 +91,7 @@ def max_t_critical_value(
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     bootstrap_seed = derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(seed),
+            seed,
             RngNamespace.RESPONSE_BOOTSTRAP,
             cast(
                 StableJsonPayload,
@@ -96,7 +103,7 @@ def max_t_critical_value(
                 ),
             ),
         )
-    ).value
+    )
     rng = torch.Generator().manual_seed(bootstrap_seed)
     maxima: list[float] = []
     for _ in range(resample_count):
@@ -128,7 +135,7 @@ def estimate_final_response(
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
     settings: ShadowSettings,
-    seed: int,
+    seed: RandomSeed,
 ) -> FinalResponseEstimate:
     final = active_config().scientific.source_response_final
     return estimate_response_bands(
@@ -151,7 +158,7 @@ def estimate_response_bands(
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
     settings: ShadowSettings,
-    seed: int,
+    seed: RandomSeed,
     *,
     replicate_count: int,
     bootstrap_resamples: int,
@@ -181,7 +188,7 @@ def estimate_response_bands(
             )
             schedule_seed = derive_seed32(
                 SeedDerivationRequest(
-                    RandomSeed(seed),
+                    seed,
                     RngNamespace.RESPONSE_SCHEDULE,
                     cast(
                         StableJsonPayload,
@@ -192,7 +199,7 @@ def estimate_response_bands(
                         ),
                     ),
                 )
-            ).value
+            )
             risks = run_shadow_pair(
                 model,
                 checkpoint.state_dict,

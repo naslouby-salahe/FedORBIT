@@ -2,59 +2,105 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pydantic import BaseModel, ConfigDict
+from fedorbit.types import (
+    AbsoluteMetric,
+    AttemptCount,
+    BatchSize,
+    Budget,
+    ClientComponentName,
+    ClientRole,
+    Coefficient,
+    ConceptCount,
+    ConcurrencyCount,
+    ConfidenceLevel,
+    CouplingCompatibility,
+    CutCount,
+    DatasetId,
+    DatasetLabel,
+    DecimalPrecision,
+    DomainModel,
+    DurationMinutes,
+    EpochCount,
+    Floor,
+    Fraction,
+    GiBMemory,
+    InterventionMagnitude,
+    InvalidPermutationCount,
+    LearningRate,
+    MethodName,
+    PatienceCount,
+    ProposalCount,
+    RandomSeed,
+    RelativeGain,
+    RepetitionCount,
+    ReplicateCount,
+    ResampleCount,
+    ResearcherCount,
+    RetryCount,
+    SampleCount,
+    ScalabilityBlockPattern,
+    ScaleFactor,
+    SignificanceLevel,
+    SourceLabel,
+    StepCount,
+    SupportCount,
+    ThreadCount,
+    Threshold,
+    TimeBudgetSeconds,
+    TimestampFieldName,
+    Tolerance,
+    TransferMethod,
+    WeightDecay,
+    WorkerCount,
+)
 
-from fedorbit.types import ClientRole, DatasetId, TransferMethod
-
-
-class FrozenModel(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+FrozenModel = DomainModel
 
 
 class ActionConfig(FrozenModel):
-    principal_sparse_support: int
-    sparse_support_sensitivity: tuple[int, ...]
-    total_curriculum_budget: float
-    coordinate_cap: float
-    linear_cost_per_actionable_node: float
-    positive_source_value_threshold: float
-    maximum_source_proposals_per_target: int
+    principal_sparse_support: SupportCount
+    sparse_support_sensitivity: tuple[SupportCount, ...]
+    total_curriculum_budget: Budget
+    coordinate_cap: Budget
+    linear_cost_per_actionable_node: Coefficient
+    positive_source_value_threshold: Threshold
+    maximum_source_proposals_per_target: ProposalCount
 
 
 class EquivalenceRelativeMacroCe(FrozenModel):
-    lower: float
-    upper: float
+    lower: RelativeGain
+    upper: RelativeGain
 
 
 class MaterialityConfig(FrozenModel):
-    coupling_objective_units: float
-    realized_relative_macro_ce: float
-    macro_f1_absolute: float
+    coupling_objective_units: Coefficient
+    realized_relative_macro_ce: RelativeGain
+    macro_f1_absolute: AbsoluteMetric
     equivalence_relative_macro_ce: EquivalenceRelativeMacroCe
-    harmful_transfer_relative_macro_ce_gain: float
-    useful_transfer_relative_macro_ce_gain: float
+    harmful_transfer_relative_macro_ce_gain: RelativeGain
+    useful_transfer_relative_macro_ce_gain: RelativeGain
 
 
 class TransferSupportConfig(FrozenModel):
-    source_train_minimum: int
-    source_meta_minimum: int
-    target_meta_minimum: int
-    target_confirm_minimum: int
-    target_test_minimum: int
-    local_prediction_attack_class_total_rows_minimum: int
-    minimum_actionable_target_concepts: int
-    minimum_nontrivial_block_size: int
+    source_train_minimum: SampleCount
+    source_meta_minimum: SampleCount
+    target_meta_minimum: SampleCount
+    target_confirm_minimum: SampleCount
+    target_test_minimum: SampleCount
+    local_prediction_attack_class_total_rows_minimum: SampleCount
+    minimum_actionable_target_concepts: ConceptCount
+    minimum_nontrivial_block_size: ConceptCount
 
 
 class ClientConfig(FrozenModel):
     role: ClientRole
-    source: str
-    component: str
-    expected_timestamp_field: str
+    source: SourceLabel
+    component: ClientComponentName
+    expected_timestamp_field: TimestampFieldName
 
 
 class TimestampAliasAcceptance(FrozenModel):
-    retained_row_parse_success_minimum: float
+    retained_row_parse_success_minimum: Fraction
 
 
 class DirectedPairSpec(FrozenModel):
@@ -67,15 +113,15 @@ class DatasetsConfig(FrozenModel):
     timestamp_alias_acceptance: TimestampAliasAcceptance
     primary_directed_pairs: tuple[DirectedPairSpec, ...]
     secondary_directed_pairs: tuple[DirectedPairSpec, ...]
-    local_prediction_normal_label: str
+    local_prediction_normal_label: DatasetLabel
 
 
 class SplitInterval(FrozenModel):
-    train: tuple[float, float]
-    meta: tuple[float, float]
-    valid: tuple[float, float]
-    confirm: tuple[float, float]
-    test: tuple[float, float]
+    train: tuple[Fraction, Fraction]
+    meta: tuple[Fraction, Fraction]
+    valid: tuple[Fraction, Fraction]
+    confirm: tuple[Fraction, Fraction]
+    test: tuple[Fraction, Fraction]
 
 
 class SplitConfig(FrozenModel):
@@ -83,105 +129,105 @@ class SplitConfig(FrozenModel):
 
 
 class NumericClip(FrozenModel):
-    lower: float
-    upper: float
+    lower: Coefficient
+    upper: Coefficient
 
 
 class PreprocessingConfig(FrozenModel):
-    missing_indicator_train_rate_threshold: float
-    rare_category_train_frequency_threshold: float
-    feature_missing_or_nonfinite_drop_threshold: float
-    client_invalidity_dropped_feature_fraction_threshold: float
+    missing_indicator_train_rate_threshold: Threshold
+    rare_category_train_frequency_threshold: Threshold
+    feature_missing_or_nonfinite_drop_threshold: Threshold
+    client_invalidity_dropped_feature_fraction_threshold: Fraction
     numeric_clip: NumericClip
-    zero_iqr_replacement_scale: float
+    zero_iqr_replacement_scale: ScaleFactor
 
 
 class AdamWConfig(FrozenModel):
-    beta1: float
-    beta2: float
-    epsilon: float
+    beta1: ConfidenceLevel
+    beta2: ConfidenceLevel
+    epsilon: Tolerance
 
 
 class EarlyStoppingConfig(FrozenModel):
-    patience_completed_epochs: int
-    minimum_improvement: float
+    patience_completed_epochs: PatienceCount
+    minimum_improvement: Tolerance
 
 
 class CheckpointConfig(FrozenModel):
-    tie_tolerance: float
+    tie_tolerance: Tolerance
 
 
 class TrainingConfig(FrozenModel):
     adamw: AdamWConfig
-    maximum_epochs: int
-    batch_size: int
-    gradient_clip_global_l2_norm: float
+    maximum_epochs: EpochCount
+    batch_size: BatchSize
+    gradient_clip_global_l2_norm: ScaleFactor
     early_stopping: EarlyStoppingConfig
     checkpoint: CheckpointConfig
-    label_smoothing: float
-    dataloader_workers: int
+    label_smoothing: Fraction
+    dataloader_workers: WorkerCount
 
 
 class BaseModelPilotConfig(FrozenModel):
-    learning_rates: tuple[float, ...]
-    weight_decays: tuple[float, ...]
-    dropouts: tuple[float, ...]
+    learning_rates: tuple[LearningRate, ...]
+    weight_decays: tuple[WeightDecay, ...]
+    dropouts: tuple[Fraction, ...]
 
 
 class SourceResponsePilotConfig(FrozenModel):
-    intervention_magnitudes: tuple[float, ...]
-    optimizer_step_horizons: tuple[int, ...]
-    paired_schedules_per_candidate: int
-    relative_derivative_discrepancy_ceiling: float
-    sign_agreement_minimum: float
-    useful_response_magnitude_threshold: float
-    minimum_useful_intervention_columns: int
-    curvature_penalty_coefficient: float
-    numerical_floor: float
+    intervention_magnitudes: tuple[InterventionMagnitude, ...]
+    optimizer_step_horizons: tuple[StepCount, ...]
+    paired_schedules_per_candidate: ReplicateCount
+    relative_derivative_discrepancy_ceiling: Fraction
+    sign_agreement_minimum: Fraction
+    useful_response_magnitude_threshold: Threshold
+    minimum_useful_intervention_columns: ConceptCount
+    curvature_penalty_coefficient: Coefficient
+    numerical_floor: Floor
 
 
 class SourceResponseFinalConfig(FrozenModel):
-    paired_replicates_per_intervention: int
-    simultaneous_confidence_level: float
-    max_t_bootstrap_resamples: int
-    response_risk_denominator_floor: float
-    response_standard_error_floor: float
-    useful_response_magnitude_threshold: float
-    minimum_useful_intervention_columns: int
-    median_band_width_to_median_absolute_mean_response_maximum: float
+    paired_replicates_per_intervention: ReplicateCount
+    simultaneous_confidence_level: ConfidenceLevel
+    max_t_bootstrap_resamples: ResampleCount
+    response_risk_denominator_floor: Floor
+    response_standard_error_floor: Floor
+    useful_response_magnitude_threshold: Threshold
+    minimum_useful_intervention_columns: ConceptCount
+    median_band_width_to_median_absolute_mean_response_maximum: ScaleFactor
 
 
 class TargetResponseDiagnosticConfig(FrozenModel):
-    intervention_magnitude: float
-    shadow_optimizer_steps: int
-    paired_replicates: int
-    simultaneous_bootstrap_resamples: int
-    confidence_level: float
+    intervention_magnitude: InterventionMagnitude
+    shadow_optimizer_steps: StepCount
+    paired_replicates: ReplicateCount
+    simultaneous_bootstrap_resamples: ResampleCount
+    confidence_level: ConfidenceLevel
 
 
 class ConfirmationConfig(FrozenModel):
-    optimizer_steps_per_shadow: int
-    paired_replicates: int
-    hierarchical_bootstrap_resamples: int
-    one_sided_confidence_level: float
-    lower_bound_acceptance_threshold_relative_macro_ce: float
-    accepted_live_assimilation_steps: int
+    optimizer_steps_per_shadow: StepCount
+    paired_replicates: ReplicateCount
+    hierarchical_bootstrap_resamples: ResampleCount
+    one_sided_confidence_level: ConfidenceLevel
+    lower_bound_acceptance_threshold_relative_macro_ce: RelativeGain
+    accepted_live_assimilation_steps: StepCount
 
 
 class ReservedBudgetConfig(FrozenModel):
-    target_response_diagnostic: int
-    confirmation_candidates: int
-    live_assimilation: int
-    nontransferable_safety_reserve: int
+    target_response_diagnostic: StepCount
+    confirmation_candidates: StepCount
+    live_assimilation: StepCount
+    nontransferable_safety_reserve: StepCount
 
 
 class TargetOptimizerBudgetConfig(FrozenModel):
-    maximum_steps_per_method_pair_seed_before_test: int
+    maximum_steps_per_method_pair_seed_before_test: StepCount
     reserved: ReservedBudgetConfig
 
 
 class PointCorrespondenceBaselineConfig(FrozenModel):
-    qap_tie_tolerance: float
+    qap_tie_tolerance: Tolerance
 
 
 class BaselinesConfig(FrozenModel):
@@ -189,63 +235,63 @@ class BaselinesConfig(FrozenModel):
 
 
 class TargetImportanceConfig(FrozenModel):
-    class_risk_floor: float
+    class_risk_floor: Floor
 
 
 class RandomnessConfig(FrozenModel):
-    pilot_seeds: tuple[int, ...]
-    confirmatory_seeds: tuple[int, ...]
-    statistical_seed: int
+    pilot_seeds: tuple[RandomSeed, ...]
+    confirmatory_seeds: tuple[RandomSeed, ...]
+    statistical_seed: RandomSeed
 
 
 class StatisticsConfig(FrozenModel):
-    confidence_level: float
-    exact_sign_flip_max_nonzero_differences_for_enumeration: int
-    exact_sign_flip_comparison_tolerance: float
-    ci_bootstrap_repetitions: int
-    identical_difference_tolerance: float
-    minimum_valid_paired_seeds: int
-    tost_alpha_per_one_sided_test: float
-    spearman_minimum_valid_points: int
-    mcnemar_exact_to_asymptotic_discordant_pair_switch: int
+    confidence_level: ConfidenceLevel
+    exact_sign_flip_max_nonzero_differences_for_enumeration: StepCount
+    exact_sign_flip_comparison_tolerance: Tolerance
+    ci_bootstrap_repetitions: ResampleCount
+    identical_difference_tolerance: Tolerance
+    minimum_valid_paired_seeds: SampleCount
+    tost_alpha_per_one_sided_test: SignificanceLevel
+    spearman_minimum_valid_points: SampleCount
+    mcnemar_exact_to_asymptotic_discordant_pair_switch: StepCount
 
 
 class StrictCrossTelemetryUtilityCriteria(FrozenModel):
-    successful_primary_pairs_required: int
-    holm_adjusted_p_maximum: float
-    bca_lower_bound_strictly_greater_than: float
+    successful_primary_pairs_required: SampleCount
+    holm_adjusted_p_maximum: SignificanceLevel
+    bca_lower_bound_strictly_greater_than: Fraction
 
 
 class ExternalSourceValueVsLocalSirCriteria(FrozenModel):
-    successful_primary_pairs_required: int
-    holm_adjusted_p_maximum: float
-    bca_lower_bound_strictly_greater_than: float
+    successful_primary_pairs_required: SampleCount
+    holm_adjusted_p_maximum: SignificanceLevel
+    bca_lower_bound_strictly_greater_than: Fraction
 
 
 class CouplingMechanismCriteria(FrozenModel):
-    theorem_zero_strict_classification_accuracy_required: float
-    real_packet_fraction_with_material_gap_minimum: float
-    primary_pairs_with_material_mean_gap_required: int
-    holm_adjusted_p_maximum: float
-    destruction_positive_gain_retention_minimum: float
+    theorem_zero_strict_classification_accuracy_required: Fraction
+    real_packet_fraction_with_material_gap_minimum: Fraction
+    primary_pairs_with_material_mean_gap_required: SampleCount
+    holm_adjusted_p_maximum: SignificanceLevel
+    destruction_positive_gain_retention_minimum: Fraction
 
 
 class SparseOperationalRelevanceCriteria(FrozenModel):
-    compared_sparse_support: int
-    dense_minus_sparse_gain_maximum: float
-    valid_unit_fraction_required: float
-    primary_pairs_with_useful_gain_required: int
+    compared_sparse_support: SupportCount
+    dense_minus_sparse_gain_maximum: RelativeGain
+    valid_unit_fraction_required: Fraction
+    primary_pairs_with_useful_gain_required: SampleCount
 
 
 class ConfirmationSafetyCriteria(FrozenModel):
-    qualifying_primary_pairs_required: int
-    absolute_risk_reduction_minimum: float
-    relative_risk_reduction_minimum: float
-    qualifying_pair_coverage_loss_maximum: float
-    pair_harmful_rate_worsening_maximum: float
-    pair_coverage_loss_maximum: float
-    equal_pair_absolute_risk_reduction_minimum: float
-    equal_pair_relative_risk_reduction_minimum: float
+    qualifying_primary_pairs_required: SampleCount
+    absolute_risk_reduction_minimum: Fraction
+    relative_risk_reduction_minimum: Fraction
+    qualifying_pair_coverage_loss_maximum: Fraction
+    pair_harmful_rate_worsening_maximum: Fraction
+    pair_coverage_loss_maximum: Fraction
+    equal_pair_absolute_risk_reduction_minimum: Fraction
+    equal_pair_relative_risk_reduction_minimum: Fraction
 
 
 class EvaluationCriteriaConfig(FrozenModel):
@@ -257,46 +303,46 @@ class EvaluationCriteriaConfig(FrozenModel):
 
 
 class MetricsConfig(FrozenModel):
-    probability_log_floor: float
-    relative_macro_ce_denominator_floor: float
-    relative_solver_error_denominator_floor: float
+    probability_log_floor: Floor
+    relative_macro_ce_denominator_floor: Floor
+    relative_solver_error_denominator_floor: Floor
 
 
 class MultiSourceSelectionConfig(FrozenModel):
-    communication_cost_coefficient_in_principal_ranking: float
-    confirmation_cost_coefficient_in_principal_ranking: float
+    communication_cost_coefficient_in_principal_ranking: Coefficient
+    confirmation_cost_coefficient_in_principal_ranking: Coefficient
 
 
 class RectangularizationIsSufficientRule(FrozenModel):
-    valid_real_packet_fraction_below_coupling_materiality_minimum: float
+    valid_real_packet_fraction_below_coupling_materiality_minimum: Fraction
 
 
 class GenericQapDominatesRule(FrozenModel):
-    intended_sparse_support_maximum: int
-    median_runtime_ratio_to_exact_sparse_maximum: float
-    p95_runtime_ratio_to_exact_sparse_maximum: float
-    peak_memory_ratio_to_exact_sparse_maximum: float
+    intended_sparse_support_maximum: SupportCount
+    median_runtime_ratio_to_exact_sparse_maximum: RelativeGain
+    p95_runtime_ratio_to_exact_sparse_maximum: RelativeGain
+    peak_memory_ratio_to_exact_sparse_maximum: RelativeGain
 
 
 class SparseSupportIsOperationallyIrrelevantRule(FrozenModel):
-    dense_gain_advantage_over_support_3_minimum: float
-    valid_primary_unit_fraction_minimum: float
-    sparse_supports_that_must_fail_useful_materiality: tuple[int, ...]
+    dense_gain_advantage_over_support_3_minimum: RelativeGain
+    valid_primary_unit_fraction_minimum: Fraction
+    sparse_supports_that_must_fail_useful_materiality: tuple[SupportCount, ...]
 
 
 class PointMatchingIsSufficientRule(FrozenModel):
-    harmful_rate_worsening_maximum: float
-    utility_advantage_over_fedorbit_minimum: float
+    harmful_rate_worsening_maximum: Fraction
+    utility_advantage_over_fedorbit_minimum: RelativeGain
 
 
 class StrictInterfaceRemovesGainRule(FrozenModel):
-    primary_pair_majority_required: int
-    point_gain_maximum: float
-    bca_upper_bound_maximum: float
+    primary_pair_majority_required: SampleCount
+    point_gain_maximum: AbsoluteMetric
+    bca_upper_bound_maximum: RelativeGain
 
 
 class SourceResponseIsTooUnstableRule(FrozenModel):
-    principal_source_packet_failure_fraction_strictly_greater_than: float
+    principal_source_packet_failure_fraction_strictly_greater_than: Fraction
 
 
 class SimplificationRulesConfig(FrozenModel):
@@ -333,38 +379,38 @@ class ScientificConfig(FrozenModel):
 
 
 class ExactSparseSolverConfig(FrozenModel):
-    lp_primal_feasibility_tolerance: float
-    lp_dual_feasibility_tolerance: float
-    lp_optimality_tolerance: float
-    separator_cut_stopping_tolerance: float
-    exact_validation_absolute_tolerance: float
-    permutation_certificate_residual_tolerance: float
-    action_tie_tolerance: float
-    action_tie_comparison_rounding_precision: float
-    lap_objective_tie_tolerance: float
-    maximum_cuts_per_support: int
-    lp_threads_per_solve: int
-    maximum_concurrent_supports: int
-    deterministic_random_seed: int
+    lp_primal_feasibility_tolerance: Tolerance
+    lp_dual_feasibility_tolerance: Tolerance
+    lp_optimality_tolerance: Tolerance
+    separator_cut_stopping_tolerance: Tolerance
+    exact_validation_absolute_tolerance: Tolerance
+    permutation_certificate_residual_tolerance: Tolerance
+    action_tie_tolerance: Tolerance
+    action_tie_comparison_rounding_precision: Tolerance
+    lap_objective_tie_tolerance: Tolerance
+    maximum_cuts_per_support: CutCount
+    lp_threads_per_solve: ThreadCount
+    maximum_concurrent_supports: ConcurrencyCount
+    deterministic_random_seed: RandomSeed
 
 
 class GenericExactQapSolverConfig(FrozenModel):
-    relative_mip_gap: float
-    feasibility_tolerance: float
-    wall_time_seconds_per_solve: int
-    threads: int
-    random_seed: int
+    relative_mip_gap: Tolerance
+    feasibility_tolerance: Tolerance
+    wall_time_seconds_per_solve: TimeBudgetSeconds
+    threads: ThreadCount
+    random_seed: RandomSeed
 
 
 class DenseCcpSolverConfig(FrozenModel):
-    penalty_multipliers_relative_to_scale: tuple[float, ...]
-    maximum_iterations_per_penalty_level: int
-    assignment_integrality_residual: float
-    relative_objective_convergence_tolerance: float
-    deterministic_starts: int
-    outer_action_cuts: int
-    wall_time_seconds: int
-    lp_threads: int
+    penalty_multipliers_relative_to_scale: tuple[Coefficient, ...]
+    maximum_iterations_per_penalty_level: StepCount
+    assignment_integrality_residual: Tolerance
+    relative_objective_convergence_tolerance: Tolerance
+    deterministic_starts: StepCount
+    outer_action_cuts: CutCount
+    wall_time_seconds: TimeBudgetSeconds
+    lp_threads: ThreadCount
 
 
 class SolversConfig(FrozenModel):
@@ -374,55 +420,55 @@ class SolversConfig(FrozenModel):
 
 
 class TargetImportanceGamma(FrozenModel):
-    shape: float
-    scale: float
+    shape: Coefficient
+    scale: ScaleFactor
 
 
 class ExactSeparatorTheoremGeneratorConfig(FrozenModel):
-    response_uniform: tuple[float, float]
-    serialization_upper_band_increment_uniform: tuple[float, float]
+    response_uniform: tuple[Coefficient, Coefficient]
+    serialization_upper_band_increment_uniform: tuple[Coefficient, Coefficient]
     target_importance_gamma: TargetImportanceGamma
-    active_action_uniform: tuple[float, float]
-    block_patterns: tuple[tuple[int, ...], ...]
-    supports: tuple[int, ...]
-    generated_instances_per_block_pattern_support_seed_cell: int
+    active_action_uniform: tuple[Coefficient, Coefficient]
+    block_patterns: tuple[tuple[ConceptCount, ...], ...]
+    supports: tuple[SupportCount, ...]
+    generated_instances_per_block_pattern_support_seed_cell: ReplicateCount
 
 
 class CouplingStructureGeneratorConfig(FrozenModel):
-    unconstrained_response_uniform: tuple[float, float]
-    compatibility: tuple[str, ...]
-    response_heterogeneity: tuple[float, ...]
-    directed_asymmetry: tuple[float, ...]
-    response_sparsity: tuple[float, ...]
-    block_patterns: tuple[tuple[int, ...], ...]
-    supports: tuple[int, ...]
-    incompatible_fixed_action_gap_strictly_greater_than: float
-    maximum_attempts_per_instance: int
+    unconstrained_response_uniform: tuple[Coefficient, Coefficient]
+    compatibility: tuple[CouplingCompatibility, ...]
+    response_heterogeneity: tuple[Coefficient, ...]
+    directed_asymmetry: tuple[Coefficient, ...]
+    response_sparsity: tuple[Coefficient, ...]
+    block_patterns: tuple[tuple[ConceptCount, ...], ...]
+    supports: tuple[SupportCount, ...]
+    incompatible_fixed_action_gap_strictly_greater_than: Threshold
+    maximum_attempts_per_instance: AttemptCount
 
 
 class CommonActionUnresolvedMapGeneratorConfig(FrozenModel):
-    block_pattern: tuple[int, ...]
-    block_pair_response_uniform: tuple[float, float]
-    maximum_attempts: int
+    block_pattern: tuple[ConceptCount, ...]
+    block_pair_response_uniform: tuple[Coefficient, Coefficient]
+    maximum_attempts: AttemptCount
 
 
 class RobustCompromiseUnresolvedMapGeneratorConfig(FrozenModel):
-    block_pattern: tuple[int, ...]
-    response_uniform: tuple[float, float]
-    robust_pre_map_value_strictly_greater_than: float
-    maximum_attempts_per_fixture: int
+    block_pattern: tuple[ConceptCount, ...]
+    response_uniform: tuple[Coefficient, Coefficient]
+    robust_pre_map_value_strictly_greater_than: Threshold
+    maximum_attempts_per_fixture: AttemptCount
 
 
 class MapDependentGeneratorConfig(FrozenModel):
-    block_pattern: tuple[int, ...]
-    response_uniform: tuple[float, float]
-    map_value_minimum: float
-    maximum_attempts: int
+    block_pattern: tuple[ConceptCount, ...]
+    response_uniform: tuple[Coefficient, Coefficient]
+    map_value_minimum: Threshold
+    maximum_attempts: AttemptCount
 
 
 class ScalabilityGeneratorConfig(FrozenModel):
-    response_uniform: tuple[float, float]
-    block_patterns: tuple[str, ...]
+    response_uniform: tuple[Coefficient, Coefficient]
+    block_patterns: tuple[ScalabilityBlockPattern, ...]
 
 
 class GeneratorsConfig(FrozenModel):
@@ -435,47 +481,47 @@ class GeneratorsConfig(FrozenModel):
 
 
 class MathematicalPrimitiveValidationConfig(FrozenModel):
-    hand_fixture_seed: int
-    fixture_error_tolerance: float
-    invalid_permutations_allowed: int
+    hand_fixture_seed: RandomSeed
+    fixture_error_tolerance: Tolerance
+    invalid_permutations_allowed: InvalidPermutationCount
 
 
 class SyntheticKRange(FrozenModel):
-    minimum: int
-    maximum: int
+    minimum: ConceptCount
+    maximum: ConceptCount
 
 
 class ExactSparseSolverBenchmarkConfig(FrozenModel):
     synthetic_k: SyntheticKRange
-    block_patterns: tuple[str, ...]
-    supports: tuple[int, ...]
-    exhaustive_truth_correspondence_count_maximum: int
-    methods: tuple[str, ...]
+    block_patterns: tuple[ScalabilityBlockPattern, ...]
+    supports: tuple[SupportCount, ...]
+    exhaustive_truth_correspondence_count_maximum: StepCount
+    methods: tuple[MethodName, ...]
 
 
 class SyntheticCouplingMechanismValidationConfig(FrozenModel):
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class CommonActionUnderUnidentifiedMapConfig(FrozenModel):
-    fixtures_per_seed: int
+    fixtures_per_seed: ReplicateCount
 
 
 class RobustCompromiseUnderUnidentifiedMapConfig(FrozenModel):
-    fixtures_per_seed: int
+    fixtures_per_seed: ReplicateCount
 
 
 class MapDependentActionBoundaryConfig(FrozenModel):
-    fixtures_per_seed: int
+    fixtures_per_seed: ReplicateCount
 
 
 class ExactMapValueBoundValidationConfig(FrozenModel):
-    zero_map_value_fixtures_per_seed: int
-    high_map_value_fixtures_per_seed: int
+    zero_map_value_fixtures_per_seed: ReplicateCount
+    high_map_value_fixtures_per_seed: ReplicateCount
 
 
 class PrimaryStrictCrossTelemetryTransferConfig(FrozenModel):
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class MultiSourceSelectionValidationConfig(FrozenModel):
@@ -483,41 +529,41 @@ class MultiSourceSelectionValidationConfig(FrozenModel):
 
 
 class MechanismAblationsConfig(FrozenModel):
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class TargetConfirmationAndPortabilityConfig(FrozenModel):
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class SecondaryCrossModalityGeneralizationConfig(FrozenModel):
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class SemanticSufficiencyFrontierConfig(FrozenModel):
     partitions: tuple[str | tuple[str, ...], ...]
-    methods: tuple[str, ...]
+    methods: tuple[MethodName, ...]
 
 
 class WeakSignalSupportAndHeterogeneityBoundariesConfig(FrozenModel):
-    response_scales: tuple[float, ...]
-    ci_half_width_multipliers: tuple[float, ...]
-    target_usable_support_fractions: tuple[float, ...]
-    response_heterogeneity_multipliers: tuple[float, ...]
-    support_budgets: tuple[int, ...]
-    methods: tuple[str, ...]
+    response_scales: tuple[ScaleFactor, ...]
+    ci_half_width_multipliers: tuple[ScaleFactor, ...]
+    target_usable_support_fractions: tuple[Fraction, ...]
+    response_heterogeneity_multipliers: tuple[ScaleFactor, ...]
+    support_budgets: tuple[SupportCount, ...]
+    methods: tuple[MethodName, ...]
 
 
 class MapAvailabilityApplicabilityAuditConfig(FrozenModel):
-    packet_only_recovery_methods: tuple[str, ...]
-    independent_researchers: int
-    minutes_per_researcher_per_pair: int
+    packet_only_recovery_methods: tuple[MethodName, ...]
+    independent_researchers: ResearcherCount
+    minutes_per_researcher_per_pair: DurationMinutes
 
 
 class ScalabilityAndEfficiencyConfig(FrozenModel):
-    k_values: tuple[int, ...]
-    block_patterns: tuple[str, ...]
-    exact_qap_supports: tuple[int, ...]
+    k_values: tuple[ConceptCount, ...]
+    block_patterns: tuple[ScalabilityBlockPattern, ...]
+    exact_qap_supports: tuple[SupportCount, ...]
 
 
 class ExperimentsConfig(FrozenModel):
@@ -542,7 +588,7 @@ class ExperimentsConfig(FrozenModel):
 
 
 class FailureHandlingConfig(FrozenModel):
-    retries_after_initial_infrastructure_failure: int
+    retries_after_initial_infrastructure_failure: RetryCount
 
 
 class ExperimentSubdirectories(FrozenModel):
@@ -585,11 +631,11 @@ class ArtifactLayoutConfig(FrozenModel):
 class RuntimeConfig(FrozenModel):
     failure_handling: FailureHandlingConfig
     reference_model_gpu: str
-    solver_cpu_worker_ceiling: int
-    host_ram_ceiling_gib_for_registered_efficiency_runs: int
-    deterministic_kernel_warmups: int
-    deterministic_kernel_timed_repetitions: int
-    full_training_timing_repetitions_per_scientific_cell: int
+    solver_cpu_worker_ceiling: ConcurrencyCount
+    host_ram_ceiling_gib_for_registered_efficiency_runs: GiBMemory
+    deterministic_kernel_warmups: RepetitionCount
+    deterministic_kernel_timed_repetitions: RepetitionCount
+    full_training_timing_repetitions_per_scientific_cell: RepetitionCount
     artifact_layout: ArtifactLayoutConfig
 
 
@@ -611,13 +657,13 @@ class EnvironmentConfig(FrozenModel):
 
 
 class ReportingPrecisionConfig(FrozenModel):
-    scientific_metric_decimals: int
-    macro_f1_decimals: int
-    balanced_accuracy_decimals: int
-    p_value_decimals: int
-    p_value_less_than_threshold: float
-    runtime_seconds_decimals: int
-    memory_decimals: int
+    scientific_metric_decimals: DecimalPrecision
+    macro_f1_decimals: DecimalPrecision
+    balanced_accuracy_decimals: DecimalPrecision
+    p_value_decimals: DecimalPrecision
+    p_value_less_than_threshold: SignificanceLevel
+    runtime_seconds_decimals: DecimalPrecision
+    memory_decimals: DecimalPrecision
 
 
 class ReportingConfig(FrozenModel):

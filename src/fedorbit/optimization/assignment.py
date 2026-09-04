@@ -6,6 +6,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import linear_sum_assignment
 
+from fedorbit.types import Score, Tolerance
+
 
 class AssignmentError(ValueError):
     pass
@@ -14,7 +16,7 @@ class AssignmentError(ValueError):
 @dataclass(frozen=True, slots=True)
 class BlockwiseAssignmentResult:
     column_for_row: tuple[int, ...]
-    objective_value: float
+    objective_value: Score
 
 
 def _completion_cost(
@@ -35,7 +37,7 @@ def _completion_cost(
 
 def solve_minimum_cost_assignment(
     costs: NDArray[np.float64],
-    tie_tolerance: float,
+    tie_tolerance: Tolerance,
 ) -> BlockwiseAssignmentResult:
     if costs.ndim != 2 or costs.shape[0] != costs.shape[1]:
         raise AssignmentError(f"assignment requires a square cost matrix, got shape {costs.shape}")

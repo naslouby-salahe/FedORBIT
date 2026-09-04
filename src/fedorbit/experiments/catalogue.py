@@ -10,7 +10,13 @@ from fedorbit.experiments.cells import (
     RegisteredCondition,
     RegisteredConditions,
 )
-from fedorbit.types import ExperimentClassification, ExperimentName, TransferMethod
+from fedorbit.types import (
+    ClientRole,
+    ExperimentClassification,
+    ExperimentName,
+    Index,
+    TransferMethod,
+)
 
 _PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs"
 _SECONDARY_PAIRS_LABEL = "optional external directed pairs"
@@ -28,7 +34,7 @@ class ExperimentDefinition:
     datasets_or_pairs: tuple[str, ...]
     conditions: RegisteredConditions
     seeds: tuple[int, ...]
-    derived_planned_cells: int
+    derived_planned_cells: Index
     prerequisites: tuple[str, ...]
 
 
@@ -142,8 +148,7 @@ def build_catalogue() -> ExperimentCatalogue:
     )
 
     primary_client_count = sum(
-        client.role.value == "primary"
-        for client in config.scientific.datasets.clients.values()
+        client.role == ClientRole.PRIMARY for client in config.scientific.datasets.clients.values()
     )
     catalogue[ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION] = definition(
         ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION,
@@ -156,13 +161,14 @@ def build_catalogue() -> ExperimentCatalogue:
         ("raw manifests",),
     )
 
+    registered_client_count = len(config.scientific.datasets.clients)
     pilot_configs = (
         len(config.scientific.base_model_pilot.learning_rates)
         * len(config.scientific.base_model_pilot.weight_decays)
         * len(config.scientific.base_model_pilot.dropouts)
     )
-    pilot_fits = primary_client_count * pilot_configs * len(pilot_seeds)
-    confirmatory_checkpoints = primary_client_count * len(confirmatory_seeds)
+    pilot_fits = registered_client_count * pilot_configs * len(pilot_seeds)
+    confirmatory_checkpoints = registered_client_count * len(confirmatory_seeds)
     catalogue[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT] = definition(
         ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
         ExperimentClassification.EXPLORATORY,
@@ -184,14 +190,14 @@ def build_catalogue() -> ExperimentCatalogue:
         (),
         (),
         pilot_seeds,
-        primary_client_count * len(pilot_seeds) * response_candidates,
+        registered_client_count * len(pilot_seeds) * response_candidates,
         (
             _experiment_name(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT),
             _experiment_name(ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION),
         ),
     )
 
-    planned_packets = primary_client_count * len(confirmatory_seeds)
+    planned_packets = registered_client_count * len(confirmatory_seeds)
     catalogue[ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION] = definition(
         ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION,
         ExperimentClassification.VALIDATION,

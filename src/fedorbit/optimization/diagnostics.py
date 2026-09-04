@@ -21,6 +21,7 @@ from fedorbit.optimization.objective import (
     robust_post_map_value,
     robust_pre_map_value,
 )
+from fedorbit.types import Index, Score, Tolerance
 
 
 def fixed_action_rectangularization_gap(
@@ -84,7 +85,7 @@ def analytic_orbit_mean(
 
 @dataclass(frozen=True, slots=True)
 class OrbitRadius:
-    radius: float
+    radius: Score
 
 
 def orbit_radius_2_norm(
@@ -102,15 +103,15 @@ def orbit_radius_2_norm(
 
 @dataclass(frozen=True, slots=True)
 class MapValueDiagnostics:
-    pre_map_value: float
-    post_map_value: float
-    exact_map_action_value: float
-    action_radius: float
-    importance_norm: float
-    orbit_radius_bound: float
-    bound: float
+    pre_map_value: Score
+    post_map_value: Score
+    exact_map_action_value: Score
+    action_radius: Score
+    importance_norm: Score
+    orbit_radius_bound: Score
+    bound: Score
 
-    def violates_bound(self, tolerance: float) -> bool:
+    def violates_bound(self, tolerance: Tolerance) -> bool:
         return self.exact_map_action_value > self.bound + tolerance
 
 
@@ -118,7 +119,7 @@ def map_value_diagnostics(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
-    tolerance: float,
+    tolerance: Tolerance,
 ) -> MapValueDiagnostics:
     pre_map = robust_pre_map_value(action_candidates, orbit)
     post_map = robust_post_map_value(action_candidates, orbit)
@@ -148,7 +149,7 @@ def map_value_diagnostics(
 
 @dataclass(frozen=True, slots=True)
 class CouplingUpperBoundDiagnostic:
-    value: float
+    value: Score
 
 
 def coupling_upper_bound_diagnostic(
@@ -172,5 +173,5 @@ def coupling_upper_bound_diagnostic(
     return CouplingUpperBoundDiagnostic(value=best)
 
 
-def orbit_is_nontrivial(orbit_size: int) -> bool:
+def orbit_is_nontrivial(orbit_size: Index) -> bool:
     return orbit_size > 1

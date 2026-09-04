@@ -6,7 +6,20 @@ from collections import OrderedDict
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
-from fedorbit.types import MetricId
+from fedorbit.types import (
+    ByteCount,
+    ElapsedSeconds,
+    Estimate,
+    Fraction,
+    Index,
+    MemoryMib,
+    MetricId,
+    RelativeGain,
+    SampleCount,
+    Score,
+    StepCount,
+    Threshold,
+)
 
 
 class MetricComputationError(ValueError):
@@ -15,7 +28,7 @@ class MetricComputationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class Probability:
-    value: float
+    value: Fraction
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.value <= 1.0:
@@ -35,7 +48,7 @@ class TrueClassProbabilities:
 
 @dataclass(frozen=True, slots=True)
 class CrossEntropy:
-    value: float
+    value: Estimate
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +64,7 @@ class ClassEntropySet:
 
 @dataclass(frozen=True, slots=True)
 class ClassF1:
-    value: float
+    value: Fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +78,7 @@ class ClassF1Set:
 
 @dataclass(frozen=True, slots=True)
 class ClassRecall:
-    value: float
+    value: Fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,8 +92,8 @@ class ClassRecallSet:
 
 @dataclass(frozen=True, slots=True)
 class RelativeMacroCeGain:
-    value: float | None
-    absolute_difference: float
+    value: RelativeGain | None
+    absolute_difference: RelativeGain
     is_na: bool
 
 
@@ -99,8 +112,8 @@ def macro_cross_entropy(class_entropies: ClassEntropySet) -> CrossEntropy:
 
 
 def relative_macro_ce_gain(
-    reference_macro_ce: float,
-    method_macro_ce: float,
+    reference_macro_ce: Score,
+    method_macro_ce: Score,
 ) -> RelativeMacroCeGain:
     floor = active_config().scientific.metrics.relative_macro_ce_denominator_floor
     absolute_difference = reference_macro_ce - method_macro_ce
@@ -150,9 +163,9 @@ def balanced_accuracy(per_class_recall: ClassRecallSet) -> ClassRecall:
 
 @dataclass(frozen=True, slots=True)
 class ConfusionCounts:
-    true_positives: int
-    false_positives: int
-    false_negatives: int
+    true_positives: SampleCount
+    false_positives: SampleCount
+    false_negatives: SampleCount
 
 
 def confusion_counts(
@@ -180,7 +193,7 @@ def confusion_counts(
     return ConfusionCounts(true_positives, false_positives, false_negatives)
 
 
-def certified_robust_predicted_value(certified_objective: float) -> float:
+def certified_robust_predicted_value(certified_objective: Score) -> Score:
     return certified_objective
 
 
@@ -200,13 +213,13 @@ def exact_map_action_value_metric(delta_map: float) -> float:
     return delta_map
 
 
-def absolute_objective_error(objective_value: float, truth_value: float) -> float:
+def absolute_objective_error(objective_value: Score, truth_value: Score) -> Score:
     return abs(objective_value - truth_value)
 
 
 def relative_objective_error(
-    objective_value: float,
-    truth_value: float,
+    objective_value: Score,
+    truth_value: Score,
 ) -> float:
     floor = active_config().scientific.metrics.relative_solver_error_denominator_floor
     return abs(objective_value - truth_value) / max(abs(truth_value), floor)
@@ -214,10 +227,10 @@ def relative_objective_error(
 
 @dataclass(frozen=True, slots=True)
 class ProposalOutcomeTally:
-    proposed: int
-    accepted: int
-    harmful_accepted: int
-    useful_accepted: int
+    proposed: SampleCount
+    accepted: SampleCount
+    harmful_accepted: SampleCount
+    useful_accepted: SampleCount
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -234,9 +247,9 @@ class ProposalOutcomeTally:
 
 @dataclass(frozen=True, slots=True)
 class ProposalRates:
-    acceptance_rate: float | None
-    harmful_accepted_rate: float | None
-    useful_accepted_rate: float | None
+    acceptance_rate: Fraction | None
+    harmful_accepted_rate: Fraction | None
+    useful_accepted_rate: Fraction | None
 
     @property
     def all_na(self) -> bool:
@@ -277,11 +290,13 @@ def coverage_loss(
     return coverage_no_confirm - coverage_confirm
 
 
-def harm_indicator(test_gain: float, harmful_threshold: float) -> bool:
+def harm_indicator(test_gain: RelativeGain, harmful_threshold: Threshold) -> bool:
     return test_gain <= harmful_threshold
 
 
-def seed_harm_rate(decision_gains: tuple[float, ...], harmful_threshold: float) -> float | None:
+def seed_harm_rate(
+    decision_gains: tuple[RelativeGain, ...], harmful_threshold: Threshold
+) -> float | None:
     if not decision_gains:
         return None
     indicators = [harm_indicator(gain, harmful_threshold) for gain in decision_gains]
@@ -306,8 +321,8 @@ def relative_risk_reduction(
 
 
 def beneficial_rejected_rate(
-    rejected_with_counterfactual_gain: int,
-    proposed: int,
+    rejected_with_counterfactual_gain: Index,
+    proposed: SampleCount,
 ) -> float | None:
     if proposed == 0:
         return None
@@ -356,13 +371,13 @@ class EfficiencyError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class EfficiencyRecord:
-    wall_time_seconds: float
-    peak_host_rss_mib: float
-    peak_cuda_allocated_bytes: int
-    packet_serialized_byte_count: int
-    source_response_optimizer_steps: int
-    target_confirmation_optimizer_steps: int
-    live_assimilation_optimizer_steps: int
+    wall_time_seconds: ElapsedSeconds
+    peak_host_rss_mib: MemoryMib
+    peak_cuda_allocated_bytes: ByteCount
+    packet_serialized_byte_count: ByteCount
+    source_response_optimizer_steps: StepCount
+    target_confirmation_optimizer_steps: StepCount
+    live_assimilation_optimizer_steps: StepCount
     timeout_indicator: bool
     resource_limit_indicator: bool
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from collections import OrderedDict
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ from fedorbit.methods.confirmation import (
     hierarchical_bootstrap_lower_bound,
 )
 from fedorbit.methods.target import CurriculumMultipliers
+from fedorbit.response.estimation import shadow_batch_schedule
 from fedorbit.types import RngNamespace, StableJsonPayload
 
 
@@ -119,36 +121,30 @@ def _confirmation_batches_for_replicate(
     features: torch.Tensor,
     targets: torch.Tensor,
     batch_size: int,
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
     replicate_index: int,
     horizon: int,
 ) -> tuple[ShadowBatch, ...]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(seed),
+            seed,
             RngNamespace.CONFIRMATION_SCHEDULE,
             cast(
                 StableJsonPayload,
                 OrderedDict(coordinates=contrast_coordinates, replicate=replicate_index),
             ),
         )
-    ).value
+    )
     generator = torch.Generator().manual_seed(rng_seed)
     train_size = int(features.shape[0])
     if train_size <= 0:
         raise AssimilationError("confirmation TRAIN split is empty")
-    batches: list[ShadowBatch] = []
-    permutation = torch.randperm(train_size, generator=generator)
-    position = 0
-    while len(batches) < horizon:
-        if position >= train_size:
-            permutation = torch.randperm(train_size, generator=generator)
-            position = 0
-        indices = permutation[position : position + batch_size]
-        batches.append(ShadowBatch(features[indices], targets[indices]))
-        position += int(indices.shape[0])
-    return tuple(batches)
+    schedule = shadow_batch_schedule(train_size, batch_size, generator)
+    return tuple(
+        ShadowBatch(features[indices], targets[indices])
+        for indices in itertools.islice(schedule, horizon)
+    )
 
 
 def _step_shadow(
@@ -229,7 +225,7 @@ class ConfirmationRequest:
     base_class_weights: ClassWeights
     curriculum_multipliers: CurriculumMultipliers
     selected_hyperparameters: SelectedHyperparameters
-    seed: int
+    seed: RandomSeed
     contrast_coordinates: str
 
 
@@ -326,17 +322,9 @@ def _assimilation_batches(
     train_size = int(features.shape[0])
     if train_size <= 0:
         raise AssimilationError("assimilation TRAIN split is empty")
-    produced = 0
-    permutation = torch.randperm(train_size, generator=generator)
-    position = 0
-    while produced < total_steps:
-        if position >= train_size:
-            permutation = torch.randperm(train_size, generator=generator)
-            position = 0
-        indices = permutation[position : position + batch_size]
+    schedule = shadow_batch_schedule(train_size, batch_size, generator)
+    for indices in itertools.islice(schedule, total_steps):
         yield ShadowBatch(features[indices], targets[indices])
-        position += int(indices.shape[0])
-        produced += 1
 
 
 def apply_accepted_assimilation(
@@ -347,7 +335,7 @@ def apply_accepted_assimilation(
     train_targets: torch.Tensor,
     base_class_weights: ClassWeights,
     curriculum_multipliers: CurriculumMultipliers,
-    seed: int,
+    seed: RandomSeed,
     assimilation_coordinates: AssimilationCoordinates,
     batch_size: int | None = None,
 ) -> int:
@@ -361,11 +349,11 @@ def apply_accepted_assimilation(
     )
     rng_seed = derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(seed),
+            seed,
             RngNamespace.ASSIMILATION_SCHEDULE,
             coordinates_payload,
         )
-    ).value
+    )
     generator = torch.Generator().manual_seed(rng_seed)
     pre_confirm.restore_into(model, optimizer)
     model.train()

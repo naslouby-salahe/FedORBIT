@@ -46,7 +46,6 @@ def test_normal_and_null_nodes_have_zero_importance() -> None:
 
 
 def test_vector_expansion_places_zero_coordinates() -> None:
-
     importance = build_target_importance(_risks())
     vector = importance.as_vector(6)
     assert vector.shape == (6,)

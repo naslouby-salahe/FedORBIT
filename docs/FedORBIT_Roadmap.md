@@ -3837,6 +3837,8 @@ Draw $w$ as configured.
 
 Use the principal sparse action set.
 
+For a fixed correspondence $P$, the map-conditioned optimal action is the certified winner returned by the Section 11 fixed-matrix optimizer (`optimize_against_fixed_matrix`) against $P^TLP$ under the principal sparse support, using the same deterministic tie-break rule as Section 8.2/4.16 (rounded at `solvers.exact_sparse.action_tie_comparison_rounding_precision`). The intersection of map-conditioned optimal-action sets is empty when this deterministic winner differs, after that rounding, across at least two correspondences in the orbit.
+
 Accept a fixture only when:
 
 1. $|\Pi|\gt 1$;

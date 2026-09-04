@@ -20,7 +20,7 @@ from fedorbit.optimization.objective import (
     rounded_action_vector,
     zero_action,
 )
-from fedorbit.types import RngNamespace, TransferMethod
+from fedorbit.types import Budget, RngNamespace, Score, StepCount, SupportCount, TransferMethod
 
 
 class CouplingDestructionError(ValueError):
@@ -41,17 +41,17 @@ class CommittedMapAction:
 
 def _block_pair_permutation(
     entry_count: int,
-    seed: int,
+    seed: RandomSeed,
     coordinates: str,
     block_pair_index: int,
 ) -> NDArray[np.intp]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(seed),
+            seed,
             RngNamespace.COUPLING_DESTRUCTION,
             OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index),
         )
-    ).value
+    )
     generator = np.random.default_rng(rng_seed)
     return generator.permutation(entry_count)
 
@@ -60,7 +60,7 @@ def coupling_destroyed_matrices(
     blocks: PaddedBlockStructure,
     lower_response_matrix: NDArray[np.float64],
     upper_response_matrix: NDArray[np.float64],
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> CouplingDestroyedMatrices:
     size = blocks.total_padded_nodes
@@ -116,11 +116,11 @@ class ComparatorResources:
     source_packet_id: str
     target_checkpoint_artifact_id: str
     target_importance_vector_sha256: str
-    action_budget_cap: float
-    support_cap: int
-    seed: int
+    action_budget_cap: Budget
+    support_cap: SupportCount
+    seed: RandomSeed
     confirmation_opportunity: bool
-    live_assimilation_step_allowance: int
+    live_assimilation_step_allowance: StepCount
     test_access_granted: bool
     extra_target_labels: bool
     additional_tuning_seeds: tuple[int, ...]
@@ -145,7 +145,7 @@ class ComparatorResources:
 
 
 def assert_identical_resources(
-    method_name: str,
+    method_name: TransferMethod,
     reference: ComparatorResources,
     candidate: ComparatorResources,
 ) -> None:
@@ -171,7 +171,7 @@ class FixedMatrixOptimizationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class FixedMatrixActionSolution:
     selected_action: CurriculumAction
-    objective_value: float
+    objective_value: Score
 
 
 def linear_objective_row(

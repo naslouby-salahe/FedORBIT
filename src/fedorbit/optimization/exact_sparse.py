@@ -14,7 +14,9 @@ from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.correspondence import (
     ActiveImageMap,
     BlockCorrespondence,
+    BlockNodeCounts,
     PaddedBlockStructure,
+    active_image_assignment_count,
     enumerate_active_image_maps,
 )
 from fedorbit.optimization.objective import (
@@ -27,6 +29,7 @@ from fedorbit.optimization.objective import (
     rounded_action_vector,
     zero_action,
 )
+from fedorbit.types import Index, SampleCount, Score, Tolerance
 
 
 class SparseMasterNonConvergenceError(RuntimeError):
@@ -39,34 +42,34 @@ class SolverExecutionError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SupportMasterLpResult:
-    robust_value: float
+    robust_value: Score
     action_coordinates: NDArray[np.float64]
 
 
 @dataclass(frozen=True, slots=True)
 class SeparatorOutcome:
     worst_correspondence: BlockCorrespondence
-    separator_objective: float
-    active_image_candidates: int
-    lap_calls: int
+    separator_objective: Score
+    active_image_candidates: SampleCount
+    lap_calls: Index
 
 
 @dataclass(frozen=True, slots=True)
 class SupportMasterSolution:
     support_nodes: tuple[int, ...]
     certified_action: CurriculumAction
-    certified_robust_value: float
+    certified_robust_value: Score
     worst_correspondence: BlockCorrespondence
-    iterations: int
-    cut_count: int
+    iterations: Index
+    cut_count: Index
 
 
 @dataclass(frozen=True, slots=True)
 class RobustActionSolution:
     selected_action: CurriculumAction
-    certified_robust_value: float
+    certified_robust_value: Score
     support_solutions: tuple[SupportMasterSolution, ...]
-    zero_action_value: float
+    zero_action_value: Score
 
 
 def _worst_images_over_active_maps(
@@ -93,15 +96,15 @@ def _worst_images_over_active_maps(
 def fixed_action_worst_correspondence(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    lap_tie_tolerance: float,
-    action_tie_tolerance: float,
+    lap_tie_tolerance: Tolerance,
+    action_tie_tolerance: Tolerance,
 ) -> SeparatorOutcome:
     blocks = problem.blocks
     active_nodes = alpha.active_support_nodes
     if not active_nodes:
         raise SolverExecutionError("separator requires a nonzero action")
     support_counts = _support_block_counts(blocks, active_nodes)
-    candidates = _active_image_candidates(blocks.padded_size_tuple, support_counts)
+    candidates = active_image_assignment_count(blocks, BlockNodeCounts(blocks, support_counts))
     lap_calls_per_map = sum(
         1
         for block_index, size in enumerate(blocks.padded_size_tuple)
@@ -119,16 +122,6 @@ def fixed_action_worst_correspondence(
         active_image_candidates=candidates,
         lap_calls=candidates * lap_calls_per_map,
     )
-
-
-def _active_image_candidates(padded_sizes: tuple[int, ...], support_counts: tuple[int, ...]) -> int:
-    candidates = 1
-    for size, support_size in zip(padded_sizes, support_counts, strict=True):
-        falling_factorial = 1
-        for offset in range(support_size):
-            falling_factorial *= size - offset
-        candidates *= falling_factorial
-    return candidates
 
 
 def _support_block_counts(

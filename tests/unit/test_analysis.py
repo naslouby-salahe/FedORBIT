@@ -6,6 +6,7 @@ import statistics
 import numpy as np
 import pytest
 
+from fedorbit.analysis.records import StatisticalAlternative
 from fedorbit.analysis.statistics import (
     BcaInterval,
     McNemarMode,
@@ -69,7 +70,7 @@ def test_exact_sign_flip_test_reports_point_summaries() -> None:
 def test_one_sided_greater_is_half_of_two_sided_when_strict() -> None:
     differences = (0.4, 0.6, 0.5, 0.7)
     two_sided = sign_flip_p_value(differences, 1e-15)
-    greater = one_sided_sign_flip_p_value(differences, "greater", 1e-15)
+    greater = one_sided_sign_flip_p_value(differences, StatisticalAlternative.GREATER, 1e-15)
     assert greater <= two_sided + 1e-12
     assert greater >= two_sided / 2 - 1e-12
 

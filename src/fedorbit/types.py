@@ -7,9 +7,76 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Annotated, ClassVar, NewType, Protocol, cast
 
-from pydantic import JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
+
+ClientComponentName = NewType("ClientComponentName", str)
+SourceLabel = NewType("SourceLabel", str)
+TimestampFieldName = NewType("TimestampFieldName", str)
+DatasetLabel = NewType("DatasetLabel", str)
+MethodName = NewType("MethodName", str)
+
+
+NonNegativeInt = Annotated[int, Field(ge=0)]
+PositiveInt = Annotated[int, Field(gt=0)]
+NonNegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
+PositiveFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
+FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
+UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
+OpenUnitInterval = Annotated[float, Field(ge=0.0, lt=1.0, allow_inf_nan=False)]
+
+
+SupportCount = PositiveInt
+ConceptCount = PositiveInt
+SampleCount = PositiveInt
+ProposalCount = PositiveInt
+EpochCount = PositiveInt
+BatchSize = PositiveInt
+CutCount = PositiveInt
+ThreadCount = PositiveInt
+ConcurrencyCount = PositiveInt
+StepCount = PositiveInt
+ReplicateCount = PositiveInt
+ResampleCount = PositiveInt
+RepetitionCount = PositiveInt
+AttemptCount = PositiveInt
+DurationMinutes = PositiveInt
+TimeBudgetSeconds = PositiveInt
+GiBMemory = PositiveInt
+ResearcherCount = PositiveInt
+PatienceCount = NonNegativeInt
+WorkerCount = NonNegativeInt
+DecimalPrecision = NonNegativeInt
+InvalidPermutationCount = NonNegativeInt
+RandomSeed = Annotated[int, Field(ge=0, lt=2**32)]
+DerivedSeed = Annotated[int, Field(ge=0, lt=2**32)]
+Index = NonNegativeInt
+ByteCount = NonNegativeInt
+RetryCount = NewType("RetryCount", int)
+
+
+LearningRate = PositiveFloat
+InterventionMagnitude = PositiveFloat
+Tolerance = PositiveFloat
+Floor = PositiveFloat
+Budget = PositiveFloat
+ScaleFactor = NonNegativeFloat
+Threshold = NonNegativeFloat
+AbsoluteMetric = NonNegativeFloat
+WeightDecay = NonNegativeFloat
+Discrepancy = NonNegativeFloat
+StandardError = NonNegativeFloat
+ElapsedSeconds = NonNegativeFloat
+MemoryMib = NonNegativeFloat
+Coefficient = FiniteFloat
+RelativeGain = FiniteFloat
+Estimate = FiniteFloat
+Score = FiniteFloat
+ConfidenceLevel = FiniteFloat
+SignificanceLevel = FiniteFloat
+Fraction = FiniteFloat
+Probability = FiniteFloat
 
 
 class ClientRole(StrEnum):
@@ -125,6 +192,12 @@ class ExperimentClassification(StrEnum):
 class ScalabilityBlockPattern(StrEnum):
     BALANCED = "balanced"
     MAXIMALLY_SKEWED = "maximally_skewed"
+    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two_block"
+
+
+class CouplingCompatibility(StrEnum):
+    JOINTLY_REALIZABLE = "jointly_realizable"
+    INCOMPATIBLE = "incompatible"
 
 
 class ArtifactState(StrEnum):
@@ -275,6 +348,12 @@ class MetricId(StrEnum):
     LIVE_ASSIMILATION_OPTIMIZER_STEPS = "Live Assimilation Optimizer Steps"
     TIMEOUT_INDICATOR = "Timeout Indicator"
     RESOURCE_LIMIT_INDICATOR = "Resource-Limit Indicator"
+
+
+class DomainModel(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        extra="forbid", frozen=True, validate_default=True, allow_inf_nan=False
+    )
 
 
 @dataclass(frozen=True, slots=True)

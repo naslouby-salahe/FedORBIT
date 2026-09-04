@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
-from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept
+from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept, SampleCount
 
 NORMAL_LABEL = "normal"
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
@@ -113,11 +113,11 @@ def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | 
 
 
 def transfer_eligibility(
-    source_train_support: int,
-    source_meta_support: int,
-    target_meta_support: int,
-    target_confirm_support: int,
-    target_test_support: int,
+    source_train_support: SampleCount,
+    source_meta_support: SampleCount,
+    target_meta_support: SampleCount,
+    target_confirm_support: SampleCount,
+    target_test_support: SampleCount,
 ) -> TransferEligibility:
     if (
         min(

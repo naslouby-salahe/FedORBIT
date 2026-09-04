@@ -15,9 +15,10 @@ from numpy.random import PCG64, Generator
 from numpy.typing import NDArray
 from scipy import stats as scipy_stats
 
+from fedorbit.analysis.records import StatisticalAlternative
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.types import RngNamespace
+from fedorbit.types import RngNamespace, SampleCount, Tolerance
 
 FloatArray = NDArray[np.float64]
 
@@ -100,7 +101,7 @@ def _mean(values: tuple[float, ...]) -> float:
 
 def sign_flip_p_value(
     differences: tuple[float, ...],
-    comparison_tolerance: float,
+    comparison_tolerance: Tolerance,
 ) -> float:
     nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
@@ -120,10 +121,10 @@ def sign_flip_p_value(
 
 def one_sided_sign_flip_p_value(
     differences: tuple[float, ...],
-    alternative: str,
-    comparison_tolerance: float,
+    alternative: StatisticalAlternative,
+    comparison_tolerance: Tolerance,
 ) -> float:
-    if alternative not in {"greater", "less"}:
+    if alternative not in {StatisticalAlternative.GREATER, StatisticalAlternative.LESS}:
         raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
     nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
@@ -135,7 +136,7 @@ def one_sided_sign_flip_p_value(
         permuted_mean = math.fsum(
             sign * value for sign, value in zip(signs, nonzero, strict=True)
         ) / len(nonzero)
-        if alternative == "greater":
+        if alternative == StatisticalAlternative.GREATER:
             extreme = permuted_mean >= observed_mean - comparison_tolerance
         else:
             extreme = permuted_mean <= observed_mean + comparison_tolerance
@@ -197,11 +198,11 @@ def statistical_bootstrap_seed(
     )
     return derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(active_config().scientific.randomness.statistical_seed),
+            active_config().scientific.randomness.statistical_seed,
             RngNamespace.STATISTICAL_BOOTSTRAP,
             coordinates,
         )
-    ).value
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,7 +216,7 @@ class BcaInterval:
 def paired_bca_interval(
     method_values: tuple[float, ...],
     reference_values: tuple[float, ...],
-    bootstrap_seed: int,
+    bootstrap_seed: RandomSeed,
 ) -> BcaInterval:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
@@ -281,8 +282,8 @@ def tost_equivalence(
     )
     shifted_lower = tuple(difference - margins.lower for difference in differences)
     shifted_upper = tuple(difference - margins.upper for difference in differences)
-    p_lower = one_sided_sign_flip_p_value(shifted_lower, "greater", tolerance)
-    p_upper = one_sided_sign_flip_p_value(shifted_upper, "less", tolerance)
+    p_lower = one_sided_sign_flip_p_value(shifted_lower, StatisticalAlternative.GREATER, tolerance)
+    p_upper = one_sided_sign_flip_p_value(shifted_upper, StatisticalAlternative.LESS, tolerance)
     return TostResult(p_lower, p_upper, max(p_lower, p_upper))
 
 
@@ -335,5 +336,5 @@ def mcnemar_test(
     )
 
 
-def minimum_valid_seeds_met(seed_count: int) -> bool:
+def minimum_valid_seeds_met(seed_count: SampleCount) -> bool:
     return seed_count >= active_config().scientific.statistics.minimum_valid_paired_seeds

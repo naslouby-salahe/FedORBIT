@@ -20,6 +20,7 @@ from fedorbit.types import (
     ExecutionCell,
     OverwritePolicy,
     SemanticCoordinates,
+    TerminalState,
 )
 
 if TYPE_CHECKING:
@@ -221,7 +222,7 @@ def validate_completed_artifact(
 ) -> None:
     validate_reusable_artifact(manifest)
     validate_completion_manifest(completion)
-    if completion.terminal_state.value != ArtifactState.COMPLETED.value:
+    if completion.terminal_state != TerminalState.COMPLETED:
         raise ArtifactValidationError("completion record is not completed")
     if completion.dependency_fingerprint_sha256 != manifest.dependency_fingerprint_sha256:
         raise ArtifactValidationError(

@@ -17,6 +17,7 @@ from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
 from fedorbit.types import (
+    ByteCount,
     DatasetId,
     ExperimentName,
     RawDatasetDirectory,
@@ -112,7 +113,7 @@ class RawInventoryRequest:
 @dataclass(frozen=True, slots=True)
 class RawFileInventory:
     relative_path: str
-    byte_size: int
+    byte_size: ByteCount
     sha256: str
     columns: tuple[str, ...]
 
@@ -199,7 +200,7 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        frame.to_parquet(temporary, index=False)
+        frame.to_parquet(temporary, index=False, compression="zstd")
         os.replace(temporary, destination / "files.parquet")
     finally:
         temporary.unlink(missing_ok=True)
@@ -230,7 +231,7 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        frame.to_parquet(temporary, index=False)
+        frame.to_parquet(temporary, index=False, compression="zstd")
         os.replace(temporary, destination / "duplicates.parquet")
     finally:
         temporary.unlink(missing_ok=True)

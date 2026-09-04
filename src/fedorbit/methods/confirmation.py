@@ -8,7 +8,8 @@ import torch
 
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.types import RngNamespace
+from fedorbit.response.estimation import shadow_batch_schedule
+from fedorbit.types import BatchSize, RngNamespace, SampleCount
 
 
 class ConfirmationError(ValueError):
@@ -37,9 +38,9 @@ class ConfirmReplicateOutcomes:
 
 
 def confirmation_schedule(
-    train_size: int,
-    batch_size: int,
-    seed: int,
+    train_size: SampleCount,
+    batch_size: BatchSize,
+    seed: RandomSeed,
     coordinates: str,
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
@@ -47,27 +48,9 @@ def confirmation_schedule(
     if batch_size <= 0:
         raise ConfirmationError("confirmation batch size must be positive")
     rng = torch.Generator().manual_seed(
-        derive_seed32(
-            SeedDerivationRequest(RandomSeed(seed), RngNamespace.CONFIRMATION_SCHEDULE, coordinates)
-        ).value
+        derive_seed32(SeedDerivationRequest(seed, RngNamespace.CONFIRMATION_SCHEDULE, coordinates))
     )
-    return _infinite_pass_batches(train_size, batch_size, rng)
-
-
-def _infinite_pass_batches(
-    train_size: int,
-    batch_size: int,
-    rng: torch.Generator,
-) -> Iterator[torch.Tensor]:
-    permutation = torch.randperm(train_size, generator=rng)
-    position = 0
-    while True:
-        if position >= train_size:
-            permutation = torch.randperm(train_size, generator=rng)
-            position = 0
-        batch = permutation[position : position + batch_size]
-        position += batch_size
-        yield batch
+    return shadow_batch_schedule(train_size, batch_size, rng)
 
 
 def _tensor_mean(values: torch.Tensor) -> float:
@@ -94,7 +77,7 @@ def _macro_ce_from_losses(
 
 def hierarchical_bootstrap_relative_gains(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> tuple[float, ...]:
     config = active_config()
@@ -105,10 +88,8 @@ def hierarchical_bootstrap_relative_gains(
     replicate_count = len(replicate_outcomes)
     bootstrap_rng = torch.Generator().manual_seed(
         derive_seed32(
-            SeedDerivationRequest(
-                RandomSeed(seed), RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates
-            )
-        ).value
+            SeedDerivationRequest(seed, RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates)
+        )
     )
     collected_gains: list[float] = []
     for _ in range(confirmation.hierarchical_bootstrap_resamples):
@@ -131,7 +112,7 @@ def hierarchical_bootstrap_relative_gains(
 
 def hierarchical_bootstrap_lower_bound(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> float:
     gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
@@ -156,7 +137,7 @@ def _linear_quantile(sorted_values: list[float], probability: float) -> float:
 
 def confirmation_decision(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> bool:
     lower_bound = hierarchical_bootstrap_lower_bound(replicate_outcomes, seed, contrast_coordinates)

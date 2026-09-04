@@ -22,13 +22,25 @@ from fedorbit.response.estimation import (
     paired_shadow_derivative,
     run_shadow_pair,
 )
-from fedorbit.types import StableJsonPayload
+from fedorbit.types import (
+    Discrepancy,
+    Estimate,
+    Fraction,
+    Index,
+    InterventionMagnitude,
+    LearningRate,
+    Score,
+    StableJsonPayload,
+    StandardError,
+    StepCount,
+    WeightDecay,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ResponseCandidate:
-    intervention_magnitude: float
-    optimizer_step_horizon: int
+    intervention_magnitude: InterventionMagnitude
+    optimizer_step_horizon: StepCount
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,21 +51,21 @@ class PilotData:
     meta_targets: torch.Tensor
     outcome_native_class_sets: tuple[tuple[int, ...], ...]
     base_class_weights: ClassWeights
-    learning_rate: float
-    weight_decay: float
+    learning_rate: LearningRate
+    weight_decay: WeightDecay
 
 
 @dataclass(frozen=True, slots=True)
 class PilotEntry:
-    outcome_index: int
-    intervention_index: int
-    a_hat_full: float
-    se_full: float
-    a_hat_half: float
-    se_half: float
-    derivative_discrepancy: float
+    outcome_index: Index
+    intervention_index: Index
+    a_hat_full: Estimate
+    se_full: StandardError
+    a_hat_half: Estimate
+    se_half: StandardError
+    derivative_discrepancy: Discrepancy
     useful: bool
-    sign_agreement: float
+    sign_agreement: Fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +74,7 @@ class CandidateResult:
     entries: tuple[PilotEntry, ...]
     eligible: bool
     ineligibility_reasons: tuple[str, ...]
-    pilot_score: float
+    pilot_score: Score
 
 
 class ResponsePilotError(ValueError):
@@ -74,7 +86,7 @@ def run_source_response_pilot(
     checkpoint: BaseCheckpoint,
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
-    seed: int,
+    seed: RandomSeed,
 ) -> tuple[CandidateResult, ...]:
     pilot = active_config().scientific.source_response_pilot
     return tuple(
@@ -113,7 +125,7 @@ def _evaluate_candidate(
     intervention_classes: tuple[tuple[int, ...], ...],
     candidate: ResponseCandidate,
     replicate_count: int,
-    seed: int,
+    seed: RandomSeed,
 ) -> CandidateResult:
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
@@ -136,7 +148,7 @@ def _evaluate_candidate(
         for intervention_index, concept_classes in enumerate(intervention_classes):
             schedule_seed = derive_seed32(
                 SeedDerivationRequest(
-                    RandomSeed(seed),
+                    seed,
                     RngNamespace.RESPONSE_SCHEDULE,
                     cast(
                         StableJsonPayload,
@@ -149,7 +161,7 @@ def _evaluate_candidate(
                         ),
                     ),
                 )
-            ).value
+            )
             shadow_data = ShadowData(
                 data.train_features,
                 data.train_targets,

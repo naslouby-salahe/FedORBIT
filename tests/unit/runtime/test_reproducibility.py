@@ -105,7 +105,7 @@ def test_identity_rejects_evaluation_criteria_change(
 
     criteria = fedorbit_config.scientific.evaluation_criteria
     utility = criteria.strict_cross_telemetry_utility.model_copy(
-            update={"successful_primary_pairs_required": 5}
+        update={"successful_primary_pairs_required": 5}
     )
     altered = fedorbit_config.model_copy(
         deep=True,

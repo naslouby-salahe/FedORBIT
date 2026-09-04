@@ -32,14 +32,14 @@ def test_pair_evidence_set_rejects_duplicate_directed_pairs() -> None:
 
 def test_family_registry_counts_match_roadmap() -> None:
     registry = registered_family_inputs()
-    assert len(registry.contrasts_for(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY)) == 4
-    assert len(registry.contrasts_for(MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR)) == 8
-    assert len(registry.contrasts_for(MultiplicityFamily.COUPLING_MECHANISM)) == 4
-    assert len(registry.contrasts_for(MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY)) == 8
-    assert len(registry.contrasts_for(MultiplicityFamily.MECHANISM_ABLATIONS)) == 8
-    assert len(registry.contrasts_for(MultiplicityFamily.SPARSITY_SENSITIVITY)) == 12
-    assert len(registry.contrasts_for(MultiplicityFamily.CONFIRMATION_SAFETY)) == 4
-    assert sum(len(entry.contrasts) for entry in registry.entries) == 48
+    assert len(registry.contrasts_for(MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY)) == 6
+    assert len(registry.contrasts_for(MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR)) == 12
+    assert len(registry.contrasts_for(MultiplicityFamily.COUPLING_MECHANISM)) == 6
+    assert len(registry.contrasts_for(MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY)) == 12
+    assert len(registry.contrasts_for(MultiplicityFamily.MECHANISM_ABLATIONS)) == 12
+    assert len(registry.contrasts_for(MultiplicityFamily.SPARSITY_SENSITIVITY)) == 18
+    assert len(registry.contrasts_for(MultiplicityFamily.CONFIRMATION_SAFETY)) == 6
+    assert sum(len(entry.contrasts) for entry in registry.entries) == 72
 
 
 def _pvalue(

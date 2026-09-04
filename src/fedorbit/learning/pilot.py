@@ -17,7 +17,18 @@ from fedorbit.learning.training import (
     TrainingOutcome,
     train_base_model,
 )
-from fedorbit.types import DatasetId, RngNamespace, StableJsonPayload
+from fedorbit.types import (
+    ConceptCount,
+    DatasetId,
+    Fraction,
+    Index,
+    LearningRate,
+    RngNamespace,
+    Score,
+    StableJsonPayload,
+    StandardError,
+    WeightDecay,
+)
 
 REFERENCE_LEARNING_RATE = 1.0e-3
 NETWORK_DATASETS = frozenset({DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK})
@@ -30,9 +41,9 @@ class PilotError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class PilotConfiguration:
-    learning_rate: float
-    weight_decay: float
-    dropout: float
+    learning_rate: LearningRate
+    weight_decay: WeightDecay
+    dropout: Fraction
 
     def hyperparameters(self) -> SelectedHyperparameters:
         return SelectedHyperparameters(self.learning_rate, self.weight_decay, self.dropout)
@@ -41,15 +52,15 @@ class PilotConfiguration:
 @dataclass(frozen=True, slots=True)
 class PilotFitResult:
     configuration: PilotConfiguration
-    seed: int
+    seed: RandomSeed
     outcome: TrainingOutcome
 
 
 @dataclass(frozen=True, slots=True)
 class PilotSelection:
     configuration: PilotConfiguration
-    median_valid_macro_cross_entropy: float
-    valid_macro_cross_entropy_standard_deviation: float
+    median_valid_macro_cross_entropy: Score
+    valid_macro_cross_entropy_standard_deviation: StandardError
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +69,7 @@ class PilotData:
     train_targets: torch.Tensor
     valid_features: torch.Tensor
     valid_targets: torch.Tensor
-    n_classes: int
+    n_classes: ConceptCount
 
 
 def pilot_grid() -> tuple[PilotConfiguration, ...]:
@@ -79,6 +90,7 @@ def pilot_grid() -> tuple[PilotConfiguration, ...]:
 def run_base_model_pilot(
     data: PilotData,
     dataset: DatasetId,
+    device: torch.device | None = None,
 ) -> tuple[PilotFitResult, ...]:
     seeds = active_config().scientific.randomness.pilot_seeds
     if len(seeds) != 3:
@@ -93,6 +105,7 @@ def run_base_model_pilot(
                 data.n_classes,
                 candidate.dropout,
                 seed,
+                device,
             )
             outcome = train_base_model(
                 model,
@@ -143,14 +156,15 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
 
 def create_classifier(
     dataset: DatasetId,
-    input_dimension: int,
-    n_classes: int,
-    dropout_probability: float,
-    seed: int,
+    input_dimension: Index,
+    n_classes: ConceptCount,
+    dropout_probability: Fraction,
+    seed: RandomSeed,
+    device: torch.device | None = None,
 ) -> NetworkFlowClassifier | HostClassifier:
     initialization_seed = derive_seed32(
         SeedDerivationRequest(
-            RandomSeed(seed),
+            seed,
             RngNamespace.MODEL_INITIALIZATION,
             cast(
                 StableJsonPayload,
@@ -161,7 +175,7 @@ def create_classifier(
                 ),
             ),
         )
-    ).value
+    )
     generator = torch.Generator().manual_seed(initialization_seed)
     if dataset in NETWORK_DATASETS:
         model: NetworkFlowClassifier | HostClassifier = NetworkFlowClassifier(
@@ -172,4 +186,6 @@ def create_classifier(
     else:
         raise PilotError(f"no classifier architecture registered for {dataset.value}")
     model.initialize(generator)
+    if device is not None:
+        model = model.to(device=device)
     return model

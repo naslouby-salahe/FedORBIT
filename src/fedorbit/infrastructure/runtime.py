@@ -18,6 +18,8 @@ from fedorbit.infrastructure.environment import EnvironmentSnapshot
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactState,
+    DerivedSeed,
+    RandomSeed,
     RngNamespace,
     SemanticCoordinates,
     StableJsonPayload,
@@ -140,6 +142,12 @@ class ExecutionLogEvent:
     cell_coordinates: SemanticCoordinates
     artifact_id: ArtifactIdentifier | None
     state: ArtifactState
+    stage: str | None = None
+    experiment: str | None = None
+    dataset: str | None = None
+    seed: int | None = None
+    elapsed_seconds: float | None = None
+    reuse_decision: str | None = None
 
 
 class ExecutionLogger:
@@ -154,6 +162,12 @@ class ExecutionLogger:
                 cell_coordinates=event.cell_coordinates.value,
                 artifact_id=event.artifact_id.value if event.artifact_id is not None else None,
                 state=event.state.value,
+                stage=event.stage,
+                experiment=event.experiment,
+                dataset=event.dataset,
+                seed=event.seed,
+                elapsed_seconds=event.elapsed_seconds,
+                reuse_decision=event.reuse_decision,
             ),
         )
 
@@ -325,35 +339,17 @@ class SeedDerivationError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class RandomSeed:
-    value: int
-
-    def __post_init__(self) -> None:
-        if not 0 <= self.value < SEED32_MODULUS:
-            raise SeedDerivationError("random seed must be in the unsigned 32-bit range")
-
-
-@dataclass(frozen=True, slots=True)
 class SeedDerivationRequest:
     base_seed: RandomSeed
     namespace: RngNamespace
     stable_coordinates: StableJsonPayload
 
 
-@dataclass(frozen=True, slots=True)
-class DerivedSeed:
-    value: int
-
-    def __post_init__(self) -> None:
-        if not 0 <= self.value < SEED32_MODULUS:
-            raise SeedDerivationError("derived seed must be in the unsigned 32-bit range")
-
-
 def derive_seed32(request: SeedDerivationRequest) -> DerivedSeed:
     coordinates_text = stable_json(request.stable_coordinates)
-    payload = f"FedORBIT|{request.base_seed.value}|{request.namespace.value}|{coordinates_text}"
+    payload = f"FedORBIT|{request.base_seed}|{request.namespace.value}|{coordinates_text}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return DerivedSeed(int(digest[:8], 16) % SEED32_MODULUS)
+    return int(digest[:8], 16) % SEED32_MODULUS
 
 
 @dataclass(frozen=True, slots=True)
@@ -409,7 +405,7 @@ class NumpyGeneratorStream:
 
 
 def numpy_generator(request: NumpyGeneratorRequest) -> NumpyGeneratorStream:
-    return NumpyGeneratorStream(np.random.default_rng(request.seed.value))
+    return NumpyGeneratorStream(np.random.default_rng(request.seed))
 
 
 @dataclass(frozen=True, slots=True)
@@ -424,7 +420,7 @@ class TorchGeneratorStream:
 
 def torch_generator(request: TorchGeneratorRequest) -> TorchGeneratorStream:
     generator = torch.Generator(device="cpu")
-    generator.manual_seed(request.seed.value)
+    generator.manual_seed(request.seed)
     return TorchGeneratorStream(generator)
 
 

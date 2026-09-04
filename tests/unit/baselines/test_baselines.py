@@ -194,11 +194,17 @@ def test_committed_map_optimizes_under_chosen_correspondence() -> None:
 
 
 def test_exact_map_oracle_uses_given_correspondence() -> None:
-    from fedorbit.oracle import OracleCorrespondence, exact_map_action
+    from fedorbit.experiments.catalogue import build_catalogue
+    from fedorbit.oracle import OracleCorrespondence, authorize_oracle_access, exact_map_action
+    from fedorbit.types import ExperimentName
 
     problem = _problem(37)
     identity = next(iter(enumerate_block_permutations(problem.blocks)))
+    oracle_experiment = ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION
+    methods = build_catalogue().definition(oracle_experiment).methods
+    token = authorize_oracle_access(oracle_experiment, methods)
     outcome = exact_map_action(
+        token,
         problem,
         OracleCorrespondence(
             source_client=DatasetId.EDGE_IIOTSET_NETWORK,
@@ -263,10 +269,10 @@ def test_identical_resources_required_across_methods() -> None:
     from dataclasses import replace
 
     bundle = _resources_bundle()
-    assert_identical_resources("Local-Only", bundle, bundle)
+    assert_identical_resources(TransferMethod.LOCAL_ONLY, bundle, bundle)
     tampered = replace(bundle, support_cap=3)
     with pytest.raises(FairnessViolationError):
-        assert_identical_resources("Local-SIR", bundle, tampered)
+        assert_identical_resources(TransferMethod.LOCAL_SIR, bundle, tampered)
 
 
 def test_fairness_violations_rejected_at_construction() -> None:

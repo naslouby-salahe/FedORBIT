@@ -7,7 +7,14 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
-from fedorbit.types import MetricId, MultiplicityFamily, Split, TransferMethod
+from fedorbit.types import (
+    DirectedPair,
+    MetricId,
+    MultiplicityFamily,
+    RandomSeed,
+    Split,
+    TransferMethod,
+)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -24,7 +31,7 @@ class PairingError(ValueError):
 class PairingLineage:
     raw_dataset_lineage_sha256: str
     directed_pair: str
-    seed: int
+    seed: RandomSeed
     split: Split
     target_pre_transfer_checkpoint_artifact_id: str
     target_importance_artifact_id: str
@@ -245,7 +252,11 @@ class FamilyStates:
         raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
 
 
-PRIMARY_PAIR_NAMES = ("Edge→Windows", "Windows→Edge", "Edge→Linux", "Linux→Edge")
+def primary_pair_names() -> tuple[str, ...]:
+    return tuple(
+        DirectedPair(spec.source, spec.target).direction
+        for spec in active_config().scientific.datasets.primary_directed_pairs
+    )
 
 
 def _pair_contrast(
@@ -260,7 +271,7 @@ def _pair_contrast(
 def registered_family_inputs() -> RegisteredFamilyInputs:
     families: defaultdict[MultiplicityFamily, list[RegisteredContrast]] = defaultdict(list)
     solver = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value
-    for pair in PRIMARY_PAIR_NAMES:
+    for pair in primary_pair_names():
         families[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY].append(
             _pair_contrast(
                 MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,

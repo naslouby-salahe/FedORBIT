@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.types import CoarseGroup
+from fedorbit.types import CoarseGroup, Index, SampleCount
 
 
 class CorrespondenceError(ValueError):
@@ -27,7 +27,7 @@ class BlockNodeCounts:
         if any(count < 0 for count in self.per_block):
             raise CorrespondenceError("block counts must be nonnegative")
 
-    def for_block(self, block_index: int) -> int:
+    def for_block(self, block_index: Index) -> int:
         return self.per_block[block_index]
 
     def total(self) -> int:
@@ -37,8 +37,8 @@ class BlockNodeCounts:
 @dataclass(frozen=True, slots=True)
 class PaddedBlockStructure:
     coarse_groups: tuple[CoarseGroup, ...]
-    source_real_counts: tuple[int, ...]
-    target_real_counts: tuple[int, ...]
+    source_real_counts: tuple[SampleCount, ...]
+    target_real_counts: tuple[SampleCount, ...]
 
     def __post_init__(self) -> None:
         if len(self.coarse_groups) == 0:
@@ -73,11 +73,11 @@ class PaddedBlockStructure:
     def orbit_size(self) -> int:
         return math.prod(math.factorial(size) for size in self.padded_size_tuple)
 
-    def block_index_range(self, block_index: int) -> range:
+    def block_index_range(self, block_index: Index) -> range:
         offset = sum(self.padded_size_tuple[:block_index])
         return range(offset, offset + self.padded_size_tuple[block_index])
 
-    def block_of_node(self, node_index: int) -> int:
+    def block_of_node(self, node_index: Index) -> int:
         total = self.total_padded_nodes
         if node_index < 0 or node_index >= total:
             raise CorrespondenceError(
@@ -265,7 +265,7 @@ def active_image_assignment_count(
 
 @dataclass(frozen=True, slots=True)
 class BlockActiveImageChoice:
-    block_index: int
+    block_index: Index
     candidate_assignments: tuple[tuple[tuple[int, int], ...], ...]
 
 

@@ -163,13 +163,13 @@ def _validate_datasets(config: FedorbitConfig) -> None:
     )
     roles = OrderedDict((client_id, client.role) for client_id, client in datasets.clients.items())
     _require(
-        roles[DatasetId.TON_IOT_WINDOWS10_HOST].value == ClientRole.PRIMARY.value
-        and roles[DatasetId.TON_IOT_LINUX_PROCESS_HOST].value == ClientRole.PRIMARY.value,
+        roles[DatasetId.TON_IOT_WINDOWS10_HOST] == ClientRole.PRIMARY
+        and roles[DatasetId.TON_IOT_LINUX_PROCESS_HOST] == ClientRole.PRIMARY,
         "the ToN-IoT host clients must have role primary",
     )
     _require(
-        roles[DatasetId.TON_IOT_NETWORK].value == ClientRole.PRIMARY.value
-        and roles[DatasetId.EDGE_IIOTSET_NETWORK].value == ClientRole.EXTERNAL.value,
+        roles[DatasetId.TON_IOT_NETWORK] == ClientRole.PRIMARY
+        and roles[DatasetId.EDGE_IIOTSET_NETWORK] == ClientRole.EXTERNAL,
         "the ToN-IoT network client must be primary and Edge-IIoTset external",
     )
 

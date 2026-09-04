@@ -5,6 +5,8 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from fedorbit.types import ByteCount
+
 
 class EdgeLoaderError(ValueError):
     pass
@@ -18,7 +20,7 @@ EDGE_NETWORK_RELATIVE_PATH = (
 @dataclass(frozen=True, slots=True)
 class EdgeTabularFile:
     relative_path: str
-    byte_size: int
+    byte_size: ByteCount
     sha256: str
     columns: tuple[str, ...]
 

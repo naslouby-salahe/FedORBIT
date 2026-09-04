@@ -17,6 +17,7 @@ from fedorbit.optimization.objective import (
     CurriculumAction,
     RobustActionProblem,
 )
+from fedorbit.types import Coefficient, Index, SampleCount, Tolerance
 
 
 class CertificateError(ValueError):
@@ -25,8 +26,8 @@ class CertificateError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SeparatorWorkCertificate:
-    active_image_candidates: int
-    lap_calls: int
+    active_image_candidates: SampleCount
+    lap_calls: Index
 
     def verify_against(
         self,
@@ -54,9 +55,9 @@ class SeparatorWorkCertificate:
 
 def verify_correspondence_certificate(
     correspondence: BlockCorrespondence,
-    reported_objective: float,
+    reported_objective: Coefficient,
     action: CurriculumAction,
-    objective_tolerance: float,
+    objective_tolerance: Tolerance,
 ) -> bool:
     from fedorbit.optimization.objective import evaluate_objective
 
@@ -65,9 +66,9 @@ def verify_correspondence_certificate(
 
 
 def verify_exactness_certificate(
-    solver_value: float,
-    exhaustive_truth_value: float,
-    exact_tolerance: float,
+    solver_value: Coefficient,
+    exhaustive_truth_value: Coefficient,
+    exact_tolerance: Tolerance,
 ) -> bool:
     return abs(solver_value - exhaustive_truth_value) <= exact_tolerance
 

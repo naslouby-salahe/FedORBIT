@@ -9,6 +9,7 @@ from fedorbit.datasets.edge_iiotset.schema import (
     EDGE_MULTICLASS_LABEL,
 )
 from fedorbit.datasets.ontology import normalize_label
+from fedorbit.types import Index
 
 
 class EdgeValidationError(ValueError):
@@ -18,7 +19,7 @@ class EdgeValidationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class LabelObservation:
     multiclass_label: str
-    binary_label: int
+    binary_label: Index
 
 
 def validate_edge_schema(schema: AdapterSchema) -> None:

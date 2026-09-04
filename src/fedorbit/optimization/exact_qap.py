@@ -29,7 +29,7 @@ from fedorbit.optimization.objective import (
     rounded_action_vector,
     zero_action,
 )
-from fedorbit.types import TerminalState
+from fedorbit.types import Score, TerminalState
 
 
 class QapUncertifiedError(RuntimeError):
@@ -39,13 +39,13 @@ class QapUncertifiedError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class CertifiedQapSeparator:
     correspondence: BlockCorrespondence
-    objective_value: float
+    objective_value: Score
 
 
 @dataclass(frozen=True, slots=True)
 class QapSeparatorResult:
     correspondence: BlockCorrespondence | None
-    objective_value: float | None
+    objective_value: Score | None
     certified: bool
     terminal_state: TerminalState | None
 

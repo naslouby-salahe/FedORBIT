@@ -121,7 +121,7 @@ def test_scalability_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY)
-    assert definition.derived_planned_cells == 1120 + 90
+    assert definition.derived_planned_cells == 1120 + 120
 
 
 def test_map_audit_recovery_attempts(
@@ -182,21 +182,21 @@ def test_pilot_uses_pilot_seeds(
 ) -> None:
     pilot = catalogue.definition(ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
     assert fedorbit_config.scientific.randomness.pilot_seeds == (101, 202, 303)
-    assert pilot.derived_planned_cells == 108 + 30
+    assert pilot.derived_planned_cells == 144 + 40
 
 
 def test_source_response_pilot_candidate_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
-    assert definition.derived_planned_cells == 81
+    assert definition.derived_planned_cells == 108
 
 
 def test_final_packets_planned(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
-    assert definition.derived_planned_cells == 30
+    assert definition.derived_planned_cells == 40
 
 
 def test_baseline_validation_seeds(

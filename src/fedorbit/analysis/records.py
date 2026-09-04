@@ -8,9 +8,16 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from fedorbit.types import (
+    Estimate,
     ExperimentName,
+    Index,
     MetricId,
     MultiplicityFamily,
+    RandomSeed,
+    RelativeGain,
+    ResampleCount,
+    SampleCount,
+    SignificanceLevel,
     Split,
     TransferMethod,
 )
@@ -54,7 +61,7 @@ class PredictionRecord(FrozenRecord):
     pair: str
     method: TransferMethod
     condition: str
-    seed: int
+    seed: RandomSeed
     row_hash: str
     split: Split
     true_local_class_id: str
@@ -95,9 +102,9 @@ class MetricRecord(FrozenRecord):
     pair: str
     method: TransferMethod
     condition: str
-    seed: int
+    seed: RandomSeed
     metric_name: MetricId
-    metric_value: float | None
+    metric_value: Estimate | None
     metric_unit: str
     direction: MetricDirection
     evaluation_class_set_sha256: str
@@ -133,16 +140,16 @@ class PairedComparisonRecord(FrozenRecord):
     method_a: TransferMethod
     method_b: TransferMethod
     metric: MetricId
-    paired_seed_count: int
-    mean_difference: float | None
-    median_difference: float | None
-    bca_ci_low: float | None
-    bca_ci_high: float | None
-    raw_p: float | None
-    holm_p: float | None
-    materiality_threshold: float | None
-    equivalence_margin_low: float | None
-    equivalence_margin_high: float | None
+    paired_seed_count: Index
+    mean_difference: RelativeGain | None
+    median_difference: RelativeGain | None
+    bca_ci_low: RelativeGain | None
+    bca_ci_high: RelativeGain | None
+    raw_p: SignificanceLevel | None
+    holm_p: SignificanceLevel | None
+    materiality_threshold: RelativeGain | None
+    equivalence_margin_low: RelativeGain | None
+    equivalence_margin_high: RelativeGain | None
     input_metric_artifact_ids: tuple[str, ...]
     dependency_fingerprint_sha256: str
     decision: ComparisonDecision
@@ -197,11 +204,11 @@ class StatisticalMetadataRecord(FrozenRecord):
     test_name: str
     exact_or_asymptotic: StatisticalExactness
     alternative: StatisticalAlternative
-    zero_difference_count: int
-    bootstrap_resamples: int
-    bootstrap_seed: int | None
-    holm_rank: int | None
-    family_size: int
+    zero_difference_count: Index
+    bootstrap_resamples: ResampleCount
+    bootstrap_seed: RandomSeed | None
+    holm_rank: Index | None
+    family_size: SampleCount
     statistical_code_sha256: str
 
     @model_validator(mode="after")

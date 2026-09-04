@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fedorbit.types import FailureCategory, TerminalState
+from fedorbit.types import FailureCategory, Index, TerminalState
 
 
 class InfrastructureFailureError(RuntimeError):
@@ -129,7 +129,7 @@ class RetryPolicy:
             raise ValueError("retry count must be nonnegative")
         self._maximum_total_attempts = retries_after_initial + 1
 
-    def decide(self, attempt_index: int, classification: FailureClassification) -> RetryDecision:
+    def decide(self, attempt_index: Index, classification: FailureClassification) -> RetryDecision:
         if not classification.retryable:
             return RetryDecision(
                 retry=False,

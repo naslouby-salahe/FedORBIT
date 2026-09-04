@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from fedorbit.datasets.common import AdapterSchema, FieldRole
 from fedorbit.datasets.ontology import normalize_label
 from fedorbit.datasets.ton_iot.components import TonIotComponent
+from fedorbit.types import Index
 
 
 class TonIotValidationError(ValueError):
@@ -14,7 +15,7 @@ class TonIotValidationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class TonIotLabelObservation:
     multiclass_label: str
-    binary_label: int
+    binary_label: Index
 
 
 def validate_ton_iot_schema(schema: AdapterSchema, component: TonIotComponent) -> None:

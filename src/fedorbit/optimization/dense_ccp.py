@@ -29,7 +29,7 @@ from fedorbit.optimization.objective import (
     evaluate_objective,
     zero_action,
 )
-from fedorbit.types import RngNamespace, TerminalState
+from fedorbit.types import Discrepancy, Index, RngNamespace, Score, TerminalState
 
 
 class DenseCcpError(ValueError):
@@ -38,15 +38,15 @@ class DenseCcpError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class AssignmentVariableKey:
-    source_node: int
-    target_node: int
+    source_node: Index
+    target_node: Index
 
 
 @dataclass(frozen=True, slots=True)
 class AssignmentVariableLayout:
     blocks: PaddedBlockStructure
     columns: tuple[AssignmentVariableKey, ...]
-    column_index: Mapping[AssignmentVariableKey, int]
+    column_index: Mapping[AssignmentVariableKey, Index]
 
     @classmethod
     def build(cls, blocks: PaddedBlockStructure) -> AssignmentVariableLayout:
@@ -56,7 +56,7 @@ class AssignmentVariableLayout:
             targets = blocks.block_index_range(block_index)
             for source in sources:
                 for target in targets:
-                    columns.append(AssignmentVariableKey(int(source), int(target)))
+                    columns.append(AssignmentVariableKey(source, target))
         index_map = OrderedDict((key, index) for index, key in enumerate(columns))
         return cls(blocks=blocks, columns=tuple(columns), column_index=index_map)
 
@@ -73,35 +73,35 @@ class AssignmentVariableLayout:
 
 @dataclass(frozen=True, slots=True)
 class LiftedRelaxationSolution:
-    objective_value: float
+    objective_value: Score
     assignment_values: NDArray[np.float64]
 
 
 @dataclass(frozen=True, slots=True)
 class CcpTrajectoryOutcome:
     final_assignment: NDArray[np.float64]
-    final_objective: float
-    integrality_residual: float
+    final_objective: Score
+    integrality_residual: Discrepancy
     converged_final_level: bool
-    iterations: int
+    iterations: Index
 
 
 @dataclass(frozen=True, slots=True)
 class ProjectedCandidate:
     correspondence: BlockCorrespondence
-    response_objective: float
-    integrality_residual: float
+    response_objective: Score
+    integrality_residual: Discrepancy
 
 
 @dataclass(frozen=True, slots=True)
 class DenseCcpOutcome:
     selected_action: CurriculumAction
-    master_objective: float
-    best_projected_response_objective: float
-    relaxation_lower_bound: float
-    dense_bound_gap: float
-    integrality_residual: float
-    outer_cut_count: int
+    master_objective: Score
+    best_projected_response_objective: Score
+    relaxation_lower_bound: Score
+    dense_bound_gap: Score
+    integrality_residual: Discrepancy
+    outer_cut_count: Index
     converged_heuristically: bool
     terminal_state: TerminalState | None
     worst_projected_correspondence: BlockCorrespondence
@@ -458,7 +458,7 @@ def barycenter_start(layout: AssignmentVariableLayout) -> NDArray[np.float64]:
 
 def dense_starts(
     layout: AssignmentVariableLayout,
-    seed: int,
+    seed: RandomSeed,
     coordinates: str,
 ) -> tuple[NDArray[np.float64], ...]:
     unique_permutations: OrderedDict[tuple[int, ...], NDArray[np.float64]] = OrderedDict()
@@ -474,9 +474,7 @@ def dense_starts(
             starts.append(unique_permutations[images].copy())
         return tuple(starts[:5])
     starts.append(unique_permutations[ordered_permutations[0]].copy())
-    rng_seed = derive_seed32(
-        SeedDerivationRequest(RandomSeed(seed), RngNamespace.DENSE_START, coordinates)
-    ).value
+    rng_seed = derive_seed32(SeedDerivationRequest(seed, RngNamespace.DENSE_START, coordinates))
     rng = np.random.default_rng(rng_seed)
     seen_orders: list[tuple[int, ...]] = [ordered_permutations[0]]
     attempts = 0
@@ -531,7 +529,7 @@ def _evaluate_projected_candidates(
     problem: RobustActionProblem,
     layout: AssignmentVariableLayout,
     alpha: CurriculumAction,
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
     deadline: float,
 ) -> tuple[list[ProjectedCandidate], bool]:
@@ -608,10 +606,10 @@ def _classify_outer_iteration(
 @dataclass(frozen=True, slots=True)
 class DenseOuterLoopResult:
     selected_action: CurriculumAction
-    master_objective: float
+    master_objective: Score
     best_candidate: ProjectedCandidate | None
-    lower_bound: float
-    outer_cut_count: int
+    lower_bound: Score
+    outer_cut_count: Index
     converged_heuristically: bool
     terminal_state: TerminalState | None
 
@@ -630,7 +628,7 @@ def _action_relaxation_bound(
 
 @dataclass(frozen=True, slots=True)
 class _LoopAccounting:
-    outer_cut_count: int
+    outer_cut_count: Index
     converged_heuristically: bool
     should_stop: bool
 
@@ -648,7 +646,7 @@ def _apply_outer_outcome(
 
 def _run_dense_outer_loop(
     problem: RobustActionProblem,
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> DenseOuterLoopResult:
     config = active_config()
@@ -712,7 +710,7 @@ def _run_dense_outer_loop(
 
 def solve_dense_ccp(
     problem: RobustActionProblem,
-    seed: int,
+    seed: RandomSeed,
     contrast_coordinates: str,
 ) -> DenseCcpOutcome:
     result = _run_dense_outer_loop(problem, seed, contrast_coordinates)

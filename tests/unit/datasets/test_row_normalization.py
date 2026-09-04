@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import unicodedata
 
+import pyarrow as pa
 import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
@@ -110,3 +111,17 @@ def test_normalize_value_applies_missing_vocabulary_without_erasing_numeric_zero
     numeric_missing = normalize_value("nan", is_categorical=False)
     assert isinstance(numeric_missing, float)
     assert math.isnan(float(numeric_missing))
+
+
+def test_numeric_scalar_bytes_match_real_arrow_float64_buffer() -> None:
+    payload = normalized_row_bytes(_features(tcp_ack=3.5), _schema())
+    reference = pa.array([3.5], type=pa.float64()).buffers()[1]
+    assert reference is not None
+    assert reference.to_pybytes() in payload
+
+
+def test_categorical_scalar_bytes_match_real_arrow_utf8_data_buffer() -> None:
+    payload = normalized_row_bytes(_features(service_state="OPEN"), _schema())
+    reference = pa.array(["OPEN"], type=pa.utf8()).buffers()[2]
+    assert reference is not None
+    assert reference.to_pybytes() in payload

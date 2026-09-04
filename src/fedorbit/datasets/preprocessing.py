@@ -21,6 +21,7 @@ from fedorbit.datasets.splitting import (
     DuplicateGroupSplitAssignment,
     assign_duplicate_groups_chronologically,
 )
+from fedorbit.types import Coefficient, Fraction, Index, ScaleFactor
 
 if TYPE_CHECKING:
     from fedorbit.datasets.preprocessing import DuplicateGroups, NormalizedRow
@@ -45,8 +46,8 @@ class NormalizedSplitRows:
 class CandidateFeature:
     name: str
     is_categorical: bool
-    train_missing_fraction: float
-    train_nonfinite_fraction: float
+    train_missing_fraction: Fraction
+    train_nonfinite_fraction: Fraction
     dropped: bool
     missing_indicator: bool
 
@@ -54,7 +55,7 @@ class CandidateFeature:
 @dataclass(frozen=True, slots=True)
 class FeatureQualityReport:
     candidate_features: tuple[CandidateFeature, ...]
-    dropped_feature_count: int
+    dropped_feature_count: Index
     client_invalid: bool
     client_invalid_reason: str | None = None
 
@@ -73,9 +74,9 @@ class TrainingFeatureValues:
 
 @dataclass(frozen=True, slots=True)
 class NumericPreprocessor:
-    median: float
-    iqr: float
-    scale: float
+    median: Coefficient
+    iqr: Coefficient
+    scale: ScaleFactor
     constant_after_imputation: bool
 
 
@@ -268,7 +269,7 @@ class PartitionedFeatureValues:
 class NormalizedRow:
     features: NormalizedFeatureVector
     label: str
-    timestamp_fraction: float
+    timestamp_fraction: Fraction
     group_id: str
 
 
@@ -327,42 +328,37 @@ def normalize_value(value: RawFeatureValue, is_categorical: bool) -> RawFeatureV
     return value
 
 
-def _numeric_bytes(value: RawFeatureValue) -> bytes:
-    if value is None:
-        return struct.pack("<d", float("nan"))
-    numeric = float(value)
-    if math.isnan(numeric):
-        return struct.pack("<d", float("nan"))
-    return struct.pack("<d", numeric)
-
-
-def _column_bytes_and_validity(value: RawFeatureValue, role: FieldRole) -> tuple[int, bytes]:
+def _arrow_column_value(value: RawFeatureValue, role: FieldRole) -> float | str:
     if role == FieldRole.BEHAVIORAL_NUMERIC:
-        missing = value is None or (
-            isinstance(value, (float, np.float64)) and math.isnan(float(value))
-        )
-        return (0 if missing else 1), _numeric_bytes(value)
-    text = unicodedata.normalize("NFC", str(value)).encode("utf-8")
-    return 1, struct.pack("<2i", 0, len(text)) + text
+        if value is None:
+            return float("nan")
+        return float(value)
+    return unicodedata.normalize("NFC", str(value))
 
 
-def _validity_mask_bits(validity: tuple[int, ...]) -> bytes:
-    mask = bytearray((len(validity) + 7) // 8)
-    for index, bit in enumerate(validity):
-        if bit:
-            mask[index // 8] |= 1 << (index % 8)
-    return bytes(mask)
+def _numeric_scalar_bytes(value: float) -> bytes:
+    return struct.pack("<d", value)
+
+
+def _categorical_scalar_bytes(value: str) -> bytes:
+    encoded = value.encode("utf-8")
+    return struct.pack("<i", len(encoded)) + encoded
 
 
 def normalized_row_bytes(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> bytes:
-    encoded = tuple(
-        _column_bytes_and_validity(row_features.value_of(column), schema.role_of(column))
-        for column in schema.feature_order
-        if schema.role_of(column)
-        in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL)
-    )
-    validity = tuple(bit for bit, _ in encoded)
-    return _validity_mask_bits(validity) + b"".join(payload for _, payload in encoded)
+    parts: list[bytes] = []
+    for column in schema.feature_order:
+        role = schema.role_of(column)
+        if role not in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL):
+            continue
+        value = _arrow_column_value(row_features.value_of(column), role)
+        if role == FieldRole.BEHAVIORAL_NUMERIC:
+            assert isinstance(value, float)
+            parts.append(_numeric_scalar_bytes(value))
+        else:
+            assert isinstance(value, str)
+            parts.append(_categorical_scalar_bytes(value))
+    return b"".join(parts)
 
 
 def exact_duplicate_hash(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> str:

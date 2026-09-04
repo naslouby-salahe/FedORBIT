@@ -16,6 +16,7 @@ from pydantic import ConfigDict
 
 from fedorbit.config.loading import active_config, repository_root
 from fedorbit.config.models import FrozenModel
+from fedorbit.types import ByteCount, Index
 
 DEPENDENCY_SPECS = (
     ("pytorch", "torch"),
@@ -51,12 +52,12 @@ class DependencyVersion:
 @dataclass(frozen=True, slots=True)
 class HardwareIdentity:
     gpu_name: str | None
-    gpu_memory_bytes: int | None
+    gpu_memory_bytes: ByteCount | None
     cuda_available: bool
     driver_cuda_version: str | None
     torch_cuda_version: str | None
     cpu_name: str
-    ram_bytes: int
+    ram_bytes: ByteCount
     os_release: str
 
 
@@ -202,7 +203,7 @@ def validate_environment(strict: bool = True) -> EnvironmentSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class LockfileSummary:
-    hashed_package_count: int
+    hashed_package_count: Index
     package_names: tuple[str, ...]
 
     @property

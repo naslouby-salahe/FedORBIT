@@ -26,7 +26,7 @@ from fedorbit.response.uncertainty import (
     FinalResponseEstimate,
     estimate_final_response,
 )
-from fedorbit.types import ClientRole, CoarseGroup, DatasetId, stable_json
+from fedorbit.types import ClientRole, CoarseGroup, DatasetId, Index, RandomSeed, stable_json
 
 RESPONSE_PACKET_SCHEMA = "source-response-packet/v1"
 PACKET_PERMITTED_FIELDS = frozenset(
@@ -205,7 +205,7 @@ class PacketConstructionContext:
     per_node_meta_support: tuple[int, ...]
     source_checkpoint_sha256: str
     response_configuration_sha256: str
-    seed: int
+    seed: RandomSeed
 
 
 @dataclass(frozen=True, slots=True)
@@ -343,8 +343,8 @@ def build_source_packet(
 
 def pad_absent_transfer_nodes(
     estimate: FinalResponseEstimate,
-    outcome_count: int,
-    intervention_count: int,
+    outcome_count: Index,
+    intervention_count: Index,
 ) -> FinalResponseEstimate:
     present = {(entry.outcome_index, entry.intervention_index) for entry in estimate.entries}
     padded = list(estimate.entries)

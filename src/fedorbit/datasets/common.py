@@ -14,7 +14,14 @@ from typing import cast
 
 from fedorbit.config.loading import active_config
 from fedorbit.datasets.ontology import normalize_label
-from fedorbit.types import DatasetId, RawDatasetDirectory, StableJsonPayload, stable_json
+from fedorbit.types import (
+    DatasetId,
+    Fraction,
+    Index,
+    RawDatasetDirectory,
+    StableJsonPayload,
+    stable_json,
+)
 
 
 class FieldRole(StrEnum):
@@ -134,8 +141,8 @@ def exactly_one_candidate(
 def resolve_timestamp_column(
     columns: tuple[str, ...],
     candidates: tuple[str, ...],
-    parse_success_fraction: float,
-    minimum_fraction: float,
+    parse_success_fraction: Fraction,
+    minimum_fraction: Fraction,
 ) -> str:
     column = exactly_one_candidate(columns, candidates, "timestamp")
     if parse_success_fraction < minimum_fraction:
@@ -209,8 +216,8 @@ class DatasetAdapter:
     def resolve_schema(
         self,
         observed_columns: tuple[str, ...],
-        timestamp_parse_success_fraction: float,
-        timestamp_alias_minimum: float,
+        timestamp_parse_success_fraction: Fraction,
+        timestamp_alias_minimum: Fraction,
         observed_value_samples: ObservedColumnSamples | None = None,
     ) -> AdapterSchema:
         if len(set(observed_columns)) != len(observed_columns):
@@ -466,22 +473,22 @@ def reconcile_component_columns(
 ) -> tuple[str, ...]:
     if not columns_by_file:
         raise DatasetInspectionError("no selected component table")
-    canonical = list(columns_by_file[0])
+    reference_columns = list(columns_by_file[0])
     for columns in columns_by_file[1:]:
         current = set(columns)
-        canonical_set = set(canonical)
+        reference_set = set(reference_columns)
         divergent = [
             column
-            for column in (*canonical, *columns)
-            if (column not in current or column not in canonical_set)
+            for column in (*reference_columns, *columns)
+            if (column not in current or column not in reference_set)
             and role_for_field(column) == FieldRole.BEHAVIORAL_CATEGORICAL
         ]
         if divergent:
             raise DatasetInspectionError(
                 f"component telemetry schema diverges on behavioral column {divergent[0]!r}"
             )
-        canonical = [column for column in canonical if column in current]
-    return tuple(canonical)
+        reference_columns = [column for column in reference_columns if column in current]
+    return tuple(reference_columns)
 
 
 def _selected_paths(request: DatasetInspectionRequest) -> tuple[Path, ...]:
@@ -514,7 +521,7 @@ def inspect_event_time(
     field: str,
     columns: tuple[str, ...],
     tally: EventTimeTally,
-    inconsistent_label_rows: int,
+    inconsistent_label_rows: Index,
 ) -> EventTimeInspection:
     rows = tally.observed_row_count
     if inconsistent_label_rows:

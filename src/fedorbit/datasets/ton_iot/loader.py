@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fedorbit.datasets.ton_iot.components import TonIotComponent
+from fedorbit.types import ByteCount
 
 
 class TonIotLoaderError(ValueError):
@@ -15,7 +16,7 @@ class TonIotLoaderError(ValueError):
 @dataclass(frozen=True, slots=True)
 class TonIotTabularFile:
     relative_path: str
-    byte_size: int
+    byte_size: ByteCount
     sha256: str
     columns: tuple[str, ...]
 

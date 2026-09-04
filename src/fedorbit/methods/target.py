@@ -15,6 +15,7 @@ from fedorbit.learning.training import BaseCheckpoint
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData
 from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_response_bands
+from fedorbit.types import Coefficient, Index, RandomSeed, Score, StepCount
 
 
 class TargetImportanceError(ValueError):
@@ -23,9 +24,9 @@ class TargetImportanceError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TransferNodeRisk:
-    node_index: int
+    node_index: Index
     is_actionable: bool
-    meta_class_risk: float
+    meta_class_risk: Coefficient
 
     def __post_init__(self) -> None:
         if self.node_index < 0:
@@ -42,7 +43,7 @@ class TransferNodeRisk:
 
 @dataclass(frozen=True, slots=True)
 class TargetImportance:
-    weights_by_node_index: Mapping[int, float]
+    weights_by_node_index: Mapping[Index, Coefficient]
 
     def __post_init__(self) -> None:
         for node_index, weight in self.weights_by_node_index.items():
@@ -58,10 +59,10 @@ class TargetImportance:
             if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=absolute_tolerance):
                 raise TargetImportanceError("target importance weights must sum to one")
 
-    def weight_of(self, node_index: int) -> float:
+    def weight_of(self, node_index: Index) -> float:
         return self.weights_by_node_index[node_index]
 
-    def as_vector(self, size: int) -> NDArray[np.float64]:
+    def as_vector(self, size: Index) -> NDArray[np.float64]:
         vector = np.zeros(size, dtype=np.float64)
         for node_index, weight in self.weights_by_node_index.items():
             if node_index >= size:
@@ -109,7 +110,7 @@ def estimate_target_response_diagnostic(
     checkpoint: BaseCheckpoint,
     data: PilotData,
     intervention_classes: tuple[int, ...],
-    seed: int,
+    seed: RandomSeed,
 ) -> FinalResponseEstimate:
     diagnostic = active_config().scientific.target_response_diagnostic
     settings = ShadowSettings(
@@ -139,18 +140,18 @@ class SelectionError(ValueError):
 @dataclass(frozen=True, slots=True)
 class SourceProposal:
     source_client_name: str
-    certified_robust_value: float
+    certified_robust_value: Score
 
 
 @dataclass(frozen=True, slots=True)
 class RankedProposal:
-    rank: int
+    rank: Index
     proposal: SourceProposal
 
 
 @dataclass(frozen=True, slots=True)
 class SelectionAttempt:
-    rank: int
+    rank: Index
     source_client_name: str
     accepted: bool
 
@@ -158,7 +159,7 @@ class SelectionAttempt:
 @dataclass(frozen=True, slots=True)
 class SelectionDecision:
     accepted_proposal: SourceProposal | None
-    accepted_rank: int | None
+    accepted_rank: Index | None
     attempts: tuple[SelectionAttempt, ...]
     remained_local_only: bool
 
@@ -240,10 +241,10 @@ class OptimizerBudgetError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class OptimizerStepAllocation:
-    target_response_diagnostic: int
-    confirmation_candidates: int
-    live_assimilation: int
-    nontransferable_safety_reserve: int
+    target_response_diagnostic: StepCount
+    confirmation_candidates: StepCount
+    live_assimilation: StepCount
+    nontransferable_safety_reserve: StepCount
 
     def for_category(self, category: BudgetCategory) -> int:
         if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
@@ -254,7 +255,7 @@ class OptimizerStepAllocation:
             return self.live_assimilation
         return self.nontransferable_safety_reserve
 
-    def incremented(self, category: BudgetCategory, steps: int) -> OptimizerStepAllocation:
+    def incremented(self, category: BudgetCategory, steps: StepCount) -> OptimizerStepAllocation:
         if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
             return OptimizerStepAllocation(
                 self.target_response_diagnostic + steps,
@@ -295,7 +296,7 @@ class OptimizerStepAllocation:
 
 @dataclass(frozen=True, slots=True)
 class TargetOptimizerStepLedger:
-    maximum_total_steps: int
+    maximum_total_steps: StepCount
     reserved_steps: OptimizerStepAllocation
     consumed_steps: OptimizerStepAllocation
 
@@ -338,7 +339,7 @@ class TargetOptimizerStepLedger:
             category
         )
 
-    def consume(self, category: BudgetCategory, steps: int) -> TargetOptimizerStepLedger:
+    def consume(self, category: BudgetCategory, steps: StepCount) -> TargetOptimizerStepLedger:
         if steps < 0:
             raise OptimizerBudgetError("consumed steps must be nonnegative")
         if steps > self.remaining(category):
@@ -352,7 +353,7 @@ class TargetOptimizerStepLedger:
             consumed_steps=self.consumed_steps.incremented(category, steps),
         )
 
-    def require_capacity(self, category: BudgetCategory, steps: int) -> None:
+    def require_capacity(self, category: BudgetCategory, steps: StepCount) -> None:
         if steps > self.remaining(category):
             raise OptimizerBudgetError(
                 f"category {category.value} cannot absorb {steps} steps; "

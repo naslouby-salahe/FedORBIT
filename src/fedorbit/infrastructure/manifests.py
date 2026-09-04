@@ -14,8 +14,15 @@ from fedorbit.types import (
     ArtifactStage,
     ArtifactState,
     ArtifactType,
+    CoarseGroup,
+    DatasetId,
+    ExperimentName,
+    Index,
+    OracleTransferConcept,
+    RandomSeed,
     StableJsonPayload,
     TerminalState,
+    TransferMethod,
     stable_json,
 )
 
@@ -62,7 +69,7 @@ class ReusableArtifactManifest(FrozenModel):
 
 
 class DatasetManifest(FrozenModel):
-    dataset: str
+    dataset: DatasetId
     component: str
     raw_files: tuple[str, ...]
     raw_sha256: str
@@ -91,32 +98,32 @@ class EligibilityCopyKind(StrEnum):
 
 
 class TransferEligibilityManifest(FrozenModel):
-    client: str
-    seed: int
-    coarse_group: str
+    client: DatasetId
+    seed: RandomSeed
+    coarse_group: CoarseGroup
     anonymous_node_id: str
     native_local_class_ids: tuple[str, ...]
     present: bool
-    train_count: int
-    meta_count: int
-    confirm_count: int
-    test_count: int
+    train_count: Index
+    meta_count: Index
+    confirm_count: Index
+    test_count: Index
     source_eligible: bool
     target_eligible: bool
     null_reason: str | None = None
-    fine_concept: str | None = None
+    fine_concept: OracleTransferConcept | None = None
 
 
 class SemanticCellManifest(FrozenModel):
-    experiment: str
-    dataset: str
-    source_client: str
-    target_client: str
+    experiment: ExperimentName
+    dataset: DatasetId
+    source_client: DatasetId
+    target_client: DatasetId
     directed_pair: str
-    method: str
+    method: TransferMethod
     condition: str
-    support: int
-    seed: int
+    support: Index
+    seed: RandomSeed
     scientific_configuration_sha256: str
     dependency_fingerprint_sha256: str
     producer_stage: ArtifactStage

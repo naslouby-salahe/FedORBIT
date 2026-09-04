@@ -12,6 +12,7 @@ from fedorbit.types import (
     ArtifactState,
     ExperimentClassification,
     ExperimentName,
+    Index,
 )
 
 EXECUTION_LAYERS = (
@@ -69,13 +70,13 @@ PROGRAMME_PREREQUISITES = (
 class PlanRow:
     experiment: ExperimentName
     classification: ExperimentClassification
-    planned_cells: int
+    planned_cells: Index
     prerequisites: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class PrerequisiteState:
-    step_index: int
+    step_index: Index
     name: str
     satisfied: bool
     owning_experiment: ExperimentName | None = None

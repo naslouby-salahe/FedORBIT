@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import resource
 import subprocess
+import time
 from collections import OrderedDict
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
 
@@ -87,6 +89,37 @@ def principal_determinism() -> Generator[None]:
 def test_determinism() -> Generator[None]:
     apply_deterministic_backend(require_cuda_device=False)
     yield
+
+
+@dataclass(slots=True)
+class EfficiencyMeasurement:
+    wall_time_seconds: float = 0.0
+    peak_host_rss_mib: float = 0.0
+    peak_cuda_allocated_bytes: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class _EfficiencyMeasurementHandle:
+    result: EfficiencyMeasurement = field(default_factory=EfficiencyMeasurement)
+
+
+def _peak_host_rss_mib() -> float:
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+
+
+@contextmanager
+def measure_efficiency() -> Generator[_EfficiencyMeasurementHandle]:
+    handle = _EfficiencyMeasurementHandle()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+    started_at = time.monotonic()
+    try:
+        yield handle
+    finally:
+        handle.result.wall_time_seconds = time.monotonic() - started_at
+        handle.result.peak_host_rss_mib = _peak_host_rss_mib()
+        if torch.cuda.is_available():
+            handle.result.peak_cuda_allocated_bytes = torch.cuda.max_memory_allocated()
 
 
 def _conv_fp32_precision() -> str:

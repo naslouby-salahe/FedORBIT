@@ -9,7 +9,12 @@ from typing import cast
 import torch
 
 from fedorbit.config.loading import active_config
-from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
+from fedorbit.infrastructure.runtime import (
+    RandomSeed,
+    SeedDerivationRequest,
+    derive_seed32,
+    principal_determinism,
+)
 from fedorbit.learning.models import HostClassifier, NetworkFlowClassifier
 from fedorbit.learning.training import (
     ClassWeights,
@@ -97,27 +102,28 @@ def run_base_model_pilot(
         raise PilotError("base-model pilot requires exactly three pilot seeds")
     class_weights = ClassWeights.from_targets(data.train_targets, data.n_classes)
     results: list[PilotFitResult] = []
-    for candidate in pilot_grid():
-        for seed in seeds:
-            model = create_classifier(
-                dataset,
-                data.train_features.shape[1],
-                data.n_classes,
-                candidate.dropout,
-                seed,
-                device,
-            )
-            outcome = train_base_model(
-                model,
-                data.train_features,
-                data.train_targets,
-                data.valid_features,
-                data.valid_targets,
-                class_weights,
-                seed,
-                candidate.hyperparameters(),
-            )
-            results.append(PilotFitResult(candidate, seed, outcome))
+    with principal_determinism():
+        for candidate in pilot_grid():
+            for seed in seeds:
+                model = create_classifier(
+                    dataset,
+                    data.train_features.shape[1],
+                    data.n_classes,
+                    candidate.dropout,
+                    seed,
+                    device,
+                )
+                outcome = train_base_model(
+                    model,
+                    data.train_features,
+                    data.train_targets,
+                    data.valid_features,
+                    data.valid_targets,
+                    class_weights,
+                    seed,
+                    candidate.hyperparameters(),
+                )
+                results.append(PilotFitResult(candidate, seed, outcome))
     if len(results) != 36:
         raise PilotError("base-model pilot must produce exactly 36 fits per client")
     return tuple(results)

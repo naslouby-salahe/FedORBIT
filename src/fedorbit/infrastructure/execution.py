@@ -8,7 +8,7 @@ import tempfile
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -17,6 +17,7 @@ import numpy as np
 import torch
 from torch import nn
 
+from fedorbit.analysis.metrics import EfficiencyRecord
 from fedorbit.analysis.records import (
     MetricDirection,
     MetricRecord,
@@ -81,11 +82,13 @@ from fedorbit.infrastructure.reuse import (
     validate_reusable_artifact,
 )
 from fedorbit.infrastructure.runtime import (
+    EfficiencyMeasurement,
     ExecutionLogEvent,
     ExecutionLogger,
     RandomSeed,
     current_code_revision,
     execution_logger,
+    measure_efficiency,
     principal_determinism,
 )
 from fedorbit.infrastructure.workspace import (
@@ -1395,24 +1398,26 @@ def _execute_client_base_model_pilot(
                 )
             )
             checkpoint_started_at = time.monotonic()
-            model = create_classifier(
-                dataset,
-                train.features.shape[1],
-                n_classes,
-                selection.configuration.dropout,
-                seed,
-                device,
-            )
-            outcome = train_base_model(
-                model,
-                train.features,
-                train.targets,
-                valid.features,
-                valid.targets,
-                class_weights,
-                seed,
-                selection.configuration.hyperparameters(),
-            )
+            with principal_determinism(), measure_efficiency() as efficiency:
+                model = create_classifier(
+                    dataset,
+                    train.features.shape[1],
+                    n_classes,
+                    selection.configuration.dropout,
+                    seed,
+                    device,
+                )
+                outcome = train_base_model(
+                    model,
+                    train.features,
+                    train.targets,
+                    valid.features,
+                    valid.targets,
+                    class_weights,
+                    seed,
+                    selection.configuration.hyperparameters(),
+                )
+            _persist_training_efficiency(layout, experiment, dataset, seed, efficiency.result)
             _persist_base_checkpoint(
                 store,
                 layout,
@@ -1438,6 +1443,34 @@ def _execute_client_base_model_pilot(
                     elapsed_seconds=time.monotonic() - checkpoint_started_at,
                 )
             )
+
+
+def _persist_training_efficiency(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    dataset: DatasetId,
+    seed: int,
+    measurement: EfficiencyMeasurement,
+) -> Path:
+    record = EfficiencyRecord(
+        wall_time_seconds=measurement.wall_time_seconds,
+        peak_host_rss_mib=measurement.peak_host_rss_mib,
+        peak_cuda_allocated_bytes=measurement.peak_cuda_allocated_bytes,
+        packet_serialized_byte_count=0,
+        source_response_optimizer_steps=0,
+        target_confirmation_optimizer_steps=0,
+        live_assimilation_optimizer_steps=0,
+        timeout_indicator=False,
+        resource_limit_indicator=False,
+    )
+    destination = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"training-efficiency.{dataset.value}.{seed}.json"
+    )
+    atomic_write_json(destination, cast(StableJsonPayload, OrderedDict(asdict(record))))
+    return destination
 
 
 def _persist_base_checkpoint(

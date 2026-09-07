@@ -13,6 +13,7 @@ from fedorbit.methods.baselines import (
     coarse_block_min_matrix,
     committed_map_action,
     coupling_destroyed_matrices,
+    local_sir_action,
     matched_resource_rectangular_lower_bounds,
     optimize_against_fixed_matrix,
     orbit_mean_matrix,
@@ -94,6 +95,14 @@ def test_local_only_is_identity_and_local_sir_uses_target_response() -> None:
                 float(problem.target_importance @ problem.lower_response_matrix @ alpha),
             )
     assert sir.objective_value >= brute_sir - 1e-6
+
+
+def test_local_sir_action_matches_optimize_against_the_target_local_matrix() -> None:
+    problem = _problem(13)
+    named = local_sir_action(problem, problem.lower_response_matrix)
+    generic = optimize_against_fixed_matrix(problem, problem.lower_response_matrix)
+    assert named.objective_value == generic.objective_value
+    assert np.array_equal(named.selected_action.coordinates, generic.selected_action.coordinates)
 
 
 def test_coarse_block_summaries_lift_to_fine_space() -> None:

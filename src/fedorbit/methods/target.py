@@ -196,6 +196,14 @@ def rank_source_proposals(
     )
 
 
+def without_confirmation_decision(proposal: SourceProposal) -> bool:
+    return proposal.certified_robust_value > 0.0
+
+
+def without_confirmation_selection(ranked: Sequence[RankedProposal]) -> SelectionDecision:
+    return select_source_sequentially(ranked, without_confirmation_decision)
+
+
 def select_source_sequentially(
     ranked: Sequence[RankedProposal],
     confirmation_decision: Callable[[SourceProposal], bool],

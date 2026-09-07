@@ -6,6 +6,7 @@ from fedorbit.methods.target import (
     SourceProposal,
     rank_source_proposals,
     select_source_sequentially,
+    without_confirmation_selection,
 )
 
 
@@ -89,6 +90,20 @@ def test_empty_candidates_remain_local_only() -> None:
     decision = select_source_sequentially(ranked, lambda _p: True)
     assert decision.remained_local_only
     assert decision.attempts == ()
+
+
+def test_without_confirmation_selection_accepts_the_first_positive_proposal() -> None:
+    ranked = rank_source_proposals(
+        (
+            _proposal("first", 0.9),
+            _proposal("second", 0.5),
+        ),
+    )
+    decision = without_confirmation_selection(ranked)
+    assert not decision.remained_local_only
+    assert decision.accepted_rank == 1
+    assert decision.accepted_proposal is not None
+    assert decision.accepted_proposal.source_client_name == "first"
 
 
 def test_principal_cost_coefficients_are_zero_and_validated() -> None:

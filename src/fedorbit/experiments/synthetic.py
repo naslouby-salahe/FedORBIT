@@ -557,6 +557,64 @@ def _joint_realizability_column_shift(
     return True
 
 
+def _rearrange_column_for_mate_pairing(
+    q: np.ndarray,
+    blocks: PaddedBlockStructure,
+    keep_mask: frozenset[tuple[int, int]],
+    importance: np.ndarray,
+    column: int,
+    target_images: tuple[int, ...],
+) -> None:
+    target_source = target_images[column]
+    block_index = blocks.block_of_node(column)
+    block_positions = tuple(blocks.block_index_range(block_index))
+    pairing = [
+        (position, target_images[position])
+        for position in block_positions
+        if position != column and (target_images[position], target_source) in keep_mask
+    ]
+    if len(pairing) < 2:
+        return
+    pairing_sorted_by_importance = sorted(pairing, key=lambda entry: -importance[entry[0]])
+    rows_in_order = tuple(row for _, row in pairing_sorted_by_importance)
+    sorted_values = sorted(q[row, target_source] for row in rows_in_order)
+    for row, value in zip(rows_in_order, sorted_values, strict=True):
+        q[row, target_source] = value
+
+
+def _enforce_joint_realizability_for_target(
+    target_images: tuple[int, ...],
+    active_nodes: tuple[int, ...],
+    orbit: Sequence[BlockCorrespondence],
+    blocks: PaddedBlockStructure,
+    q: np.ndarray,
+    importance: np.ndarray,
+    keep_mask: frozenset[tuple[int, int]],
+    tie_tolerance: float,
+) -> bool:
+    for column in active_nodes:
+        _rearrange_column_for_mate_pairing(q, blocks, keep_mask, importance, column, target_images)
+    for _ in range(_JOINT_REALIZABILITY_MAX_ITERATIONS):
+        converged = True
+        for column in active_nodes:
+            best = math.inf
+            target_value = 0.0
+            for correspondence in orbit:
+                value = float(importance @ q[correspondence.images, correspondence.images[column]])
+                best = min(best, value)
+                if correspondence.images == target_images:
+                    target_value = value
+            if target_value <= best + tie_tolerance:
+                continue
+            delta = target_value - best + tie_tolerance / 2
+            if not _joint_realizability_column_shift(q, keep_mask, importance, column, delta):
+                return False
+            converged = False
+        if converged:
+            return True
+    return False
+
+
 def _enforce_joint_realizability(
     active_nodes: tuple[int, ...],
     orbit: Sequence[BlockCorrespondence],
@@ -566,23 +624,21 @@ def _enforce_joint_realizability(
     tie_tolerance: float,
 ) -> bool:
     identity_images = tuple(range(q.shape[0]))
-    for _ in range(_JOINT_REALIZABILITY_MAX_ITERATIONS):
-        converged = True
-        for column in active_nodes:
-            best = math.inf
-            identity_value = 0.0
-            for correspondence in orbit:
-                value = float(importance @ q[correspondence.images, correspondence.images[column]])
-                best = min(best, value)
-                if correspondence.images == identity_images:
-                    identity_value = value
-            if identity_value <= best + tie_tolerance:
-                continue
-            delta = identity_value - best + tie_tolerance / 2
-            if not _joint_realizability_column_shift(q, keep_mask, importance, column, delta):
-                return False
-            converged = False
-        if converged:
+    blocks = orbit[0].blocks
+    candidate_targets = (
+        identity_images,
+        *(
+            correspondence.images
+            for correspondence in orbit
+            if correspondence.images != identity_images
+        ),
+    )
+    for target_images in candidate_targets:
+        trial = q.copy()
+        if _enforce_joint_realizability_for_target(
+            target_images, active_nodes, orbit, blocks, trial, importance, keep_mask, tie_tolerance
+        ):
+            q[...] = trial
             return True
     return False
 

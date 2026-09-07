@@ -271,6 +271,13 @@ def optimize_against_fixed_matrix(
     return FixedMatrixActionSolution(selected_action=winning_action, objective_value=winner_value)
 
 
+def local_sir_action(
+    problem: RobustActionProblem,
+    target_local_response_matrix: NDArray[np.float64],
+) -> FixedMatrixActionSolution:
+    return optimize_against_fixed_matrix(problem, target_local_response_matrix)
+
+
 @dataclass(frozen=True, slots=True)
 class CoarseBlockSummary:
     matrix: NDArray[np.float64]

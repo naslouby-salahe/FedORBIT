@@ -5,18 +5,31 @@ import html
 import io
 import json
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from pydantic import JsonValue
+
 from fedorbit.analysis.evidence import EvidenceClassificationInputs, classify_all_propositions
-from fedorbit.analysis.records import MetricRecord
+from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config
+from fedorbit.config.models import FedorbitConfig
 from fedorbit.infrastructure.execution import ArtifactStore, atomic_write_bytes, atomic_write_json
-from fedorbit.infrastructure.manifests import ReusableArtifactManifest
+from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
 from fedorbit.infrastructure.workspace import WorkspaceLayout, results_workspace
-from fedorbit.types import ArtifactIdentifier, ExperimentName, StableJsonPayload, stable_json
+from fedorbit.types import (
+    ArtifactIdentifier,
+    ClientRole,
+    EvidenceProposition,
+    EvidenceStatus,
+    ExperimentName,
+    MetricId,
+    StableJsonPayload,
+    TransferMethod,
+    stable_json,
+)
 
 
 class FigureError(ValueError):
@@ -429,3 +442,471 @@ def _metric_pdf_bytes(label: str, value: float) -> bytes:
         )
     )
     return bytes(document)
+
+
+def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]:
+    if isinstance(value, Mapping):
+        rows: list[tuple[str, str]] = []
+        for key, item in value.items():
+            rows.extend(_leaf_scalars(f"{prefix}.{key}", item))
+        return tuple(rows)
+    if isinstance(value, list):
+        rows = []
+        for index, item in enumerate(value):
+            rows.extend(_leaf_scalars(f"{prefix}[{index}]", item))
+        return tuple(rows)
+    return ((prefix, str(value)),)
+
+
+def numerical_constants_and_seeds_table(config: FedorbitConfig | None = None) -> EvidenceTable:
+    resolved = config if config is not None else active_config()
+    dumped = cast(Mapping[str, JsonValue], resolved.model_dump(mode="json"))
+    rows = tuple(
+        sorted(_leaf_scalars("scientific", dumped.get("scientific", OrderedDict())))
+        + sorted(_leaf_scalars("solvers", dumped.get("solvers", OrderedDict())))
+    )
+    return EvidenceTable(
+        columns=("configuration_path", "value"),
+        rows=tuple((path, value) for path, value in rows),
+    )
+
+
+def experiment_matrix_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "experiment",
+            "classification",
+            "datasets_or_pairs",
+            "methods",
+            "registered_seeds",
+            "conditions",
+            "derived_planned_cells",
+            "prerequisites",
+            "evidence_relationship",
+        ),
+        rows,
+    )
+
+
+def dataset_and_client_protocol_table(
+    manifests: Sequence[DatasetManifest],
+    modality_by_dataset: Mapping[str, str],
+    role_by_dataset: Mapping[str, ClientRole],
+    excluded_class_counts: Mapping[str, int],
+) -> EvidenceTable:
+    columns = (
+        "dataset_component",
+        "modality",
+        "observed_raw_rows",
+        "retained_rows",
+        "timestamp_range",
+        "local_prediction_classes",
+        "feature_count",
+        "transfer_candidates",
+        "exclusions",
+        "scientific_role",
+        "raw_manifest_hash",
+    )
+    rows = tuple(
+        (
+            manifest.component,
+            modality_by_dataset.get(manifest.dataset.value, ""),
+            sum(manifest.raw_counts.values()),
+            sum(manifest.local_class_counts.values()),
+            f"{manifest.timestamp_range[0]}..{manifest.timestamp_range[1]}",
+            len(manifest.local_class_counts),
+            len(manifest.adapter_feature_order),
+            len(manifest.transfer_candidate_counts),
+            excluded_class_counts.get(manifest.dataset.value, 0),
+            role_by_dataset.get(manifest.dataset.value, ClientRole.PRIMARY).value,
+            manifest.raw_sha256,
+        )
+        for manifest in manifests
+    )
+    return EvidenceTable(columns=columns, rows=rows)
+
+
+def proposition_support_table(
+    statuses: Mapping[EvidenceProposition, EvidenceStatus],
+    materiality_result_by_proposition: Mapping[EvidenceProposition, str],
+    statistical_result_by_proposition: Mapping[EvidenceProposition, str],
+    evidence_completeness_by_proposition: Mapping[EvidenceProposition, str],
+    scope_by_proposition: Mapping[EvidenceProposition, str],
+    supporting_table_by_proposition: Mapping[EvidenceProposition, str],
+    supporting_figure_by_proposition: Mapping[EvidenceProposition, str],
+    forbidden_wording_by_proposition: Mapping[EvidenceProposition, str],
+) -> EvidenceTable:
+    columns = (
+        "proposition",
+        "final_state",
+        "materiality_result",
+        "statistical_result",
+        "evidence_completeness",
+        "scope",
+        "supporting_table",
+        "supporting_figure",
+        "forbidden_wording",
+    )
+    rows = tuple(
+        (
+            proposition.value,
+            status.value,
+            materiality_result_by_proposition.get(proposition, ""),
+            statistical_result_by_proposition.get(proposition, ""),
+            evidence_completeness_by_proposition.get(proposition, ""),
+            scope_by_proposition.get(proposition, ""),
+            supporting_table_by_proposition.get(proposition, ""),
+            supporting_figure_by_proposition.get(proposition, ""),
+            forbidden_wording_by_proposition.get(proposition, ""),
+        )
+        for proposition, status in statuses.items()
+    )
+    return EvidenceTable(columns=columns, rows=rows)
+
+
+def _metric_value(
+    records: Sequence[MetricRecord],
+    pair: str,
+    method: TransferMethod,
+    metric_name: MetricId,
+) -> float | None:
+    matches = [
+        record
+        for record in records
+        if record.pair == pair
+        and record.method == method
+        and record.metric_name == metric_name
+        and record.valid
+    ]
+    if not matches:
+        return None
+    return sum(record.metric_value for record in matches if record.metric_value is not None) / len(
+        matches
+    )
+
+
+def primary_strict_transfer_results_table(
+    metric_records: Sequence[MetricRecord],
+    comparison_records: Sequence[PairedComparisonRecord],
+) -> EvidenceTable:
+    columns = (
+        "pair",
+        "method",
+        "valid_seeds",
+        "test_macro_ce",
+        "macro_f1",
+        "balanced_accuracy",
+        "gain_vs_local",
+        "bca_ci_low",
+        "bca_ci_high",
+        "raw_p",
+        "holm_p",
+        "strict_validity",
+        "confirmation_coverage",
+    )
+    pairs = sorted({record.pair for record in metric_records})
+    method_order = (
+        TransferMethod.LOCAL_ONLY,
+        TransferMethod.LOCAL_SIR,
+        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+        TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+        TransferMethod.GENERIC_EXACT_QAP,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        TransferMethod.EXACT_MAP_ORACLE,
+    )
+    rows: list[tuple[TableScalar, ...]] = []
+    for pair in pairs:
+        for method in method_order:
+            comparison = next(
+                (
+                    record
+                    for record in comparison_records
+                    if record.pair == pair and record.method_a == method
+                ),
+                None,
+            )
+            rows.append(
+                (
+                    pair,
+                    method.value,
+                    comparison.paired_seed_count if comparison is not None else 0,
+                    _metric_value(metric_records, pair, method, MetricId.MACRO_CROSS_ENTROPY),
+                    _metric_value(metric_records, pair, method, MetricId.MACRO_F1),
+                    _metric_value(metric_records, pair, method, MetricId.BALANCED_ACCURACY),
+                    comparison.mean_difference if comparison is not None else None,
+                    comparison.bca_ci_low if comparison is not None else None,
+                    comparison.bca_ci_high if comparison is not None else None,
+                    comparison.raw_p if comparison is not None else None,
+                    comparison.holm_p if comparison is not None else None,
+                    comparison.decision.value if comparison is not None else "",
+                    _metric_value(metric_records, pair, method, MetricId.COVERAGE_CONFIRM),
+                )
+            )
+    return EvidenceTable(columns=columns, rows=tuple(rows))
+
+
+def _rows_table(
+    columns: tuple[str, ...], rows: Sequence[Mapping[str, TableScalar]]
+) -> EvidenceTable:
+    return EvidenceTable(
+        columns=columns,
+        rows=tuple(tuple(row[column] for column in columns) for row in rows),
+    )
+
+
+def transfer_ontology_and_null_padding_table(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> EvidenceTable:
+    return _rows_table(
+        (
+            "coarse_group",
+            "source_real_or_null",
+            "target_real_or_null",
+            "support_counts",
+            "action_eligibility",
+            "null_reason",
+        ),
+        rows,
+    )
+
+
+def model_and_training_protocol_table(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> EvidenceTable:
+    return _rows_table(
+        (
+            "model",
+            "architecture",
+            "normalization",
+            "activation",
+            "initialization",
+            "optimizer",
+            "batch",
+            "selected_learning_rate",
+            "selected_weight_decay",
+            "selected_dropout",
+            "stopping_rule",
+        ),
+        rows,
+    )
+
+
+def information_resource_matrix_table(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> EvidenceTable:
+    return _rows_table(
+        (
+            "method",
+            "target_raw_data",
+            "anonymous_source_nodes",
+            "coarse_groups",
+            "source_response",
+            "target_local_response",
+            "fine_names",
+            "exact_map",
+            "confirmation",
+            "predecision_test_access",
+            "strict_compatibility",
+        ),
+        rows,
+    )
+
+
+def coupling_mechanism_results_table(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> EvidenceTable:
+    return _rows_table(
+        (
+            "condition_or_pair",
+            "valid_units",
+            "fixed_action_gap",
+            "robust_coupling_gap",
+            "fraction_above_materiality",
+            "ci",
+            "holm_p",
+            "coupling_destruction_retained_gain_fraction",
+        ),
+        rows,
+    )
+
+
+def exact_solver_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "k",
+            "block_pattern",
+            "support",
+            "truth_availability",
+            "exact_mismatches",
+            "maximum_absolute_error",
+            "runtime_median",
+            "runtime_p95",
+            "qap_runtime",
+            "dense_runtime",
+            "timeouts",
+            "memory",
+            "active_images",
+            "lap_calls",
+        ),
+        rows,
+    )
+
+
+def ablation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "ablation",
+            "pair",
+            "realized_gain",
+            "difference_vs_full",
+            "equivalence",
+            "retained_gain",
+            "confirmation_safety",
+        ),
+        rows,
+    )
+
+
+def sparsity_and_dense_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "support_or_dense_condition",
+            "pair",
+            "realized_gain",
+            "certified_value",
+            "runtime",
+            "memory",
+            "confirmation_coverage",
+            "dense_minus_sparse_difference",
+        ),
+        rows,
+    )
+
+
+def confirmation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "pair",
+            "proposals",
+            "accepted",
+            "harmful_accepted_rate",
+            "useful_accepted_rate",
+            "beneficial_rejected_rate",
+            "coverage",
+            "no_confirm_harmful_rate",
+            "arr",
+            "rrr",
+            "ci",
+            "p",
+        ),
+        rows,
+    )
+
+
+def generalization_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "pair",
+            "method",
+            "valid_seeds",
+            "test_macro_ce",
+            "macro_f1",
+            "balanced_accuracy",
+            "gain_vs_local",
+            "bca_ci_low",
+            "bca_ci_high",
+            "raw_p",
+            "holm_p",
+            "strict_validity",
+            "confirmation_coverage",
+            "is_secondary_pair",
+        ),
+        rows,
+    )
+
+
+def failure_boundary_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "boundary_dimension",
+            "setting",
+            "pair",
+            "method",
+            "certified_value",
+            "realized_gain",
+            "abstention",
+            "null_node_count",
+            "confirmation_coverage",
+            "state",
+        ),
+        rows,
+    )
+
+
+def scalability_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+    return _rows_table(
+        (
+            "k",
+            "block",
+            "support",
+            "method",
+            "n_s",
+            "lap_calls",
+            "cuts",
+            "runtime_median",
+            "runtime_p95",
+            "rss",
+            "cuda_memory",
+            "timeout",
+            "exactness_status",
+        ),
+        rows,
+    )
+
+
+def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return EvidenceFigure(x_label=x_label, y_label=y_label, series=tuple(series))
+
+
+def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("paired mean relative macro-CE gain vs local", "primary directed pair", series)
+
+
+def baseline_paired_difference_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("primary directed pair", "seed-level paired difference", series)
+
+
+def coupling_gap_phase_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("coupling factor combination", "predicted structural zero/strict state", series)
+
+
+def predicted_vs_realized_transfer_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("certified robust predicted value", "TEST relative macro-CE gain", series)
+
+
+def sparsity_utility_efficiency_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("runtime", "realized gain", series)
+
+
+def confirmation_safety_coverage_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("confirmation coverage", "harmful accepted rate", series)
+
+
+def semantic_sufficiency_frontier_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("log|orbit|", "realized gain", series)
+
+
+def failure_boundary_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("boundary setting", "certified value / realized gain", series)
+
+
+def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure(
+        "N_S * sum(n_g^3) (log scale)",
+        "runtime (log scale)",
+        series,
+    )
+
+
+def map_value_bound_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+    return _figure("orbit-radius bound", "exact map action value", series)

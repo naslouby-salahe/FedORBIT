@@ -351,17 +351,17 @@ def _arrow_column_value(value: RawFeatureValue, role: FieldRole
     return unicodedata.normalize("NFC", str(value))
 
 
-def _numeric_scalar_bytes(value: float) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
+def _numeric_scalar_bytes(value: float) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value) #TODO: PERF: encode each distinct value once (lru_cache keyed by value) - currently re-encoded per row over the whole lineage
     return struct.pack("<d", value)
 
 
-def _categorical_scalar_bytes(value: str) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
+def _categorical_scalar_bytes(value: str) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value) #TODO: PERF: encode each distinct value once (lru_cache keyed by value) - currently re-encoded per row over the whole lineage
     encoded = value.encode("utf-8")
     return struct.pack("<i", len(encoded)) + encoded
 
 
 def normalized_row_bytes(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> bytes:
-    parts: list[bytes] = []
+    parts: list[bytes] = [] #TODO: PERF: duplicate-hash path serializes every feature of every row in Python - memoize per-value encodings and prefer column-wise row hashing
     for column in schema.feature_order:
         role = schema.role_of(column)
         if role not in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL):
@@ -384,7 +384,7 @@ def exact_duplicate_hash(row_features: NormalizedFeatureVector, schema: AdapterS
 def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> DuplicateGroups:
     groups: defaultdict[str, list[NormalizedRow]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for row in rows:
-        row_hash = exact_duplicate_hash(row.features, schema)
+        row_hash = exact_duplicate_hash(row.features, schema) #TODO: PERF: group duplicate rows column-wise (sort/tabulate normalized column tuples) instead of one sha256 per row; encode each distinct row once
         groups.setdefault(row_hash, []).append(row)
     return DuplicateGroups(
         tuple((row_hash, tuple(members)) for row_hash, members in sorted(groups.items()))

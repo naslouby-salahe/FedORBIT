@@ -98,7 +98,7 @@ def hierarchical_bootstrap_relative_gains(
         for position in range(replicate_count):
             outcomes = replicate_outcomes[int(selected[position])]
             resample_indices = tuple(
-                torch.randint(0, losses.shape[0], (losses.shape[0],), generator=bootstrap_rng)
+                torch.randint(0, losses.shape[0], (losses.shape[0],), generator=bootstrap_rng) #TODO: PERF: draw all bootstrap resamples in one tensor call and vectorize the loss aggregation instead of per-resample python loops
                 for losses in outcomes.baseline_losses_by_class
             )
             baseline = _macro_ce_from_losses(outcomes.baseline_losses_by_class, resample_indices)

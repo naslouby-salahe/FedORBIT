@@ -59,7 +59,7 @@ class FinalResponseEstimate:
     stability_rule_passed: bool
 
 
-def max_t_critical_value(
+def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, resamples) - pure, deterministic (functools.lru_cache)
     entry_derivatives: tuple[tuple[float, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entry_derivatives)
     seed: RandomSeed,
     resamples: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: resamples)
@@ -109,7 +109,7 @@ def max_t_critical_value(
     maxima: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for _ in range(resample_count):
         indices = tuple(
-            int(torch.randint(0, replicate_count, (1,), generator=rng)[0])
+            int(torch.randint(0, replicate_count, (1,), generator=rng)[0]) #TODO: PERF: draw all replicate indices in one torch.randint((resample_count, replicate_count)) tensor and vectorize the reduction
             for _ in range(replicate_count)
         )
         studentized: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -175,7 +175,7 @@ def estimate_response_bands(
         raise ResponseUncertaintyError(
             "response estimation requires at least two paired replicates"
         )
-    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this #TODO: PERF: accumulate bootstrap statistics in a preallocated numpy/torch array instead of python list-of-lists append per replicate
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
             shadow_data = ShadowData(

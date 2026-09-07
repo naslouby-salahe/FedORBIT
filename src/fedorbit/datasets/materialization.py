@@ -122,7 +122,7 @@ def _read_component_rows(
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
         frames.append(frame)
-        raw_files.append(RawFileProvenance(str(path), file_sha256(path), len(frame)))
+        raw_files.append(RawFileProvenance(str(path), file_sha256(path), len(frame))) #TODO: PERF: hashing triggers a second full disk read of every raw file - hash during the read pass (wrap the handle) or reuse persisted RawFileProvenance.sha256 while (size, mtime) is unchanged
     columns = reconcile_component_columns(tuple(per_file_columns))
     combined = pd.concat(
         [frame.reindex(columns=list(columns)) for frame in frames],
@@ -132,7 +132,7 @@ def _read_component_rows(
         [cast(str, value) for value in combined[column].to_numpy(dtype=object)]
         for column in columns
     ]
-    rows = [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)]
+    rows = [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)] #TODO: PERF: keep the raw lineage columnar - one dict per row for the whole dataset dominates runtime; use column arrays (pandas/polars) and build row objects only where mandatory
     return columns, rows, tuple(raw_files)
 
 
@@ -201,7 +201,7 @@ def _build_normalized_rows(
         values: OrderedDict[str, RawFeatureValue] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for column in behavioral:
             is_categorical = column in categorical_columns
-            values[column] = normalize_value(row.get(column, ""), is_categorical)
+            values[column] = normalize_value(row.get(column, ""), is_categorical) #TODO: PERF: normalize column-wise with numpy/pandas vector ops instead of per-row, per-value Python normalization
         normalized_rows.append(
             NormalizedRow(
                 features=NormalizedFeatureVector(values),
@@ -219,7 +219,7 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
     )
     counts: defaultdict[str, int] = defaultdict(int) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for row in rows:
-        counts[row.label] += 1
+        counts[row.label] += 1 #TODO: PERF: replace the per-row class counter with pandas value_counts / groupby on a category dtype
     retained = sorted(
         label for label, count in counts.items() if label == "normal" or count >= minimum
     )
@@ -269,13 +269,13 @@ def _assign_splits(
 def _numeric_array(rows: Sequence[NormalizedRow], 
                    column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
                    ) -> np.ndarray:
-    return np.array([row.features.value_of(column) for row in rows], dtype=object)
+    return np.array([row.features.value_of(column) for row in rows], dtype=object) #TODO: PERF: build numeric arrays column-wise once instead of per-row feature.value_of lookups
 
 
 def _categorical_array(rows: Sequence[NormalizedRow], 
                        column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
                        ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return tuple(str(row.features.value_of(column)) for row in rows)
+    return tuple(str(row.features.value_of(column)) for row in rows) #TODO: PERF: build categorical arrays column-wise once instead of per-row feature.value_of lookups
 
 
 def _missing_indicator(rows: Sequence[NormalizedRow], 
@@ -321,7 +321,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
     rows = _build_normalized_rows(schema, raw_rows)
     del raw_rows
     assert schema.timestamp_column is not None
-    timestamp_range = (
+    timestamp_range = ( #TODO: PERF: compute timestamp bounds on the parsed column array instead of min/max over row objects
         min(row.timestamp_fraction for row in rows),
         max(row.timestamp_fraction for row in rows),
     )
@@ -341,7 +341,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         (
             label,
             OrderedDict(
-                (split, sum(1 for row in buckets[split] if row.label == label)) for split in Split
+                (split, sum(1 for row in buckets[split] if row.label == label)) for split in Split #TODO: PERF: derive per-split class counts with vectorized groupby/value_counts instead of nested per-row sums
             ),
         )
         for label in manifest.class_names
@@ -423,7 +423,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         matrix = (
             np.stack(blocks, axis=1) if blocks else np.empty((len(split_rows), 0), dtype=np.float32)
         )
-        targets = np.array([manifest.index_of(row.label) for row in split_rows], dtype=np.int64)
+        targets = np.array([manifest.index_of(row.label) for row in split_rows], dtype=np.int64) #TODO: PERF: convert labels to integer codes once (vectorized) instead of per-row manifest.index_of
         splits[split] = SplitTensors(
             torch.from_numpy(matrix.astype(np.float32, copy=False)),
             torch.from_numpy(targets),

@@ -1,3 +1,5 @@
+#TODO: delete this file completely. None of these methods are needed. Remove them from the code. OR just have them in unit tests.
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -12,15 +14,17 @@ class ConfigurationContractError(ValueError):
 
 _registered_method_names = {candidate.value for candidate in TransferMethod}
 
-_experiment_local_method_names = {"exact_orbit"}
+_experiment_local_method_names = {"exact_orbit"} #TODO: i prefer not using this
 
 
-def _require(condition: bool, message: str) -> None:
+def _require(condition: bool,
+             message: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+             ) -> None:
     if not condition:
         raise ConfigurationContractError(message)
 
 
-def _validate_split_intervals(config: FedorbitConfig) -> None:
+def _validate_split_intervals(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     intervals = config.scientific.split.duplicate_safe_chronological_intervals
     numerical_tolerance = config.scientific.source_response_pilot.numerical_floor
     named: OrderedDict[str, tuple[float, float]] = OrderedDict(
@@ -51,7 +55,7 @@ def _validate_split_intervals(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_seeds(config: FedorbitConfig) -> None:
+def _validate_seeds(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     randomness = config.scientific.randomness
     _require(len(randomness.pilot_seeds) == 3, "pilot seed list must contain exactly 3 seeds")
     _require(
@@ -77,7 +81,7 @@ def _validate_seeds(config: FedorbitConfig) -> None:
     _require(randomness.statistical_seed > 0, "statistical seed must be positive")
 
 
-def _validate_action(config: FedorbitConfig) -> None:
+def _validate_action(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     action = config.scientific.action
     _require(
         action.principal_sparse_support >= 1,
@@ -111,7 +115,7 @@ def _validate_action(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_datasets(config: FedorbitConfig) -> None:
+def _validate_datasets(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     datasets = config.scientific.datasets
     _require(
         tuple(datasets.clients.keys())
@@ -174,7 +178,7 @@ def _validate_datasets(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_training(config: FedorbitConfig) -> None:
+def _validate_training(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     training = config.scientific.training
     _require(training.maximum_epochs >= 1, "maximum epochs must be at least 1")
     _require(training.batch_size >= 1, "batch size must be at least 1")

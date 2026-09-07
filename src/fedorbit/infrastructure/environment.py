@@ -18,7 +18,7 @@ from fedorbit.config.loading import active_config, repository_root
 from fedorbit.config.models import FrozenModel
 from fedorbit.types import ByteCount, Index
 
-DEPENDENCY_SPECS = (
+DEPENDENCY_SPECS = ( #TODO: remove this from the code compeletely and any callers
     ("pytorch", "torch"),
     ("numpy", "numpy"),
     ("scipy", "scipy"),
@@ -38,7 +38,7 @@ class EnvironmentMismatchError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
-class DependencyVersion:
+class DependencyVersion: #TODO: remove this from code
     configured_key: str
     distribution: str
     configured: str
@@ -51,32 +51,32 @@ class DependencyVersion:
 
 @dataclass(frozen=True, slots=True)
 class HardwareIdentity:
-    gpu_name: str | None
+    gpu_name: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     gpu_memory_bytes: ByteCount | None
     cuda_available: bool
-    driver_cuda_version: str | None
-    torch_cuda_version: str | None
-    cpu_name: str
+    driver_cuda_version: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    torch_cuda_version: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    cpu_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     ram_bytes: ByteCount
-    os_release: str
+    os_release: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
 class EnvironmentSnapshot:
-    python_version: str
-    dependencies: tuple[DependencyVersion, ...]
+    python_version: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependencies: tuple[DependencyVersion, ...] #TODO: remove this from code
     hardware: HardwareIdentity
-    fingerprint_sha256: str
+    fingerprint_sha256: str #TODO: remove this from code
 
     def mismatches(self) -> tuple[DependencyVersion, ...]:
         return tuple(dependency for dependency in self.dependencies if not dependency.matches)
 
 
-def observed_python_version() -> str:
+def observed_python_version() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     return platform.python_version()
 
 
-def observed_dependencies() -> tuple[DependencyVersion, ...]:
+def observed_dependencies() -> tuple[DependencyVersion, ...]:#TODO remove this from code
     environment = active_config().environment
     observed: list[DependencyVersion] = []
     for configured_key, distribution in DEPENDENCY_SPECS:
@@ -111,10 +111,10 @@ def observed_hardware() -> HardwareIdentity:
     )
 
 
-def _gpu_memory_bytes() -> int | None:
+def _gpu_memory_bytes() -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"], #TODO: use enums
             capture_output=True,
             text=True,
             check=True,
@@ -125,10 +125,10 @@ def _gpu_memory_bytes() -> int | None:
         return None
 
 
-def _driver_version() -> str | None:
+def _driver_version() -> str | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], #TODO: use enums
             capture_output=True,
             text=True,
             check=True,
@@ -139,7 +139,7 @@ def _driver_version() -> str | None:
         return None
 
 
-def _fingerprint(snapshot: EnvironmentSnapshot) -> str:
+def _fingerprint(snapshot: EnvironmentSnapshot) -> str: #TODO: remove this from code
     dependencies = OrderedDict(
         (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
     )
@@ -182,7 +182,7 @@ def environment_snapshot() -> EnvironmentSnapshot:
     )
 
 
-def validate_environment(strict: bool = True) -> EnvironmentSnapshot:
+def validate_environment(strict: bool = True) -> EnvironmentSnapshot: #TODO: remove this from code
     snapshot = environment_snapshot()
     deviations: list[str] = []
     configured_python = active_config().environment.python
@@ -202,7 +202,7 @@ def validate_environment(strict: bool = True) -> EnvironmentSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
-class LockfileSummary:
+class LockfileSummary: #TODO: remove this from code
     hashed_package_count: Index
     package_names: tuple[str, ...]
 
@@ -211,7 +211,7 @@ class LockfileSummary:
         return self.hashed_package_count == len(self.package_names)
 
 
-class LockfileSource(FrozenModel):
+class LockfileSource(FrozenModel): #TODO: remove this from code
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     editable: str | None = None
@@ -220,13 +220,13 @@ class LockfileSource(FrozenModel):
     url: str | None = None
 
 
-class LockfileDistribution(FrozenModel):
+class LockfileDistribution(FrozenModel): #TODO: remove this from code
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     hash: str | None = None
 
 
-class LockfilePackage(FrozenModel):
+class LockfilePackage(FrozenModel): #TODO: remove this from code
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     name: str
@@ -236,13 +236,13 @@ class LockfilePackage(FrozenModel):
     wheels: tuple[LockfileDistribution, ...] = ()
 
 
-class LockfileDocument(FrozenModel):
+class LockfileDocument(FrozenModel): #TODO: remove this from code
     model_config = ConfigDict(frozen=True, extra="ignore")
 
     package: tuple[LockfilePackage, ...] = ()
 
 
-SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"})
+SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"}) #TODO: use enums
 
 
 def _package_has_hash(package: LockfilePackage) -> bool:
@@ -254,7 +254,7 @@ def _package_has_hash(package: LockfilePackage) -> bool:
     return any(wheel.hash is not None for wheel in package.wheels)
 
 
-def _collect_locked_packages(
+def _collect_locked_packages(  #TODO: remove this from code
     packages: tuple[LockfilePackage, ...],
 ) -> tuple[list[str], Mapping[str, str]]:
     package_names: list[str] = []
@@ -270,7 +270,7 @@ def _collect_locked_packages(
     return package_names, locked_versions
 
 
-def validate_lockfile(allow_deviations: frozenset[str] = frozenset()) -> LockfileSummary:
+def validate_lockfile(allow_deviations: frozenset[str] = frozenset()) -> LockfileSummary: #TODO: remove this from code
     lock_path = repository_root() / "uv.lock"
     if not lock_path.is_file():
         raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
@@ -310,7 +310,7 @@ def validate_lockfile(allow_deviations: frozenset[str] = frozenset()) -> Lockfil
     )
 
 
-def reference_gpu_matches() -> bool:
+def reference_gpu_matches() -> bool: #TODO: remove from code
     hardware = observed_hardware()
     reference = active_config().runtime.reference_model_gpu
     if hardware.gpu_name is None or hardware.gpu_memory_bytes is None:

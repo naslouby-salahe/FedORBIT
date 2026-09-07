@@ -35,7 +35,7 @@ from fedorbit.types import (
     WeightDecay,
 )
 
-REFERENCE_LEARNING_RATE = 1.0e-3
+REFERENCE_LEARNING_RATE = 1.0e-3 #TODO : move to constants
 NETWORK_DATASETS = frozenset({DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK})
 HOST_DATASETS = frozenset({DatasetId.TON_IOT_WINDOWS10_HOST, DatasetId.TON_IOT_LINUX_PROCESS_HOST})
 
@@ -87,7 +87,7 @@ def pilot_grid() -> tuple[PilotConfiguration, ...]:
             pilot.dropouts,
         )
     )
-    if len(configurations) != 12:
+    if len(configurations) != 12: #TODO: says who?? Don't just assume. Remove this. Move it to unit tests
         raise PilotError("base-model pilot grid must contain exactly 12 configurations")
     return configurations
 
@@ -98,7 +98,7 @@ def run_base_model_pilot(
     device: torch.device | None = None,
 ) -> tuple[PilotFitResult, ...]:
     seeds = active_config().scientific.randomness.pilot_seeds
-    if len(seeds) != 3:
+    if len(seeds) != 3: #TODO: move to yml and access through configuration
         raise PilotError("base-model pilot requires exactly three pilot seeds")
     class_weights = ClassWeights.from_targets(data.train_targets, data.n_classes)
     results: list[PilotFitResult] = []
@@ -124,7 +124,7 @@ def run_base_model_pilot(
                     candidate.hyperparameters(),
                 )
                 results.append(PilotFitResult(candidate, seed, outcome))
-    if len(results) != 36:
+    if len(results) != 36: #TODO: move to yml and access through configuration
         raise PilotError("base-model pilot must produce exactly 36 fits per client")
     return tuple(results)
 
@@ -137,7 +137,7 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
         )
     candidates: list[PilotSelection] = []
     for configuration, values in grouped.items():
-        if len(values) != 3:
+        if len(values) != 3: #TODO: move to yml and access through configuration
             raise PilotError("every pilot configuration must have exactly three seed results")
         candidates.append(
             PilotSelection(
@@ -146,7 +146,7 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
                 statistics.pstdev(values),
             )
         )
-    if len(candidates) != 12:
+    if len(candidates) != 12: #TODO: move to yml and access through configuration
         raise PilotError("pilot selection requires all 12 registered configurations")
     return min(
         candidates,

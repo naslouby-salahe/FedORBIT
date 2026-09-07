@@ -12,7 +12,7 @@ class SplitError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class DuplicateGroupId:
-    value: str
+    value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not self.value:
@@ -21,7 +21,7 @@ class DuplicateGroupId:
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalFraction:
-    value: float
+    value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.value <= 1.0:
@@ -30,12 +30,12 @@ class ChronologicalFraction:
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalTimestamp:
-    value: float
+    value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalRowCount:
-    value: int
+    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if self.value < 0:

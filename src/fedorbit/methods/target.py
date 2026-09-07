@@ -71,7 +71,7 @@ class TargetImportance:
         return vector
 
     @property
-    def actionable_total(self) -> float:
+    def actionable_total(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return sum(self.weights_by_node_index.values())
 
 
@@ -109,7 +109,7 @@ def estimate_target_response_diagnostic(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[int, ...],
+    intervention_classes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     seed: RandomSeed,
 ) -> FinalResponseEstimate:
     diagnostic = active_config().scientific.target_response_diagnostic
@@ -139,7 +139,7 @@ class SelectionError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SourceProposal:
-    source_client_name: str
+    source_client_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     certified_robust_value: Score
 
 
@@ -152,7 +152,7 @@ class RankedProposal:
 @dataclass(frozen=True, slots=True)
 class SelectionAttempt:
     rank: Index
-    source_client_name: str
+    source_client_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     accepted: bool
 
 
@@ -254,7 +254,7 @@ class OptimizerStepAllocation:
     live_assimilation: StepCount
     nontransferable_safety_reserve: StepCount
 
-    def for_category(self, category: BudgetCategory) -> int:
+    def for_category(self, category: BudgetCategory) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
             return self.target_response_diagnostic
         if category == BudgetCategory.CONFIRMATION_CANDIDATES:
@@ -293,7 +293,7 @@ class OptimizerStepAllocation:
         )
 
     @property
-    def total(self) -> int:
+    def total(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return (
             self.target_response_diagnostic
             + self.confirmation_candidates
@@ -342,7 +342,7 @@ class TargetOptimizerStepLedger:
             consumed_steps=OptimizerStepAllocation(0, 0, 0, 0),
         )
 
-    def remaining(self, category: BudgetCategory) -> int:
+    def remaining(self, category: BudgetCategory) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return self.reserved_steps.for_category(category) - self.consumed_steps.for_category(
             category
         )
@@ -369,7 +369,7 @@ class TargetOptimizerStepLedger:
             )
 
     @property
-    def total_consumed(self) -> int:
+    def total_consumed(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return self.consumed_steps.total
 
 

@@ -12,17 +12,17 @@ class EdgeLoaderError(ValueError):
     pass
 
 
-EDGE_NETWORK_RELATIVE_PATH = (
+EDGE_NETWORK_RELATIVE_PATH = ( #TODO: should be in yaml and accessed through config
     "Edge-IIoTset dataset/Selected dataset for ML and DL/DNN-EdgeIIoT-dataset.csv"
 )
 
 
 @dataclass(frozen=True, slots=True)
 class EdgeTabularFile:
-    relative_path: str
+    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     byte_size: ByteCount
-    sha256: str
-    columns: tuple[str, ...]
+    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def discover_edge_tabular_files(raw_root: Path) -> tuple[Path, ...]:

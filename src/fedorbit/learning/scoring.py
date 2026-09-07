@@ -22,7 +22,7 @@ class ScoringError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class LocalClassCount:
-    value: int
+    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if self.value <= 1:
@@ -31,12 +31,12 @@ class LocalClassCount:
 
 @dataclass(frozen=True, slots=True)
 class ScoreRowIndex:
-    value: int
+    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
 class LocalClassIndex:
-    value: int
+    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)

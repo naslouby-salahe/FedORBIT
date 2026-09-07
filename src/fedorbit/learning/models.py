@@ -5,7 +5,10 @@ from torch import nn
 
 
 class NetworkFlowClassifier(nn.Module):
-    def __init__(self, input_dim: int, n_classes: int, dropout_probability: float) -> None:
+    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 n_classes: int,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
             raise ValueError("network classifier dimensions must be positive")
@@ -42,7 +45,10 @@ class NetworkFlowClassifier(nn.Module):
 
 
 class HostClassifier(nn.Module):
-    def __init__(self, input_dim: int, n_classes: int, dropout_probability: float) -> None:
+    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 n_classes: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                 ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
             raise ValueError("host classifier dimensions must be positive")
@@ -50,24 +56,24 @@ class HostClassifier(nn.Module):
             raise ValueError("dropout probability must be in [0, 1)")
         self.dropout_probability = dropout_probability
         self.block1 = nn.Sequential(
-            nn.Linear(input_dim, 192),
+            nn.Linear(input_dim, 192), #TODO: move to constants
             nn.ReLU(inplace=False),
             nn.BatchNorm1d(
-                192,
-                eps=1e-5,
-                momentum=0.1,
+                192, #TODO: move to constants
+                eps=1e-5, #TODO: move to constants
+                momentum=0.1, #TODO: move to constants
                 affine=True,
                 track_running_stats=True,
             ),
             nn.Dropout(dropout_probability),
         )
         self.block2 = nn.Sequential(
-            nn.Linear(192, 96),
+            nn.Linear(192, 96), #TODO: move to constants
             nn.ReLU(inplace=False),
             nn.Dropout(dropout_probability),
         )
-        self.block3 = nn.Sequential(nn.Linear(96, 48), nn.ReLU(inplace=False))
-        self.classifier = nn.Linear(48, n_classes)
+        self.block3 = nn.Sequential(nn.Linear(96, 48), nn.ReLU(inplace=False)) #TODO: move to constants
+        self.classifier = nn.Linear(48, n_classes) #TODO: move to constants
         self.to(dtype=torch.float32)
 
     def initialize(self, generator: torch.Generator) -> None:

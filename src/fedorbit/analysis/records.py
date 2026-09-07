@@ -22,7 +22,7 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$") #TODO: centralize this. Seems duplicated
 
 
 class MetricDirection(StrEnum):
@@ -58,19 +58,19 @@ class FrozenRecord(BaseModel):
 
 class PredictionRecord(FrozenRecord):
     experiment: ExperimentName
-    pair: str
+    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     method: TransferMethod
-    condition: str
+    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     seed: RandomSeed
-    row_hash: str
+    row_hash: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     split: Split
-    true_local_class_id: str
-    predicted_local_class_id: str
-    probabilities: tuple[float, ...]
-    loss: float
-    checkpoint_artifact_id: str
-    processed_split_artifact_id: str
-    dependency_fingerprint_sha256: str
+    true_local_class_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    predicted_local_class_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    probabilities: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    loss: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    processed_split_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     @model_validator(mode="after")
     def validate_record(self) -> PredictionRecord:
@@ -99,19 +99,19 @@ class PredictionRecord(FrozenRecord):
 
 class MetricRecord(FrozenRecord):
     experiment: ExperimentName
-    pair: str
+    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     method: TransferMethod
-    condition: str
+    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     seed: RandomSeed
     metric_name: MetricId
     metric_value: Estimate | None
-    metric_unit: str
+    metric_unit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     direction: MetricDirection
-    evaluation_class_set_sha256: str
-    input_artifact_ids: tuple[str, ...]
-    dependency_fingerprint_sha256: str
+    evaluation_class_set_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    input_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     valid: bool
-    invalid_reason: str | None
+    invalid_reason: str | None#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     @model_validator(mode="after")
     def validate_record(self) -> MetricRecord:
@@ -134,9 +134,9 @@ class MetricRecord(FrozenRecord):
 
 
 class PairedComparisonRecord(FrozenRecord):
-    contrast_name: str
+    contrast_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     family: MultiplicityFamily
-    pair: str
+    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     method_a: TransferMethod
     method_b: TransferMethod
     metric: MetricId
@@ -150,8 +150,8 @@ class PairedComparisonRecord(FrozenRecord):
     materiality_threshold: RelativeGain | None
     equivalence_margin_low: RelativeGain | None
     equivalence_margin_high: RelativeGain | None
-    input_metric_artifact_ids: tuple[str, ...]
-    dependency_fingerprint_sha256: str
+    input_metric_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     decision: ComparisonDecision
 
     @model_validator(mode="after")
@@ -201,7 +201,7 @@ class PairedComparisonRecord(FrozenRecord):
 
 
 class StatisticalMetadataRecord(FrozenRecord):
-    test_name: str
+    test_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     exact_or_asymptotic: StatisticalExactness
     alternative: StatisticalAlternative
     zero_difference_count: Index
@@ -209,7 +209,7 @@ class StatisticalMetadataRecord(FrozenRecord):
     bootstrap_seed: RandomSeed | None
     holm_rank: Index | None
     family_size: SampleCount
-    statistical_code_sha256: str
+    statistical_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     @model_validator(mode="after")
     def validate_record(self) -> StatisticalMetadataRecord:
@@ -229,7 +229,9 @@ class StatisticalMetadataRecord(FrozenRecord):
         return self
 
 
-def _require_sha256(value: str, field_name: str) -> None:
+def _require_sha256(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+, field_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> None:
     if _SHA256.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
@@ -252,7 +254,8 @@ def validate_prediction_records(
     records: PredictionRecordCollection,
 ) -> PredictionRecordCollection:
     materialized = records.records
-    identities: set[tuple[str, str, str, str, int, str, str]] = set()
+    identities: set[tuple[str, str, str, str, int, str, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                    ] = set()
     for record in materialized:
         identity = (
             record.experiment.value,
@@ -269,9 +272,10 @@ def validate_prediction_records(
     return PredictionRecordCollection(materialized)
 
 
-def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection:
+def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection: #TODO: is this duplicated?? Should be handled better
     materialized = records.records
-    identities: set[tuple[str, str, str, str, int, str]] = set()
+    identities: set[tuple[str, str, str, str, int, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                    ] = set()
     for record in materialized:
         identity = (
             record.experiment.value,

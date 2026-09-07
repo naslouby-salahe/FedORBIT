@@ -184,13 +184,13 @@ class StorageError(ValueError):
     pass
 
 
-def atomic_write_json(path: Path, payload: StableJsonPayload) -> None:
+def atomic_write_json(path: Path, payload: StableJsonPayload) -> None: #TODO: should be in paths/storage package
     atomic_write_bytes(path, (stable_json(payload) + "\n").encode("utf-8"))
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=".tmp-")
+    descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=".tmp-") #TODO: use enum
     try:
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(data)
@@ -206,9 +206,9 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
 class ArtifactStore:
     def __init__(self, root: Path) -> None:
         self._root = root
-        self._manifests = root / "manifests"
-        self._completions = root / "completions"
-        self._staging = root / "staging"
+        self._manifests = root / "manifests" #TODO: use enums
+        self._completions = root / "completions" #TODO: use enums
+        self._staging = root / "staging" #TODO: use enums
 
     @property
     def root(self) -> Path:
@@ -276,7 +276,7 @@ class ArtifactStore:
     ) -> ReusableArtifactManifest | None:
         if not self._manifests.is_dir():
             return None
-        for path in sorted(self._manifests.glob("*.json")):
+        for path in sorted(self._manifests.glob("*.json")): #TODO: use enums
             manifest = ReusableArtifactManifest.model_validate_json(
                 path.read_text(encoding="utf-8")
             )
@@ -298,7 +298,7 @@ class ArtifactStore:
             return ()
         return tuple(
             ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in sorted(self._manifests.glob("*.json"))
+            for path in sorted(self._manifests.glob("*.json")) #TODO: use enums
         )
 
 
@@ -433,7 +433,7 @@ def _recover(store: ArtifactStore, cells: tuple[ExecutionCell, ...]) -> None:
 
 
 def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparationResult:
-    raw_root = repository_root() / "data" / "raw"
+    raw_root = repository_root() / "data" / "raw" #TODO: should be in yaml
     inventories = tuple(
         inspect_raw_inventory(RawInventoryRequest(dataset, raw_root))
         for dataset in request.datasets
@@ -443,7 +443,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     store = execution_store()
     persisted_inventory_paths = tuple(
         persist_raw_inventory(
-            RawInventoryPersistenceRequest(inventory, store.root / "preprocessing")
+            RawInventoryPersistenceRequest(inventory, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
         )
         for inventory in inventories
     )
@@ -456,13 +456,13 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
         raise ExecutionError("dataset observation collection did not cover every requested dataset")
     validation_paths = tuple(
         persist_dataset_observation(
-            DatasetObservationPersistenceRequest(observation, store.root / "preprocessing")
+            DatasetObservationPersistenceRequest(observation, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
         )
         for observation in observations
     )
     duplicate_paths = tuple(
         persist_raw_duplicate_report(
-            RawDuplicateReportRequest(dataset, raw_root, store.root / "preprocessing")
+            RawDuplicateReportRequest(dataset, raw_root, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
         )
         for dataset in request.datasets
     )
@@ -491,7 +491,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     )
 
 
-def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:
+def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:  #TODO: remove this from code and move to tests
     del overwrite_policy
     seed = active_config().scientific.randomness.pilot_seeds[0]
     exact = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 2), seed))
@@ -551,7 +551,7 @@ def _execute_producer_with_retry(producer: Callable[[], ReusableArtifactManifest
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
-                    cell_coordinates=SemanticCoordinates("infrastructure-retry"),
+                    cell_coordinates=SemanticCoordinates("infrastructure-retry"), #TODO: should be enum
                     artifact_id=None,
                     state=ArtifactState.RUNNING if decision.retry else ArtifactState.FAILED,
                     reuse_decision=(
@@ -567,7 +567,7 @@ def _execute_producer_with_retry(producer: Callable[[], ReusableArtifactManifest
             attempt += 1
 
 
-def run_experiment(request: ExperimentExecutionRequest) -> None:
+def run_experiment(request: ExperimentExecutionRequest) -> None: #TODO: should be handled better
     store = execution_store()
     layout = build_layout()
     if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
@@ -649,7 +649,7 @@ def execute_dataset_client_and_resource_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
-    raw_root = repository_root() / "data" / "raw"
+    raw_root = repository_root() / "data" / "raw"  #TODO: should be in yaml and centralized and accessed from config
     datasets: list[StableJsonPayload] = []
     materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
     for dataset in active_config().scientific.datasets.clients:
@@ -725,12 +725,12 @@ def execute_dataset_client_and_resource_validation(
             ),
         ),
         frozenset(),
-        "fedorbit.infrastructure.execution",
+        "fedorbit.infrastructure.execution", #TODO: should be deleted. We don't reference this in code. 
         "dataset-client-resource-validation",
     )
 
 
-def _chronology_block_reasons() -> OrderedDict[str, str]:
+def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     raw_root = repository_root() / "data" / "raw"
     primary_datasets = tuple(
         dataset
@@ -752,7 +752,7 @@ def _persist_blocked_experiment(
     request: ExperimentExecutionRequest,
     reasons: OrderedDict[str, str],
 ) -> None:
-    destination = experiment_workspace(layout, request.experiment) / "artifacts" / "derived"
+    destination = experiment_workspace(layout, request.experiment) / "artifacts" / "derived" #TODO: should be enum value. Not hardcoded
     payload = cast(
         StableJsonPayload,
         OrderedDict(
@@ -770,10 +770,10 @@ def _persist_synthetic_experiment_payload(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
     seed: ExperimentSeed,
-    payload_builder: Callable[[str], StableJsonPayload],
-    configuration_sections: frozenset[str],
-    producer_module: str,
-    artifact_name: str,
+    payload_builder: Callable[[str], StableJsonPayload],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    configuration_sections: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    producer_module: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    artifact_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> ReusableArtifactManifest:
     cell = SemanticCell(experiment=request.experiment, seed=seed)
     relevance = experiment_relevance(request.experiment)
@@ -793,9 +793,9 @@ def _persist_synthetic_experiment_payload(
     payload = payload_builder(fingerprint)
     payload_path = (
         experiment_workspace(layout, request.experiment)
-        / "artifacts"
-        / "derived"
-        / f"{artifact_name}.{fingerprint[:16]}.json"
+        / "artifacts" #TODO: use enum. Not hardcoded values
+        / "derived" #TODO: use enum. Not hardcoded values
+        / f"{artifact_name}.{fingerprint[:16]}.json" #TODO: use enum. Not hardcoded values
     )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
@@ -858,7 +858,7 @@ def execute_synthetic_experiment(
 
 
 _THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
-_THEOREM_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+_THEOREM_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. THis is horrible
 
 
 def execute_exact_sparse_theorem_exhaustive_validation(
@@ -879,7 +879,8 @@ def execute_exact_sparse_theorem_exhaustive_validation(
     )
 
 
-def _theorem_exhaustive_validation_payload(fingerprint: str) -> StableJsonPayload:
+def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                                           ) -> StableJsonPayload:
     generator_config = active_config().generators.exact_separator_theorem
     solver_config = active_config().solvers.exact_sparse
     seeds = active_config().scientific.randomness.confirmatory_seeds
@@ -922,15 +923,15 @@ def _theorem_exhaustive_validation_payload(fingerprint: str) -> StableJsonPayloa
 
 
 def _theorem_exhaustive_validation_cell(
-    pattern: tuple[int, ...],
-    support: int,
+    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     seeds: tuple[RandomSeed, ...],
-    instances_per_seed: int,
+    instances_per_seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     blocks: PaddedBlockStructure,
     orbit: tuple[BlockCorrespondence, ...],
-    lap_objective_tie_tolerance: float,
-    action_tie_tolerance: float,
-    exact_validation_absolute_tolerance: float,
+    lap_objective_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    action_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    exact_validation_absolute_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> StableJsonPayload:
     total_nodes = sum(pattern)
     max_absolute_objective_error = 0.0
@@ -983,10 +984,10 @@ def _theorem_exhaustive_validation_cell(
 
 
 _COUPLING_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
-_COUPLING_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+_COUPLING_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
 
 
-def execute_coupling_and_map_bound_validation(
+def execute_coupling_and_map_bound_validation( #TODO: DELETE THIS NOW
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
@@ -1004,7 +1005,8 @@ def execute_coupling_and_map_bound_validation(
     )
 
 
-def _coupling_and_map_bound_validation_payload(fingerprint: str) -> StableJsonPayload:
+def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                                               ) -> StableJsonPayload:
     coupling_config = active_config().generators.coupling_structure
     seeds = active_config().scientific.randomness.confirmatory_seeds
     incompatible_gap_threshold = coupling_config.incompatible_fixed_action_gap_strictly_greater_than
@@ -2137,15 +2139,15 @@ def _score_deterministic_validation_batch() -> ScoreArtifact:
 
 
 def _completion(
-    coordinates: str,
-    fingerprint: str,
-    payload_path: Path,
-    payload_sha256: str,
-    configuration_sha256: str,
-    code_sha256: str,
-    runtime_sha256: str,
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    payload_path: Path, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    payload_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    code_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    runtime_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     stage: ArtifactStage = _STAGE,
-    upstream_artifact_ids: tuple[str, ...] = (),
+    upstream_artifact_ids: tuple[str, ...] = (), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(

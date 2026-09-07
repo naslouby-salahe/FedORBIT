@@ -32,18 +32,19 @@ class WorkspaceError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceLayout:
-    execution_root: Path
-    manuscript_root: Path
-    preprocessing: Path
-    artifacts: Path
-    experiments: Path
-    cache: Path
-    staging: Path
-    results_experiments: Path
-    project_summary: Path
+    execution_root: Path #TODO: should be in config
+    manuscript_root: Path #TODO: delete this from code
+    preprocessing: Path #TODO: should be in config
+    artifacts: Path#TODO: should be in config
+    experiments: Path #TODO: should be in config
+    cache: Path #TODO: should be in config
+    staging: Path #TODO: should be in config
+    results_experiments: Path #TODO: should be in config
+    project_summary: Path #TODO: should be in config
 
 
-def safe_slug(value: str) -> str:
+def safe_slug(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+              ) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     normalized = unicodedata.normalize("NFC", value).casefold()
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
     if not slug:
@@ -59,13 +60,13 @@ def build_layout(root: Path | None = None) -> WorkspaceLayout:
     return WorkspaceLayout(
         execution_root=execution_root,
         manuscript_root=manuscript_root,
-        preprocessing=execution_root / "preprocessing",
-        artifacts=execution_root / "artifacts",
-        experiments=execution_root / "experiments",
-        cache=execution_root / "cache",
-        staging=execution_root / "cache" / "staging",
-        results_experiments=manuscript_root / "experiments",
-        project_summary=manuscript_root / "project_summary",
+        preprocessing=execution_root / "preprocessing", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        artifacts=execution_root / "artifacts", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        experiments=execution_root / "experiments", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        cache=execution_root / "cache", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        staging=execution_root / "cache" / "staging", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        results_experiments=manuscript_root / "experiments", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        project_summary=manuscript_root / "project_summary", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     )
 
 
@@ -80,9 +81,9 @@ def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Pa
 def leaf_path(
     layout: WorkspaceLayout,
     workspace: Path,
-    semantic_coordinates: str,
-    fingerprint_sha256: str,
-    suffix: str,
+    semantic_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fingerprint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    suffix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> Path:
     if not workspace.is_absolute():
         workspace = layout.execution_root / workspace
@@ -169,18 +170,18 @@ class RawDuplicateReportRequest:
 def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
     from fedorbit.infrastructure.execution import atomic_write_json
 
-    destination = request.preprocessing_root / "inventories" / request.inventory.dataset.value
+    destination = request.preprocessing_root / "inventories" / request.inventory.dataset.value #TODO: use enums
     destination.mkdir(parents=True, exist_ok=True)
     atomic_write_json(destination / "manifest.json", request.inventory.serialization_payload())
     atomic_write_json(
-        destination / "checksums.json",
+        destination / "checksums.json", #TODO: use enums
         cast(
             StableJsonPayload,
             OrderedDict((entry.relative_path, entry.sha256) for entry in request.inventory.files),
         ),
     )
     atomic_write_json(
-        destination / "schema.json",
+        destination / "schema.json",#TODO: use enums
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -196,15 +197,15 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
             columns=[list(entry.columns) for entry in request.inventory.files],
         )
     )
-    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet") #TODO: use enums
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
         frame.to_parquet(temporary, index=False, compression="zstd")
-        os.replace(temporary, destination / "files.parquet")
+        os.replace(temporary, destination / "files.parquet") #TODO: use enums
     finally:
         temporary.unlink(missing_ok=True)
-    return destination / "manifest.json"
+    return destination / "manifest.json" #TODO: use enums
 
 
 def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
@@ -225,17 +226,17 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
     )
     frame = pd.DataFrame(
         duplicate_rows,
-        columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count"),
+        columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count"), #TODO: use enums
     )
-    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
+    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet") #TODO: use enums
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
         frame.to_parquet(temporary, index=False, compression="zstd")
-        os.replace(temporary, destination / "duplicates.parquet")
+        os.replace(temporary, destination / "duplicates.parquet") #TODO: use enums
     finally:
         temporary.unlink(missing_ok=True)
-    return destination / "duplicates.parquet"
+    return destination / "duplicates.parquet" #TODO: use enums
 
 
 def _selected_raw_paths(dataset: DatasetId, raw_root: Path) -> tuple[Path, ...]:

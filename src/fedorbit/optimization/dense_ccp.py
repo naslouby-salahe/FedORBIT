@@ -61,10 +61,10 @@ class AssignmentVariableLayout:
         return cls(blocks=blocks, columns=tuple(columns), column_index=index_map)
 
     @property
-    def size(self) -> int:
+    def size(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return len(self.columns)
 
-    def column_of(self, key: AssignmentVariableKey) -> int:
+    def column_of(self, key: AssignmentVariableKey) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return self.column_index[key]
 
     def zeros(self) -> NDArray[np.float64]:

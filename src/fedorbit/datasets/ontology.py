@@ -9,43 +9,44 @@ from dataclasses import dataclass
 from fedorbit.config.loading import active_config
 from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept, SampleCount
 
-NORMAL_LABEL = "normal"
+NORMAL_LABEL = "normal" #TODO: move to constants or enums
 TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
 TRANSFER_ONTOLOGY: Mapping[
-    OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]
+    OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                                 , tuple[str, ...]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ] = OrderedDict[OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]](
     (
         (
             OracleTransferConcept.DDOS,
-            (CoarseGroup.DISRUPTION, ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"), ("ddos",)),
+            (CoarseGroup.DISRUPTION, ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"), ("ddos",)), #TODO: should be in enums
         ),
         (
             OracleTransferConcept.RANSOMWARE,
-            (CoarseGroup.DISRUPTION, ("ransomware",), ("ransomware",)),
+            (CoarseGroup.DISRUPTION, ("ransomware",), ("ransomware",)), #TODO: should be in enums
         ),
-        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, ("backdoor",), ("backdoor",))),
+        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, ("backdoor",), ("backdoor",))), #TODO: should be in enums
         (
             OracleTransferConcept.INJECTION,
-            (CoarseGroup.EXPLOITATION, ("sql_injection",), ("injection",)),
+            (CoarseGroup.EXPLOITATION, ("sql_injection",), ("injection",)), #TODO: should be in enums
         ),
-        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, ("xss",), ("xss",))),
+        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, ("xss",), ("xss",))), #TODO: should be in enums
         (
             OracleTransferConcept.PASSWORD_ATTACK,
-            (CoarseGroup.ACCESS_AND_DISCOVERY, ("password",), ("password",)),
+            (CoarseGroup.ACCESS_AND_DISCOVERY, ("password",), ("password",)), #TODO: should be in enums
         ),
         (
             OracleTransferConcept.SCANNING,
             (
                 CoarseGroup.ACCESS_AND_DISCOVERY,
-                ("port_scanning", "fingerprinting", "vulnerability_scanner"),
-                ("scanning",),
+                ("port_scanning", "fingerprinting", "vulnerability_scanner"), #TODO: should be in enums
+                ("scanning",), #TODO: should be in enums
             ),
         ),
-        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, ("mitm",), ("mitm",))),
+        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, ("mitm",), ("mitm",))), #TODO: should be in enums
     )
 )
-EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({"uploading"})
-TON_ELIGIBLE_LOCAL_CLASSES = frozenset({"dos"})
+EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({"uploading"}) #TODO: should be more centralized and in enums
+TON_ELIGIBLE_LOCAL_CLASSES = frozenset({"dos"}) #TODO: should be more centralized and in enums
 
 
 class OntologyError(ValueError):
@@ -71,18 +72,19 @@ class TransferEligibility:
         return self.target_eligible
 
 
-def normalize_label(raw: str) -> str:
-    normalized = unicodedata.normalize("NFC", raw).strip().casefold()
+def normalize_label(raw: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                    ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    normalized = unicodedata.normalize("NFC", raw).strip().casefold() #TODO: should be in enums
     underscored = re.sub(r"[^0-9a-z]+", "_", normalized)
     return re.sub(r"_+", "_", underscored).strip("_")
 
 
-def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[str, ...]:
+def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     _, edge_labels, ton_labels = TRANSFER_ONTOLOGY[concept]
     return edge_labels if client == DatasetId.EDGE_IIOTSET_NETWORK else ton_labels
 
 
-def native_labels_for(client: DatasetId) -> frozenset[str]:
+def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     labels = {
         label for concept in OracleTransferConcept for label in _native_mapping(client, concept)
     }
@@ -95,7 +97,7 @@ def native_labels_for(client: DatasetId) -> frozenset[str]:
 
 def transfer_concept_for(
     client: DatasetId,
-    normalized_label: str,
+    normalized_label: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> OracleTransferConcept | None:
     matches = tuple(
         concept

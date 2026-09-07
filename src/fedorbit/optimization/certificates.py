@@ -32,7 +32,7 @@ class SeparatorWorkCertificate:
     def verify_against(
         self,
         blocks: PaddedBlockStructure,
-        support_block_counts: tuple[int, ...],
+        support_block_counts: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     ) -> bool:
         from fedorbit.optimization.correspondence import (
             BlockNodeCounts,
@@ -115,7 +115,8 @@ def build_rectangular_hull(
     return RectangularHull(blocks=blocks, lower_bounds=lower, upper_bounds=upper)
 
 
-def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull) -> float:
+def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull
+                     ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     return float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates)
 
 
@@ -123,7 +124,7 @@ def orbit_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     best = -math.inf
     for candidate in action_candidates:
         minimum_response = math.inf
@@ -142,7 +143,7 @@ def rectangular_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     hull: RectangularHull,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     best = -math.inf
     for candidate in action_candidates:
         objective = h_rect_from_hull(candidate, hull) - float(
@@ -159,7 +160,7 @@ def robust_coupling_gap(
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
     hull: RectangularHull,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     return orbit_value_over_candidates(action_candidates, problem, orbit) - (
         rectangular_value_over_candidates(action_candidates, problem, hull)
     )

@@ -41,7 +41,7 @@ def confirmation_schedule(
     train_size: SampleCount,
     batch_size: BatchSize,
     seed: RandomSeed,
-    coordinates: str,
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
         raise ConfirmationError("confirmation TRAIN set is empty")
@@ -78,8 +78,8 @@ def _macro_ce_from_losses(
 def hierarchical_bootstrap_relative_gains(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str,
-) -> tuple[float, ...]:
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     config = active_config()
     confirmation = config.scientific.confirmation
     denominator_floor = config.scientific.metrics.relative_macro_ce_denominator_floor
@@ -113,8 +113,8 @@ def hierarchical_bootstrap_relative_gains(
 def hierarchical_bootstrap_lower_bound(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str,
-) -> float:
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
     lower_probability = 1.0 - active_config().scientific.confirmation.one_sided_confidence_level
     return _linear_quantile(sorted(gains), lower_probability)
@@ -138,7 +138,7 @@ def _linear_quantile(sorted_values: list[float], probability: float) -> float:
 def confirmation_decision(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str,
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> bool:
     lower_bound = hierarchical_bootstrap_lower_bound(replicate_outcomes, seed, contrast_coordinates)
     threshold = (

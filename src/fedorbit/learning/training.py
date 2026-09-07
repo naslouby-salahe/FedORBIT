@@ -36,7 +36,9 @@ class ClassWeights:
     values: torch.Tensor
 
     @classmethod
-    def from_targets(cls, targets: torch.Tensor, n_classes: int) -> ClassWeights:
+    def from_targets(cls, targets: torch.Tensor,
+                     n_classes: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                     ) -> ClassWeights:
         if targets.ndim != 1 or targets.numel() == 0:
             raise LossContractError("TRAIN targets must be a non-empty one-dimensional tensor")
         if n_classes <= 0:
@@ -129,7 +131,7 @@ def optimizer_step(optimizer: torch.optim.Optimizer) -> None:
 
 @dataclass(frozen=True, slots=True)
 class NamedTensor:
-    name: str
+    name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     value: torch.Tensor
 
 
@@ -223,11 +225,11 @@ class TrainingOutcome:
     completed_epochs: EpochCount
 
     @property
-    def epoch(self) -> int:
+    def epoch(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return self.checkpoint.epoch
 
     @property
-    def valid_macro_cross_entropy(self) -> float:
+    def valid_macro_cross_entropy(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         return self.checkpoint.valid_macro_cross_entropy
 
 
@@ -274,7 +276,7 @@ def make_adamw(
 def _seed_training_rng(epoch_seed: RandomSeed, device: torch.device) -> None:
     cpu_state = torch.Generator().manual_seed(epoch_seed).get_state()
     torch.set_rng_state(cpu_state)
-    if device.type != "cuda":
+    if device.type != "cuda": #TODO: use enum for device type
         return
     states = [
         torch.Generator(device=torch.device("cuda", index)).manual_seed(epoch_seed).get_state()

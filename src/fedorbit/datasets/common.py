@@ -35,7 +35,9 @@ class FieldRole(StrEnum):
     FORBIDDEN_PROVENANCE = "forbidden_provenance"
 
 
-def file_sha256(path: Path) -> str:
+def file_sha256(path: Path
+                ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
@@ -43,7 +45,7 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-IDENTITY_MARKERS = (
+IDENTITY_MARKERS = ( #TODO: should be enum
     "ip.",
     "mac",
     "host",
@@ -61,7 +63,7 @@ IDENTITY_MARKERS = (
     "uid",
     "gid",
 )
-PAYLOAD_MARKERS = (
+PAYLOAD_MARKERS = ( #TODO: convert to enum
     "payload",
     "file_data",
     "full_uri",
@@ -70,7 +72,7 @@ PAYLOAD_MARKERS = (
     "options",
     "referer",
 )
-PROVENANCE_MARKERS = ("source_file", "capture", "acquisition", "provenance", "file_name")
+PROVENANCE_MARKERS = ("source_file", "capture", "acquisition", "provenance", "file_name") #TODO: convert to enum
 
 
 class DatasetSchemaError(ValueError):
@@ -81,32 +83,38 @@ def _empty_roles() -> Mapping[str, FieldRole]:
     return OrderedDict()
 
 
-RawCellValue = str | int | float | None
+RawCellValue = str | int | float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this and should be in types
 
 
 @dataclass(frozen=True, slots=True)
 class ObservedColumnSamples:
-    samples_by_column: Mapping[str, tuple[RawCellValue, ...]]
+    samples_by_column: Mapping[str,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                               tuple[RawCellValue, ...]]
 
-    def samples_of(self, column_name: str) -> tuple[RawCellValue, ...]:
+    def samples_of(self, column_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                   ) -> tuple[RawCellValue, ...]:
         return self.samples_by_column.get(column_name, ())
 
 
 @dataclass(frozen=True, slots=True)
 class AdapterSchema:
     dataset_id: DatasetId
-    feature_order: tuple[str, ...]
+    feature_order: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
     roles: Mapping[str, FieldRole] = field(default_factory=_empty_roles)
-    timestamp_column: str | None = None
-    multiclass_label_column: str | None = None
-    binary_label_column: str | None = None
-    observed_columns: tuple[str, ...] = field(default_factory=tuple)
-    excluded_columns: tuple[str, ...] = field(default_factory=tuple)
+    timestamp_column: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
+    multiclass_label_column: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    binary_label_column: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    observed_columns: tuple[str, ...] = field(default_factory=tuple) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    excluded_columns: tuple[str, ...] = field(default_factory=tuple) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
 
     def role_of(self, column: str) -> FieldRole:
         return self.roles.get(column, FieldRole.BEHAVIORAL_CATEGORICAL)
 
-    def behavioral_features(self) -> tuple[str, ...]:
+    def behavioral_features(self) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
         return tuple(
             column
             for column in self.feature_order
@@ -117,25 +125,28 @@ class AdapterSchema:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedLabelColumns:
-    multiclass_label_field: str
-    binary_label_field: str
+    multiclass_label_field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    binary_label_field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
 
 
 @dataclass(frozen=True, slots=True)
 class AdapterContract:
     dataset_id: DatasetId
-    timestamp_candidates: tuple[str, ...]
-    multiclass_label_candidates: tuple[str, ...]
-    binary_label_candidates: tuple[str, ...]
-    additional_exclusions: frozenset[str] = frozenset()
-    official_feature_order: tuple[str, ...] = ()
+    timestamp_candidates: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    multiclass_label_candidates: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    binary_label_candidates: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    additional_exclusions: frozenset[str] = frozenset() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    official_feature_order: tuple[str, ...] = () #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
 
 
 def exactly_one_candidate(
-    columns: tuple[str, ...],
-    candidates: tuple[str, ...],
-    semantic_role: str,
-) -> str:
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    semantic_role: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+
     observed = tuple(column for column in columns if column in candidates)
     if len(observed) != 1:
         message = (
@@ -147,12 +158,12 @@ def exactly_one_candidate(
 
 
 def resolve_timestamp_column(
-    columns: tuple[str, ...],
-    candidates: tuple[str, ...],
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     parse_success_fraction: Fraction,
     minimum_fraction: Fraction,
-) -> str:
-    column = exactly_one_candidate(columns, candidates, "timestamp")
+) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    column = exactly_one_candidate(columns, candidates, "timestamp") #TODO: do not hardcode values. Use enum for semantic roles
     if parse_success_fraction < minimum_fraction:
         message = (
             f"timestamp alias {column!r} parse success {parse_success_fraction} "
@@ -163,27 +174,28 @@ def resolve_timestamp_column(
 
 
 def resolve_label_columns(
-    columns: tuple[str, ...],
-    expected_multiclass: tuple[str, ...],
-    expected_binary: tuple[str, ...],
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    expected_multiclass: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    expected_binary: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> ResolvedLabelColumns:
     return ResolvedLabelColumns(
-        exactly_one_candidate(columns, expected_multiclass, "multiclass label"),
-        exactly_one_candidate(columns, expected_binary, "binary label"),
+        exactly_one_candidate(columns, expected_multiclass, "multiclass label"), #TODO: do not hardcode strings. Use enum for semantic roles
+        exactly_one_candidate(columns, expected_binary, "binary label"), #TODO: do not hardcode strings. Use enum for semantic roles
     )
 
 
 def is_missing_sample(value: RawCellValue) -> bool:
-    return str(value).strip().casefold() in ("", "0", "0.0", "nan", "none", "null")
+    return str(value).strip().casefold() in ("", "0", "0.0", "nan", "none", "null") #TODO: use enum for these strings
 
 
-def _lossless_float64(value: str | int | float) -> bool:
+def _lossless_float64(value: str | int | float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                      ) -> bool:
     if isinstance(value, bool):
         return False
     if isinstance(value, (int, float)):
         return math.isfinite(float(value))
     text = value.strip().casefold()
-    if text in ("nan", "inf", "-inf", "infinity", "-infinity"):
+    if text in ("nan", "inf", "-inf", "infinity", "-infinity"): #TODO: use enum for these strings
         return False
     try:
         return math.isfinite(float(text))
@@ -202,7 +214,8 @@ def infer_feature_type(samples: tuple[RawCellValue, ...]) -> FieldRole:
     return FieldRole.BEHAVIORAL_CATEGORICAL
 
 
-def role_for_field(field: str) -> FieldRole:
+def role_for_field(field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                   ) -> FieldRole:
     lowered = field.casefold()
     if any(marker in lowered for marker in PROVENANCE_MARKERS):
         return FieldRole.FORBIDDEN_PROVENANCE
@@ -223,7 +236,7 @@ class DatasetAdapter:
 
     def resolve_schema(
         self,
-        observed_columns: tuple[str, ...],
+        observed_columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         timestamp_parse_success_fraction: Fraction,
         timestamp_alias_minimum: Fraction,
         observed_value_samples: ObservedColumnSamples | None = None,
@@ -241,7 +254,8 @@ class DatasetAdapter:
             self._contract.multiclass_label_candidates,
             self._contract.binary_label_candidates,
         )
-        roles: OrderedDict[str, FieldRole] = OrderedDict()
+        roles: OrderedDict[str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                           FieldRole] = OrderedDict()
         excluded = self._contract.additional_exclusions
         for column in observed_columns:
             if column == timestamp:
@@ -307,35 +321,35 @@ class DatasetInspectionRequest:
 
 @dataclass(frozen=True, slots=True)
 class LabelCount:
-    label: str
-    row_count: int
+    label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
 class EventTimeInspection:
-    field: str
-    observed_row_count: int
-    timestamp_pattern_row_count: int
-    unusable_row_count: int
+    field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    observed_row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    timestamp_pattern_row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    unusable_row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     state: ChronologyValidationState
-    reason: str
+    reason: str#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
 class DatasetObservation:
     dataset: DatasetId
-    row_count: int
-    observed_columns: tuple[str, ...]
+    row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    observed_columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     local_class_counts: tuple[LabelCount, ...]
     binary_label_counts: tuple[LabelCount, ...]
-    inconsistent_binary_label_rows: int
+    inconsistent_binary_label_rows: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     event_time: EventTimeInspection
 
     @property
     def valid_for_chronological_preprocessing(self) -> bool:
         return self.event_time.state == ChronologyValidationState.VALID
 
-    def fingerprint(self) -> str:
+    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         payload = stable_json(cast(StableJsonPayload, self))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -355,12 +369,13 @@ def inspect_dataset(request: DatasetInspectionRequest) -> DatasetObservation:
     timestamp_field = (
         active_config().scientific.datasets.clients[request.dataset].expected_timestamp_field
     )
-    class_counts: Counter[str] = Counter()
-    binary_counts: Counter[str] = Counter()
+    class_counts: Counter[str] = Counter() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    binary_counts: Counter[str] = Counter() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     event_time_tally = EventTimeTally()
     rows = 0
     inconsistent = 0
-    per_file_columns: list[tuple[str, ...]] = []
+    per_file_columns: list[tuple[str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                                 ...]] = []
     for path in paths:
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
@@ -402,11 +417,11 @@ def inspect_dataset(request: DatasetInspectionRequest) -> DatasetObservation:
 def persist_dataset_observation(request: DatasetObservationPersistenceRequest) -> Path:
     from fedorbit.infrastructure.execution import atomic_write_json
 
-    destination = request.preprocessing_root / "validation" / request.observation.dataset.value
+    destination = request.preprocessing_root / "validation" / request.observation.dataset.value #TODO: should be handled in path management module and also no hardcoded strings. SHould be in enum
     destination.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(destination / "validation.json", cast(StableJsonPayload, request.observation))
+    atomic_write_json(destination / "validation.json", cast(StableJsonPayload, request.observation)) #TODO: should be handled in path management module and also no hardcoded strings. SHould be in enum
     atomic_write_json(
-        destination / "leakage.json",
+        destination / "leakage.json", #TODO: should be handled in path management module and also no hardcoded strings. SHould be in enum
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -417,7 +432,7 @@ def persist_dataset_observation(request: DatasetObservationPersistenceRequest) -
         ),
     )
     atomic_write_json(
-        destination / "timestamp_aliases.json",
+        destination / "timestamp_aliases.json", #TODO: should be handled in path management module and also no hardcoded strings. SHould be in enum
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -427,22 +442,23 @@ def persist_dataset_observation(request: DatasetObservationPersistenceRequest) -
             ),
         ),
     )
-    return destination / "validation.json"
+    return destination / "validation.json" #TODO: should be handled in path management module and also no hardcoded strings. SHould be in enum
 
 
 @dataclass(frozen=True, slots=True)
 class LabelFields:
-    multiclass_field: str
-    binary_field: str
+    multiclass_field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    binary_field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(slots=True)
 class EventTimeTally:
-    observed_row_count: int = 0
-    timestamp_pattern_row_count: int = 0
-    resolvable_row_count: int = 0
+    observed_row_count: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    timestamp_pattern_row_count: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    resolvable_row_count: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    def observe(self, value: str) -> None:
+    def observe(self, value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                ) -> None:
         self.observed_row_count += 1
         ambiguous = _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None
         resolvable = _is_resolvable_event_time(value)
@@ -450,7 +466,8 @@ class EventTimeTally:
         self.resolvable_row_count += int(resolvable)
 
 
-def _is_resolvable_event_time(value: str) -> bool:
+def _is_resolvable_event_time(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                              ) -> bool:
     if _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None:
         return False
     try:
@@ -472,13 +489,13 @@ def _is_resolvable_event_time(value: str) -> bool:
 
 def _labels_for(dataset: DatasetId) -> LabelFields:
     if dataset == DatasetId.EDGE_IIOTSET_NETWORK:
-        return LabelFields("Attack_type", "Attack_label")
-    return LabelFields("type", "label")
+        return LabelFields("Attack_type", "Attack_label") #TODO should be enum
+    return LabelFields("type", "label") #TODO should be enum
 
 
 def reconcile_component_columns(
-    columns_by_file: tuple[tuple[str, ...], ...],
-) -> tuple[str, ...]:
+    columns_by_file: tuple[tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     if not columns_by_file:
         raise DatasetInspectionError("no selected component table")
     reference_columns = list(columns_by_file[0])
@@ -514,11 +531,13 @@ def _selected_paths(request: DatasetInspectionRequest) -> tuple[Path, ...]:
     )
 
 
-def _binary_label_disagrees(multiclass: str, binary: str) -> bool:
+def _binary_label_disagrees(multiclass: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                            binary: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                            ) -> bool:
     normalized = normalize_label(multiclass)
-    if binary not in ("0", "1"):
+    if binary not in ("0", "1"): #TODO: should be enum
         return True
-    return (normalized == "normal") != (binary == "0")
+    return (normalized == "normal") != (binary == "0") #TODO: should be enum
 
 
 def _sorted_counts(counts: Counter[str]) -> tuple[LabelCount, ...]:
@@ -526,27 +545,27 @@ def _sorted_counts(counts: Counter[str]) -> tuple[LabelCount, ...]:
 
 
 def inspect_event_time(
-    field: str,
-    columns: tuple[str, ...],
+    field: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     tally: EventTimeTally,
     inconsistent_label_rows: Index,
 ) -> EventTimeInspection:
     rows = tally.observed_row_count
     if inconsistent_label_rows:
         return EventTimeInspection(
-            field,
-            rows,
-            0,
-            rows,
+            field, #TODO; this seems duplicated
+            rows, #TODO: this does not seem safe, nor clean
+            0, #TODO: this does not seem safe, nor clean
+            rows, #TODO: this does not seem safe, nor clean
             ChronologyValidationState.LABEL_INCONSISTENCY,
             "binary and multiclass label partitions disagree",
         )
     if field not in columns:
         return EventTimeInspection(
-            field,
-            0,
-            0,
-            0,
+            field, #TODO; this seems duplicated
+            0, #TODO; This does not seem safe nor clean
+            0, #TODO; This does not seem safe nor clean
+            0, #TODO; This does not seem safe nor clean
             ChronologyValidationState.MISSING_FIELD,
             "the configured event-time field is absent from the selected table",
         )

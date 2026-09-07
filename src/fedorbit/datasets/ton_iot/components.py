@@ -10,11 +10,11 @@ from fedorbit.types import DatasetId
 @dataclass(frozen=True, slots=True)
 class TonIotComponent:
     dataset_id: DatasetId
-    component_name: str
-    relative_paths: tuple[str, ...]
+    component_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relative_paths: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
-TON_COMPONENTS = (
+TON_COMPONENTS = ( #TODO: should be in yaml and accessed through config
     TonIotComponent(
         DatasetId.TON_IOT_WINDOWS10_HOST,
         "windows10_host",

@@ -40,10 +40,10 @@ class CommittedMapAction:
 
 
 def _block_pair_permutation(
-    entry_count: int,
+    entry_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     seed: RandomSeed,
-    coordinates: str,
-    block_pair_index: int,
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pair_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> NDArray[np.intp]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
@@ -113,9 +113,9 @@ class FairnessViolationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ComparatorResources:
-    source_packet_id: str
-    target_checkpoint_artifact_id: str
-    target_importance_vector_sha256: str
+    source_packet_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_importance_vector_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     action_budget_cap: Budget
     support_cap: SupportCount
     seed: RandomSeed
@@ -123,7 +123,7 @@ class ComparatorResources:
     live_assimilation_step_allowance: StepCount
     test_access_granted: bool
     extra_target_labels: bool
-    additional_tuning_seeds: tuple[int, ...]
+    additional_tuning_seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     local_base_checkpoint_favorable: bool
 
     def validate_contract(self) -> None:
@@ -159,7 +159,8 @@ def assert_identical_resources(
 REGISTERED_METHOD_NAMES = frozenset(method.value for method in TransferMethod)
 
 
-def assert_registered_method_name(name: str) -> None:
+def assert_registered_method_name(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                                  ) -> None:
     if name not in REGISTERED_METHOD_NAMES:
         raise FairnessViolationError(f"unregistered comparator name: {name}")
 
@@ -209,12 +210,12 @@ def _solve_support_lp(
     lp.a_matrix_.index_ = list(range(columns))
     lp.a_matrix_.value_ = budget_coefficients
     highs = highspy.Highs()
-    highs.setOptionValue("output_flag", False)
-    highs.setOptionValue("solver", "simplex")
-    highs.setOptionValue("presolve", "on")
-    highs.setOptionValue("threads", settings.lp_threads_per_solve)
-    highs.setOptionValue("random_seed", settings.deterministic_random_seed)
-    highs.setOptionValue("primal_feasibility_tolerance", settings.lp_primal_feasibility_tolerance)
+    highs.setOptionValue("output_flag", False) #TODO: use enums for these strings
+    highs.setOptionValue("solver", "simplex") #TODO: use enums for these strings
+    highs.setOptionValue("presolve", "on") #TODO: use enums for these strings
+    highs.setOptionValue("threads", settings.lp_threads_per_solve) #TODO: use enums for these strings
+    highs.setOptionValue("random_seed", settings.deterministic_random_seed) #TODO: use enums for these strings
+    highs.setOptionValue("primal_feasibility_tolerance", settings.lp_primal_feasibility_tolerance) #TODO: use enums for these strings
     highs.passModel(lp)
     highs.run()
     if highs.getModelStatus() != highspy.HighsModelStatus.kOptimal:
@@ -230,7 +231,7 @@ def _solve_support_lp(
 def optimize_against_fixed_matrix(
     problem: RobustActionProblem,
     matrix: NDArray[np.float64],
-    support_limit: int | None = None,
+    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> FixedMatrixActionSolution:
     expected_shape = (problem.size, problem.size)
     if matrix.shape != expected_shape:
@@ -273,7 +274,7 @@ def optimize_against_fixed_matrix(
 
 def local_sir_action(
     problem: RobustActionProblem,
-    target_local_response_matrix: NDArray[np.float64],
+    target_local_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> FixedMatrixActionSolution:
     return optimize_against_fixed_matrix(problem, target_local_response_matrix)
 
@@ -283,20 +284,23 @@ class CoarseBlockSummary:
     matrix: NDArray[np.float64]
 
 
-def _real_source_indices(blocks: PaddedBlockStructure, block_index: int) -> range:
+def _real_source_indices(blocks: PaddedBlockStructure,
+                         block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                         ) -> range:
     return range(
         blocks.block_index_range(block_index).start,
         blocks.block_index_range(block_index).start + blocks.source_real_counts[block_index],
     )
 
 
-def _target_block_range(blocks: PaddedBlockStructure, block_index: int) -> range:
+def _target_block_range(blocks: PaddedBlockStructure, block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                        ) -> range:
     return blocks.block_index_range(block_index)
 
 
 def coarse_block_mean_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64],
+    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CoarseBlockSummary:
     size = blocks.total_padded_nodes
     summary = np.zeros((size, size), dtype=np.float64)
@@ -317,7 +321,7 @@ def coarse_block_mean_matrix(
 
 def coarse_block_min_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64],
+    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CoarseBlockSummary:
     size = blocks.total_padded_nodes
     summary = np.zeros((size, size), dtype=np.float64)
@@ -338,15 +342,15 @@ def coarse_block_min_matrix(
 
 def orbit_mean_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64],
+    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CoarseBlockSummary:
     return CoarseBlockSummary(matrix=analytic_orbit_mean(blocks, response_matrix))
 
 
 def matched_resource_rectangular_lower_bounds(
     blocks: PaddedBlockStructure,
-    lower_response_matrix: NDArray[np.float64],
-    upper_response_matrix: NDArray[np.float64],
+    lower_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    upper_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CoarseBlockSummary:
     hull = build_rectangular_hull(blocks, lower_response_matrix, upper_response_matrix)
     return CoarseBlockSummary(matrix=hull.lower_bounds)

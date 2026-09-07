@@ -42,11 +42,11 @@ class DeterministicBackendState:
     cudnn_deterministic: bool
     matmul_allow_tf32: bool
     cudnn_allow_tf32: bool
-    matmul_fp32_precision: str
-    conv_fp32_precision: str
+    matmul_fp32_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    conv_fp32_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     stochastic_rounding: bool
-    default_dtype: str
-    float32_matmul_precision: str
+    default_dtype: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    float32_matmul_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def require_cuda() -> None:
@@ -93,9 +93,9 @@ def test_determinism() -> Generator[None]:
 
 @dataclass(slots=True)
 class EfficiencyMeasurement:
-    wall_time_seconds: float = 0.0
-    peak_host_rss_mib: float = 0.0
-    peak_cuda_allocated_bytes: int = 0
+    wall_time_seconds: float = 0.0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    peak_host_rss_mib: float = 0.0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    peak_cuda_allocated_bytes: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +103,7 @@ class _EfficiencyMeasurementHandle:
     result: EfficiencyMeasurement = field(default_factory=EfficiencyMeasurement)
 
 
-def _peak_host_rss_mib() -> float:
+def _peak_host_rss_mib() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 
@@ -122,7 +122,7 @@ def measure_efficiency() -> Generator[_EfficiencyMeasurementHandle]:
             handle.result.peak_cuda_allocated_bytes = torch.cuda.max_memory_allocated()
 
 
-def _conv_fp32_precision() -> str:
+def _conv_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     conv = getattr(torch.backends.cudnn, "conv", None)
     if conv is not None:
         precision = getattr(conv, "fp32_precision", None)
@@ -131,7 +131,7 @@ def _conv_fp32_precision() -> str:
     return "absent"
 
 
-def _matmul_fp32_precision() -> str:
+def _matmul_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     precision = getattr(torch.backends.cuda.matmul, "fp32_precision", None)
     if precision is not None:
         return str(precision)
@@ -175,12 +175,12 @@ class ExecutionLogEvent:
     cell_coordinates: SemanticCoordinates
     artifact_id: ArtifactIdentifier | None
     state: ArtifactState
-    stage: str | None = None
-    experiment: str | None = None
-    dataset: str | None = None
-    seed: int | None = None
-    elapsed_seconds: float | None = None
-    reuse_decision: str | None = None
+    stage: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    experiment: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dataset: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seed: int | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    elapsed_seconds: float | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    reuse_decision: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 class ExecutionLogger:
@@ -216,8 +216,8 @@ class IncompatibleIdentityError(ValueError):
 @dataclass(frozen=True, slots=True)
 class CodeRevision:
     commit: str
-    dirty: bool
-    tree_digest: str
+    dirty: bool #TODO: do not check for dirty, delete this
+    tree_digest: str #TODO: delete this
 
     def identity(self) -> str:
         suffix = "-dirty" if self.dirty else ""
@@ -286,11 +286,11 @@ def _seed_digest() -> str:
 
 @dataclass(frozen=True, slots=True)
 class ReproducibilityIdentity:
-    config_digest: str
-    seed_digest: str
-    environment_fingerprint: str
-    code_revision: CodeRevision
-    statistical_identity_digest: str
+    config_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seed_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    environment_fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    code_revision: CodeRevision #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    statistical_identity_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def fingerprint(self) -> str:
         return hashlib.sha256(
@@ -388,7 +388,7 @@ def derive_seed32(request: SeedDerivationRequest) -> DerivedSeed:
 @dataclass(frozen=True, slots=True)
 class SeedPlan:
     base_seed: RandomSeed
-    coordinates_json: str
+    coordinates_json: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     streams: tuple[SeedStream, ...]
 
     def seed_for(self, namespace: RngNamespace) -> DerivedSeed:

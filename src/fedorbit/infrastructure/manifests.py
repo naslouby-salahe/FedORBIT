@@ -31,64 +31,64 @@ FINE_CONCEPT_FIELD = "fine_concept"
 
 
 class CompletionManifest(FrozenModel):
-    schema_version: str
-    semantic_experiment_coordinates: str
+    schema_version: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    semantic_experiment_coordinates: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     producer_stage: ArtifactStage
     terminal_state: TerminalState
-    dependency_fingerprint_sha256: str
-    upstream_artifact_ids: tuple[str, ...]
-    mandatory_artifact_paths: tuple[str, ...]
-    mandatory_artifact_sha256: str
-    scientific_configuration_sha256: str
-    relevant_code_sha256: str
-    material_runtime_sha256: str
-    upstream_lineage: str
-    completion_validation_state: str
-    completion_written_last: bool
-    completion_manifest_sha256: str
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    upstream_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    mandatory_artifact_paths: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    mandatory_artifact_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    scientific_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relevant_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    material_runtime_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    upstream_lineage: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    completion_validation_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    completion_written_last: bool #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    completion_manifest_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 class ReusableArtifactManifest(FrozenModel):
-    artifact_id: str
+    artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     artifact_type: ArtifactType
-    semantic_producer_coordinates: str
+    semantic_producer_coordinates: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     producer_stage: ArtifactStage
-    dependency_fingerprint_sha256: str
-    upstream_artifact_ids: tuple[str, ...]
-    applicable_configuration_sha256: str
-    relevant_code_sha256: str
-    material_runtime_sha256: str
-    payload_paths: tuple[str, ...]
-    payload_sha256: str
-    schema_version: str
-    created_git_commit: str
-    created_environment_sha256: str
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    upstream_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    applicable_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relevant_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    material_runtime_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    payload_paths: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    payload_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    schema_version: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    created_git_commit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    created_environment_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     state: ArtifactState
     completion_required: bool = False
-    completion_manifest_sha256: str
+    completion_manifest_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 class DatasetManifest(FrozenModel):
     dataset: DatasetId
-    component: str
-    raw_files: tuple[str, ...]
-    raw_sha256: str
-    raw_counts: Mapping[str, int]
+    component: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    raw_files: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    raw_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    raw_counts: Mapping[str, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     schema_version: str = Field(serialization_alias="schema", validation_alias="schema")
-    adapter_feature_order: tuple[str, ...]
-    adapter_feature_roles: Mapping[str, str]
-    accepted_schema_aliases: tuple[str, ...]
-    adapter_adaptations: tuple[str, ...]
-    timestamp_field: str
-    timestamp_range: tuple[str, str]
-    duplicate_counts: Mapping[str, int]
-    conflicting_duplicate_counts: Mapping[str, int]
-    local_class_counts: Mapping[str, int]
-    transfer_candidate_counts: Mapping[str, int]
-    feature_quality: Mapping[str, str | int | float | bool | None]
-    preprocessing_state: str
-    dependency_fingerprint_sha256: str
-    producer_code_sha256: str
+    adapter_feature_order: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    adapter_feature_roles: Mapping[str, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    accepted_schema_aliases: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    adapter_adaptations: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    timestamp_field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    timestamp_range: tuple[str, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    duplicate_counts: Mapping[str, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    conflicting_duplicate_counts: Mapping[str, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    local_class_counts: Mapping[str, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    transfer_candidate_counts: Mapping[str, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    feature_quality: Mapping[str, str | int | float | bool | None] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    preprocessing_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this 
+    producer_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 class EligibilityCopyKind(StrEnum):
@@ -101,8 +101,8 @@ class TransferEligibilityManifest(FrozenModel):
     client: DatasetId
     seed: RandomSeed
     coarse_group: CoarseGroup
-    anonymous_node_id: str
-    native_local_class_ids: tuple[str, ...]
+    anonymous_node_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    native_local_class_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     present: bool
     train_count: Index
     meta_count: Index
@@ -110,7 +110,7 @@ class TransferEligibilityManifest(FrozenModel):
     test_count: Index
     source_eligible: bool
     target_eligible: bool
-    null_reason: str | None = None
+    null_reason: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     fine_concept: OracleTransferConcept | None = None
 
 
@@ -119,30 +119,30 @@ class SemanticCellManifest(FrozenModel):
     dataset: DatasetId
     source_client: DatasetId
     target_client: DatasetId
-    directed_pair: str
+    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     method: TransferMethod
-    condition: str
+    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     support: Index
     seed: RandomSeed
-    scientific_configuration_sha256: str
-    dependency_fingerprint_sha256: str
+    scientific_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     producer_stage: ArtifactStage
-    upstream_artifact_ids: tuple[str, ...]
-    dataset_manifest_sha256: str
-    split_sha256: str
-    preprocessing_sha256: str
-    source_checkpoint_sha256: str
-    response_packet_sha256: str
-    target_checkpoint_sha256: str
-    importance_vector_sha256: str
-    resource_manifest_sha256: str
-    relevant_code_sha256: str
-    material_runtime_sha256: str
-    git_commit: str
+    upstream_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dataset_manifest_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    split_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    preprocessing_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_packet_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    importance_vector_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    resource_manifest_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relevant_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    material_runtime_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    git_commit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     git_dirty: bool
-    environment_sha256: str
+    environment_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     state: ArtifactState
-    state_reason: str | None = None
+    state_reason: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def eligibility_copy(
@@ -160,11 +160,13 @@ def eligibility_copy(
     return manifest
 
 
-def _sha256(payload: str) -> str:
+def _sha256(payload: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+            ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def file_sha256(path: Path) -> str:
+def file_sha256(path: Path
+                ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
@@ -174,11 +176,11 @@ def file_sha256(path: Path) -> str:
 
 def dependency_fingerprint(
     coordinates: StableJsonPayload,
-    upstream_artifact_ids: tuple[str, ...],
-    configuration_sha256: str,
-    code_sha256: str,
-    runtime_sha256: str,
-) -> str:
+    upstream_artifact_ids: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    code_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    runtime_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     payload = stable_json(
         cast(
             StableJsonPayload,
@@ -195,10 +197,10 @@ def dependency_fingerprint(
 
 
 def artifact_id(
-    artifact_type: str,
+    artifact_type: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     coordinates: StableJsonPayload,
-    fingerprint_sha256: str,
-) -> str:
+    fingerprint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     payload = stable_json(
         cast(
             StableJsonPayload,
@@ -212,6 +214,7 @@ def artifact_id(
     return _sha256(payload)
 
 
-def completion_manifest_self_hash(manifest: CompletionManifest) -> str:
+def completion_manifest_self_hash(manifest: CompletionManifest
+                                  ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     payload = stable_json(manifest.model_dump(mode="json", exclude={"completion_manifest_sha256"}))
     return _sha256(payload)

@@ -61,7 +61,7 @@ STAGE_DEPENDENCIES: Mapping[ArtifactStage, tuple[ArtifactStage, ...]] = OrderedD
     )
 )
 
-RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict(
+RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict( #TODO: DELETE THIS NOW
     (
         (ArtifactStage.RAW, ("numpy", "pandas")),
         (ArtifactStage.PREPROCESSING, ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn")),
@@ -86,7 +86,7 @@ class ProvenanceError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeFingerprint:
+class RuntimeFingerprint: #TODO: DELETE THIS NOW
     components: tuple[str, ...]
     versions: tuple[tuple[str, str], ...]
     digest: str
@@ -97,7 +97,7 @@ class RuntimeFingerprint:
 
 
 @dataclass(frozen=True, slots=True)
-class ProvenanceRecord:
+class ProvenanceRecord: #TODO: DELETE THIS NOW
     artifact_id: str
     created_git_commit: str
     dependency_lock_sha256: str
@@ -107,7 +107,7 @@ class ProvenanceRecord:
     environment_sha256: str
 
 
-def _resolve_module_path(module_name: str) -> Path:
+def _resolve_module_path(module_name: str) -> Path: #TODO: DELETE THIS NOW
     module_path = repository_root() / "src" / Path(*module_name.split(".")).with_suffix(".py")
     if not module_path.is_file():
         module_path = module_path.with_name(module_path.stem) / "__init__.py"
@@ -116,7 +116,7 @@ def _resolve_module_path(module_name: str) -> Path:
     return module_path
 
 
-def _local_imported_modules(tree: ast.Module) -> tuple[str, ...]:
+def _local_imported_modules(tree: ast.Module) -> tuple[str, ...]: #TODO: DELETE THIS NOW
     imported: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fedorbit"):
@@ -126,7 +126,7 @@ def _local_imported_modules(tree: ast.Module) -> tuple[str, ...]:
     return tuple(imported)
 
 
-def _module_source_digest(module_name: str, visited: set[str]) -> str:
+def _module_source_digest(module_name: str, visited: set[str]) -> str: #TODO: DELETE THIS NOW
     if module_name in visited:
         return ""
     visited.add(module_name)
@@ -138,7 +138,7 @@ def _module_source_digest(module_name: str, visited: set[str]) -> str:
     return digest.hexdigest()
 
 
-def implementation_fingerprint(producer_module: str) -> str:
+def implementation_fingerprint(producer_module: str) -> str: #TODO: DELETE THIS NOW
     if not producer_module.startswith("fedorbit"):
         raise ProvenanceError(f"producer must be a fedorbit module: {producer_module}")
     return _module_source_digest(producer_module, set())
@@ -169,7 +169,7 @@ def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     )
 
 
-def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]:
+def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]: #TODO: DELETE THIS NOW
     config = active_config()
     scientific = config.scientific
     return OrderedDict(
@@ -197,7 +197,7 @@ def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]:
     )
 
 
-def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
+def configuration_subset_digest(relevant_sections: frozenset[str]) -> str: #TODO: DELETE THIS NOW
     extractors = _section_extractors()
     values: OrderedDict[str, JsonValue] = OrderedDict()
     for section in sorted(relevant_sections):
@@ -207,7 +207,7 @@ def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
     return hashlib.sha256(stable_json(values).encode("utf-8")).hexdigest()
 
 
-def stage_dependency_fingerprint(
+def stage_dependency_fingerprint( #TODO: DELETE THIS NOW
     stage: ArtifactStage,
     cell: SemanticCell,
     relevance: frozenset[SemanticCoordinate],
@@ -243,3 +243,6 @@ def provenance_record(manifest: ReusableArtifactManifest) -> ProvenanceRecord:
         driver=environment.hardware.driver_cuda_version or "unknown",
         environment_sha256=environment.fingerprint_sha256,
     )
+
+
+#TODO: DELETE THIS whole file

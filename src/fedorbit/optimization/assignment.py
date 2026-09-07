@@ -15,15 +15,15 @@ class AssignmentError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockwiseAssignmentResult:
-    column_for_row: tuple[int, ...]
+    column_for_row: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     objective_value: Score
 
 
 def _completion_cost(
-    costs: NDArray[np.float64],
-    fixed_rows: tuple[int, ...],
-    fixed_columns: tuple[int, ...],
-) -> float:
+    costs: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fixed_rows: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fixed_columns: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     free_rows = [row for row in range(costs.shape[0]) if row not in fixed_rows]
     free_columns = [column for column in range(costs.shape[1]) if column not in fixed_columns]
     if not free_rows:
@@ -36,7 +36,7 @@ def _completion_cost(
 
 
 def solve_minimum_cost_assignment(
-    costs: NDArray[np.float64],
+    costs: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     tie_tolerance: Tolerance,
 ) -> BlockwiseAssignmentResult:
     if costs.ndim != 2 or costs.shape[0] != costs.shape[1]:

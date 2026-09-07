@@ -15,10 +15,10 @@ class TonIotLoaderError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TonIotTabularFile:
-    relative_path: str
+    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     byte_size: ByteCount
-    sha256: str
-    columns: tuple[str, ...]
+    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def discover_ton_iot_component_files(

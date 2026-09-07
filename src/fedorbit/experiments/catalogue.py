@@ -19,8 +19,8 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-_PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs"
-_SECONDARY_PAIRS_LABEL = "optional external directed pairs"
+_PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs" #TODO: should be enum
+_SECONDARY_PAIRS_LABEL = "optional external directed pairs" #TODO: should be enum
 
 
 def _experiment_name(name: ExperimentName) -> str:
@@ -31,12 +31,12 @@ def _experiment_name(name: ExperimentName) -> str:
 class ExperimentDefinition:
     name: ExperimentName
     classification: ExperimentClassification
-    methods: tuple[str, ...]
-    datasets_or_pairs: tuple[str, ...]
+    methods: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    datasets_or_pairs: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     conditions: RegisteredConditions
-    seeds: tuple[int, ...]
+    seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     derived_planned_cells: Index
-    prerequisites: tuple[str, ...]
+    prerequisites: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +60,7 @@ class CatalogueError(KeyError):
     pass
 
 
-def build_catalogue() -> ExperimentCatalogue:
+def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems to be sticking together. Revamp it so it's cleaner and clearer. NO HARDCODED STRINGS....
     config = active_config()
     confirmatory_seeds = config.scientific.randomness.confirmatory_seeds
     pilot_seeds = config.scientific.randomness.pilot_seeds
@@ -72,12 +72,12 @@ def build_catalogue() -> ExperimentCatalogue:
     def definition(
         name: ExperimentName,
         classification: ExperimentClassification,
-        method_names: tuple[str, ...],
-        pairs: tuple[str, ...],
-        conditions: tuple[str | tuple[str, ...], ...],
-        seeds: tuple[int, ...],
-        derived_cells: int,
-        prerequisites: tuple[str, ...],
+        method_names: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        pairs: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        conditions: tuple[str | tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        derived_cells: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        prerequisites: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     ) -> ExperimentDefinition:
         return ExperimentDefinition(
             name=name,

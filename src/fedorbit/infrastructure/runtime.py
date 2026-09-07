@@ -103,7 +103,7 @@ class _EfficiencyMeasurementHandle:
     result: EfficiencyMeasurement = field(default_factory=EfficiencyMeasurement)
 
 
-def _peak_host_rss_mib() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _peak_host_rss_mib() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 
@@ -122,7 +122,7 @@ def measure_efficiency() -> Generator[_EfficiencyMeasurementHandle]:
             handle.result.peak_cuda_allocated_bytes = torch.cuda.max_memory_allocated()
 
 
-def _conv_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _conv_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     conv = getattr(torch.backends.cudnn, "conv", None)
     if conv is not None:
         precision = getattr(conv, "fp32_precision", None)
@@ -131,7 +131,7 @@ def _conv_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropr
     return "absent"
 
 
-def _matmul_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _matmul_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     precision = getattr(torch.backends.cuda.matmul, "fp32_precision", None)
     if precision is not None:
         return str(precision)
@@ -215,16 +215,16 @@ class IncompatibleIdentityError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class CodeRevision:
-    commit: str
+    commit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     dirty: bool #TODO: do not check for dirty, delete this
     tree_digest: str #TODO: delete this
 
-    def identity(self) -> str:
+    def identity(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         suffix = "-dirty" if self.dirty else ""
         return f"{self.commit}{suffix}"
 
 
-def _git_head() -> str:
+def _git_head() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repository_root(),
@@ -237,7 +237,7 @@ def _git_head() -> str:
     return result.stdout.strip()
 
 
-def _git_dirty() -> bool:
+def _git_dirty() -> bool: #TODO: do not check for dirty, delete this
     result = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repository_root(),
@@ -248,7 +248,7 @@ def _git_dirty() -> bool:
     return result.returncode == 0 and bool(result.stdout.strip())
 
 
-def _source_tree_digest() -> str:
+def _source_tree_digest() -> str: #TODO: delete this
     digest = hashlib.sha256()
     source_root = repository_root() / "src"
     for path in sorted(source_root.rglob("*.py")):
@@ -268,7 +268,7 @@ def current_code_revision() -> CodeRevision:
     )
 
 
-def _seed_digest() -> str:
+def _seed_digest() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     randomness = active_config().scientific.randomness
     return hashlib.sha256(
         stable_json(
@@ -292,7 +292,7 @@ class ReproducibilityIdentity:
     code_revision: CodeRevision #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     statistical_identity_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    def fingerprint(self) -> str:
+    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return hashlib.sha256(
             "|".join(
                 (
@@ -306,7 +306,7 @@ class ReproducibilityIdentity:
         ).hexdigest()
 
 
-def statistical_identity_digest(environment: EnvironmentSnapshot) -> str:
+def statistical_identity_digest(environment: EnvironmentSnapshot) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     scientific = active_config().scientific
     statistics = scientific.statistics
     payload = stable_json(

@@ -10,7 +10,7 @@ from fedorbit.config.loading import active_config
 from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept, SampleCount
 
 NORMAL_LABEL = "normal" #TODO: move to constants or enums
-TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept)
+TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept) #TODO: remove this from code and move to tests
 TRANSFER_ONTOLOGY: Mapping[
     OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
                                  , tuple[str, ...]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -72,19 +72,19 @@ class TransferEligibility:
         return self.target_eligible
 
 
-def normalize_label(raw: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def normalize_label(raw: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: raw)
+                    ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     normalized = unicodedata.normalize("NFC", raw).strip().casefold() #TODO: should be in enums
     underscored = re.sub(r"[^0-9a-z]+", "_", normalized)
     return re.sub(r"_+", "_", underscored).strip("_")
 
 
-def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     _, edge_labels, ton_labels = TRANSFER_ONTOLOGY[concept]
     return edge_labels if client == DatasetId.EDGE_IIOTSET_NETWORK else ton_labels
 
 
-def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     labels = {
         label for concept in OracleTransferConcept for label in _native_mapping(client, concept)
     }
@@ -97,7 +97,7 @@ def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use pr
 
 def transfer_concept_for(
     client: DatasetId,
-    normalized_label: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    normalized_label: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
 ) -> OracleTransferConcept | None:
     matches = tuple(
         concept
@@ -109,7 +109,7 @@ def transfer_concept_for(
     return matches[0] if matches else None
 
 
-def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | None:
+def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
     concept = transfer_concept_for(client, normalized_label)
     return None if concept is None else TRANSFER_ONTOLOGY[concept][0]
 

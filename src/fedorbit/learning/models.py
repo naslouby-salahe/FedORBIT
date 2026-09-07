@@ -5,9 +5,9 @@ from torch import nn
 
 
 class NetworkFlowClassifier(nn.Module):
-    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 n_classes: int,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: input_dim)
+                 n_classes: int,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
+                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: dropout_probability)
                  ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
@@ -45,9 +45,9 @@ class NetworkFlowClassifier(nn.Module):
 
 
 class HostClassifier(nn.Module):
-    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 n_classes: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: input_dim)
+                 n_classes: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
+                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: dropout_probability)
                  ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:

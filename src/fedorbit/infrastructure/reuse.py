@@ -118,8 +118,8 @@ class ExecutionReuse:
             if decision.manifest is not None:
                 self._store.resolve(ArtifactIdentifier(decision.manifest.artifact_id))
 
-    def stale_descendants(self, artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                          ) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def stale_descendants(self, artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: artifact_id)
+                          ) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return frozenset(
             manifest.artifact_id
             for manifest in self._store.all_manifests()
@@ -239,7 +239,7 @@ def validate_completed_artifact(
 
 def validate_upstream_lineage(
     manifest: ReusableArtifactManifest,
-    available_artifact_ids: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    available_artifact_ids: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: available_artifact_ids)
 ) -> None:
     missing = tuple(
         artifact_id

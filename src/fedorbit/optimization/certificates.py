@@ -25,7 +25,7 @@ class CertificateError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class SeparatorWorkCertificate:
+class SeparatorWorkCertificate: #TODO: DELETE THIS NOW
     active_image_candidates: SampleCount
     lap_calls: Index
 
@@ -73,13 +73,13 @@ def verify_exactness_certificate(
     return abs(solver_value - exhaustive_truth_value) <= exact_tolerance
 
 
-def require_valid_images(images: Sequence[int], blocks: PaddedBlockStructure) -> None:
+def require_valid_images(images: Sequence[int], blocks: PaddedBlockStructure) -> None: #TODO: DELETE THIS NOW
     total = blocks.total_padded_nodes
     if sorted(images) != list(range(total)):
         raise CertificateError("certificate images are not a padded-space bijection")
 
 
-def certificate_residual(reported: float, recomputed: float) -> float:
+def certificate_residual(reported: float, recomputed: float) -> float: #TODO: DELETE THIS NOW
     return float(np.abs(reported - recomputed))
 
 
@@ -116,7 +116,7 @@ def build_rectangular_hull(
 
 
 def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull
-                     ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                     ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates)
 
 
@@ -124,7 +124,7 @@ def orbit_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     best = -math.inf
     for candidate in action_candidates:
         minimum_response = math.inf
@@ -143,7 +143,7 @@ def rectangular_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     hull: RectangularHull,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     best = -math.inf
     for candidate in action_candidates:
         objective = h_rect_from_hull(candidate, hull) - float(
@@ -160,7 +160,7 @@ def robust_coupling_gap(
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
     hull: RectangularHull,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return orbit_value_over_candidates(action_candidates, problem, orbit) - (
         rectangular_value_over_candidates(action_candidates, problem, hull)
     )

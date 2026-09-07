@@ -28,7 +28,7 @@ def fixed_action_rectangularization_gap(
     alpha: CurriculumAction,
     orbit: Sequence[BlockCorrespondence],
     lower_hull: NDArray[np.float64],
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     gap = h_orb(alpha, orbit) - h_rect(alpha, lower_hull)
     if gap < 0.0:
         raise ActionSpaceError(
@@ -39,7 +39,7 @@ def fixed_action_rectangularization_gap(
 
 def _same_group_block_means(
     block_entries: NDArray[np.float64],
-) -> tuple[float, float]:
+) -> tuple[float, float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     diagonal_mean = float(np.mean(np.diag(block_entries)))
     off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
     off_diagonal_values = block_entries[off_diagonal_mask]
@@ -48,11 +48,11 @@ def _same_group_block_means(
 
 
 def _fill_target_block(
-    mean: NDArray[np.float64],
+    mean: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     targets_rows: range,
     targets_columns: range,
-    fill_diagonal: float,
-    fill_off_diagonal: float,
+    fill_diagonal: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fill_diagonal)
+    fill_off_diagonal: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fill_off_diagonal)
 ) -> None:
     for target_k in targets_rows:
         for target_j in targets_columns:
@@ -62,8 +62,8 @@ def _fill_target_block(
 
 def analytic_orbit_mean(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64],
-) -> NDArray[np.float64]:
+    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     size = blocks.total_padded_nodes
     if response_matrix.shape != (size, size):
         raise ActionSpaceError("response matrix shape mismatch for analytic orbit mean")
@@ -90,7 +90,7 @@ class OrbitRadius:
 
 def orbit_radius_2_norm(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64],
+    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> OrbitRadius:
     mean = analytic_orbit_mean(blocks, response_matrix)
     radius = 0.0
@@ -148,15 +148,15 @@ def map_value_diagnostics(
 
 
 @dataclass(frozen=True, slots=True)
-class CouplingUpperBoundDiagnostic:
+class CouplingUpperBoundDiagnostic: #TODO: DELETE THIS NOW
     value: Score
 
 
-def coupling_upper_bound_diagnostic(
+def coupling_upper_bound_diagnostic( #TODO: DELETE THIS NOW
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
-    hull_lower_bounds: NDArray[np.float64],
-    hull_upper_bounds: NDArray[np.float64],
+    hull_lower_bounds: NDArray[np.float64],#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    hull_upper_bounds: NDArray[np.float64],#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> CouplingUpperBoundDiagnostic:
     expected = (problem.size, problem.size)
     if hull_lower_bounds.shape != expected or hull_upper_bounds.shape != expected:
@@ -173,5 +173,5 @@ def coupling_upper_bound_diagnostic(
     return CouplingUpperBoundDiagnostic(value=best)
 
 
-def orbit_is_nontrivial(orbit_size: Index) -> bool:
+def orbit_is_nontrivial(orbit_size: Index) -> bool: #TODO: DELETE THIS NOW
     return orbit_size > 1

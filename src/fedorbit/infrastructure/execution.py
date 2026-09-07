@@ -370,7 +370,7 @@ class DatasetPreparationResult:
     observations: tuple[DatasetObservation, ...]
     validation_artifact_paths: tuple[ArtifactPath, ...]
     duplicate_artifact_paths: tuple[ArtifactPath, ...]
-    resource_blocked_datasets: tuple[tuple[DatasetId, str], ...] = ()
+    resource_blocked_datasets: tuple[tuple[DatasetId, str], ...] = () #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     @property
     def blocked_datasets(self) -> tuple[DatasetId, ...]:
@@ -381,7 +381,7 @@ class DatasetPreparationResult:
         )
 
 
-class ExecutionExecutor:
+class ExecutionExecutor: #TODO: should be deleted. We don't reference this in code.
     def __init__(self, store: ArtifactStore, logger: ExecutionLogger | None = None) -> None:
         self._store = store
         self._logger = logger if logger is not None else execution_logger()
@@ -469,7 +469,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     if len(duplicate_paths) != len(request.datasets):
         raise ExecutionError("duplicate diagnostics did not cover every requested dataset")
     layout = build_layout()
-    resource_blocked: list[tuple[DatasetId, str]] = []
+    resource_blocked: list[tuple[DatasetId, str]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for observation in observations:
         if not observation.valid_for_chronological_preprocessing:
             continue
@@ -730,7 +730,7 @@ def execute_dataset_client_and_resource_validation(
     )
 
 
-def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     raw_root = repository_root() / "data" / "raw"
     primary_datasets = tuple(
         dataset
@@ -750,7 +750,7 @@ def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use prim
 def _persist_blocked_experiment(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    reasons: OrderedDict[str, str],
+    reasons: OrderedDict[str, str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reasons)
 ) -> None:
     destination = experiment_workspace(layout, request.experiment) / "artifacts" / "derived" #TODO: should be enum value. Not hardcoded
     payload = cast(
@@ -771,9 +771,9 @@ def _persist_synthetic_experiment_payload(
     request: ExperimentExecutionRequest,
     seed: ExperimentSeed,
     payload_builder: Callable[[str], StableJsonPayload],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    configuration_sections: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    producer_module: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    artifact_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    configuration_sections: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: configuration_sections)
+    producer_module: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: producer_module)
+    artifact_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: artifact_name)
 ) -> ReusableArtifactManifest:
     cell = SemanticCell(experiment=request.experiment, seed=seed)
     relevance = experiment_relevance(request.experiment)
@@ -879,7 +879,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
     )
 
 
-def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
                                            ) -> StableJsonPayload:
     generator_config = active_config().generators.exact_separator_theorem
     solver_config = active_config().solvers.exact_sparse
@@ -923,15 +923,15 @@ def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use pr
 
 
 def _theorem_exhaustive_validation_cell(
-    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
+    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support)
     seeds: tuple[RandomSeed, ...],
-    instances_per_seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    instances_per_seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: instances_per_seed)
     blocks: PaddedBlockStructure,
     orbit: tuple[BlockCorrespondence, ...],
-    lap_objective_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    action_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    exact_validation_absolute_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    lap_objective_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_objective_tie_tolerance)
+    action_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: action_tie_tolerance)
+    exact_validation_absolute_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: exact_validation_absolute_tolerance)
 ) -> StableJsonPayload:
     total_nodes = sum(pattern)
     max_absolute_objective_error = 0.0
@@ -1005,7 +1005,7 @@ def execute_coupling_and_map_bound_validation( #TODO: DELETE THIS NOW
     )
 
 
-def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
                                                ) -> StableJsonPayload:
     coupling_config = active_config().generators.coupling_structure
     seeds = active_config().scientific.randomness.confirmatory_seeds
@@ -1112,13 +1112,13 @@ def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not us
 
 def _coupling_validation_instance(
     compatibility: CouplingCompatibility,
-    heterogeneity: float,
-    asymmetry: float,
-    sparsity: float,
-    block_pattern: tuple[int, ...],
-    support: int,
+    heterogeneity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: heterogeneity)
+    asymmetry: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: asymmetry)
+    sparsity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: sparsity)
+    block_pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pattern)
+    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support)
     seed: RandomSeed,
-    incompatible_gap_threshold: float,
+    incompatible_gap_threshold: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: incompatible_gap_threshold)
 ) -> tuple[bool, bool]:
     request = CouplingInstanceRequest(
         compatibility=compatibility,
@@ -1184,9 +1184,9 @@ def _map_bound_fixture_results(seeds: tuple[RandomSeed, ...]) -> StableJsonPaylo
 
 def _synthetic_experiment_payload(
     experiment: ExperimentName,
-    pattern: tuple[int, ...],
+    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
     seed: RandomSeed,
-    fingerprint: str,
+    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
 ) -> StableJsonPayload:
     instance = generate_exact_separator_instance(ExactSeparatorInstanceRequest(pattern, seed))
     groups = tuple(CoarseGroup)[: len(pattern)]
@@ -1256,7 +1256,7 @@ def _synthetic_experiment_payload(
 
 
 _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({"models"})
-_BASE_MODEL_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+_BASE_MODEL_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
 
 
 def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
@@ -1273,7 +1273,7 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
     local_class_counts = OrderedDict(
         (label, sum(counts.values())) for label, counts in materialized.class_row_counts.items()
     )
-    transfer_candidate_counts: Mapping[str, int] = OrderedDict(
+    transfer_candidate_counts: Mapping[str, int] = OrderedDict( #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         (str(group.concept.value), group.train_support)
         for group in transfer_concept_groups(materialized.dataset, materialized)
     )
@@ -1402,7 +1402,7 @@ def _persist_client_invalid(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     dataset: DatasetId,
-    reason: str,
+    reason: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reason)
 ) -> None:
     destination = experiment_workspace(layout, experiment) / "artifacts" / "derived"
     payload = cast(
@@ -1489,7 +1489,7 @@ def execute_base_model_pilot(
 _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.MODELS, ConfigurationSection.RESPONSE}
 )
-_SOURCE_RESPONSE_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+_SOURCE_RESPONSE_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
 
 
 def execute_source_response_estimator_pilot(
@@ -1513,7 +1513,7 @@ def execute_source_response_estimator_pilot(
 def _source_response_estimator_payload(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    fingerprint: str,
+    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
 ) -> StableJsonPayload:
     return _source_response_estimator_client_results(layout, request, fingerprint)
 
@@ -1605,7 +1605,7 @@ def _execute_final_source_response_band_validation(
 def _source_response_estimator_client_results(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    fingerprint: str,
+    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
 ) -> StableJsonPayload:
     raw_root = repository_root() / "data" / "raw"
     pilot_seeds = active_config().scientific.randomness.pilot_seeds
@@ -1744,7 +1744,7 @@ def _execute_client_base_model_pilot(
     relevance: frozenset[SemanticCoordinate],
     dataset: DatasetId,
     materialized: MaterializedClient,
-    confirmatory_seeds: tuple[int, ...],
+    confirmatory_seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confirmatory_seeds)
     overwrite_policy: OverwritePolicy,
     device: torch.device,
     logger: ExecutionLogger,
@@ -1898,7 +1898,7 @@ def _persist_training_efficiency(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     dataset: DatasetId,
-    seed: int,
+    seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed)
     measurement: EfficiencyMeasurement,
 ) -> Path:
     record = EfficiencyRecord(
@@ -1928,10 +1928,10 @@ def _persist_base_checkpoint(
     experiment: ExperimentName,
     relevance: frozenset[SemanticCoordinate],
     dataset: DatasetId,
-    seed: int,
+    seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed)
     checkpoint: BaseCheckpoint,
     stage: ArtifactStage,
-    directory_segment: str,
+    directory_segment: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: directory_segment)
     overwrite_policy: OverwritePolicy,
 ) -> None:
     checkpoint_cell = SemanticCell(
@@ -2014,7 +2014,7 @@ class PrimitiveValidationError(ValueError):
 _EXPERIMENT = ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION
 _STAGE = ArtifactStage.EVALUATION
 _CONFIGURATION_SECTIONS = frozenset({"action", "generators", "metrics"})
-_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
 
 
 def execute_primitive_validation(
@@ -2082,7 +2082,7 @@ def execute_primitive_validation(
     return manifest
 
 
-def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path:
+def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
     return (
         experiment_workspace(layout, _EXPERIMENT)
         / "artifacts"
@@ -2091,7 +2091,7 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path:
     )
 
 
-def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload:
+def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pattern)
     source_seed = active_config().scientific.randomness.pilot_seeds[0]
     instance = generate_exact_separator_instance(
         ExactSeparatorInstanceRequest(block_pattern, source_seed)
@@ -2139,15 +2139,15 @@ def _score_deterministic_validation_batch() -> ScoreArtifact:
 
 
 def _completion(
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
+    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
     payload_path: Path, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    payload_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    code_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    runtime_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    payload_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: payload_sha256)
+    configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: configuration_sha256)
+    code_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: code_sha256)
+    runtime_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: runtime_sha256)
     stage: ArtifactStage = _STAGE,
-    upstream_artifact_ids: tuple[str, ...] = (), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    upstream_artifact_ids: tuple[str, ...] = (), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: upstream_artifact_ids)
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(

@@ -84,7 +84,7 @@ def score_model(request: ScoringRequest) -> ScoreArtifact:
     log_floor = active_config().scientific.metrics.probability_log_floor
     losses = -torch.log(torch.clamp(selected, min=log_floor))
     predictions = probabilities.argmax(dim=1)
-    class_risks: list[float] = []
+    class_risks: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for class_index in range(n_classes):
         mask = target_values == class_index
         class_risks.append(float(losses[mask].mean()) if bool(mask.any()) else math.nan)

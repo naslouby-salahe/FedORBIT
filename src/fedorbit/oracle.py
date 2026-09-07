@@ -38,7 +38,7 @@ class OracleAccessToken:
 
 def authorize_oracle_access(
     experiment: ExperimentName,
-    registered_methods: tuple[str, ...],
+    registered_methods: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: registered_methods)
 ) -> OracleAccessToken:
     if ORACLE_METHOD_NAME not in registered_methods:
         raise OracleAccessError(f"{experiment.value} is not a registered oracle-method experiment")
@@ -48,14 +48,14 @@ def authorize_oracle_access(
 @dataclass(frozen=True, slots=True)
 class ExactMapActionOutcome:
     selected_action: CurriculumAction
-    objective_value: float
+    objective_value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def exact_map_action(
     access: OracleAccessToken,
     problem: RobustActionProblem,
     oracle_correspondence: OracleCorrespondence,
-    support_limit: int | None = None,
+    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
 ) -> ExactMapActionOutcome:
     del access
     from fedorbit.methods.baselines import optimize_against_fixed_matrix

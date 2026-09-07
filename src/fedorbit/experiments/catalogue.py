@@ -23,7 +23,7 @@ _PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs" #TODO: should be enu
 _SECONDARY_PAIRS_LABEL = "optional external directed pairs" #TODO: should be enum
 
 
-def _experiment_name(name: ExperimentName) -> str:
+def _experiment_name(name: ExperimentName) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return name.value
 
 
@@ -52,7 +52,7 @@ class ExperimentCatalogue:
     def registered_names(self) -> tuple[ExperimentName, ...]:
         return tuple(self.definitions_by_name.keys())
 
-    def __len__(self) -> int:
+    def __len__(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return len(self.definitions_by_name)
 
 
@@ -72,12 +72,12 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     def definition(
         name: ExperimentName,
         classification: ExperimentClassification,
-        method_names: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        pairs: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        conditions: tuple[str | tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        derived_cells: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        prerequisites: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        method_names: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: method_names)
+        pairs: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pairs)
+        conditions: tuple[str | tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: conditions)
+        seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seeds)
+        derived_cells: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: derived_cells)
+        prerequisites: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prerequisites)
     ) -> ExperimentDefinition:
         return ExperimentDefinition(
             name=name,

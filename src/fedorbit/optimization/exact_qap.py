@@ -67,34 +67,35 @@ class QapRobustOutcome:
         return self.certified_solution is not None
 
 
-def _terminal_state_for(status: str) -> TerminalState | None:
-    if status == "timelimit":
+def _terminal_state_for(status: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                        ) -> TerminalState | None:
+    if status == "timelimit":  #TODO: use enums
         return TerminalState.TIME_LIMIT
-    if status in {"memlimit", "nodelimit", "gaplimit"}:
+    if status in {"memlimit", "nodelimit", "gaplimit"}: #TODO: use enum for status codes instead of raw strings
         return TerminalState.RESOURCE_LIMIT
     return None
 
 
-def _configure_model(model: Model, deadline: float | None) -> None:
+def _configure_model(model: Model, deadline: float | None) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
     settings = active_config().solvers.generic_exact_qap
     model.hideOutput()
     remaining = settings.wall_time_seconds_per_solve
     if deadline is not None:
         remaining = min(remaining, max(0.0, deadline - time.monotonic()))
-    model.setRealParam("limits/time", float(remaining))
-    model.setIntParam("parallel/maxnthreads", int(settings.threads))
-    model.setIntParam("randomization/randomseedshift", int(settings.random_seed))
-    model.setIntParam("randomization/permutationseed", int(settings.random_seed))
-    model.setRealParam("numerics/feastol", float(settings.feasibility_tolerance))
-    model.setRealParam("limits/gap", float(settings.relative_mip_gap))
+    model.setRealParam("limits/time", float(remaining)) #TODO: use enums instead of hardcoded strings
+    model.setIntParam("parallel/maxnthreads", int(settings.threads)) #TODO: use enums instead of hardcoded strings
+    model.setIntParam("randomization/randomseedshift", int(settings.random_seed)) #TODO: use enums instead of hardcoded strings
+    model.setIntParam("randomization/permutationseed", int(settings.random_seed)) #TODO: use enums instead of hardcoded strings
+    model.setRealParam("numerics/feastol", float(settings.feasibility_tolerance)) #TODO: use enums instead of hardcoded strings
+    model.setRealParam("limits/gap", float(settings.relative_mip_gap)) #TODO: use enums instead of hardcoded strings
 
 
 def _build_assignment_structure(
     model: Model,
     blocks: PaddedBlockStructure,
-    prefix: str,
-) -> Mapping[tuple[int, int], Expr]:
-    assignment_variables: OrderedDict[tuple[int, int], Expr] = OrderedDict()
+    prefix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prefix)
+) -> Mapping[tuple[int, int], Expr]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    assignment_variables: OrderedDict[tuple[int, int], Expr] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
         sources = list(blocks.block_index_range(block_index))
@@ -115,11 +116,11 @@ def _build_assignment_structure(
 
 def _add_mccormick_products(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr],
-    coefficients: Mapping[tuple[int, int, int, int], float],
-    prefix: str,
+    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
+    coefficients: Mapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients)
+    prefix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prefix)
 ) -> list[Expr]:
-    product_variables: OrderedDict[tuple[int, int, int, int], Expr] = OrderedDict()
+    product_variables: OrderedDict[tuple[int, int, int, int], Expr] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     objective_terms: list[Expr] = []
     for key, coefficient in sorted(coefficients.items()):
         source_a, source_b, target_k, target_j = key
@@ -141,9 +142,9 @@ def _add_mccormick_products(
 def _append_products_for_target_pair(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    target_k: int,
-    target_j: int,
-    coefficients: MutableMapping[tuple[int, int, int, int], float],
+    target_k: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_k)
+    target_j: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_j)
+    coefficients: MutableMapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients)
 ) -> None:
     blocks = problem.blocks
     lower = problem.lower_response_matrix
@@ -161,9 +162,9 @@ def _append_products_for_target_pair(
 def _fixed_action_product_coefficients(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-) -> Mapping[tuple[int, int, int, int], float]:
+) -> Mapping[tuple[int, int, int, int], float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     blocks = problem.blocks
-    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict()
+    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for target_k in range(blocks.total_padded_nodes):
         for target_j in alpha.active_support_nodes:
             _append_products_for_target_pair(problem, alpha, target_k, target_j, coefficients)
@@ -221,7 +222,7 @@ def point_correspondence_commitment(
     size = blocks.total_padded_nodes
     if source_response_matrix.shape != (size, size) or target_response_matrix.shape != (size, size):
         raise SolverExecutionError("point-correspondence matrices must match padded size")
-    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict()
+    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for source_a, source_b, target_k, target_j in product(range(size), repeat=4):
         if blocks.block_of_node(source_a) != blocks.block_of_node(target_k):
             continue
@@ -282,20 +283,20 @@ def point_correspondence_commitment(
 
 def _refine_lexicographic_correspondence(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr],
+    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
     objective_terms: list[Expr],
     blocks: PaddedBlockStructure,
-    best_objective: float,
-    tie_tolerance: float,
-    deadline: float,
-) -> tuple[tuple[int, ...], float] | None:
+    best_objective: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: best_objective)
+    tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: tie_tolerance)
+    deadline: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
+) -> tuple[tuple[int, ...], float] | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     model.freeTransform()
     model.addCons(
         quicksum(objective_terms) <= best_objective + tie_tolerance,
         name="tie_bound",
         removable=True,
     )
-    chosen_images: list[int] = []
+    chosen_images: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for target in range(blocks.total_padded_nodes):
         block_sources = list(blocks.block_index_range(blocks.block_of_node(target)))
         fixed = False
@@ -382,13 +383,13 @@ def solve_support_master_qap(
 
 def solve_robust_action_qap(
     problem: RobustActionProblem,
-    support_limit: int | None = None,
+    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
 ) -> QapRobustOutcome:
     settings = active_config().solvers.exact_sparse
     supports = enumerate_support_coordinate_sets(problem, support_limit)
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     zero_candidate = zero_action(problem)
-    candidates: list[tuple[float, CurriculumAction]] = [
+    candidates: list[tuple[float, CurriculumAction]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         (evaluate_objective(zero_candidate, identity), zero_candidate)
     ]
     solutions: list[SupportMasterSolution] = []
@@ -427,10 +428,10 @@ def solve_robust_action_qap(
 
 def _extract_images(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr],
+    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
     blocks: PaddedBlockStructure,
-) -> tuple[int, ...]:
-    images: list[int] = []
+) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    images: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for target in range(blocks.total_padded_nodes):
         selected = [
             source

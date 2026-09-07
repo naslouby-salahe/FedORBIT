@@ -43,8 +43,8 @@ class WorkspaceLayout:
     project_summary: Path #TODO: should be in config
 
 
-def safe_slug(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-              ) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def safe_slug(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
+              ) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     normalized = unicodedata.normalize("NFC", value).casefold()
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
     if not slug:
@@ -81,9 +81,9 @@ def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Pa
 def leaf_path(
     layout: WorkspaceLayout,
     workspace: Path,
-    semantic_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fingerprint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    suffix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    semantic_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: semantic_coordinates)
+    fingerprint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint_sha256)
+    suffix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: suffix)
 ) -> Path:
     if not workspace.is_absolute():
         workspace = layout.execution_root / workspace
@@ -113,10 +113,10 @@ class RawInventoryRequest:
 
 @dataclass(frozen=True, slots=True)
 class RawFileInventory:
-    relative_path: str
+    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     byte_size: ByteCount
-    sha256: str
-    columns: tuple[str, ...]
+    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +128,7 @@ class RawDatasetInventory:
         if not self.files:
             raise RawInventoryError("raw dataset inventory requires at least one file")
 
-    def fingerprint(self) -> str:
+    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return hashlib.sha256(stable_json(self.serialization_payload()).encode("utf-8")).hexdigest()
 
     def serialization_payload(self) -> StableJsonPayload:

@@ -56,7 +56,7 @@ class SeparatorOutcome:
 
 @dataclass(frozen=True, slots=True)
 class SupportMasterSolution:
-    support_nodes: tuple[int, ...]
+    support_nodes: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     certified_action: CurriculumAction
     certified_robust_value: Score
     worst_correspondence: BlockCorrespondence
@@ -75,10 +75,10 @@ class RobustActionSolution:
 def _worst_images_over_active_maps(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    active_nodes: tuple[int, ...],
-    lap_tie_tolerance: float,
-    action_tie_tolerance: float,
-) -> tuple[int, ...]:
+    active_nodes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
+    lap_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_tie_tolerance)
+    action_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: action_tie_tolerance)
+) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     blocks = problem.blocks
     evaluations = [
         _evaluate_active_image_map(problem, alpha, mapping, lap_tie_tolerance)
@@ -125,8 +125,8 @@ def fixed_action_worst_correspondence(
 
 
 def _support_block_counts(
-    blocks: PaddedBlockStructure, active_nodes: tuple[int, ...]
-) -> tuple[int, ...]:
+    blocks: PaddedBlockStructure, active_nodes: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
+) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     counts = [0] * len(blocks.padded_size_tuple)
     for node in active_nodes:
         counts[blocks.block_of_node(node)] += 1
@@ -136,8 +136,8 @@ def _support_block_counts(
 def _fixed_active_contribution(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    image_by_target: Mapping[int, int],
-) -> float:
+    image_by_target: Mapping[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: image_by_target)
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     active_targets = sorted(image_by_target.keys())
     coordinates = alpha.coordinates
     total_cost = 0.0
@@ -155,9 +155,9 @@ def _evaluate_active_image_map(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     mapping: ActiveImageMap,
-    lap_tie_tolerance: float,
-) -> tuple[float, tuple[int, ...]]:
-    image_by_target: OrderedDict[int, int] = OrderedDict(mapping.fixed_pairs())
+    lap_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_tie_tolerance)
+) -> tuple[float, tuple[int, ...]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    image_by_target: OrderedDict[int, int] = OrderedDict(mapping.fixed_pairs()) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     fixed_cost = _fixed_active_contribution(problem, alpha, image_by_target)
     completion_cost, images = _complete_with_blockwise_laps(
         problem, alpha, image_by_target, lap_tie_tolerance
@@ -168,11 +168,11 @@ def _evaluate_active_image_map(
 def _lap_cost_entry(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    active_targets: list[int],
-    image_by_target: Mapping[int, int],
-    target_node: int,
-    source_node: int,
-) -> float:
+    active_targets: list[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_targets)
+    image_by_target: Mapping[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: image_by_target)
+    target_node: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_node)
+    source_node: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: source_node)
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     weight = float(problem.target_importance[target_node])
     accumulated = 0.0
     for j in active_targets:
@@ -186,9 +186,9 @@ def _lap_cost_entry(
 def _complete_with_blockwise_laps(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    image_by_target: Mapping[int, int],
-    lap_tie_tolerance: float,
-) -> tuple[float, tuple[int, ...]]:
+    image_by_target: Mapping[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: image_by_target)
+    lap_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_tie_tolerance)
+) -> tuple[float, tuple[int, ...]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     blocks = problem.blocks
     used_sources = set(image_by_target.values())
     active_targets = sorted(image_by_target.keys())
@@ -224,11 +224,11 @@ def _complete_with_blockwise_laps(
 def _solve_block_completion(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    active_targets: list[int],
-    image_by_target: Mapping[int, int],
-    remaining_targets: list[int],
-    unused_sources: list[int],
-    lap_tie_tolerance: float,
+    active_targets: list[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_targets)
+    image_by_target: Mapping[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: image_by_target)
+    remaining_targets: list[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: remaining_targets)
+    unused_sources: list[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: unused_sources)
+    lap_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_tie_tolerance)
 ):
     cost_matrix = np.zeros((len(remaining_targets), len(unused_sources)), dtype=np.float64)
     for row_index, target_node in enumerate(remaining_targets):
@@ -249,7 +249,7 @@ def scenario_cut_row(
 def solve_support_master(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    maximum_cuts: int | None = None,
+    maximum_cuts: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: maximum_cuts)
 ) -> SupportMasterSolution:
     settings = active_config().solvers.exact_sparse
     cut_cap = maximum_cuts if maximum_cuts is not None else settings.maximum_cuts_per_support
@@ -305,18 +305,18 @@ def solve_support_master(
 def run_support_master_lp(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    scenario_rows: Sequence[NDArray[np.float64]],
+    scenario_rows: Sequence[NDArray[np.float64]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 ) -> SupportMasterLpResult:
     settings = active_config().solvers.exact_sparse
     columns = 1 + support.size
     infinity = highspy.kHighsInf
-    row_lower: list[float] = []
-    row_upper: list[float] = []
+    row_lower: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    row_upper: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     matrix_start = [0]
-    matrix_index: list[int] = []
-    matrix_value: list[float] = []
+    matrix_index: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    matrix_value: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    def add_row(coefficients: list[float], upper: float) -> None:
+    def add_row(coefficients: list[float], upper: float) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: upper)
         matrix_index.extend(range(columns))
         matrix_value.extend(coefficients)
         matrix_start.append(len(matrix_index))
@@ -347,13 +347,13 @@ def run_support_master_lp(
     lp.a_matrix_.value_ = matrix_value
 
     highs = highspy.Highs()
-    highs.setOptionValue("output_flag", False)
-    highs.setOptionValue("solver", "simplex")
-    highs.setOptionValue("presolve", "on")
-    highs.setOptionValue("threads", settings.lp_threads_per_solve)
-    highs.setOptionValue("random_seed", settings.deterministic_random_seed)
-    highs.setOptionValue("primal_feasibility_tolerance", settings.lp_primal_feasibility_tolerance)
-    highs.setOptionValue("dual_feasibility_tolerance", settings.lp_dual_feasibility_tolerance)
+    highs.setOptionValue("output_flag", False) #TODO: use enum for these options and values
+    highs.setOptionValue("solver", "simplex") #TODO: use enum for these options and values
+    highs.setOptionValue("presolve", "on") #TODO: use enum for these options and values
+    highs.setOptionValue("threads", settings.lp_threads_per_solve) #TODO: use enum for these options and values
+    highs.setOptionValue("random_seed", settings.deterministic_random_seed) #TODO: use enum for these options and values
+    highs.setOptionValue("primal_feasibility_tolerance", settings.lp_primal_feasibility_tolerance) #TODO: use enum for these options and values
+    highs.setOptionValue("dual_feasibility_tolerance", settings.lp_dual_feasibility_tolerance) #TODO: use enum for these options and values
     highs.passModel(lp)
     highs.run()
     model_status = highs.getModelStatus()
@@ -370,8 +370,8 @@ def run_support_master_lp(
 
 def solve_robust_action(
     problem: RobustActionProblem,
-    support_limit: int | None = None,
-    maximum_cuts: int | None = None,
+    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
+    maximum_cuts: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: maximum_cuts)
 ) -> RobustActionSolution:
     settings = active_config().solvers.exact_sparse
     supports = enumerate_support_coordinate_sets(problem, support_limit)
@@ -390,7 +390,7 @@ def solve_robust_action(
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     zero_candidate = zero_action(problem)
     zero_value = evaluate_objective(zero_candidate, identity)
-    candidates: list[tuple[float, CurriculumAction]] = [(zero_value, zero_candidate)]
+    candidates: list[tuple[float, CurriculumAction]] = [(zero_value, zero_candidate)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     candidates.extend(
         (solution.certified_robust_value, solution.certified_action) for solution in solutions
     )

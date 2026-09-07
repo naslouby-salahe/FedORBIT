@@ -14,7 +14,7 @@ class TonIotValidationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TonIotLabelObservation:
-    multiclass_label: str
+    multiclass_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     binary_label: Index
 
 

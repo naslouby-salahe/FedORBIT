@@ -70,8 +70,8 @@ class PairedObservation:
 
 @dataclass(frozen=True, slots=True)
 class PairedValues:
-    directed_pair: str
-    seeds: tuple[int, ...]
+    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     method_values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     reference_values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
@@ -118,7 +118,7 @@ def validate_paired_observations(
 
 def _index_observations(
     observations: tuple[PairedObservation, ...],
-) -> tuple[tuple[tuple[str, int], PairedObservation], ...]:
+) -> tuple[tuple[tuple[str, int], PairedObservation], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     indexed = tuple(
         sorted(
             (
@@ -162,7 +162,7 @@ class RegisteredContrast:
     statistic: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     @property
-    def key(self) -> tuple[MultiplicityFamily, str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def key(self) -> tuple[MultiplicityFamily, str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.family, self.name, self.directed_pair
 
 
@@ -182,7 +182,7 @@ class RegisteredFamilyInputs:
                 return entry.contrasts
         raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
 
-    def registered_keys(self) -> frozenset[tuple[MultiplicityFamily, str, str]]:
+    def registered_keys(self) -> frozenset[tuple[MultiplicityFamily, str, str]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return frozenset(contrast.key for entry in self.entries for contrast in entry.contrasts)
 
 
@@ -203,7 +203,7 @@ class ContrastPValue:
             raise ContrastRegistryError("valid seed count must be nonnegative")
 
     @property
-    def key(self) -> tuple[MultiplicityFamily, str, str]:
+    def key(self) -> tuple[MultiplicityFamily, str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.family, self.contrast_name, self.directed_pair
 
 
@@ -251,7 +251,7 @@ class FamilyStates:
         raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
 
 
-def primary_pair_names() -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def primary_pair_names() -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return tuple(
         DirectedPair(spec.source, spec.target).direction
         for spec in active_config().scientific.datasets.primary_directed_pairs
@@ -260,9 +260,9 @@ def primary_pair_names() -> tuple[str, ...]: #TODO: do not use primitivies. Use 
 
 def _pair_contrast(
     family: MultiplicityFamily,
-    name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    statistic: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
+    pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pair)
+    statistic: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: statistic)
 ) -> RegisteredContrast:
     return RegisteredContrast(family, name, pair, statistic) #TODO: what's the point of such wrapper. Just inline
 
@@ -396,7 +396,7 @@ def _family_states(
         key=lambda entry: (entry.raw_p_value, entry.contrast_name, entry.directed_pair),
     )
     family_size = len(ordered)
-    adjusted_by_key: OrderedDict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = (
+    adjusted_by_key: OrderedDict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = ( #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         OrderedDict()
     )
     running_max = 0.0
@@ -448,15 +448,15 @@ class SpearmanError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SpearmanReport:
-    rho: float
-    point_count: int
-    pair: str
+    rho: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    point_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
 def descriptive_spearman(
-    predicted_values: tuple[float, ...],
-    realized_values: tuple[float, ...],
-    directed_pair: str,
+    predicted_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: predicted_values)
+    realized_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: realized_values)
+    directed_pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: directed_pair)
 ) -> SpearmanReport | None:
     minimum = active_config().scientific.statistics.spearman_minimum_valid_points
     if len(predicted_values) != len(realized_values):
@@ -469,9 +469,9 @@ def descriptive_spearman(
     return SpearmanReport(rho=rho, point_count=len(predicted_values), pair=directed_pair)
 
 
-def _ranks(values: tuple[float, ...]) -> tuple[float, ...]:
+def _ranks(values: tuple[float, ...]) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     order = sorted(range(len(values)), key=lambda index: values[index])
-    ranks: list[float] = [0.0] * len(values)
+    ranks: list[float] = [0.0] * len(values) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     position = 0
     while position < len(order):
         block_end = position
@@ -486,7 +486,7 @@ def _ranks(values: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(ranks)
 
 
-def _pearson(left: tuple[float, ...], right: tuple[float, ...]) -> float:
+def _pearson(left: tuple[float, ...], right: tuple[float, ...]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: left)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: right)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     mean_left = statistics.fmean(left)
     mean_right = statistics.fmean(right)
     covariance = sum((a - mean_left) * (b - mean_right) for a, b in zip(left, right, strict=True))

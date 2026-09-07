@@ -144,7 +144,7 @@ def implementation_fingerprint(producer_module: str) -> str: #TODO: DELETE THIS 
     return _module_source_digest(producer_module, set())
 
 
-def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
+def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint: #TODO: DELETE THIS NOW
     if stage not in STAGE_DEPENDENCIES:
         raise ProvenanceError(f"unknown stage: {stage}")
     components = RUNTIME_COMPONENTS[stage]
@@ -231,7 +231,7 @@ def stage_dependency_fingerprint( #TODO: DELETE THIS NOW
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def provenance_record(manifest: ReusableArtifactManifest) -> ProvenanceRecord:
+def provenance_record(manifest: ReusableArtifactManifest) -> ProvenanceRecord: #TODO: DELETE THIS NOW
     environment = environment_snapshot()
     revision = current_code_revision()
     return ProvenanceRecord(

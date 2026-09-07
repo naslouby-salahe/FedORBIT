@@ -56,12 +56,12 @@ class LocalClassManifest:
     class_names: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     excluded_classes: tuple[tuple[str, int], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    def index_of(self, normalized_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def index_of(self, normalized_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
+                 ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.class_names.index(normalized_label)
 
     @property
-    def class_count(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def class_count(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return len(self.class_names)
 
 
@@ -102,8 +102,8 @@ class MaterializedClient:
 
 def _read_component_rows(
     paths: tuple[Path, ...],
-) -> tuple[tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-           , list[dict[str, str]],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> tuple[tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+           , list[dict[str, str]],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
            tuple[RawFileProvenance, ...]]:
     frames: list[pd.DataFrame] = []
     per_file_columns: list[tuple[str, ...]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -117,7 +117,7 @@ def _read_component_rows(
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed: tuple[str, ...] = tuple(frame.columns)
+        observed: tuple[str, ...] = tuple(frame.columns) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
@@ -128,7 +128,7 @@ def _read_component_rows(
         [frame.reindex(columns=list(columns)) for frame in frames],
         ignore_index=True,
     )
-    column_arrays: list[list[str]] = [
+    column_arrays: list[list[str]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         [cast(str, value) for value in combined[column].to_numpy(dtype=object)]
         for column in columns
     ]
@@ -142,7 +142,7 @@ class _LazyColumnSamples(Mapping[str, #TODO: do not use primitivies. Use an appr
                  columns: tuple[str, ...]) -> None:  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         self._rows = rows
         self._columns = columns
-        self._cache: dict[str, tuple[str, ...]] = OrderedDict()
+        self._cache: dict[str, tuple[str, ...]] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __getitem__(self, key: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
                     ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -159,8 +159,8 @@ class _LazyColumnSamples(Mapping[str, #TODO: do not use primitivies. Use an appr
 
 def _resolve_schema(
     dataset: DatasetId,
-    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    , rows: list[dict[str, str]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
+    , rows: list[dict[str, str]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: rows)
 ) -> AdapterSchema:
     adapter = ton_iot_adapter(dataset)
     samples = ObservedColumnSamples(_LazyColumnSamples(rows, columns))
@@ -172,8 +172,8 @@ def _resolve_schema(
     )
 
 
-def _parse_epoch_seconds(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                         ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _parse_epoch_seconds(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
+                         ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     try:
         return float(value)
     except ValueError as error:
@@ -182,7 +182,7 @@ def _parse_epoch_seconds(value: str #TODO: do not use primitivies. Use an approp
 
 def _build_normalized_rows(
     schema: AdapterSchema,
-    rows: list[dict[str, str]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    rows: list[dict[str, str]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: rows)
 ) -> tuple[NormalizedRow, ...]:
     behavioral = schema.behavioral_features()
     categorical_columns = frozenset(
@@ -198,7 +198,7 @@ def _build_normalized_rows(
     for row in rows:
         normalized_label = normalize_label(row[label_column])
         timestamp = _parse_epoch_seconds(row[timestamp_column])
-        values: OrderedDict[str, RawFeatureValue] = OrderedDict()
+        values: OrderedDict[str, RawFeatureValue] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for column in behavioral:
             is_categorical = column in categorical_columns
             values[column] = normalize_value(row.get(column, ""), is_categorical)
@@ -217,7 +217,7 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
     minimum = (
         active_config().scientific.transfer_support.local_prediction_attack_class_total_rows_minimum
     )
-    counts: defaultdict[str, int] = defaultdict(int)
+    counts: defaultdict[str, int] = defaultdict(int) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for row in rows:
         counts[row.label] += 1
     retained = sorted(
@@ -244,7 +244,7 @@ def _assign_splits(
     manifest: LocalClassManifest,
 ) -> SplitAssignmentResult:
     buckets: dict[Split, list[NormalizedRow]] = OrderedDict((split, []) for split in Split)
-    by_class: defaultdict[str, list[NormalizedRow]] = defaultdict(list)
+    by_class: defaultdict[str, list[NormalizedRow]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for row in rows:
         if row.label in manifest.class_names:
             by_class[row.label].append(row)
@@ -267,19 +267,19 @@ def _assign_splits(
 
 
 def _numeric_array(rows: Sequence[NormalizedRow], 
-                   column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                   column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
                    ) -> np.ndarray:
     return np.array([row.features.value_of(column) for row in rows], dtype=object)
 
 
 def _categorical_array(rows: Sequence[NormalizedRow], 
-                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                       ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
+                       ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return tuple(str(row.features.value_of(column)) for row in rows)
 
 
 def _missing_indicator(rows: Sequence[NormalizedRow], 
-                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
                        ) -> np.ndarray:
     indicator = np.zeros(len(rows), dtype=np.float32)
     for index, row in enumerate(rows):
@@ -371,8 +371,8 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         raise MaterializationError(
             f"{dataset.value} is Invalid Data: {quality.client_invalid_reason}"
         )
-    numeric_preprocessors: OrderedDict[str, NumericPreprocessor] = OrderedDict()
-    categorical_preprocessors: OrderedDict[str, CategoricalPreprocessor] = OrderedDict()
+    numeric_preprocessors: OrderedDict[str, NumericPreprocessor] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    categorical_preprocessors: OrderedDict[str, CategoricalPreprocessor] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     missing_indicator_columns: list[str] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for candidate in quality.candidate_features:
         if candidate.dropped:
@@ -453,7 +453,7 @@ def transfer_concept_groups(
     dataset: DatasetId,
     materialized: MaterializedClient,
 ) -> tuple[TransferConceptGroup, ...]:
-    grouped: OrderedDict[OracleTransferConcept, list[int]] = OrderedDict()
+    grouped: OrderedDict[OracleTransferConcept, list[int]] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for index, label in enumerate(materialized.class_manifest.class_names):
         concept = transfer_concept_for(dataset, label)
         if concept is not None:
@@ -488,7 +488,7 @@ def transfer_concept_groups(
     return tuple(groups)
 
 
-def eligible_source_transfer_node_classes(
+def eligible_source_transfer_node_classes( #TODO: should be deleted. We don't reference this in code.
     groups: tuple[TransferConceptGroup, ...],
 ) -> tuple[tuple[int, ...], ...]:
     return tuple(group.native_class_indices for group in groups if group.source_eligible)

@@ -41,7 +41,7 @@ def confirmation_schedule(
     train_size: SampleCount,
     batch_size: BatchSize,
     seed: RandomSeed,
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
         raise ConfirmationError("confirmation TRAIN set is empty")
@@ -53,7 +53,7 @@ def confirmation_schedule(
     return shadow_batch_schedule(train_size, batch_size, rng)
 
 
-def _tensor_mean(values: torch.Tensor) -> float:
+def _tensor_mean(values: torch.Tensor) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if values.shape[0] == 0:
         raise ConfirmationError("resampled class has zero examples")
     total = 0.0
@@ -65,7 +65,7 @@ def _tensor_mean(values: torch.Tensor) -> float:
 def _macro_ce_from_losses(
     losses_by_class: tuple[torch.Tensor, ...],
     resample_indices: tuple[torch.Tensor, ...],
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if len(resample_indices) != len(losses_by_class):
         raise ConfirmationError("class resampling must cover every evaluation class")
     class_entropies = [
@@ -78,8 +78,8 @@ def _macro_ce_from_losses(
 def hierarchical_bootstrap_relative_gains(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
+) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     config = active_config()
     confirmation = config.scientific.confirmation
     denominator_floor = config.scientific.metrics.relative_macro_ce_denominator_floor
@@ -91,10 +91,10 @@ def hierarchical_bootstrap_relative_gains(
             SeedDerivationRequest(seed, RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates)
         )
     )
-    collected_gains: list[float] = []
+    collected_gains: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for _ in range(confirmation.hierarchical_bootstrap_resamples):
         selected = torch.randint(0, replicate_count, (replicate_count,), generator=bootstrap_rng)
-        replicate_gains: list[float] = []
+        replicate_gains: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for position in range(replicate_count):
             outcomes = replicate_outcomes[int(selected[position])]
             resample_indices = tuple(
@@ -113,14 +113,14 @@ def hierarchical_bootstrap_relative_gains(
 def hierarchical_bootstrap_lower_bound(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
+) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
     lower_probability = 1.0 - active_config().scientific.confirmation.one_sided_confidence_level
     return _linear_quantile(sorted(gains), lower_probability)
 
 
-def _linear_quantile(sorted_values: list[float], probability: float) -> float:
+def _linear_quantile(sorted_values: list[float], probability: float) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: sorted_values)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: probability)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if not 0.0 <= probability <= 1.0:
         raise ConfirmationError(f"quantile probability outside [0,1]: {probability}")
     count = len(sorted_values)
@@ -138,7 +138,7 @@ def _linear_quantile(sorted_values: list[float], probability: float) -> float:
 def confirmation_decision(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
 ) -> bool:
     lower_bound = hierarchical_bootstrap_lower_bound(replicate_outcomes, seed, contrast_coordinates)
     threshold = (

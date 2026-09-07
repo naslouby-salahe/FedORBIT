@@ -21,9 +21,9 @@ class BlockwiseAssignmentResult:
 
 def _completion_cost(
     costs: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fixed_rows: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fixed_columns: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fixed_rows: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fixed_rows)
+    fixed_columns: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fixed_columns)
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     free_rows = [row for row in range(costs.shape[0]) if row not in fixed_rows]
     free_columns = [column for column in range(costs.shape[1]) if column not in fixed_columns]
     if not free_rows:
@@ -50,8 +50,8 @@ def solve_minimum_cost_assignment(
     optimum = _completion_cost(costs, (), ())
     if not np.isfinite(optimum):
         raise AssignmentError("assignment optimum is not finite")
-    fixed_rows: list[int] = []
-    fixed_columns: list[int] = []
+    fixed_rows: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fixed_columns: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     assigned_cost = 0.0
     for row in range(costs.shape[0]):
         for column in sorted(set(range(costs.shape[1])) - set(fixed_columns)):

@@ -36,7 +36,7 @@ class FieldRole(StrEnum):
 
 
 def file_sha256(path: Path
-                ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
 
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -79,7 +79,7 @@ class DatasetSchemaError(ValueError):
     pass
 
 
-def _empty_roles() -> Mapping[str, FieldRole]:
+def _empty_roles() -> Mapping[str, FieldRole]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return OrderedDict()
 
 
@@ -91,7 +91,7 @@ class ObservedColumnSamples:
     samples_by_column: Mapping[str,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
                                tuple[RawCellValue, ...]]
 
-    def samples_of(self, column_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def samples_of(self, column_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column_name)
                    ) -> tuple[RawCellValue, ...]:
         return self.samples_by_column.get(column_name, ())
 
@@ -101,7 +101,7 @@ class AdapterSchema:
     dataset_id: DatasetId
     feature_order: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    roles: Mapping[str, FieldRole] = field(default_factory=_empty_roles)
+    roles: Mapping[str, FieldRole] = field(default_factory=_empty_roles) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     timestamp_column: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     multiclass_label_column: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -110,10 +110,10 @@ class AdapterSchema:
     excluded_columns: tuple[str, ...] = field(default_factory=tuple) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
 
-    def role_of(self, column: str) -> FieldRole:
+    def role_of(self, column: str) -> FieldRole: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
         return self.roles.get(column, FieldRole.BEHAVIORAL_CATEGORICAL)
 
-    def behavioral_features(self) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def behavioral_features(self) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
 
         return tuple(
             column
@@ -142,10 +142,10 @@ class AdapterContract:
 
 
 def exactly_one_candidate(
-    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    semantic_role: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
+    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: candidates)
+    semantic_role: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: semantic_role)
+) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
 
     observed = tuple(column for column in columns if column in candidates)
     if len(observed) != 1:
@@ -158,11 +158,11 @@ def exactly_one_candidate(
 
 
 def resolve_timestamp_column(
-    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
+    candidates: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: candidates)
     parse_success_fraction: Fraction,
     minimum_fraction: Fraction,
-) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     column = exactly_one_candidate(columns, candidates, "timestamp") #TODO: do not hardcode values. Use enum for semantic roles
     if parse_success_fraction < minimum_fraction:
         message = (
@@ -174,9 +174,9 @@ def resolve_timestamp_column(
 
 
 def resolve_label_columns(
-    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    expected_multiclass: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    expected_binary: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
+    expected_multiclass: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: expected_multiclass)
+    expected_binary: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: expected_binary)
 ) -> ResolvedLabelColumns:
     return ResolvedLabelColumns(
         exactly_one_candidate(columns, expected_multiclass, "multiclass label"), #TODO: do not hardcode strings. Use enum for semantic roles
@@ -188,7 +188,7 @@ def is_missing_sample(value: RawCellValue) -> bool:
     return str(value).strip().casefold() in ("", "0", "0.0", "nan", "none", "null") #TODO: use enum for these strings
 
 
-def _lossless_float64(value: str | int | float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _lossless_float64(value: str | int | float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
                       ) -> bool:
     if isinstance(value, bool):
         return False
@@ -214,7 +214,7 @@ def infer_feature_type(samples: tuple[RawCellValue, ...]) -> FieldRole:
     return FieldRole.BEHAVIORAL_CATEGORICAL
 
 
-def role_for_field(field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def role_for_field(field: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: field)
                    ) -> FieldRole:
     lowered = field.casefold()
     if any(marker in lowered for marker in PROVENANCE_MARKERS):
@@ -236,7 +236,7 @@ class DatasetAdapter:
 
     def resolve_schema(
         self,
-        observed_columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        observed_columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: observed_columns)
         timestamp_parse_success_fraction: Fraction,
         timestamp_alias_minimum: Fraction,
         observed_value_samples: ObservedColumnSamples | None = None,
@@ -349,7 +349,7 @@ class DatasetObservation:
     def valid_for_chronological_preprocessing(self) -> bool:
         return self.event_time.state == ChronologyValidationState.VALID
 
-    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         payload = stable_json(cast(StableJsonPayload, self))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -457,7 +457,7 @@ class EventTimeTally:
     timestamp_pattern_row_count: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     resolvable_row_count: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
-    def observe(self, value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def observe(self, value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
                 ) -> None:
         self.observed_row_count += 1
         ambiguous = _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None
@@ -466,7 +466,7 @@ class EventTimeTally:
         self.resolvable_row_count += int(resolvable)
 
 
-def _is_resolvable_event_time(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _is_resolvable_event_time(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
                               ) -> bool:
     if _AMBIGUOUS_EDGE_TIME.fullmatch(value) is not None:
         return False
@@ -494,8 +494,8 @@ def _labels_for(dataset: DatasetId) -> LabelFields:
 
 
 def reconcile_component_columns(
-    columns_by_file: tuple[tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    columns_by_file: tuple[tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns_by_file)
+) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if not columns_by_file:
         raise DatasetInspectionError("no selected component table")
     reference_columns = list(columns_by_file[0])
@@ -531,8 +531,8 @@ def _selected_paths(request: DatasetInspectionRequest) -> tuple[Path, ...]:
     )
 
 
-def _binary_label_disagrees(multiclass: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                            binary: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _binary_label_disagrees(multiclass: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: multiclass)
+                            binary: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: binary)
                             ) -> bool:
     normalized = normalize_label(multiclass)
     if binary not in ("0", "1"): #TODO: should be enum
@@ -540,13 +540,13 @@ def _binary_label_disagrees(multiclass: str, #TODO: do not use primitivies. Use 
     return (normalized == "normal") != (binary == "0") #TODO: should be enum
 
 
-def _sorted_counts(counts: Counter[str]) -> tuple[LabelCount, ...]:
+def _sorted_counts(counts: Counter[str]) -> tuple[LabelCount, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: counts)
     return tuple(LabelCount(label, count) for label, count in sorted(counts.items()))
 
 
 def inspect_event_time(
-    field: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    field: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: field)
+    columns: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
     tally: EventTimeTally,
     inconsistent_label_rows: Index,
 ) -> EventTimeInspection:

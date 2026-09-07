@@ -37,7 +37,7 @@ class ClassWeights:
 
     @classmethod
     def from_targets(cls, targets: torch.Tensor,
-                     n_classes: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                     n_classes: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
                      ) -> ClassWeights:
         if targets.ndim != 1 or targets.numel() == 0:
             raise LossContractError("TRAIN targets must be a non-empty one-dimensional tensor")
@@ -225,11 +225,11 @@ class TrainingOutcome:
     completed_epochs: EpochCount
 
     @property
-    def epoch(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def epoch(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.checkpoint.epoch
 
     @property
-    def valid_macro_cross_entropy(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def valid_macro_cross_entropy(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.checkpoint.valid_macro_cross_entropy
 
 
@@ -237,7 +237,7 @@ def macro_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
     probability_log_floor: Floor,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if logits.ndim != 2 or targets.ndim != 1 or logits.shape[0] != targets.shape[0]:
         raise TrainingError("logits and targets have incompatible shapes")
     if targets.numel() == 0:

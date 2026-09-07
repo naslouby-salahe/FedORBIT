@@ -39,8 +39,8 @@ class AnonymityCoordinate:
 
 @dataclass(frozen=True, slots=True)
 class AnonymousNodeOrder:
-    permutation: tuple[int, ...]
-    display_ids: tuple[str, ...]
+    permutation: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    display_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         expected = tuple(range(len(self.permutation)))

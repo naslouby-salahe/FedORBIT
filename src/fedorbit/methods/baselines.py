@@ -40,10 +40,10 @@ class CommittedMapAction:
 
 
 def _block_pair_permutation(
-    entry_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    entry_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entry_count)
     seed: RandomSeed,
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    block_pair_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
+    block_pair_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pair_index)
 ) -> NDArray[np.intp]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
@@ -159,7 +159,7 @@ def assert_identical_resources(
 REGISTERED_METHOD_NAMES = frozenset(method.value for method in TransferMethod)
 
 
-def assert_registered_method_name(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def assert_registered_method_name(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
                                   ) -> None:
     if name not in REGISTERED_METHOD_NAMES:
         raise FairnessViolationError(f"unregistered comparator name: {name}")
@@ -231,7 +231,7 @@ def _solve_support_lp(
 def optimize_against_fixed_matrix(
     problem: RobustActionProblem,
     matrix: NDArray[np.float64],
-    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
 ) -> FixedMatrixActionSolution:
     expected_shape = (problem.size, problem.size)
     if matrix.shape != expected_shape:
@@ -242,11 +242,11 @@ def optimize_against_fixed_matrix(
     objective_row = linear_objective_row(problem, matrix)
     supports = enumerate_support_coordinate_sets(problem, support_limit)
 
-    def objective_of(action: CurriculumAction) -> float:
+    def objective_of(action: CurriculumAction) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return float(objective_row @ action.coordinates)
 
     zero_candidate = zero_action(problem)
-    candidates: list[tuple[float, CurriculumAction]] = [
+    candidates: list[tuple[float, CurriculumAction]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         (objective_of(zero_candidate), zero_candidate)
     ]
     candidates.extend(
@@ -285,7 +285,7 @@ class CoarseBlockSummary:
 
 
 def _real_source_indices(blocks: PaddedBlockStructure,
-                         block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                         block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_index)
                          ) -> range:
     return range(
         blocks.block_index_range(block_index).start,
@@ -293,7 +293,7 @@ def _real_source_indices(blocks: PaddedBlockStructure,
     )
 
 
-def _target_block_range(blocks: PaddedBlockStructure, block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _target_block_range(blocks: PaddedBlockStructure, block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_index)
                         ) -> range:
     return blocks.block_index_range(block_index)
 

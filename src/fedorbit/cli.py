@@ -41,9 +41,9 @@ from fedorbit.types import (
     StableJsonPayload,
 )
 
-EXIT_OK = 0
-EXIT_RUNTIME = 1
-EXIT_USAGE = 2
+EXIT_OK = 0 #TODO: should be enum and moved to types or enum file
+EXIT_RUNTIME = 1 #TODO: should be enum and moved to types or enum file
+EXIT_USAGE = 2 #TODO: should be enum and moved to types or enum file
 
 
 class CliUsageError(ValueError):
@@ -61,7 +61,8 @@ def exit_from_error(error: BaseException) -> NoReturn:
     raise Exit(EXIT_RUNTIME) from error
 
 
-def dataset_identifier(name: str) -> DatasetId:
+def dataset_identifier(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                       ) -> DatasetId:
     for candidate in DatasetId:
         if candidate.value == name:
             return candidate
@@ -72,7 +73,8 @@ def dataset_identifier(name: str) -> DatasetId:
     )
 
 
-def experiment_identifier(name: str) -> ExperimentName:
+def experiment_identifier(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                          ) -> ExperimentName:
     for candidate in ExperimentName:
         if candidate.value == name:
             return candidate
@@ -84,7 +86,7 @@ def experiment_identifier(name: str) -> ExperimentName:
 def doctor() -> None:
     try:
         snapshot = environment_snapshot()
-        lockfile = validate_lockfile()
+        lockfile = validate_lockfile() #TODO DELETE #TODO DELETE
         gpu_ok = reference_gpu_matches()
         raw_root = Path("data/raw")
         typer.echo(f"python: {snapshot.python_version}")
@@ -110,7 +112,7 @@ def plan() -> None:
 
 
 def preprocess(
-    dataset_name: str | None = Argument(None),
+    dataset_name: str | None = Argument(None), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     overwrite: bool = False,
 ) -> None:
     try:
@@ -235,7 +237,7 @@ def report(
 
 
 def run(
-    experiment_name: str,
+    experiment_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     overwrite: bool = False,
 ) -> None:
     try:
@@ -259,7 +261,8 @@ def smoke(overwrite: bool = False) -> None:
         exit_from_error(error)
 
 
-def status(experiment_name: str | None = Argument(None)) -> None:
+def status(experiment_name: str | None = Argument(None) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+           ) -> None:
     try:
         rows = build_plan()
         selected = (
@@ -291,13 +294,13 @@ def status(experiment_name: str | None = Argument(None)) -> None:
 
 
 app = typer.Typer(name="fedorbit", no_args_is_help=True)
-app.command("doctor")(doctor)
-app.command("preprocess")(preprocess)
-app.command("plan")(plan)
-app.command("smoke")(smoke)
-app.command("run")(run)
-app.command("status")(status)
-app.command("report")(report)
+app.command("doctor")(doctor) #TODO: Use enum values
+app.command("preprocess")(preprocess) #TODO: Use enum values
+app.command("plan")(plan) #TODO: Use enum values
+app.command("smoke")(smoke) #TODO: Use enum values
+app.command("run")(run) #TODO: Use enum values
+app.command("status")(status) #TODO: Use enum values
+app.command("report")(report) #TODO: Use enum values
 
 
 _EXECUTION_LOG_FORMAT = (

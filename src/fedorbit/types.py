@@ -12,10 +12,10 @@ from typing import Annotated, ClassVar, NewType, Protocol, cast
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 ClientComponentName = NewType("ClientComponentName", str)
-SourceLabel = NewType("SourceLabel", str)
+SourceLabel = NewType("SourceLabel", str) #TODO: use enums
 TimestampFieldName = NewType("TimestampFieldName", str)
 DatasetLabel = NewType("DatasetLabel", str)
-MethodName = NewType("MethodName", str)
+MethodName = NewType("MethodName", str) #TODO: use enums
 
 
 NonNegativeInt = Annotated[int, Field(ge=0)]
@@ -23,11 +23,11 @@ PositiveInt = Annotated[int, Field(gt=0)]
 NonNegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 PositiveFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
-UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
-OpenUnitInterval = Annotated[float, Field(ge=0.0, lt=1.0, allow_inf_nan=False)]
+UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)] #TODO: should be deleted. We don't reference this in code.
+OpenUnitInterval = Annotated[float, Field(ge=0.0, lt=1.0, allow_inf_nan=False)] #TODO: should be deleted. We don't reference this in code.
 
 
-SupportCount = PositiveInt
+SupportCount = PositiveInt #TODO: is this duplicated?? Should be handled better
 ConceptCount = PositiveInt
 SampleCount = PositiveInt
 ProposalCount = PositiveInt
@@ -49,11 +49,11 @@ PatienceCount = NonNegativeInt
 WorkerCount = NonNegativeInt
 DecimalPrecision = NonNegativeInt
 InvalidPermutationCount = NonNegativeInt
-RandomSeed = Annotated[int, Field(ge=0, lt=2**32)]
+RandomSeed = Annotated[int, Field(ge=0, lt=2**32)] #TODO: centralize this. Seems duplicated
 DerivedSeed = Annotated[int, Field(ge=0, lt=2**32)]
 Index = NonNegativeInt
 ByteCount = NonNegativeInt
-RetryCount = NewType("RetryCount", int)
+RetryCount = NewType("RetryCount", int) #TODO: is this duplicated?? Should be handled better
 
 
 LearningRate = PositiveFloat
@@ -80,7 +80,7 @@ Fraction = FiniteFloat
 
 class ClientRole(StrEnum):
     PRIMARY = "primary"
-    SECONDARY = "secondary"
+    SECONDARY = "secondary" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     EXTERNAL = "external"
     SOURCE = "source"
     TARGET = "target"
@@ -183,15 +183,15 @@ class ExperimentClassification(StrEnum):
     ABLATION = "Ablation"
     ROBUSTNESS = "Robustness"
     GENERALIZATION = "Generalization"
-    FINAL_EVIDENCE = "FINAL EVIDENCE"
+    FINAL_EVIDENCE = "FINAL EVIDENCE" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     CONFIRMATORY_ANALYSIS = "Confirmatory ANALYSIS"
-    EFFICIENCY = "EFFICIENCY"
+    EFFICIENCY = "EFFICIENCY" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
 
 
 class ScalabilityBlockPattern(StrEnum):
     BALANCED = "balanced"
     MAXIMALLY_SKEWED = "maximally_skewed"
-    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two_block"
+    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two_block" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
 
 
 class CouplingCompatibility(StrEnum):
@@ -200,12 +200,12 @@ class CouplingCompatibility(StrEnum):
 
 
 class ArtifactState(StrEnum):
-    MISSING = "Missing"
+    MISSING = "Missing" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     RUNNING = "Running"
     COMPLETED = "Completed"
     FAILED = "Failed"
     INVALID = "Invalid"
-    STALE = "Stale"
+    STALE = "Stale" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     BLOCKED = "Blocked"
 
 
@@ -214,7 +214,7 @@ class OverwritePolicy(StrEnum):
     REPLACE = "replace"
 
 
-class TerminalState(StrEnum):
+class TerminalState(StrEnum): #TODO: is this duplicated?? Should be handled better
     COMPLETED = "Completed"
     FAILED_INFRASTRUCTURE = "Failed / Infrastructure Failure"
     INVALID = "Invalid"
@@ -240,7 +240,7 @@ class RngNamespace(StrEnum):
     DENSE_START = "dense_start"
 
 
-class ArtifactType(StrEnum):
+class ArtifactType(StrEnum): #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     PREPARED_SPLIT = "prepared_split"
     CHECKPOINT = "checkpoint"
     PREDICTION = "prediction"
@@ -269,19 +269,19 @@ class ArtifactStage(StrEnum):
 
 
 class ConfigurationSection(StrEnum):
-    ACTION = "action"
-    GENERATORS = "generators"
+    ACTION = "action" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    GENERATORS = "generators" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     MODELS = "models"
     RESPONSE = "response"
-    SOLVERS = "solvers"
-    METRICS = "metrics"
+    SOLVERS = "solvers" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    METRICS = "metrics" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
 
 
 class SemanticCoordinate(StrEnum):
     EXPERIMENT = "experiment"
     DATASET = "dataset"
     SOURCE_CLIENT = "source_client"
-    TARGET_CLIENT = "target_client"
+    TARGET_CLIENT = "target_client" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     DIRECTED_PAIR = "directed_pair"
     METHOD = "method"
     CONDITION = "condition"
@@ -294,8 +294,8 @@ class FailureCategory(StrEnum):
     VALIDATION = "validation"
     SCIENTIFIC_NULL = "scientific_null"
     SCIENTIFIC_BOUNDARY = "scientific_boundary"
-    SOLVER_TIME_LIMIT = "solver_time_limit"
-    RESOURCE_LIMIT = "resource_limit"
+    SOLVER_TIME_LIMIT = "solver_time_limit" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    RESOURCE_LIMIT = "resource_limit" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     SCIENTIFIC_ALGORITHMIC = "scientific_algorithmic"
 
 
@@ -309,7 +309,7 @@ class MultiplicityFamily(StrEnum):
     CONFIRMATION_SAFETY = "Confirmation Safety"
 
 
-class MetricId(StrEnum):
+class MetricId(StrEnum): #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     CLASS_CONDITIONAL_CROSS_ENTROPY = "Class-Conditional Cross-Entropy"
     MACRO_CROSS_ENTROPY = "Macro Cross-Entropy"
     RELATIVE_MACRO_CE_GAIN = "Relative Macro-CE Gain"
@@ -374,7 +374,7 @@ class ArtifactPath:
 
 
 @dataclass(frozen=True, slots=True)
-class ArtifactIdentifier:
+class ArtifactIdentifier: #TODO: centralize this. Seems duplicated
     value: str
 
     def __post_init__(self) -> None:
@@ -392,7 +392,7 @@ class ArtifactFingerprint:
 
 
 @dataclass(frozen=True, slots=True)
-class SemanticCoordinates:
+class SemanticCoordinates: #TODO: handle this better
     value: str
 
     def __post_init__(self) -> None:
@@ -401,7 +401,7 @@ class SemanticCoordinates:
 
 
 @dataclass(frozen=True, slots=True)
-class ExperimentCondition:
+class ExperimentCondition: #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     value: str
 
     def __post_init__(self) -> None:
@@ -410,7 +410,7 @@ class ExperimentCondition:
 
 
 @dataclass(frozen=True, slots=True)
-class SupportSize:
+class SupportSize: #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     value: int
 
     def __post_init__(self) -> None:
@@ -418,12 +418,12 @@ class SupportSize:
             raise ValueError("support size must be positive")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True) #TODO: is this duplicated?? Should be handled better
 class ExperimentSeed:
     value: int
 
     def __post_init__(self) -> None:
-        if not 0 <= self.value < 2**32:
+        if not 0 <= self.value < 2**32: #TODO: move to constants
             raise ValueError("experiment seed must be in the unsigned 32-bit range")
 
 
@@ -449,7 +449,7 @@ class SemanticCell:
     experiment: ExperimentName
     dataset: DatasetId | None = None
     source_client: DatasetId | None = None
-    target_client: DatasetId | None = None
+    target_client: DatasetId | None = None #TODO: delete this
     directed_pair: DirectedPair | None = None
     method: TransferMethod | None = None
     condition: ExperimentCondition | None = None
@@ -457,7 +457,7 @@ class SemanticCell:
     seed: ExperimentSeed | None = None
 
     def identity_json(self, relevance: frozenset[SemanticCoordinate]) -> str:
-        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
+        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( #TODO: handle this better
             dataset=self.dataset.value if self.dataset is not None else None,
             source_client=self.source_client.value if self.source_client is not None else None,
             target_client=self.target_client.value if self.target_client is not None else None,
@@ -485,12 +485,12 @@ class StableSerializationError(ValueError):
     pass
 
 
-class StableJsonPayload(Protocol):
+class StableJsonPayload(Protocol): #TODO: this does not seem safe, nor clean
     __slots__ = ()
 
 
-def stable_json(value: StableJsonPayload) -> str:
-    return json.dumps(_stable_value(value), sort_keys=True, separators=(",", ":"))
+def stable_json(value: StableJsonPayload) -> str: #TODO: is this duplicated?? Should be handled better
+    return json.dumps(_stable_value(value), sort_keys=True, separators=(",", ":")) #TODO: is this duplicated?? Should be handled better
 
 
 def _stable_value(value: StableJsonPayload) -> JsonValue:
@@ -499,13 +499,13 @@ def _stable_value(value: StableJsonPayload) -> JsonValue:
             (field.name, _stable_value(getattr(value, field.name))) for field in fields(value)
         )
     if isinstance(value, Mapping):
-        mapping = cast(Mapping[str, StableJsonPayload], value)
+        mapping = cast(Mapping[str, StableJsonPayload], value) #TODO: this does not seem safe, nor clean
         return OrderedDict(
             (str(key), _stable_value(item))
             for key, item in sorted(mapping.items(), key=lambda pair: str(pair[0]))
         )
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        sequence = cast(Sequence[StableJsonPayload], value)
+        sequence = cast(Sequence[StableJsonPayload], value) #TODO: this does not seem safe, nor clean
         return [_stable_value(item) for item in sequence]
     if isinstance(value, Enum):
         return _stable_value(value.value)

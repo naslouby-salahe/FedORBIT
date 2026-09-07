@@ -60,12 +60,12 @@ class FinalResponseEstimate:
 
 
 def max_t_critical_value(
-    entry_derivatives: tuple[tuple[float, ...], ...],
+    entry_derivatives: tuple[tuple[float, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entry_derivatives)
     seed: RandomSeed,
-    resamples: int | None = None,
-    confidence_level: float | None = None,
-    standard_error_floor: float | None = None,
-) -> float:
+    resamples: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: resamples)
+    confidence_level: float | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confidence_level)
+    standard_error_floor: float | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: standard_error_floor)
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     final = active_config().scientific.source_response_final
     resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
     level = (
@@ -106,13 +106,13 @@ def max_t_critical_value(
         )
     )
     rng = torch.Generator().manual_seed(bootstrap_seed)
-    maxima: list[float] = []
+    maxima: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for _ in range(resample_count):
         indices = tuple(
             int(torch.randint(0, replicate_count, (1,), generator=rng)[0])
             for _ in range(replicate_count)
         )
-        studentized: list[float] = []
+        studentized: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for entry_index, values in enumerate(entry_derivatives):
             resampled = tuple(values[index] for index in indices)
             bootstrap_mean = statistics.fmean(resampled)
@@ -134,7 +134,7 @@ def estimate_final_response(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...],
+    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
     settings: ShadowSettings,
     seed: RandomSeed,
 ) -> FinalResponseEstimate:
@@ -157,14 +157,14 @@ def estimate_response_bands(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...],
+    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
     settings: ShadowSettings,
     seed: RandomSeed,
     *,
-    replicate_count: int,
-    bootstrap_resamples: int,
-    confidence_level: float,
-    seed_stage: str,
+    replicate_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: replicate_count)
+    bootstrap_resamples: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: bootstrap_resamples)
+    confidence_level: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confidence_level)
+    seed_stage: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed_stage)
 ) -> FinalResponseEstimate:
     final = active_config().scientific.source_response_final
     outcome_count = len(data.outcome_native_class_sets)
@@ -175,7 +175,7 @@ def estimate_response_bands(
         raise ResponseUncertaintyError(
             "response estimation requires at least two paired replicates"
         )
-    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)]
+    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
             shadow_data = ShadowData(
@@ -260,15 +260,15 @@ def estimate_response_bands(
 
 
 def _build_final_entries(
-    outcome_count: int,
-    intervention_count: int,
-    means: tuple[float, ...],
-    standard_errors: tuple[float, ...],
-    critical: float,
-) -> tuple[list[FinalResponseEntry], set[int]]:
+    outcome_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: outcome_count)
+    intervention_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_count)
+    means: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: means)
+    standard_errors: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: standard_errors)
+    critical: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: critical)
+) -> tuple[list[FinalResponseEntry], set[int]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     final = active_config().scientific.source_response_final
     entries: list[FinalResponseEntry] = []
-    useful_columns: set[int] = set()
+    useful_columns: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for outcome in range(outcome_count):
         for intervention in range(intervention_count):
             entry_index = outcome * intervention_count + intervention

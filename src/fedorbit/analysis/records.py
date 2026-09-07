@@ -229,8 +229,8 @@ class StatisticalMetadataRecord(FrozenRecord):
         return self
 
 
-def _require_sha256(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-, field_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _require_sha256(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
+, field_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: field_name)
 ) -> None:
     if _SHA256.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")

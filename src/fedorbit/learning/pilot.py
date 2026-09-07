@@ -130,7 +130,7 @@ def run_base_model_pilot(
 
 
 def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSelection:
-    grouped: defaultdict[PilotConfiguration, list[float]] = defaultdict(list)
+    grouped: defaultdict[PilotConfiguration, list[float]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for result in results:
         grouped.setdefault(result.configuration, []).append(
             result.outcome.valid_macro_cross_entropy

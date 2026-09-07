@@ -45,8 +45,8 @@ class ShadowData:
     train_targets: torch.Tensor
     meta_features: torch.Tensor
     meta_targets: torch.Tensor
-    intervention_classes: tuple[int, ...]
-    outcome_native_class_sets: tuple[tuple[int, ...], ...]
+    intervention_classes: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    outcome_native_class_sets: tuple[tuple[int, ...], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     base_class_weights: ClassWeights
 
 
@@ -63,7 +63,7 @@ def native_class_cross_entropy(
     targets: torch.Tensor,
     class_index: Index,
     probability_log_floor: Floor,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     class_examples = targets == class_index
     if not bool(class_examples.any()):
         return math.nan
@@ -80,7 +80,7 @@ def equal_native_class_risk(
     targets: torch.Tensor,
     native_classes: tuple[Index, ...],
     probability_log_floor: Floor,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     risks = tuple(
         native_class_cross_entropy(logits, targets, class_index, probability_log_floor)
         for class_index in native_classes
@@ -116,7 +116,7 @@ def paired_shadow_derivative(
     baseline_risk: Coefficient,
     epsilon: InterventionMagnitude,
     denominator_floor: Floor,
-) -> float:
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if epsilon <= 0.0:
         raise ResponseEstimationError("intervention magnitude must be positive")
     if denominator_floor <= 0.0:
@@ -132,7 +132,7 @@ def run_shadow_pair(
     data: ShadowData,
     settings: ShadowSettings,
     schedule_seed: RandomSeed,
-) -> tuple[tuple[float, float, float], ...]:
+) -> tuple[tuple[float, float, float], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     config = active_config()
     batch_size = config.scientific.training.batch_size
     positive_rng = torch.Generator().manual_seed(schedule_seed)
@@ -179,10 +179,10 @@ def _run_shadow(
     base_rng_state: RngState,
     data: ShadowData,
     settings: ShadowSettings,
-    multiplier: float,
-    batch_size: int,
+    multiplier: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: multiplier)
+    batch_size: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: batch_size)
     schedule_rng: torch.Generator,
-) -> tuple[float, ...]:
+) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if settings.horizon <= 0:
         raise ResponseEstimationError("shadow optimizer horizon must be positive")
     base_state.load_into(model)
@@ -242,8 +242,8 @@ def _shadow_ce(
 def _shadow_weights(
     class_weights: ClassWeights,
     targets: torch.Tensor,
-    intervention_classes: tuple[int, ...],
-    multiplier: float,
+    intervention_classes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    multiplier: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: multiplier)
 ) -> torch.Tensor:
     multipliers = torch.ones_like(class_weights.values)
     for class_index in intervention_classes:
@@ -255,8 +255,8 @@ def _evaluate_risks(
     model: torch.nn.Module,
     meta_features: torch.Tensor,
     meta_targets: torch.Tensor,
-    outcome_native_class_sets: tuple[tuple[int, ...], ...],
-) -> tuple[float, ...]:
+    outcome_native_class_sets: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: outcome_native_class_sets)
+) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
@@ -273,7 +273,8 @@ def _evaluate_risks(
     )
 
 
-def standard_error(values: tuple[float, ...]) -> float:
+def standard_error(values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                   ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if len(values) < 2:
         return math.nan
     return statistics.stdev(values) / math.sqrt(len(values))

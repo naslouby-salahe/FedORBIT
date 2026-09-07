@@ -200,7 +200,7 @@ def _validate_training(config: FedorbitConfig) -> None: #TODO: remove this. Such
     )
 
 
-def _validate_response(config: FedorbitConfig) -> None:
+def _validate_response(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     pilot = config.scientific.source_response_pilot
     _require(
         len(pilot.intervention_magnitudes) == 3 and len(pilot.optimizer_step_horizons) == 3,
@@ -226,7 +226,7 @@ def _validate_response(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_confirmation(config: FedorbitConfig) -> None:
+def _validate_confirmation(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     confirmation = config.scientific.confirmation
     _require(
         confirmation.optimizer_steps_per_shadow >= 1
@@ -252,7 +252,7 @@ def _validate_confirmation(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_statistics(config: FedorbitConfig) -> None:
+def _validate_statistics(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     statistics = config.scientific.statistics
     _require(
         0.0 < statistics.confidence_level < 1.0,
@@ -276,7 +276,7 @@ def _validate_statistics(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_evaluation_criteria(config: FedorbitConfig) -> None:
+def _validate_evaluation_criteria(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     criteria = config.scientific.evaluation_criteria
     primary_pair_count = len(config.scientific.datasets.primary_directed_pairs)
     _require(
@@ -308,7 +308,7 @@ def _validate_evaluation_criteria(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_simplification_rules(config: FedorbitConfig) -> None:
+def _validate_simplification_rules(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     rules = config.scientific.simplification_rules
     rectangular_rule = rules.rectangularization_is_sufficient
     rectangular_fraction = (
@@ -341,7 +341,7 @@ def _validate_simplification_rules(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_generators(config: FedorbitConfig) -> None:
+def _validate_generators(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     generators = config.generators
     _require(
         all(support in (1, 2, 3) for support in generators.exact_separator_theorem.supports),
@@ -360,7 +360,7 @@ def _validate_generators(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_solvers(config: FedorbitConfig) -> None:
+def _validate_solvers(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     exact_sparse = config.solvers.exact_sparse
     _require(
         exact_sparse.maximum_concurrent_supports >= 1,
@@ -384,7 +384,7 @@ def _validate_solvers(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_experiments(config: FedorbitConfig) -> None:
+def _validate_experiments(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     experiments = config.experiments
     _require(
         experiments.exact_sparse_solver_benchmark.synthetic_k.minimum >= 1
@@ -462,7 +462,7 @@ def _validate_experiments(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_runtime(config: FedorbitConfig) -> None:
+def _validate_runtime(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     runtime = config.runtime
     _require(
         runtime.failure_handling.retries_after_initial_infrastructure_failure >= 0,
@@ -494,7 +494,7 @@ def _validate_runtime(config: FedorbitConfig) -> None:
     )
 
 
-def _validate_reporting(config: FedorbitConfig) -> None:
+def _validate_reporting(config: FedorbitConfig) -> None: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
     precision = config.reporting.precision
     _require(
         all(

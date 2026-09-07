@@ -27,10 +27,10 @@ class BlockNodeCounts:
         if any(count < 0 for count in self.per_block):
             raise CorrespondenceError("block counts must be nonnegative")
 
-    def for_block(self, block_index: Index) -> int:
+    def for_block(self, block_index: Index) -> int: #TODO: should be deleted. We don't reference this in code.
         return self.per_block[block_index]
 
-    def total(self) -> int:
+    def total(self) -> int: #TODO: should be deleted. We don't reference this in code.
         return sum(self.per_block)
 
 
@@ -54,7 +54,7 @@ class PaddedBlockStructure:
 
     @property
     def padded_size_tuple(self
-                          ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                          ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return tuple(
             max(source_count, target_count)
             for source_count, target_count in zip(
@@ -68,12 +68,12 @@ class PaddedBlockStructure:
 
     @property
     def total_padded_nodes(self
-                           ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                           ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return sum(self.padded_size_tuple)
 
     @property
     def orbit_size(self
-                   ) -> int:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                   ) -> int:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return math.prod(math.factorial(size) for size in self.padded_size_tuple)
 
     def block_index_range(self, block_index: Index) -> range:
@@ -81,7 +81,7 @@ class PaddedBlockStructure:
         return range(offset, offset + self.padded_size_tuple[block_index])
 
     def block_of_node(self, node_index: Index
-                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         total = self.total_padded_nodes
         if node_index < 0 or node_index >= total:
             raise CorrespondenceError(
@@ -115,8 +115,8 @@ class PaddedBlockStructure:
 
 def build_padded_block_structure(
     coarse_groups: Sequence[CoarseGroup],
-    source_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    target_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    source_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: source_real_counts)
+    target_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_real_counts)
 ) -> PaddedBlockStructure:
     ordered_groups = tuple(coarse_groups)
     missing = [
@@ -144,7 +144,7 @@ class BlockCorrespondence:
             raise CorrespondenceError(
                 f"correspondence length {len(self.images)} does not match padded size {expected}"
             )
-        seen: set[int] = set()
+        seen: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for target_index, image in enumerate(self.images):
             if image < 0 or image >= expected:
                 raise CorrespondenceError(f"image {image} outside padded space of size {expected}")
@@ -166,7 +166,7 @@ class BlockCorrespondence:
     def lexicographically_smallest(cls, blocks: PaddedBlockStructure) -> BlockCorrespondence:
         return cls.identity(blocks)
 
-    def ordering_key(self) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def ordering_key(self) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.images
 
     def permutation_matrix(self) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
@@ -199,7 +199,7 @@ def enumerate_block_permutations(blocks: PaddedBlockStructure) -> Iterator[Block
 
 def compare_correspondences_lexicographically(
     left: BlockCorrespondence, right: BlockCorrespondence
-) -> int:
+) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     for left_value, right_value in zip(left.images, right.images, strict=True):
         if left_value != right_value:
             return -1 if left_value < right_value else 1
@@ -226,25 +226,25 @@ class ActiveImageMap:
                     f"active-image assignment ({target}, {image}) crosses coarse-group boundary"
                 )
 
-    def image_of(self, target_node: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 ) -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def image_of(self, target_node: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_node)
+                 ) -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         for target, image in self.assignments:
             if target == target_node:
                 return image
         return None
 
     def fixed_pairs(self
-                    ) -> tuple[tuple[int, int], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                    ) -> tuple[tuple[int, int], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         return self.assignments
 
 
 def active_support_of_action(alpha: NDArray[np.float64] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                             ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                             ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return tuple(int(node) for node in np.flatnonzero(alpha > 0.0))
 
 
 def support_per_block(blocks: PaddedBlockStructure,
-                      active_nodes: Sequence[int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+                      active_nodes: Sequence[int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
                       ) -> BlockNodeCounts:
     counts = [0] * len(blocks.padded_size_tuple)
     for node in active_nodes:
@@ -254,9 +254,9 @@ def support_per_block(blocks: PaddedBlockStructure,
     return BlockNodeCounts(blocks=blocks, per_block=tuple(counts))
 
 
-def falling_factorial(n: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                      r: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def falling_factorial(n: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n)
+                      r: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: r)
+                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if r < 0 or r > n:
         raise CorrespondenceError(f"invalid falling factorial arguments n={n} r={r}")
     result = 1
@@ -267,7 +267,7 @@ def falling_factorial(n: int, #TODO: do not use primitivies. Use an appropriate 
 
 def active_image_assignment_count(
     blocks: PaddedBlockStructure, support_counts: BlockNodeCounts
-) -> int:
+) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     count = 1
     for block_index, support_size in enumerate(support_counts.per_block):
         count *= falling_factorial(blocks.padded_size_tuple[block_index], support_size)
@@ -282,9 +282,9 @@ class BlockActiveImageChoice:
 
 def enumerate_active_image_maps(
     blocks: PaddedBlockStructure,
-    active_support_nodes: Sequence[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    active_support_nodes: Sequence[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_support_nodes)
 ) -> Iterator[ActiveImageMap]:
-    by_block: defaultdict[int, list[int]] = defaultdict(list)
+    by_block: defaultdict[int, list[int]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     for node in sorted(active_support_nodes):
         by_block.setdefault(blocks.block_of_node(node), []).append(node)
     choices: list[BlockActiveImageChoice] = []
@@ -306,7 +306,7 @@ def enumerate_active_image_maps(
             BlockActiveImageChoice(block_index=block_index, candidate_assignments=candidates)
         )
     for combination in itertools.product(*(choice.candidate_assignments for choice in choices)):
-        assignments: list[tuple[int, int]] = []
+        assignments: list[tuple[int, int]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
         for pairs in combination:
             assignments.extend(pairs)
         yield ActiveImageMap(blocks=blocks, assignments=tuple(assignments))

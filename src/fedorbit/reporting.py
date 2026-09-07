@@ -34,10 +34,10 @@ class FigureError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class FigureSeries:
-    name: str
-    x: tuple[float, ...]
-    y: tuple[float, ...]
+class FigureSeries: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    x: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    y: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -47,16 +47,16 @@ class FigureSeries:
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceFigurePayload:
-    x_label: str
-    y_label: str
+class EvidenceFigurePayload: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    x_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    y_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     series: tuple[FigureSeries, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceFigure:
-    x_label: str
-    y_label: str
+class EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    x_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    y_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     series: tuple[FigureSeries, ...]
 
     def __post_init__(self) -> None:
@@ -65,7 +65,7 @@ class EvidenceFigure:
         if not self.series:
             raise FigureError("evidence figure requires at least one series")
 
-    def payload(self) -> EvidenceFigurePayload:
+    def payload(self) -> EvidenceFigurePayload: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
         return EvidenceFigurePayload(self.x_label, self.y_label, self.series)
 
 
@@ -73,19 +73,19 @@ class TableError(ValueError):
     pass
 
 
-TableScalar = str | int | float | bool | None
+TableScalar = str | int | float | bool | None #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceTablePayload:
-    columns: tuple[str, ...]
+class EvidenceTablePayload: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     rows: tuple[tuple[TableScalar, ...], ...]
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceTable:
-    columns: tuple[str, ...]
-    rows: tuple[tuple[TableScalar, ...], ...]
+class EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    rows: tuple[tuple[TableScalar, ...], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not self.columns:
@@ -95,7 +95,7 @@ class EvidenceTable:
         if any(len(row) != len(self.columns) for row in self.rows):
             raise TableError("evidence table row width differs from column count")
 
-    def payload(self) -> EvidenceTablePayload:
+    def payload(self) -> EvidenceTablePayload: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
         return EvidenceTablePayload(self.columns, self.rows)
 
 
@@ -122,7 +122,7 @@ class VerifiedEvidenceWriter:
                 f"evidence requires a verified completed artifact: {error}"
             ) from error
         workspace = results_workspace(self._layout, experiment)
-        destination = workspace / f"{experiment.value}.evidence.json"
+        destination = workspace / f"{experiment.value}.evidence.json" #TODO: use enums
         rendered = (stable_json(evidence) + "\n").encode("utf-8")
         if destination.is_file():
             if destination.read_bytes() == rendered:
@@ -134,15 +134,15 @@ class VerifiedEvidenceWriter:
         atomic_write_bytes(destination, rendered)
         return destination
 
-    def write_table(
+    def write_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
         table: EvidenceTable,
-        name: str,
+        name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
     ) -> Path:
         self._store.resolve(artifact_id)
-        destination = results_workspace(self._layout, experiment) / f"{name}.table.json"
+        destination = results_workspace(self._layout, experiment) / f"{name}.table.json" #TODO: move to constants
         atomic_write_json(destination, table.payload())
         return destination
 
@@ -156,21 +156,21 @@ class VerifiedEvidenceWriter:
             return ()
         workspace = results_workspace(self._layout, experiment)
         serialized = cast(StableJsonPayload, metric.model_dump(mode="json"))
-        summary = workspace / "metrics" / _experiment_metric_summary_directory() / "summary.json"
+        summary = workspace / "metrics" / _experiment_metric_summary_directory() / "summary.json" #TODO: use enums
         atomic_write_json(summary, serialized)
-        columns = tuple(metric.model_dump(mode="json").keys())
+        columns = tuple(metric.model_dump(mode="json").keys()) #TODO: handle this better
         row = tuple(str(value) for value in metric.model_dump(mode="json").values())
         csv_path = (
             workspace
-            / "tables"
+            / "tables" #TODO: use enums
             / _experiment_supplementary_table_directory()
-            / "metric_records.csv"
+            / "metric_records.csv" #TODO: use enums
         )
         tex_path = (
             workspace
-            / "tables"
+            / "tables" #TODO: use enums
             / _experiment_supplementary_table_directory()
-            / "metric_records.tex"
+            / "metric_records.tex" #TODO: use enums
         )
         atomic_write_bytes(csv_path, _csv_bytes(columns, (row,)))
         atomic_write_bytes(tex_path, _tex_bytes(columns, (row,)))
@@ -188,12 +188,12 @@ class VerifiedEvidenceWriter:
             raise EvidenceExportError("metric figure requires a valid finite metric value")
         destination = (
             results_workspace(self._layout, experiment)
-            / "figures"
+            / "figures" #TODO: use enums
             / _experiment_main_figure_directory()
         )
         label = f"{metric.metric_name.value}: {metric.metric_value:g} {metric.metric_unit}"
-        svg_path = destination / "metric_value.svg"
-        pdf_path = destination / "metric_value.pdf"
+        svg_path = destination / "metric_value.svg" #TODO: use enums
+        pdf_path = destination / "metric_value.pdf" #TODO: use enums
         atomic_write_bytes(svg_path, _metric_svg_bytes(label, metric.metric_value))
         atomic_write_bytes(pdf_path, _metric_pdf_bytes(label, metric.metric_value))
         return (svg_path, pdf_path)
@@ -215,12 +215,12 @@ class VerifiedEvidenceWriter:
             )
             for manifest in manifests
         )
-        experiments = summary / "tables" / _project_main_table_directory() / "experiments.csv"
+        experiments = summary / "tables" / _project_main_table_directory() / "experiments.csv" #TODO: use enums
         atomic_write_bytes(
             experiments,
             _csv_bytes(
                 (
-                    "artifact_id",
+                    "artifact_id", #TODO: use enums
                     "semantic_producer_coordinates",
                     "producer_stage",
                     "dependency_fingerprint_sha256",
@@ -236,10 +236,10 @@ class VerifiedEvidenceWriter:
             tuple(metrics[0].model_dump(mode="json").keys()) if metrics else ("metric_record",)
         )
         evidence_summary = (
-            summary / "tables" / _project_main_table_directory() / "evidence_summary.csv"
+            summary / "tables" / _project_main_table_directory() / "evidence_summary.csv" #TODO: use enums
         )
         atomic_write_bytes(evidence_summary, _csv_bytes(metric_columns, metric_rows))
-        metrics_summary = summary / "metrics" / _project_metric_summary_directory() / "summary.json"
+        metrics_summary = summary / "metrics" / _project_metric_summary_directory() / "summary.json" #TODO: centralize this. Seems duplicated
         atomic_write_json(
             metrics_summary,
             cast(
@@ -251,9 +251,9 @@ class VerifiedEvidenceWriter:
         )
         configuration = (
             summary
-            / "reproducibility"
+            / "reproducibility" #TODO: use enums
             / _project_configuration_reproducibility_directory()
-            / "scientific_configuration.json"
+            / "scientific_configuration.json" #TODO: use enums
         )
         atomic_write_json(
             configuration,
@@ -268,9 +268,9 @@ class VerifiedEvidenceWriter:
         )
         execution = (
             summary
-            / "reproducibility"
+            / "reproducibility" #TODO: use enums
             / _project_execution_reproducibility_directory()
-            / "execution.json"
+            / "execution.json" #TODO: use enums
         )
         atomic_write_json(
             execution,
@@ -286,15 +286,15 @@ class VerifiedEvidenceWriter:
         )
         return (experiments, evidence_summary, metrics_summary, configuration, execution)
 
-    def write_figure(
+    def write_figure( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
         figure: EvidenceFigure,
-        name: str,
+        name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
     ) -> Path:
         self._store.resolve(artifact_id)
-        destination = results_workspace(self._layout, experiment) / f"{name}.figure.json"
+        destination = results_workspace(self._layout, experiment) / f"{name}.figure.json" #TODO: move to constants
         atomic_write_json(destination, figure.payload())
         return destination
 
@@ -308,7 +308,7 @@ class VerifiedEvidenceWriter:
         raw = json.loads(payload_path.read_text(encoding="utf-8"))
         if not isinstance(raw, Mapping):
             raise EvidenceExportError("verified payload must be a JSON object")
-        metric_payload = raw.get("metric_record")
+        metric_payload = raw.get("metric_record") #TODO: is this duplicated?? Should be handled better
         if metric_payload is None:
             return None
         try:
@@ -340,59 +340,59 @@ def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> b
 
 
 def _tex_escape(value: str) -> str:
-    return value.replace("\\", r"\textbackslash{}").replace("_", r"\_")
+    return value.replace("\\", r"\textbackslash{}").replace("_", r"\_") #TODO: this does not seem safe, nor clean
 
 
-def _experiment_metric_summary_directory() -> str:
-    return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.metrics[-1]
+def _experiment_metric_summary_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+    return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.metrics[-1] #TODO: handle this better
 
 
-def _project_metric_summary_directory() -> str:
+def _project_metric_summary_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.project_summary_subdirectories.metrics[-1]
 
 
-def _experiment_supplementary_table_directory() -> str:
+def _experiment_supplementary_table_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.tables[-1]
 
 
-def _experiment_main_figure_directory() -> str:
+def _experiment_main_figure_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.manuscript_experiment_subdirectories.figures[0]
 
 
-def _project_main_table_directory() -> str:
+def _project_main_table_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.project_summary_subdirectories.tables[0]
 
 
-def _project_configuration_reproducibility_directory() -> str:
+def _project_configuration_reproducibility_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.project_summary_subdirectories.reproducibility[0]
 
 
-def _project_execution_reproducibility_directory() -> str:
+def _project_execution_reproducibility_directory() -> str: #TODO: should be retrieved from config yml and converted in Paths and accessed through config
     return active_config().runtime.artifact_layout.project_summary_subdirectories.reproducibility[
         -1
     ]
 
 
-def _metric_svg_bytes(label: str, value: float) -> bytes:
-    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4))
+def _metric_svg_bytes(label: str, value: float) -> bytes: #TODO: centralize this. Seems duplicated
+    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4)) #TODO: move to constants
     text = html.escape(label)
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="180" '
         'viewBox="0 0 480 180"><rect width="480" height="180" fill="white"/>'
         f'<text x="40" y="45" font-family="sans-serif" font-size="18">{text}</text>'
         '<line x1="40" y1="130" x2="440" y2="130" stroke="black"/>'
-        f'<rect x="40" y="80" width="{bar_width:g}" height="50" fill="#2a6fbb"/>'
+        f'<rect x="40" y="80" width="{bar_width:g}" height="50" fill="#2a6fbb"/>' #TODO: is this duplicated?? Should be handled better
         "</svg>\n"
     )
     return svg.encode("utf-8")
 
 
 def _metric_pdf_bytes(label: str, value: float) -> bytes:
-    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4))
+    bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4)) #TODO: move to constants
     escaped = label.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
     stream = (
         f"BT /F1 14 Tf 40 150 Td ({escaped}) Tj ET\n"
-        "0.16 0.44 0.73 rg\n"
+        "0.16 0.44 0.73 rg\n" #TODO: move to constants
         f"40 70 {bar_width:g} 40 re f\n"
         "0 0 0 RG\n40 70 m 440 70 l S\n"
     ).encode("ascii", errors="replace")
@@ -400,7 +400,7 @@ def _metric_pdf_bytes(label: str, value: float) -> bytes:
         b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n",
         b"2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n",
         (
-            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 480 180]"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 480 180]" #TODO: move to constants
             b"/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n"
         ),
         b"4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n",
@@ -410,7 +410,7 @@ def _metric_pdf_bytes(label: str, value: float) -> bytes:
         + stream
         + b"endstream\nendobj\n",
     )
-    document = bytearray(b"%PDF-1.4\n")
+    document = bytearray(b"%PDF-1.4\n") #TODO: this does not seem safe, nor clean
     offsets: list[int] = [0]
     for item in objects:
         offsets.append(len(document))
@@ -427,7 +427,7 @@ def _metric_pdf_bytes(label: str, value: float) -> bytes:
     return bytes(document)
 
 
-def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]:
+def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     if isinstance(value, Mapping):
         rows: list[tuple[str, str]] = []
         for key, item in value.items():
@@ -441,11 +441,11 @@ def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]:
     return ((prefix, str(value)),)
 
 
-def numerical_constants_and_seeds_table(config: FedorbitConfig | None = None) -> EvidenceTable:
+def numerical_constants_and_seeds_table(config: FedorbitConfig | None = None) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     resolved = config if config is not None else active_config()
     dumped = cast(Mapping[str, JsonValue], resolved.model_dump(mode="json"))
     rows = tuple(
-        sorted(_leaf_scalars("scientific", dumped.get("scientific", OrderedDict())))
+        sorted(_leaf_scalars("scientific", dumped.get("scientific", OrderedDict()))) #TODO: use enums for these strings
         + sorted(_leaf_scalars("solvers", dumped.get("solvers", OrderedDict())))
     )
     return EvidenceTable(
@@ -454,7 +454,7 @@ def numerical_constants_and_seeds_table(config: FedorbitConfig | None = None) ->
     )
 
 
-def experiment_matrix_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def experiment_matrix_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "experiment",
@@ -471,7 +471,7 @@ def experiment_matrix_table(rows: Sequence[Mapping[str, TableScalar]]) -> Eviden
     )
 
 
-def dataset_and_client_protocol_table(
+def dataset_and_client_protocol_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     manifests: Sequence[DatasetManifest],
     modality_by_dataset: Mapping[str, str],
     role_by_dataset: Mapping[str, ClientRole],
@@ -509,7 +509,7 @@ def dataset_and_client_protocol_table(
     return EvidenceTable(columns=columns, rows=rows)
 
 
-def _metric_value(
+def _metric_value( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     records: Sequence[MetricRecord],
     pair: str,
     method: TransferMethod,
@@ -530,11 +530,11 @@ def _metric_value(
     )
 
 
-def primary_strict_transfer_results_table(
+def primary_strict_transfer_results_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     metric_records: Sequence[MetricRecord],
     comparison_records: Sequence[PairedComparisonRecord],
 ) -> EvidenceTable:
-    columns = (
+    columns = ( #TODO: centralize this. Seems duplicated
         "pair",
         "method",
         "valid_seeds",
@@ -550,7 +550,7 @@ def primary_strict_transfer_results_table(
         "confirmation_coverage",
     )
     pairs = sorted({record.pair for record in metric_records})
-    method_order = (
+    method_order = ( #TODO: handle this better
         TransferMethod.LOCAL_ONLY,
         TransferMethod.LOCAL_SIR,
         TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
@@ -574,7 +574,7 @@ def primary_strict_transfer_results_table(
                 (
                     pair,
                     method.value,
-                    comparison.paired_seed_count if comparison is not None else 0,
+                    comparison.paired_seed_count if comparison is not None else 0, #TODO: this does not seem safe, nor clean
                     _metric_value(metric_records, pair, method, MetricId.MACRO_CROSS_ENTROPY),
                     _metric_value(metric_records, pair, method, MetricId.MACRO_F1),
                     _metric_value(metric_records, pair, method, MetricId.BALANCED_ACCURACY),
@@ -583,14 +583,14 @@ def primary_strict_transfer_results_table(
                     comparison.bca_ci_high if comparison is not None else None,
                     comparison.raw_p if comparison is not None else None,
                     comparison.holm_p if comparison is not None else None,
-                    comparison.decision.value if comparison is not None else "",
+                    comparison.decision.value if comparison is not None else "", #TODO: handle this better
                     _metric_value(metric_records, pair, method, MetricId.COVERAGE_CONFIRM),
                 )
             )
     return EvidenceTable(columns=columns, rows=tuple(rows))
 
 
-def _rows_table(
+def _rows_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     columns: tuple[str, ...], rows: Sequence[Mapping[str, TableScalar]]
 ) -> EvidenceTable:
     return EvidenceTable(
@@ -599,7 +599,7 @@ def _rows_table(
     )
 
 
-def transfer_ontology_and_null_padding_table(
+def transfer_ontology_and_null_padding_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
@@ -615,7 +615,7 @@ def transfer_ontology_and_null_padding_table(
     )
 
 
-def model_and_training_protocol_table(
+def model_and_training_protocol_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
@@ -636,7 +636,7 @@ def model_and_training_protocol_table(
     )
 
 
-def information_resource_matrix_table(
+def information_resource_matrix_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
@@ -657,7 +657,7 @@ def information_resource_matrix_table(
     )
 
 
-def coupling_mechanism_results_table(
+def coupling_mechanism_results_table( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
@@ -675,7 +675,7 @@ def coupling_mechanism_results_table(
     )
 
 
-def exact_solver_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def exact_solver_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "k",
@@ -697,7 +697,7 @@ def exact_solver_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evi
     )
 
 
-def ablation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def ablation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "ablation",
@@ -712,7 +712,7 @@ def ablation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evidenc
     )
 
 
-def sparsity_and_dense_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def sparsity_and_dense_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "support_or_dense_condition",
@@ -728,7 +728,7 @@ def sparsity_and_dense_results_table(rows: Sequence[Mapping[str, TableScalar]]) 
     )
 
 
-def confirmation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def confirmation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "pair",
@@ -739,7 +739,7 @@ def confirmation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evi
             "beneficial_rejected_rate",
             "coverage",
             "no_confirm_harmful_rate",
-            "arr",
+            "arr", #TODO: name should be enum values
             "rrr",
             "ci",
             "p",
@@ -748,7 +748,7 @@ def confirmation_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evi
     )
 
 
-def generalization_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def generalization_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "pair",
@@ -770,7 +770,7 @@ def generalization_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> E
     )
 
 
-def failure_boundary_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def failure_boundary_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "boundary_dimension",
@@ -788,7 +788,7 @@ def failure_boundary_results_table(rows: Sequence[Mapping[str, TableScalar]]) ->
     )
 
 
-def scalability_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable:
+def scalability_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> EvidenceTable: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _rows_table(
         (
             "k",
@@ -809,43 +809,43 @@ def scalability_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evid
     )
 
 
-def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure:
+def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return EvidenceFigure(x_label=x_label, y_label=y_label, series=tuple(series))
 
 
-def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("paired mean relative macro-CE gain vs local", "primary directed pair", series)
 
 
-def baseline_paired_difference_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def baseline_paired_difference_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("primary directed pair", "seed-level paired difference", series)
 
 
-def coupling_gap_phase_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def coupling_gap_phase_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("coupling factor combination", "predicted structural zero/strict state", series)
 
 
-def predicted_vs_realized_transfer_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def predicted_vs_realized_transfer_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("certified robust predicted value", "TEST relative macro-CE gain", series)
 
 
-def sparsity_utility_efficiency_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def sparsity_utility_efficiency_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("runtime", "realized gain", series)
 
 
-def confirmation_safety_coverage_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def confirmation_safety_coverage_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("confirmation coverage", "harmful accepted rate", series)
 
 
-def semantic_sufficiency_frontier_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def semantic_sufficiency_frontier_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("log|orbit|", "realized gain", series)
 
 
-def failure_boundary_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def failure_boundary_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("boundary setting", "certified value / realized gain", series)
 
 
-def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure(
         "N_S * sum(n_g^3) (log scale)",
         "runtime (log scale)",
@@ -853,5 +853,5 @@ def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
     )
 
 
-def map_value_bound_figure(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def map_value_bound_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
     return _figure("orbit-radius bound", "exact map action value", series)

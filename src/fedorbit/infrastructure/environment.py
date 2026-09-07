@@ -68,11 +68,11 @@ class EnvironmentSnapshot:
     hardware: HardwareIdentity
     fingerprint_sha256: str #TODO: remove this from code
 
-    def mismatches(self) -> tuple[DependencyVersion, ...]:
+    def mismatches(self) -> tuple[DependencyVersion, ...]: #TODO: remove this from code
         return tuple(dependency for dependency in self.dependencies if not dependency.matches)
 
 
-def observed_python_version() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def observed_python_version() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return platform.python_version()
 
 
@@ -111,7 +111,7 @@ def observed_hardware() -> HardwareIdentity:
     )
 
 
-def _gpu_memory_bytes() -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _gpu_memory_bytes() -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"], #TODO: use enums
@@ -125,7 +125,7 @@ def _gpu_memory_bytes() -> int | None: #TODO: do not use primitivies. Use an app
         return None
 
 
-def _driver_version() -> str | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _driver_version() -> str | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], #TODO: use enums
@@ -245,7 +245,7 @@ class LockfileDocument(FrozenModel): #TODO: remove this from code
 SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"}) #TODO: use enums
 
 
-def _package_has_hash(package: LockfilePackage) -> bool:
+def _package_has_hash(package: LockfilePackage) -> bool: #TODO: remove this from code
     source = package.source
     if source is not None and any(getattr(source, marker) is not None for marker in SOURCE_MARKERS):
         return True

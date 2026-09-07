@@ -119,13 +119,13 @@ def classify_failure(error: BaseException) -> FailureClassification:
 @dataclass(frozen=True, slots=True)
 class RetryDecision:
     retry: bool
-    remaining_attempts: int
+    remaining_attempts: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     terminal_state: TerminalState | None = None
 
 
 class RetryPolicy:
-    def __init__(self, retries_after_initial: int) -> None:
-        if retries_after_initial < 0:
+    def __init__(self, retries_after_initial: int) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: retries_after_initial)
+        if retries_after_initial < 0: #TODO: remove this. Such checks are not done in the code. They are values we get from the configuration and are tested by unit tests
             raise ValueError("retry count must be nonnegative")
         self._maximum_total_attempts = retries_after_initial + 1
 
@@ -157,10 +157,10 @@ class ExecutionOutcome:
     terminal_state: TerminalState
     failure_category: FailureCategory | None = None
     method_outcome: MethodOutcome = field(default_factory=MethodOutcome)
-    failure_reason: str | None = None
+    failure_reason: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     diagnostics_produced: bool = False
-    completed_support_records: tuple[str, ...] = ()
-    cut_master_counters: tuple[tuple[str, int], ...] = ()
+    completed_support_records: tuple[str, ...] = () #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    cut_master_counters: tuple[tuple[str, int], ...] = () #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     certified_action_available: bool = False
     proceeded_to_confirmation: bool = False
     proceeded_to_assimilation: bool = False
@@ -176,7 +176,7 @@ def infrastructure_exhausted_outcome() -> ExecutionOutcome:
     )
 
 
-def validation_failure_outcome(reason: str, invalid: bool) -> ExecutionOutcome:
+def validation_failure_outcome(reason: str, invalid: bool) -> ExecutionOutcome: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reason)
     return ExecutionOutcome(
         terminal_state=TerminalState.INVALID if invalid else TerminalState.FAILED_VALIDATION,
         failure_category=FailureCategory.VALIDATION,
@@ -185,10 +185,10 @@ def validation_failure_outcome(reason: str, invalid: bool) -> ExecutionOutcome:
 
 
 def scientific_algorithmic_failure_outcome(
-    reason: str,
+    reason: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reason)
     diagnostics: bool,
-    completed_support_records: tuple[str, ...],
-    cut_master_counters: tuple[tuple[str, int], ...],
+    completed_support_records: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: completed_support_records)
+    cut_master_counters: tuple[tuple[str, int], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: cut_master_counters)
 ) -> ExecutionOutcome:
     return ExecutionOutcome(
         terminal_state=TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC,

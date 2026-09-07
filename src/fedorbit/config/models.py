@@ -680,11 +680,11 @@ class FedorbitConfig(FrozenModel):
     reporting: ReportingConfig
 
 
-def _registered_method_values() -> set[str]:
+def _registered_method_values() -> set[str]: #TODO: should be deleted. We don't reference this in code.
     return {method.value for method in TransferMethod}
 
 
-def _append_registered_method(
+def _append_registered_method( #TODO: should be deleted. We don't reference this in code.
     methods: list[TransferMethod], candidate_name: str, registered_values: set[str]
 ) -> None:
     if candidate_name not in registered_values:
@@ -694,7 +694,7 @@ def _append_registered_method(
         methods.append(candidate)
 
 
-def all_registered_methods() -> tuple[TransferMethod, ...]:
+def all_registered_methods() -> tuple[TransferMethod, ...]: #TODO: should be deleted. We don't reference this in code.
     from fedorbit.config.loading import active_config
 
     config = active_config()

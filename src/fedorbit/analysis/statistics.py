@@ -53,7 +53,7 @@ class PValueSet:
         if len(set(names)) != len(names):
             raise StatisticsError("p-value set contains duplicate names")
 
-    def value_of(self, name: str) -> float | None:
+    def value_of(self, name: str) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
         for entry in self.entries:
             if entry.name == name:
                 return entry.p_value
@@ -89,21 +89,21 @@ _BOOTSTRAP = _TYPED_SCIPY_STATS.bootstrap #TODO: handle this better
 _CHI_SQUARE_CDF = _TYPED_SCIPY_STATS.chi2.cdf #TODO: handle this better
 
 
-def nominal_alpha() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def nominal_alpha() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     return 1.0 - active_config().scientific.statistics.confidence_level
 
 
-def _mean(values: tuple[float, ...]#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-          ) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def _mean(values: tuple[float, ...]#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)
+          ) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if not values:
         raise StatisticsError("statistical mean requires at least one value")
     return math.fsum(values) / len(values)
 
 
 def sign_flip_p_value(
-    differences: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    differences: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: differences)
     comparison_tolerance: Tolerance,
-) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
         return 1.0
@@ -121,10 +121,10 @@ def sign_flip_p_value(
 
 
 def one_sided_sign_flip_p_value(
-    differences: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    differences: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: differences)
     alternative: StatisticalAlternative,
     comparison_tolerance: Tolerance,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if alternative not in {StatisticalAlternative.GREATER, StatisticalAlternative.LESS}:
         raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
     nonzero = tuple(value for value in differences if value != 0.0)
@@ -155,8 +155,8 @@ class SignFlipResult:
 
 
 def exact_sign_flip_test(
-    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: method_values)
+    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reference_values)
 ) -> SignFlipResult:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
@@ -184,12 +184,12 @@ def exact_sign_flip_test(
 
 
 def statistical_bootstrap_seed(
-    contrast_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    family: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    metric: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    purpose: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_name)
+    family: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: family)
+    directed_pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: directed_pair)
+    metric: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: metric)
+    purpose: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: purpose)
+) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     coordinates: OrderedDict[str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
                              str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
                              ] = OrderedDict(
@@ -217,8 +217,8 @@ class BcaInterval:
 
 
 def paired_bca_interval(
-    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: method_values)
+    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reference_values)
     bootstrap_seed: RandomSeed,
 ) -> BcaInterval:
     if len(method_values) != len(reference_values):
@@ -239,7 +239,7 @@ def paired_bca_interval(
     method_array = np.asarray(method_values, dtype=np.float64)
     reference_array = np.asarray(reference_values, dtype=np.float64)
 
-    def statistic(x: FloatArray, y: FloatArray, axis: int = -1) -> FloatArray:
+    def statistic(x: FloatArray, y: FloatArray, axis: int = -1) -> FloatArray: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: axis)
         return np.asarray(np.mean(x - y, axis=axis), dtype=np.float64)
 
     rng = Generator(PCG64(bootstrap_seed))
@@ -271,8 +271,8 @@ class TostResult:
 
 
 def tost_equivalence(
-    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    method_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: method_values)
+    reference_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reference_values)
 ) -> TostResult:
     if len(method_values) != len(reference_values):
         raise StatisticsError("paired sample sizes differ")
@@ -302,9 +302,9 @@ def holm_step_down(raw_p_values: PValueSet) -> PValueSet:
     return PValueSet(tuple(adjusted))
 
 
-def mcnemar_exact_p(b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    b10: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def mcnemar_exact_p(b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b01)
+                    b10: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b10)
+                    ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if b01 < 0 or b10 < 0:
         raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
@@ -315,9 +315,9 @@ def mcnemar_exact_p(b01: int, #TODO: do not use primitivies. Use an appropriate 
     return min(1.0, 2.0 * tail / 2**discordant)
 
 
-def mcnemar_asymptotic_continuity_corrected_p(b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                                               b10: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                                               ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def mcnemar_asymptotic_continuity_corrected_p(b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b01)
+                                               b10: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b10)
+                                               ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     if b01 < 0 or b10 < 0:
         raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
@@ -329,8 +329,8 @@ def mcnemar_asymptotic_continuity_corrected_p(b01: int, #TODO: do not use primit
 
 
 def mcnemar_test(
-    b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    b10: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    b01: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b01)
+    b10: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: b10)
 ) -> McNemarResult:
     switch = (
         active_config().scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch

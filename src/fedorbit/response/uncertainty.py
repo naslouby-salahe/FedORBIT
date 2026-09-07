@@ -22,6 +22,7 @@ from fedorbit.response.estimation import (
     ShadowSettings,
     paired_shadow_derivative,
     run_shadow_pair,
+    standard_error,
 )
 from fedorbit.response.pilot import PilotData
 from fedorbit.types import (
@@ -292,9 +293,3 @@ def _build_final_entries(
                 )
             )
     return entries, useful_columns
-
-
-def standard_error(values: tuple[float, ...]) -> float:
-    if len(values) < 2:
-        return math.nan
-    return statistics.stdev(values) / math.sqrt(len(values))

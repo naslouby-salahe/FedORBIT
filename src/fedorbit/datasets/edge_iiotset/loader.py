@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from fedorbit.datasets.common import file_sha256 as _file_sha256
 from fedorbit.types import ByteCount
 
 
@@ -23,14 +23,6 @@ class EdgeTabularFile:
     byte_size: ByteCount
     sha256: str
     columns: tuple[str, ...]
-
-
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def discover_edge_tabular_files(raw_root: Path) -> tuple[Path, ...]:

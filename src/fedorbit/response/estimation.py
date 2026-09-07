@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import statistics
 from collections.abc import Iterator
 from dataclasses import dataclass
 
@@ -31,6 +32,10 @@ from fedorbit.types import (
 
 
 class ResponseEstimationError(ValueError):
+    pass
+
+
+class NonFiniteShadowLossError(ResponseEstimationError):
     pass
 
 
@@ -202,7 +207,7 @@ def _run_shadow(
         )
         loss = (per_example_ce * weights).sum() / per_example_ce.numel()
         if not bool(torch.isfinite(loss)):
-            raise ResponseEstimationError(f"non-finite shadow loss at optimizer step {step}")
+            raise NonFiniteShadowLossError(f"non-finite shadow loss at optimizer step {step}")
         backward_value(loss)
         torch.nn.utils.clip_grad_norm_(
             model.parameters(),
@@ -266,3 +271,9 @@ def _evaluate_risks(
         )
         for class_set in outcome_native_class_sets
     )
+
+
+def standard_error(values: tuple[float, ...]) -> float:
+    if len(values) < 2:
+        return math.nan
+    return statistics.stdev(values) / math.sqrt(len(values))

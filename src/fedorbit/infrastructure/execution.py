@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import shutil
 import tempfile
@@ -35,10 +36,13 @@ from fedorbit.datasets.common import (
 )
 from fedorbit.datasets.materialization import (
     MaterializationError,
+    MaterializationResourceLimitError,
     MaterializedClient,
+    TransferConceptGroup,
     materialize_client,
     transfer_concept_groups,
 )
+from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.synthetic import (
@@ -110,7 +114,7 @@ from fedorbit.learning.pilot import (
     run_base_model_pilot,
     select_pilot_configuration,
 )
-from fedorbit.learning.scoring import LocalClassCount, ScoringRequest, score_model
+from fedorbit.learning.scoring import LocalClassCount, ScoreArtifact, ScoringRequest, score_model
 from fedorbit.learning.training import BaseCheckpoint, ClassWeights, train_base_model
 from fedorbit.methods.assimilation import capture_pre_confirm_pair
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
@@ -134,9 +138,14 @@ from fedorbit.optimization.objective import (
     curriculum_action_from_entries,
     evaluate_objective,
 )
-from fedorbit.response.packet import build_source_packet
+from fedorbit.response.packet import (
+    PacketConstructionContext,
+    build_source_packet,
+    construct_source_packet,
+)
 from fedorbit.response.pilot import (
     PilotCheckpoint,
+    ResponseCandidate,
     run_pooled_source_response_pilot,
     select_response_configuration,
 )
@@ -151,6 +160,7 @@ from fedorbit.types import (
     ArtifactType,
     ClientRole,
     CoarseGroup,
+    ConfigurationSection,
     CouplingCompatibility,
     DatasetId,
     ExecutionCell,
@@ -360,6 +370,7 @@ class DatasetPreparationResult:
     observations: tuple[DatasetObservation, ...]
     validation_artifact_paths: tuple[ArtifactPath, ...]
     duplicate_artifact_paths: tuple[ArtifactPath, ...]
+    resource_blocked_datasets: tuple[tuple[DatasetId, str], ...] = ()
 
     @property
     def blocked_datasets(self) -> tuple[DatasetId, ...]:
@@ -458,11 +469,15 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     if len(duplicate_paths) != len(request.datasets):
         raise ExecutionError("duplicate diagnostics did not cover every requested dataset")
     layout = build_layout()
+    resource_blocked: list[tuple[DatasetId, str]] = []
     for observation in observations:
         if not observation.valid_for_chronological_preprocessing:
             continue
         try:
             materialized = materialize_client(observation.dataset, raw_root)
+        except MaterializationResourceLimitError as error:
+            resource_blocked.append((observation.dataset, str(error)))
+            continue
         except MaterializationError as error:
             raise ExecutionError(
                 f"could not materialize {observation.dataset.value}: {error}"
@@ -472,6 +487,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
         observations=observations,
         validation_artifact_paths=tuple(ArtifactPath(path) for path in validation_paths),
         duplicate_artifact_paths=tuple(ArtifactPath(path) for path in duplicate_paths),
+        resource_blocked_datasets=tuple(resource_blocked),
     )
 
 
@@ -569,6 +585,11 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
             lambda: execute_coupling_and_map_bound_validation(store, layout, request)
         )
         return
+    if request.experiment == ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION:
+        _execute_producer_with_retry(
+            lambda: execute_dataset_client_and_resource_validation(store, layout, request)
+        )
+        return
     if request.experiment in _SYNTHETIC_EXPERIMENTS:
         _execute_producer_with_retry(lambda: execute_synthetic_experiment(store, layout, request))
         return
@@ -578,6 +599,11 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     if request.experiment == ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT:
         _execute_producer_with_retry(
             lambda: execute_source_response_estimator_pilot(store, layout, request)
+        )
+        return
+    if request.experiment == ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION:
+        _execute_producer_with_retry(
+            lambda: execute_final_source_response_band_validation(store, layout, request)
         )
         return
     blocked = _chronology_block_reasons()
@@ -616,6 +642,92 @@ _SYNTHETIC_EXPERIMENTS = frozenset(
         ExperimentName.SCALABILITY_AND_EFFICIENCY,
     }
 )
+
+
+def execute_dataset_client_and_resource_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> ReusableArtifactManifest:
+    raw_root = repository_root() / "data" / "raw"
+    datasets: list[StableJsonPayload] = []
+    materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+    for dataset in active_config().scientific.datasets.clients:
+        try:
+            client = materialize_client(dataset, raw_root)
+        except MaterializationError as error:
+            datasets.append(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        dataset=dataset.value,
+                        state=ArtifactState.INVALID.value,
+                        reason=str(error),
+                    ),
+                )
+            )
+            continue
+        materialized[dataset] = client
+        datasets.append(
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=dataset.value,
+                    state=ArtifactState.COMPLETED.value,
+                    local_class_count=client.class_manifest.class_count,
+                    feature_count=len(client.feature_names),
+                    transfer_candidates=len(transfer_concept_groups(dataset, client)),
+                ),
+            )
+        )
+    pairs: list[StableJsonPayload] = []
+    for pair in active_config().scientific.datasets.primary_directed_pairs:
+        source = materialized.get(pair.source)
+        target = materialized.get(pair.target)
+        if source is None or target is None:
+            pairs.append(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        source=pair.source.value,
+                        target=pair.target.value,
+                        state=ArtifactState.INVALID.value,
+                    ),
+                )
+            )
+            continue
+        source_groups = {group.concept for group in transfer_concept_groups(pair.source, source)}
+        target_groups = {group.concept for group in transfer_concept_groups(pair.target, target)}
+        pairs.append(
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    source=pair.source.value,
+                    target=pair.target.value,
+                    state=ArtifactState.COMPLETED.value,
+                    shared_transfer_concept_count=len(source_groups & target_groups),
+                ),
+            )
+        )
+    seed = ExperimentSeed(active_config().scientific.randomness.confirmatory_seeds[0])
+    return _persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        seed,
+        lambda fingerprint: cast(
+            StableJsonPayload,
+            OrderedDict(
+                experiment=request.experiment.value,
+                dependency_fingerprint_sha256=fingerprint,
+                datasets=tuple(datasets),
+                primary_pairs=tuple(pairs),
+            ),
+        ),
+        frozenset(),
+        "fedorbit.infrastructure.execution",
+        "dataset-client-resource-validation",
+    )
 
 
 def _chronology_block_reasons() -> OrderedDict[str, str]:
@@ -1373,7 +1485,7 @@ def execute_base_model_pilot(
 
 
 _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS = frozenset(
-    {"datasets", "models", "source_response_pilot", "transfer_support"}
+    {ConfigurationSection.MODELS, ConfigurationSection.RESPONSE}
 )
 _SOURCE_RESPONSE_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
 
@@ -1397,6 +1509,98 @@ def execute_source_response_estimator_pilot(
 
 
 def _source_response_estimator_payload(
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    fingerprint: str,
+) -> StableJsonPayload:
+    return _source_response_estimator_client_results(layout, request, fingerprint)
+
+
+def _execute_final_source_response_band_validation(
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = repository_root() / "data" / "raw"
+    selected_root = (
+        experiment_workspace(layout, ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
+        / "artifacts"
+        / "fitted"
+    )
+    checkpoint_root = (
+        experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
+        / "checkpoints"
+        / "training"
+    )
+    for dataset in active_config().scientific.datasets.clients:
+        try:
+            materialized = materialize_client(dataset, raw_root)
+        except MaterializationError as error:
+            _persist_client_invalid(layout, request.experiment, dataset, str(error))
+            continue
+        selected_path = selected_root / f"{dataset.value}.json"
+        if not selected_path.is_file():
+            raise ExecutionError(f"missing selected response configuration: {selected_path}")
+        selected_payload = json.loads(selected_path.read_text(encoding="utf-8"))
+        candidate = ResponseCandidate(
+            selected_payload["intervention_magnitude"],
+            selected_payload["optimizer_step_horizon"],
+        )
+        eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
+        for group in transfer_concept_groups(dataset, materialized):
+            if group.source_eligible:
+                eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
+        for seed in active_config().scientific.randomness.confirmatory_seeds:
+            checkpoint_path = checkpoint_root / dataset.value / f"seed-{seed}" / "checkpoint.pt"
+            if not checkpoint_path.is_file():
+                raise ExecutionError(f"missing confirmatory checkpoint: {checkpoint_path}")
+            checkpoint = load_base_checkpoint(checkpoint_path)
+            for coarse_group, groups in eligible_by_group.items():
+                node_classes = tuple(group.native_class_indices for group in groups)
+                model = create_classifier(
+                    dataset,
+                    materialized.splits[Split.TRAIN].features.shape[1],
+                    materialized.class_manifest.class_count,
+                    checkpoint.selected_hyperparameters.dropout_probability,
+                    seed,
+                )
+                checkpoint.state_dict.load_into(model)
+                packet = construct_source_packet(
+                    PacketConstructionContext(
+                        dataset,
+                        materialized.splits[Split.TRAIN].features.shape[1],
+                        materialized.class_manifest.class_count,
+                        coarse_group,
+                        tuple(group.concept.value for group in groups),
+                        tuple(group.train_support for group in groups),
+                        tuple(group.meta_support for group in groups),
+                        file_sha256(checkpoint_path),
+                        hashlib.sha256(selected_path.read_bytes()).hexdigest(),
+                        seed,
+                    ),
+                    checkpoint,
+                    model,
+                    materialized.splits[Split.TRAIN].features,
+                    materialized.splits[Split.TRAIN].targets,
+                    materialized.splits[Split.META].features,
+                    materialized.splits[Split.META].targets,
+                    node_classes,
+                    node_classes,
+                    checkpoint.train_class_weights,
+                    candidate,
+                    datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                ).packet
+                destination = (
+                    experiment_workspace(layout, request.experiment)
+                    / "artifacts"
+                    / "packets"
+                    / dataset.value
+                    / f"seed-{seed}"
+                    / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
+                )
+                atomic_write_bytes(destination, (packet.serialized() + "\n").encode("utf-8"))
+
+
+def _source_response_estimator_client_results(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
     fingerprint: str,
@@ -1520,6 +1724,15 @@ def _source_response_estimator_payload(
             clients=tuple(client_results),
         ),
     )
+
+
+def execute_final_source_response_band_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    del store
+    _execute_final_source_response_band_validation(layout, request)
 
 
 def _execute_client_base_model_pilot(
@@ -1909,7 +2122,7 @@ def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload:
     )
 
 
-def _score_deterministic_validation_batch():
+def _score_deterministic_validation_batch() -> ScoreArtifact:
     model = nn.Linear(2, 2, bias=False)
     with torch.no_grad():
         model.weight.copy_(torch.tensor(((1.0, -1.0), (-1.0, 1.0))))

@@ -157,13 +157,11 @@ def _evaluate_active_image_map(
     mapping: ActiveImageMap,
     lap_tie_tolerance: float,
 ) -> tuple[float, tuple[int, ...]]:
-    blocks = problem.blocks
     image_by_target: OrderedDict[int, int] = OrderedDict(mapping.fixed_pairs())
     fixed_cost = _fixed_active_contribution(problem, alpha, image_by_target)
     completion_cost, images = _complete_with_blockwise_laps(
         problem, alpha, image_by_target, lap_tie_tolerance
     )
-    del blocks
     return fixed_cost + completion_cost, images
 
 

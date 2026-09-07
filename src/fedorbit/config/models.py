@@ -680,12 +680,6 @@ class FedorbitConfig(FrozenModel):
     reporting: ReportingConfig
 
 
-def nominal_alpha() -> float:
-    from fedorbit.config.loading import active_config
-
-    return round(1.0 - active_config().scientific.statistics.confidence_level, 10)
-
-
 def _registered_method_values() -> set[str]:
     return {method.value for method in TransferMethod}
 
@@ -734,9 +728,3 @@ def all_registered_methods() -> tuple[TransferMethod, ...]:
     ) in config.experiments.map_availability_applicability_audit.packet_only_recovery_methods:
         _append_registered_method(methods, method, registered_values)
     return tuple(methods)
-
-
-def registered_client_ids() -> tuple[DatasetId, ...]:
-    from fedorbit.config.loading import active_config
-
-    return tuple(active_config().scientific.datasets.clients.keys())

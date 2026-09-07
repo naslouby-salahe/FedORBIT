@@ -237,6 +237,21 @@ CELL_FIELDS = {
     "scientific_configuration_sha256": "d" * 64,
     "dependency_fingerprint_sha256": "e" * 64,
     "producer_stage": "response",
+    "upstream_artifact_ids": (),
+    "dataset_manifest_sha256": "f" * 64,
+    "split_sha256": "a" * 64,
+    "preprocessing_sha256": "b" * 64,
+    "source_checkpoint_sha256": "c" * 64,
+    "response_packet_sha256": "d" * 64,
+    "target_checkpoint_sha256": "e" * 64,
+    "importance_vector_sha256": "f" * 64,
+    "resource_manifest_sha256": "a" * 64,
+    "relevant_code_sha256": "b" * 64,
+    "material_runtime_sha256": "c" * 64,
+    "git_commit": "d" * 40,
+    "git_dirty": False,
+    "environment_sha256": "e" * 64,
+    "state": "Completed",
 }
 
 

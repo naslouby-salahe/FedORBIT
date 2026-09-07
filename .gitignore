@@ -216,7 +216,7 @@ tempCodeRunnerFile.py
 !/results/**/
 !/results/**/.gitkeep
 /docs/.refactor-audit/
-/graphify-out/
+/docs/.graphify-audit/
 
 # PyPI configuration file
 .pypirc
@@ -228,6 +228,4 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-docs/.graphify-audit/
-graphify-out/
 .claude/

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -57,13 +56,3 @@ def configured(config: FedorbitConfig) -> Generator[None]:
         yield
     finally:
         _bound_config.reset(token)
-
-
-def stable_json(config: FedorbitConfig) -> str:
-    payload = config.model_dump(mode="json")
-    return json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )

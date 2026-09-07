@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
     DirectedPair,
-    MetricId,
     MultiplicityFamily,
     RandomSeed,
     Split,
@@ -497,6 +496,3 @@ def _pearson(left: tuple[float, ...], right: tuple[float, ...]) -> float:
     if denominator == 0.0:
         return 0.0
     return covariance / denominator
-
-
-SPEARMAN_METRIC_NAME = MetricId.PREDICTED_REALIZED_SPEARMAN

@@ -129,7 +129,6 @@ def test_repository_root_entries_are_allowed() -> None:
         ".import_linter_cache",
         "outputs",
         "results",
-        "graphify-out",
     }
     actual = {
         entry.name

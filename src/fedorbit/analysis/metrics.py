@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import statistics
-from collections import OrderedDict
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
@@ -13,7 +12,6 @@ from fedorbit.types import (
     Fraction,
     Index,
     MemoryMib,
-    MetricId,
     RelativeGain,
     SampleCount,
     Score,
@@ -354,15 +352,6 @@ def equal_pair_relative_risk_reduction(
     equal_pair_risk_reduction: float | None,
 ) -> float | None:
     return relative_risk_reduction(equal_pair_harm_no_confirm, equal_pair_risk_reduction)
-
-
-METRIC_NAMES: OrderedDict[str, MetricId] = OrderedDict(
-    certified_value=MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
-    rectangularization_gap=MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
-    coupling_gap=MetricId.ROBUST_COUPLING_VALUE_GAP,
-    upper_bound=MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
-    map_value=MetricId.EXACT_MAP_ACTION_VALUE,
-)
 
 
 class EfficiencyError(ValueError):

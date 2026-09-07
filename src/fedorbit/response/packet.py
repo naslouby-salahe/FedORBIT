@@ -3,11 +3,14 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass, fields
+from pathlib import Path
 
 import numpy as np
 import torch
+from pydantic import ValidationError
 
 from fedorbit.config.loading import active_config
+from fedorbit.config.models import FrozenModel
 from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
@@ -58,6 +61,29 @@ class Float64ArrayPayload:
     order: str
     shape: tuple[int, ...]
     data: tuple[float, ...]
+
+
+class PacketArrayDocument(FrozenModel):
+    dtype: str
+    order: str
+    shape: tuple[int, ...]
+    data: tuple[float, ...]
+
+
+class PacketDocument(FrozenModel):
+    anonymous_fine_node_ids: tuple[str, ...]
+    exposed_coarse_group_id: str
+    L: PacketArrayDocument
+    U: PacketArrayDocument
+    per_node_train_support: PacketArrayDocument
+    per_node_meta_support: PacketArrayDocument
+    per_node_effective_replicate_count: PacketArrayDocument
+    packet_schema_metadata: str
+    source_checkpoint_sha256: str
+    response_configuration_sha256: str
+    packet_integrity_sha256: str
+    packet_validity_state: str
+    technical_creation_timestamp: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,11 +140,71 @@ class SourcePacket:
     def serialized(self) -> str:
         return stable_json(self._wire_payload())
 
+    @classmethod
+    def from_serialized(cls, payload: str) -> SourcePacket:
+        try:
+            document = PacketDocument.model_validate_json(payload)
+        except ValidationError as error:
+            raise PacketError("malformed source-response packet serialization") from error
+        arrays = (
+            document.L,
+            document.U,
+            document.per_node_train_support,
+            document.per_node_meta_support,
+            document.per_node_effective_replicate_count,
+        )
+        if any(
+            array.dtype != "float64"
+            or array.order != "C"
+            or len(array.shape) != 1
+            or array.shape[0] != len(array.data)
+            for array in arrays
+        ):
+            raise PacketError("packet arrays must be one-dimensional C-order float64")
+        integer_arrays = (
+            document.per_node_train_support,
+            document.per_node_meta_support,
+            document.per_node_effective_replicate_count,
+        )
+        if any(
+            any(not float(value).is_integer() for value in array.data) for array in integer_arrays
+        ):
+            raise PacketError("packet support arrays must contain integer values")
+        packet = cls(
+            anonymous_fine_node_ids=document.anonymous_fine_node_ids,
+            exposed_coarse_group_id=document.exposed_coarse_group_id,
+            L=document.L.data,
+            U=document.U.data,
+            per_node_train_support=tuple(
+                int(value) for value in document.per_node_train_support.data
+            ),
+            per_node_meta_support=tuple(
+                int(value) for value in document.per_node_meta_support.data
+            ),
+            per_node_effective_replicate_count=tuple(
+                int(value) for value in document.per_node_effective_replicate_count.data
+            ),
+            packet_schema_metadata=document.packet_schema_metadata,
+            source_checkpoint_sha256=document.source_checkpoint_sha256,
+            response_configuration_sha256=document.response_configuration_sha256,
+            packet_integrity_sha256=document.packet_integrity_sha256,
+            packet_validity_state=document.packet_validity_state,
+            technical_creation_timestamp=document.technical_creation_timestamp,
+        )
+        packet.validate()
+        return packet
+
     def compute_integrity_sha256(self) -> str:
         return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
 
     def payload_sha256(self) -> str:
         return hashlib.sha256(self.serialized().encode("utf-8")).hexdigest()
+
+    def lower_matrix(self) -> np.ndarray:
+        return self._response_matrix(self.L)
+
+    def upper_matrix(self) -> np.ndarray:
+        return self._response_matrix(self.U)
 
     def validate(self) -> None:
         validate_exact_fields(
@@ -147,6 +233,8 @@ class SourcePacket:
             raise PacketError("per-node packet arrays do not match anonymous node count")
         if len(self.L) != len(self.U) or not self.L:
             raise PacketError("response interval arrays must be non-empty and equal length")
+        if len(self.L) != node_count * node_count:
+            raise PacketError("response interval arrays do not form a square node matrix")
         if any(not math.isfinite(value) for value in (*self.L, *self.U)):
             raise PacketError("response interval contains a non-finite value")
         if any(value < 0 for value in (*self.per_node_train_support, *self.per_node_meta_support)):
@@ -193,6 +281,12 @@ class SourcePacket:
             technical_creation_timestamp=self.technical_creation_timestamp,
         )
 
+    def _response_matrix(self, entries: tuple[float, ...]) -> np.ndarray:
+        node_count = len(self.anonymous_fine_node_ids)
+        if len(entries) != node_count * node_count:
+            raise PacketError("packet response entries do not form a square node matrix")
+        return np.asarray(entries, dtype=np.float64).reshape((node_count, node_count), order="C")
+
 
 @dataclass(frozen=True, slots=True)
 class PacketConstructionContext:
@@ -216,6 +310,12 @@ class ConstructedPacket:
 
 class PacketConstructionError(ValueError):
     pass
+
+
+def load_source_packet(source: Path) -> SourcePacket:
+    if not source.is_file():
+        raise PacketError(f"source-response packet does not exist: {source}")
+    return SourcePacket.from_serialized(source.read_text(encoding="utf-8"))
 
 
 def construct_source_packet(

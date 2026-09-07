@@ -17,10 +17,12 @@ from fedorbit.infrastructure.runtime import (
 )
 from fedorbit.learning.training import BaseCheckpoint, ClassWeights
 from fedorbit.response.estimation import (
+    NonFiniteShadowLossError,
     ShadowData,
     ShadowSettings,
     paired_shadow_derivative,
     run_shadow_pair,
+    standard_error,
 )
 from fedorbit.types import (
     Discrepancy,
@@ -149,60 +151,63 @@ def _evaluate_candidate(
         data.learning_rate,
         data.weight_decay,
     )
-    for pilot_checkpoint in pilot_checkpoints:
-        for replicate in range(replicate_count):
-            for intervention_index, concept_classes in enumerate(intervention_classes):
-                schedule_seed = derive_seed32(
-                    SeedDerivationRequest(
-                        pilot_checkpoint.seed,
-                        RngNamespace.RESPONSE_SCHEDULE,
-                        cast(
-                            StableJsonPayload,
-                            OrderedDict(
-                                stage="pilot",
-                                magnitude=candidate.intervention_magnitude,
-                                horizon=candidate.optimizer_step_horizon,
-                                replicate=replicate,
-                                intervention=intervention_index,
+    try:
+        for pilot_checkpoint in pilot_checkpoints:
+            for replicate in range(replicate_count):
+                for intervention_index, concept_classes in enumerate(intervention_classes):
+                    schedule_seed = derive_seed32(
+                        SeedDerivationRequest(
+                            pilot_checkpoint.seed,
+                            RngNamespace.RESPONSE_SCHEDULE,
+                            cast(
+                                StableJsonPayload,
+                                OrderedDict(
+                                    stage="pilot",
+                                    magnitude=candidate.intervention_magnitude,
+                                    horizon=candidate.optimizer_step_horizon,
+                                    replicate=replicate,
+                                    intervention=intervention_index,
+                                ),
                             ),
-                        ),
+                        )
                     )
-                )
-                shadow_data = ShadowData(
-                    data.train_features,
-                    data.train_targets,
-                    data.meta_features,
-                    data.meta_targets,
-                    concept_classes,
-                    data.outcome_native_class_sets,
-                    data.base_class_weights,
-                )
-                full_risks = run_shadow_pair(
-                    pilot_checkpoint.model,
-                    pilot_checkpoint.checkpoint.state_dict,
-                    pilot_checkpoint.checkpoint.optimizer_state,
-                    pilot_checkpoint.checkpoint.rng_state,
-                    shadow_data,
-                    full_settings,
-                    schedule_seed,
-                )
-                half_risks = run_shadow_pair(
-                    pilot_checkpoint.model,
-                    pilot_checkpoint.checkpoint.state_dict,
-                    pilot_checkpoint.checkpoint.optimizer_state,
-                    pilot_checkpoint.checkpoint.rng_state,
-                    shadow_data,
-                    half_settings,
-                    schedule_seed,
-                )
-                for outcome_index in range(outcome_count):
-                    full = _derivative(full_risks[outcome_index], full_settings.epsilon)
-                    half = _derivative(half_risks[outcome_index], half_settings.epsilon)
-                    if not math.isfinite(full) or not math.isfinite(half):
-                        all_finite = False
-                    entry_index = outcome_index * intervention_count + intervention_index
-                    full_values[entry_index].append(full)
-                    half_values[entry_index].append(half)
+                    shadow_data = ShadowData(
+                        data.train_features,
+                        data.train_targets,
+                        data.meta_features,
+                        data.meta_targets,
+                        concept_classes,
+                        data.outcome_native_class_sets,
+                        data.base_class_weights,
+                    )
+                    full_risks = run_shadow_pair(
+                        pilot_checkpoint.model,
+                        pilot_checkpoint.checkpoint.state_dict,
+                        pilot_checkpoint.checkpoint.optimizer_state,
+                        pilot_checkpoint.checkpoint.rng_state,
+                        shadow_data,
+                        full_settings,
+                        schedule_seed,
+                    )
+                    half_risks = run_shadow_pair(
+                        pilot_checkpoint.model,
+                        pilot_checkpoint.checkpoint.state_dict,
+                        pilot_checkpoint.checkpoint.optimizer_state,
+                        pilot_checkpoint.checkpoint.rng_state,
+                        shadow_data,
+                        half_settings,
+                        schedule_seed,
+                    )
+                    for outcome_index in range(outcome_count):
+                        full = _derivative(full_risks[outcome_index], full_settings.epsilon)
+                        half = _derivative(half_risks[outcome_index], half_settings.epsilon)
+                        if not math.isfinite(full) or not math.isfinite(half):
+                            all_finite = False
+                        entry_index = outcome_index * intervention_count + intervention_index
+                        full_values[entry_index].append(full)
+                        half_values[entry_index].append(half)
+    except NonFiniteShadowLossError:
+        all_finite = False
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):
@@ -252,6 +257,18 @@ def _build_pilot_entry(
     half_values: tuple[float, ...],
 ) -> PilotEntry:
     pilot = active_config().scientific.source_response_pilot
+    if not full_values or not half_values:
+        return PilotEntry(
+            outcome_index,
+            intervention_index,
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            math.nan,
+            False,
+            0.0,
+        )
     a_hat_full = statistics.fmean(full_values)
     a_hat_half = statistics.fmean(half_values)
     discrepancy = abs(a_hat_full - a_hat_half) / max(
@@ -314,12 +331,6 @@ def _pilot_score(
     )
     curvature = statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
     return signal - pilot.curvature_penalty_coefficient * curvature
-
-
-def standard_error(values: tuple[float, ...]) -> float:
-    if len(values) < 2:
-        return math.nan
-    return statistics.stdev(values) / math.sqrt(len(values))
 
 
 def sign_agreement(values: tuple[float, ...]) -> float:

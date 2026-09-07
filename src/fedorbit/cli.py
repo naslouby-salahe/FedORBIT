@@ -132,6 +132,8 @@ def preprocess(
                 f"{observation.dataset.value}: {state} | chronology={event_time.state.value} | "
                 f"reason={event_time.reason}"
             )
+        for dataset, reason in result.resource_blocked_datasets:
+            typer.echo(f"{dataset.value}: blocked | reason={reason}")
     except (CliUsageError, ExecutionError) as error:
         exit_from_error(error)
 

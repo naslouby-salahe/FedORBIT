@@ -76,7 +76,6 @@ Score = FiniteFloat
 ConfidenceLevel = FiniteFloat
 SignificanceLevel = FiniteFloat
 Fraction = FiniteFloat
-Probability = FiniteFloat
 
 
 class ClientRole(StrEnum):
@@ -267,6 +266,15 @@ class ArtifactStage(StrEnum):
     EVALUATION = "evaluation"
     STATISTICS = "statistics"
     REPORTING = "reporting"
+
+
+class ConfigurationSection(StrEnum):
+    ACTION = "action"
+    GENERATORS = "generators"
+    MODELS = "models"
+    RESPONSE = "response"
+    SOLVERS = "solvers"
+    METRICS = "metrics"
 
 
 class SemanticCoordinate(StrEnum):

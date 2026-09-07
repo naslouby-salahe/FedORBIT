@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -17,6 +16,7 @@ from fedorbit.datasets.common import (
     AdapterSchema,
     FieldRole,
     ObservedColumnSamples,
+    file_sha256,
     reconcile_component_columns,
 )
 from fedorbit.datasets.ontology import normalize_label, transfer_concept_for, transfer_eligibility
@@ -44,6 +44,10 @@ from fedorbit.types import DatasetId, OracleTransferConcept, RawDatasetDirectory
 
 
 class MaterializationError(ValueError):
+    pass
+
+
+class MaterializationResourceLimitError(MaterializationError):
     pass
 
 
@@ -95,14 +99,6 @@ class MaterializedClient:
     provenance: DatasetProvenance
 
 
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _read_component_rows(
     paths: tuple[Path, ...],
 ) -> tuple[tuple[str, ...], list[dict[str, str]], tuple[RawFileProvenance, ...]]:
@@ -123,7 +119,7 @@ def _read_component_rows(
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
         frames.append(frame)
-        raw_files.append(RawFileProvenance(str(path), _file_sha256(path), len(frame)))
+        raw_files.append(RawFileProvenance(str(path), file_sha256(path), len(frame)))
     columns = reconcile_component_columns(tuple(per_file_columns))
     combined = pd.concat(
         [frame.reindex(columns=list(columns)) for frame in frames],
@@ -289,7 +285,7 @@ def require_safe_memory_budget(dataset: DatasetId, paths: tuple[Path, ...]) -> N
     available_bytes = psutil.virtual_memory().available
     budget_bytes = available_bytes * _MAXIMUM_MEMORY_BUDGET_FRACTION
     if estimated_peak_bytes > budget_bytes:
-        raise MaterializationError(
+        raise MaterializationResourceLimitError(
             f"{dataset.value} materialization is estimated to need "
             f"{estimated_peak_bytes / 1e9:.1f} GB, exceeding the safe budget of "
             f"{budget_bytes / 1e9:.1f} GB ({available_bytes / 1e9:.1f} GB currently available); "

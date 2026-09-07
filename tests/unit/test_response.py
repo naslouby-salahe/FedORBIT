@@ -11,6 +11,8 @@ def _estimate() -> FinalResponseEstimate:
         entries=(
             FinalResponseEntry(0, 0, 0.3, 0.05, 0.1, 0.5, True),
             FinalResponseEntry(1, 0, -0.2, 0.04, -0.4, -0.01, True),
+            FinalResponseEntry(0, 1, 0.0, 0.0, 0.0, 0.0, False),
+            FinalResponseEntry(1, 1, 0.0, 0.0, 0.0, 0.0, False),
         ),
         critical_value=4.0,
         useful_intervention_columns=1,

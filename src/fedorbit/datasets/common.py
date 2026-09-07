@@ -35,7 +35,7 @@ class FieldRole(StrEnum):
     FORBIDDEN_PROVENANCE = "forbidden_provenance"
 
 
-def file_sha256(path: Path
+def file_sha256(path: Path #TODO: optional xxhash fast change-detection pass before the SHA-256 hash of large raw files
                 ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
 
     digest = hashlib.sha256()

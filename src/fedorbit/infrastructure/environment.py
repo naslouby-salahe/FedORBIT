@@ -139,7 +139,7 @@ def _driver_version() -> str | None: #TODO: do not use primitivies. Use an appro
         return None
 
 
-def _fingerprint(snapshot: EnvironmentSnapshot) -> str: #TODO: remove this from code
+def _fingerprint(snapshot: EnvironmentSnapshot) -> str: #TODO: remove this from code #TODO: consolidate the duplicate canonical-JSON encoders into one helper (types.stable_json / msgspec)
     dependencies = OrderedDict(
         (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
     )

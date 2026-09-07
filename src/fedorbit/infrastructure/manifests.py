@@ -165,7 +165,7 @@ def _sha256(payload: str #TODO: do not use primitivies. Use an appropriate alias
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def file_sha256(path: Path
+def file_sha256(path: Path #TODO: optional xxhash fast change-detection pass before the SHA-256 hash of large raw files
                 ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
     digest = hashlib.sha256()
     with path.open("rb") as handle:

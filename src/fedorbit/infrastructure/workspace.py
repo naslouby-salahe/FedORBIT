@@ -201,7 +201,7 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        frame.to_parquet(temporary, index=False, compression="zstd")
+        frame.to_parquet(temporary, index=False, compression="zstd") #TODO: guard concurrent artifact promotion with filelock
         os.replace(temporary, destination / "files.parquet") #TODO: use enums
     finally:
         temporary.unlink(missing_ok=True)
@@ -232,7 +232,7 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
     os.close(descriptor)
     temporary = Path(temporary_name)
     try:
-        frame.to_parquet(temporary, index=False, compression="zstd")
+        frame.to_parquet(temporary, index=False, compression="zstd") #TODO: guard concurrent artifact promotion with filelock
         os.replace(temporary, destination / "duplicates.parquet") #TODO: use enums
     finally:
         temporary.unlink(missing_ok=True)

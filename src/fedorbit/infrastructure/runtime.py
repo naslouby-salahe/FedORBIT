@@ -206,7 +206,7 @@ class ExecutionLogger:
 
 
 def execution_logger() -> ExecutionLogger:
-    return ExecutionLogger(logging.getLogger("fedorbit.execution"))
+    return ExecutionLogger(logging.getLogger("fedorbit.execution")) #TODO: structured key/value logging via structlog
 
 
 class IncompatibleIdentityError(ValueError):

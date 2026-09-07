@@ -485,11 +485,11 @@ class StableSerializationError(ValueError):
     pass
 
 
-class StableJsonPayload(Protocol): #TODO: this does not seem safe, nor clean
+class StableJsonPayload(Protocol): #TODO: this does not seem safe, nor clean #TODO: type the JSON boundary with msgspec (replaces empty Protocol + unchecked casts)
     __slots__ = ()
 
 
-def stable_json(value: StableJsonPayload) -> str: #TODO: is this duplicated?? Should be handled better
+def stable_json(value: StableJsonPayload) -> str: #TODO: is this duplicated?? Should be handled better #TODO: consolidate the duplicate canonical-JSON encoders into one helper (types.stable_json / msgspec)
     return json.dumps(_stable_value(value), sort_keys=True, separators=(",", ":")) #TODO: is this duplicated?? Should be handled better
 
 

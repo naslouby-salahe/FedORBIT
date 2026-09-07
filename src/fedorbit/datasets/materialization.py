@@ -109,7 +109,7 @@ def _read_component_rows(
     per_file_columns: list[tuple[str, ...]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
     raw_files: list[RawFileProvenance] = []
     for path in paths:
-        frame = pd.read_csv(
+        frame = pd.read_csv( #TODO: evaluate polars streaming CSV read for the large raw lineage (lower peak memory, faster)
             path,
             dtype=object,
             keep_default_na=False,
@@ -296,7 +296,7 @@ _MAXIMUM_MEMORY_BUDGET_FRACTION = 0.65 #TODO: should be in constants
 
 def require_safe_memory_budget(dataset: DatasetId, paths: tuple[Path, ...]) -> None: #TODO: should be in runtime
     raw_bytes = sum(path.stat().st_size for path in paths)
-    estimated_peak_bytes = raw_bytes * _OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO
+    estimated_peak_bytes = raw_bytes * _OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO #TODO: verify the peak-memory estimate with tracemalloc / memory-profiler
     available_bytes = psutil.virtual_memory().available
     budget_bytes = available_bytes * _MAXIMUM_MEMORY_BUDGET_FRACTION
     if estimated_peak_bytes > budget_bytes:

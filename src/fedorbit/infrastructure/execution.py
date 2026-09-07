@@ -184,11 +184,11 @@ class StorageError(ValueError):
     pass
 
 
-def atomic_write_json(path: Path, payload: StableJsonPayload) -> None: #TODO: should be in paths/storage package
+def atomic_write_json(path: Path, payload: StableJsonPayload) -> None: #TODO: should be in paths/storage package #TODO: guard concurrent artifact promotion with filelock
     atomic_write_bytes(path, (stable_json(payload) + "\n").encode("utf-8"))
 
 
-def atomic_write_bytes(path: Path, data: bytes) -> None:
+def atomic_write_bytes(path: Path, data: bytes) -> None: #TODO: guard concurrent artifact promotion with filelock
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=".tmp-") #TODO: use enum
     try:
@@ -475,7 +475,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
             continue
         try:
             materialized = materialize_client(observation.dataset, raw_root)
-        except MaterializationResourceLimitError as error:
+        except MaterializationResourceLimitError as error: #TODO: back the resource-limit decision with tracemalloc/memory-profiler measurements
             resource_blocked.append((observation.dataset, str(error)))
             continue
         except MaterializationError as error:
@@ -1334,7 +1334,7 @@ def persist_dataset_manifest(
         / "derived"
         / f"dataset-manifest.{dataset.value}.json"
     )
-    atomic_write_json(destination, cast(StableJsonPayload, manifest.model_dump(mode="json")))
+    atomic_write_json(destination, cast(StableJsonPayload, manifest.model_dump(mode="json"))) #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
     return destination
 
 
@@ -1368,7 +1368,7 @@ def persist_materialized_client(
     manifest = build_dataset_manifest(materialized)
     atomic_write_json(
         layout.preprocessing / "prepared" / dataset.value / "data.json",
-        cast(StableJsonPayload, manifest.model_dump(mode="json")),
+        cast(StableJsonPayload, manifest.model_dump(mode="json")), #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
     )
     eligibility = tuple(
         cast(
@@ -1918,7 +1918,7 @@ def _persist_training_efficiency(
         / "derived"
         / f"training-efficiency.{dataset.value}.{seed}.json"
     )
-    atomic_write_json(destination, cast(StableJsonPayload, OrderedDict(asdict(record))))
+    atomic_write_json(destination, cast(StableJsonPayload, OrderedDict(asdict(record)))) #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
     return destination
 
 
@@ -2162,7 +2162,7 @@ def _completion(
             scientific_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
             material_runtime_sha256=runtime_sha256,
-            upstream_lineage=stable_json(cast(StableJsonPayload, OrderedDict())),
+            upstream_lineage=stable_json(cast(StableJsonPayload, OrderedDict())), #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
             completion_validation_state="validated",
             completion_written_last=True,
             completion_manifest_sha256="",

@@ -146,7 +146,7 @@ class VerifiedEvidenceWriter:
         atomic_write_json(destination, table.payload())
         return destination
 
-    def write_metric_exports(
+    def write_metric_exports( #TODO: emit CSV/TeX with pandas to_csv/to_latex instead of hand-rolled writers
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
@@ -177,7 +177,7 @@ class VerifiedEvidenceWriter:
         figure_paths = self.write_metric_figure(experiment, artifact_id, metric)
         return (summary, csv_path, tex_path, *figure_paths)
 
-    def write_metric_figure(
+    def write_metric_figure( #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
@@ -198,7 +198,7 @@ class VerifiedEvidenceWriter:
         atomic_write_bytes(pdf_path, _metric_pdf_bytes(label, metric.metric_value))
         return (svg_path, pdf_path)
 
-    def write_project_summary(
+    def write_project_summary( #TODO: emit CSV/TeX with pandas to_csv/to_latex instead of hand-rolled writers
         self,
         manifests: tuple[ReusableArtifactManifest, ...],
         metrics: tuple[MetricRecord, ...],
@@ -286,7 +286,7 @@ class VerifiedEvidenceWriter:
         )
         return (experiments, evidence_summary, metrics_summary, configuration, execution)
 
-    def write_figure( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+    def write_figure( #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
@@ -308,7 +308,7 @@ class VerifiedEvidenceWriter:
         raw = json.loads(payload_path.read_text(encoding="utf-8"))
         if not isinstance(raw, Mapping):
             raise EvidenceExportError("verified payload must be a JSON object")
-        metric_payload = raw.get("metric_record") #TODO: is this duplicated?? Should be handled better
+        metric_payload = raw.get("metric_record") #TODO: is this duplicated?? Should be handled better #TODO: read MetricRecord via a typed artifact model (pydantic/msgspec) instead of raw key lookup
         if metric_payload is None:
             return None
         try:
@@ -317,7 +317,7 @@ class VerifiedEvidenceWriter:
             raise EvidenceExportError(f"verified metric payload is invalid: {error}") from error
 
 
-def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes:
+def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes: #TODO: emit CSV/TeX with pandas to_csv/to_latex instead of hand-rolled writers
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer)
     writer.writerow(columns)
@@ -325,7 +325,7 @@ def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> b
     return buffer.getvalue().encode("utf-8")
 
 
-def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes:
+def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes: #TODO: emit CSV/TeX with pandas to_csv/to_latex instead of hand-rolled writers
     escaped_columns = tuple(_tex_escape(value) for value in columns)
     escaped_rows = tuple(tuple(_tex_escape(value) for value in row) for row in rows)
     lines = (
@@ -373,7 +373,7 @@ def _project_execution_reproducibility_directory() -> str: #TODO: should be retr
     ]
 
 
-def _metric_svg_bytes(label: str, value: float) -> bytes: #TODO: centralize this. Seems duplicated
+def _metric_svg_bytes(label: str, value: float) -> bytes: #TODO: centralize this. Seems duplicated #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4)) #TODO: move to constants
     text = html.escape(label)
     svg = (
@@ -387,7 +387,7 @@ def _metric_svg_bytes(label: str, value: float) -> bytes: #TODO: centralize this
     return svg.encode("utf-8")
 
 
-def _metric_pdf_bytes(label: str, value: float) -> bytes:
+def _metric_pdf_bytes(label: str, value: float) -> bytes: #TODO: replace hand-rolled PDF writer with fpdf2 (or reportlab)
     bar_width = min(float(480 - 80), max(0.0, abs(value) * (480 - 80) / 4)) #TODO: move to constants
     escaped = label.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
     stream = (
@@ -809,43 +809,43 @@ def scalability_results_table(rows: Sequence[Mapping[str, TableScalar]]) -> Evid
     )
 
 
-def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return EvidenceFigure(x_label=x_label, y_label=y_label, series=tuple(series))
 
 
-def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("paired mean relative macro-CE gain vs local", "primary directed pair", series)
 
 
-def baseline_paired_difference_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def baseline_paired_difference_plot(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("primary directed pair", "seed-level paired difference", series)
 
 
-def coupling_gap_phase_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def coupling_gap_phase_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("coupling factor combination", "predicted structural zero/strict state", series)
 
 
-def predicted_vs_realized_transfer_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def predicted_vs_realized_transfer_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("certified robust predicted value", "TEST relative macro-CE gain", series)
 
 
-def sparsity_utility_efficiency_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def sparsity_utility_efficiency_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("runtime", "realized gain", series)
 
 
-def confirmation_safety_coverage_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def confirmation_safety_coverage_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("confirmation coverage", "harmful accepted rate", series)
 
 
-def semantic_sufficiency_frontier_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def semantic_sufficiency_frontier_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("log|orbit|", "realized gain", series)
 
 
-def failure_boundary_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def failure_boundary_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("boundary setting", "certified value / realized gain", series)
 
 
-def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure(
         "N_S * sum(n_g^3) (log scale)",
         "runtime (log scale)",
@@ -853,5 +853,5 @@ def scalability_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO:
     )
 
 
-def map_value_bound_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def map_value_bound_figure(series: Sequence[FigureSeries]) -> EvidenceFigure: #TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete #TODO: use matplotlib to emit canonical SVG figures instead of hand-built SVG markup
     return _figure("orbit-radius bound", "exact map action value", series)

@@ -310,7 +310,7 @@ _EXECUTION_LOG_FORMAT = (
 )
 
 
-def _configure_execution_logging() -> None:
+def _configure_execution_logging() -> None: #TODO: structured key/value logging via structlog
     execution_logger = logging.getLogger("fedorbit.execution")
     execution_logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()

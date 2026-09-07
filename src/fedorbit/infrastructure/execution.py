@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 
@@ -102,7 +103,7 @@ from fedorbit.infrastructure.workspace import (
     persist_raw_duplicate_report,
     persist_raw_inventory,
 )
-from fedorbit.learning.checkpoints import save_base_checkpoint
+from fedorbit.learning.checkpoints import load_base_checkpoint, save_base_checkpoint
 from fedorbit.learning.pilot import (
     PilotData,
     create_classifier,
@@ -134,6 +135,12 @@ from fedorbit.optimization.objective import (
     evaluate_objective,
 )
 from fedorbit.response.packet import build_source_packet
+from fedorbit.response.pilot import (
+    PilotCheckpoint,
+    run_pooled_source_response_pilot,
+    select_response_configuration,
+)
+from fedorbit.response.pilot import PilotData as ResponsePilotData
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
 from fedorbit.types import (
     ArtifactFingerprint,
@@ -450,6 +457,17 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     )
     if len(duplicate_paths) != len(request.datasets):
         raise ExecutionError("duplicate diagnostics did not cover every requested dataset")
+    layout = build_layout()
+    for observation in observations:
+        if not observation.valid_for_chronological_preprocessing:
+            continue
+        try:
+            materialized = materialize_client(observation.dataset, raw_root)
+        except MaterializationError as error:
+            raise ExecutionError(
+                f"could not materialize {observation.dataset.value}: {error}"
+            ) from error
+        persist_materialized_client(layout, materialized, request.overwrite_policy)
     return DatasetPreparationResult(
         observations=observations,
         validation_artifact_paths=tuple(ArtifactPath(path) for path in validation_paths),
@@ -556,6 +574,11 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         return
     if request.experiment == ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT:
         _execute_producer_with_retry(lambda: execute_base_model_pilot(store, layout, request))
+        return
+    if request.experiment == ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT:
+        _execute_producer_with_retry(
+            lambda: execute_source_response_estimator_pilot(store, layout, request)
+        )
         return
     blocked = _chronology_block_reasons()
     if blocked:
@@ -1201,6 +1224,66 @@ def persist_dataset_manifest(
     return destination
 
 
+def persist_materialized_client(
+    layout: WorkspaceLayout,
+    materialized: MaterializedClient,
+    overwrite_policy: OverwritePolicy,
+) -> tuple[Path, ...]:
+    dataset = materialized.dataset
+    split_paths: list[Path] = []
+    for split, tensors in materialized.splits.items():
+        destination = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet"
+        if overwrite_policy == OverwritePolicy.REUSE and destination.is_file():
+            split_paths.append(destination)
+            continue
+        frame = pd.DataFrame(
+            tensors.features.detach().cpu().numpy(),
+            columns=materialized.feature_names,
+        )
+        frame.insert(len(frame.columns), "target", tensors.targets.detach().cpu().numpy())
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(dir=destination.parent, suffix=".parquet")
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        try:
+            frame.to_parquet(temporary, index=False, compression="zstd")
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+        split_paths.append(destination)
+    manifest = build_dataset_manifest(materialized)
+    atomic_write_json(
+        layout.preprocessing / "prepared" / dataset.value / "data.json",
+        cast(StableJsonPayload, manifest.model_dump(mode="json")),
+    )
+    eligibility = tuple(
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                concept=group.concept.value,
+                native_class_indices=group.native_class_indices,
+                train_support=group.train_support,
+                meta_support=group.meta_support,
+                source_eligible=group.source_eligible,
+            ),
+        )
+        for group in transfer_concept_groups(dataset, materialized)
+    )
+    atomic_write_json(
+        layout.preprocessing / "features" / dataset.value / "data.json",
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                feature_names=materialized.feature_names,
+                local_class_names=materialized.class_manifest.class_names,
+                excluded_classes=materialized.class_manifest.excluded_classes,
+                transfer_eligibility=eligibility,
+            ),
+        ),
+    )
+    return tuple(split_paths)
+
+
 def _persist_client_invalid(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
@@ -1243,6 +1326,7 @@ def execute_base_model_pilot(
                 dataset=dataset.value,
             )
         )
+
         materialize_started_at = time.monotonic()
         try:
             materialized = materialize_client(dataset, raw_root)
@@ -1286,6 +1370,156 @@ def execute_base_model_pilot(
             device,
             logger,
         )
+
+
+_SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS = frozenset(
+    {"datasets", "models", "source_response_pilot", "transfer_support"}
+)
+_SOURCE_RESPONSE_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution"
+
+
+def execute_source_response_estimator_pilot(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> ReusableArtifactManifest:
+    seed = ExperimentSeed(active_config().scientific.randomness.pilot_seeds[0])
+    return _persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        seed,
+        lambda fingerprint: _source_response_estimator_payload(layout, request, fingerprint),
+        _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
+        _SOURCE_RESPONSE_PILOT_PRODUCER_MODULE,
+        "source-response-pilot",
+    )
+
+
+def _source_response_estimator_payload(
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    fingerprint: str,
+) -> StableJsonPayload:
+    raw_root = repository_root() / "data" / "raw"
+    pilot_seeds = active_config().scientific.randomness.pilot_seeds
+    base_workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
+    destination = experiment_workspace(layout, request.experiment) / "artifacts" / "fitted"
+    diagnostics_destination = (
+        experiment_workspace(layout, request.experiment) / "artifacts" / "derived"
+    )
+    client_results: list[StableJsonPayload] = []
+    for dataset in active_config().scientific.datasets.clients:
+        try:
+            materialized = materialize_client(dataset, raw_root)
+        except MaterializationError as error:
+            _persist_client_invalid(layout, request.experiment, dataset, str(error))
+            client_results.append(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(dataset=dataset.value, state=ArtifactState.INVALID.value),
+                )
+            )
+            continue
+        groups = transfer_concept_groups(dataset, materialized)
+        eligible = tuple(group for group in groups if group.source_eligible)
+        if len(eligible) < 2:
+            _persist_client_invalid(
+                layout,
+                request.experiment,
+                dataset,
+                "fewer than two eligible source transfer concepts",
+            )
+            client_results.append(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(dataset=dataset.value, state=ArtifactState.INVALID.value),
+                )
+            )
+            continue
+        checkpoints: list[PilotCheckpoint] = []
+        for seed in pilot_seeds:
+            path = (
+                base_workspace
+                / "checkpoints"
+                / "pilot"
+                / dataset.value
+                / f"seed-{seed}"
+                / "checkpoint.pt"
+            )
+            if not path.is_file():
+                raise ExecutionError(f"missing selected pilot checkpoint: {path}")
+            checkpoint = load_base_checkpoint(path)
+            model = create_classifier(
+                dataset,
+                materialized.splits[Split.TRAIN].features.shape[1],
+                materialized.class_manifest.class_count,
+                checkpoint.selected_hyperparameters.dropout_probability,
+                seed,
+            )
+            checkpoint.state_dict.load_into(model)
+            checkpoints.append(PilotCheckpoint(model, checkpoint, seed))
+        checkpoint = checkpoints[0].checkpoint
+        intervention_classes = tuple(group.native_class_indices for group in eligible)
+        data = ResponsePilotData(
+            materialized.splits[Split.TRAIN].features,
+            materialized.splits[Split.TRAIN].targets,
+            materialized.splits[Split.META].features,
+            materialized.splits[Split.META].targets,
+            intervention_classes,
+            checkpoint.train_class_weights,
+            checkpoint.selected_hyperparameters.learning_rate,
+            checkpoint.selected_hyperparameters.weight_decay,
+        )
+        results = run_pooled_source_response_pilot(tuple(checkpoints), data, intervention_classes)
+        selected = select_response_configuration(results)
+        atomic_write_json(
+            diagnostics_destination / f"{dataset.value}-candidates.json",
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=dataset.value,
+                    pilot_checkpoint_seeds=pilot_seeds,
+                    candidates=tuple(asdict(result) for result in results),
+                ),
+            ),
+        )
+        atomic_write_json(
+            destination / f"{dataset.value}.json",
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=dataset.value,
+                    intervention_magnitude=selected.intervention_magnitude,
+                    optimizer_step_horizon=selected.optimizer_step_horizon,
+                    pilot_checkpoint_seeds=pilot_seeds,
+                ),
+            ),
+        )
+        client_results.append(
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    dataset=dataset.value,
+                    state=ArtifactState.COMPLETED.value,
+                    selected_configuration=cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            intervention_magnitude=selected.intervention_magnitude,
+                            optimizer_step_horizon=selected.optimizer_step_horizon,
+                        ),
+                    ),
+                ),
+            )
+        )
+    return cast(
+        StableJsonPayload,
+        OrderedDict(
+            experiment=request.experiment.value,
+            dependency_fingerprint_sha256=fingerprint,
+            clients=tuple(client_results),
+        ),
+    )
 
 
 def _execute_client_base_model_pilot(

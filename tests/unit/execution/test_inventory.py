@@ -1,19 +1,28 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pandas as pd
+import pytest
+import torch
 
+import fedorbit.infrastructure.execution as execution
 from fedorbit.datasets.edge_iiotset.loader import EDGE_NETWORK_RELATIVE_PATH
+from fedorbit.datasets.materialization import MaterializedClient
+from fedorbit.infrastructure.execution import persist_materialized_client
 from fedorbit.infrastructure.workspace import (
     RawDuplicateReportRequest,
     RawInventoryPersistenceRequest,
     RawInventoryRequest,
+    build_layout,
     inspect_raw_inventory,
     persist_raw_duplicate_report,
     persist_raw_inventory,
 )
-from fedorbit.types import DatasetId, stable_json
+from fedorbit.types import DatasetId, OverwritePolicy, Split, stable_json
 
 
 def test_edge_raw_inventory_records_file_identity(tmp_path: Path) -> None:
@@ -57,3 +66,60 @@ def test_raw_duplicate_report_records_exact_duplicate_rows(tmp_path: Path) -> No
     )
     assert report["occurrence_count"].tolist() == [2]
     assert report["duplicate_row_count"].tolist() == [1]
+
+
+def test_materialized_client_persistence_writes_compressed_splits_and_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    layout = build_layout(root=tmp_path)
+    materialized = SimpleNamespace(
+        dataset=DatasetId.EDGE_IIOTSET_NETWORK,
+        splits=OrderedDict(
+            (
+                (
+                    Split.TRAIN,
+                    SimpleNamespace(
+                        features=torch.tensor([[1.0, 2.0], [3.0, 4.0]]),
+                        targets=torch.tensor([0, 1]),
+                    ),
+                ),
+            )
+        ),
+        feature_names=("feature_a", "feature_b"),
+        class_manifest=SimpleNamespace(class_names=("normal", "attack"), excluded_classes=()),
+    )
+
+    def model_dump(mode: str) -> dict[str, str]:
+        del mode
+        return {"dataset": "edge_iiotset_network"}
+
+    manifest = SimpleNamespace(model_dump=model_dump)
+    group = SimpleNamespace(
+        concept=SimpleNamespace(value="DDoS"),
+        native_class_indices=(1,),
+        train_support=10,
+        meta_support=4,
+        source_eligible=True,
+    )
+
+    def fake_manifest(_materialized: MaterializedClient) -> Any:
+        return manifest
+
+    def fake_groups(_dataset: DatasetId, _materialized: MaterializedClient) -> Any:
+        return (group,)
+
+    monkeypatch.setattr(execution, "build_dataset_manifest", fake_manifest)
+    monkeypatch.setattr(execution, "transfer_concept_groups", fake_groups)
+
+    paths = persist_materialized_client(
+        layout,
+        cast(MaterializedClient, materialized),
+        OverwritePolicy.REPLACE,
+    )
+
+    assert len(paths) == 1
+    frame = pd.read_parquet(paths[0])
+    assert tuple(frame.columns) == ("feature_a", "feature_b", "target")
+    assert frame["target"].tolist() == [0, 1]
+    assert (layout.preprocessing / "prepared" / "edge_iiotset_network" / "data.json").is_file()
+    assert (layout.preprocessing / "features" / "edge_iiotset_network" / "data.json").is_file()

@@ -56,6 +56,13 @@ class PilotData:
 
 
 @dataclass(frozen=True, slots=True)
+class PilotCheckpoint:
+    model: torch.nn.Module
+    checkpoint: BaseCheckpoint
+    seed: RandomSeed
+
+
+@dataclass(frozen=True, slots=True)
 class PilotEntry:
     outcome_index: Index
     intervention_index: Index
@@ -81,23 +88,23 @@ class ResponsePilotError(ValueError):
     pass
 
 
-def run_source_response_pilot(
-    model: torch.nn.Module,
-    checkpoint: BaseCheckpoint,
+def run_pooled_source_response_pilot(
+    pilot_checkpoints: tuple[PilotCheckpoint, ...],
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
-    seed: RandomSeed,
 ) -> tuple[CandidateResult, ...]:
+    if len(pilot_checkpoints) != 3:
+        raise ResponsePilotError("source-response pilot requires exactly three checkpoints")
+    if len({checkpoint.seed for checkpoint in pilot_checkpoints}) != 3:
+        raise ResponsePilotError("source-response pilot checkpoint seeds must be distinct")
     pilot = active_config().scientific.source_response_pilot
     return tuple(
         _evaluate_candidate(
-            model,
-            checkpoint,
+            pilot_checkpoints,
             data,
             intervention_classes,
             ResponseCandidate(magnitude, horizon),
             pilot.paired_schedules_per_candidate,
-            seed,
         )
         for magnitude in pilot.intervention_magnitudes
         for horizon in pilot.optimizer_step_horizons
@@ -119,13 +126,11 @@ def select_response_configuration(results: tuple[CandidateResult, ...]) -> Respo
 
 
 def _evaluate_candidate(
-    model: torch.nn.Module,
-    checkpoint: BaseCheckpoint,
+    pilot_checkpoints: tuple[PilotCheckpoint, ...],
     data: PilotData,
     intervention_classes: tuple[tuple[int, ...], ...],
     candidate: ResponseCandidate,
     replicate_count: int,
-    seed: RandomSeed,
 ) -> CandidateResult:
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
@@ -144,59 +149,60 @@ def _evaluate_candidate(
         data.learning_rate,
         data.weight_decay,
     )
-    for replicate in range(replicate_count):
-        for intervention_index, concept_classes in enumerate(intervention_classes):
-            schedule_seed = derive_seed32(
-                SeedDerivationRequest(
-                    seed,
-                    RngNamespace.RESPONSE_SCHEDULE,
-                    cast(
-                        StableJsonPayload,
-                        OrderedDict(
-                            stage="pilot",
-                            magnitude=candidate.intervention_magnitude,
-                            horizon=candidate.optimizer_step_horizon,
-                            replicate=replicate,
-                            intervention=intervention_index,
+    for pilot_checkpoint in pilot_checkpoints:
+        for replicate in range(replicate_count):
+            for intervention_index, concept_classes in enumerate(intervention_classes):
+                schedule_seed = derive_seed32(
+                    SeedDerivationRequest(
+                        pilot_checkpoint.seed,
+                        RngNamespace.RESPONSE_SCHEDULE,
+                        cast(
+                            StableJsonPayload,
+                            OrderedDict(
+                                stage="pilot",
+                                magnitude=candidate.intervention_magnitude,
+                                horizon=candidate.optimizer_step_horizon,
+                                replicate=replicate,
+                                intervention=intervention_index,
+                            ),
                         ),
-                    ),
+                    )
                 )
-            )
-            shadow_data = ShadowData(
-                data.train_features,
-                data.train_targets,
-                data.meta_features,
-                data.meta_targets,
-                concept_classes,
-                data.outcome_native_class_sets,
-                data.base_class_weights,
-            )
-            full_risks = run_shadow_pair(
-                model,
-                checkpoint.state_dict,
-                checkpoint.optimizer_state,
-                checkpoint.rng_state,
-                shadow_data,
-                full_settings,
-                schedule_seed,
-            )
-            half_risks = run_shadow_pair(
-                model,
-                checkpoint.state_dict,
-                checkpoint.optimizer_state,
-                checkpoint.rng_state,
-                shadow_data,
-                half_settings,
-                schedule_seed,
-            )
-            for outcome_index in range(outcome_count):
-                full = _derivative(full_risks[outcome_index], full_settings.epsilon)
-                half = _derivative(half_risks[outcome_index], half_settings.epsilon)
-                if not math.isfinite(full) or not math.isfinite(half):
-                    all_finite = False
-                entry_index = outcome_index * intervention_count + intervention_index
-                full_values[entry_index].append(full)
-                half_values[entry_index].append(half)
+                shadow_data = ShadowData(
+                    data.train_features,
+                    data.train_targets,
+                    data.meta_features,
+                    data.meta_targets,
+                    concept_classes,
+                    data.outcome_native_class_sets,
+                    data.base_class_weights,
+                )
+                full_risks = run_shadow_pair(
+                    pilot_checkpoint.model,
+                    pilot_checkpoint.checkpoint.state_dict,
+                    pilot_checkpoint.checkpoint.optimizer_state,
+                    pilot_checkpoint.checkpoint.rng_state,
+                    shadow_data,
+                    full_settings,
+                    schedule_seed,
+                )
+                half_risks = run_shadow_pair(
+                    pilot_checkpoint.model,
+                    pilot_checkpoint.checkpoint.state_dict,
+                    pilot_checkpoint.checkpoint.optimizer_state,
+                    pilot_checkpoint.checkpoint.rng_state,
+                    shadow_data,
+                    half_settings,
+                    schedule_seed,
+                )
+                for outcome_index in range(outcome_count):
+                    full = _derivative(full_risks[outcome_index], full_settings.epsilon)
+                    half = _derivative(half_risks[outcome_index], half_settings.epsilon)
+                    if not math.isfinite(full) or not math.isfinite(half):
+                        all_finite = False
+                    entry_index = outcome_index * intervention_count + intervention_index
+                    full_values[entry_index].append(full)
+                    half_values[entry_index].append(half)
     entries: list[PilotEntry] = []
     useful_columns: set[int] = set()
     for outcome_index in range(outcome_count):

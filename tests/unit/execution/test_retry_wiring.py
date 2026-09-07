@@ -18,11 +18,11 @@ from fedorbit.infrastructure.workspace import WorkspaceLayout, build_layout
 from fedorbit.types import ExperimentName, OverwritePolicy
 
 
-def _request() -> ExperimentExecutionRequest:
-    definition = build_catalogue().definition(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION)
-    return ExperimentExecutionRequest(
-        ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION, definition, OverwritePolicy.REUSE
-    )
+def _request(
+    experiment: ExperimentName = ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION,
+) -> ExperimentExecutionRequest:
+    definition = build_catalogue().definition(experiment)
+    return ExperimentExecutionRequest(experiment, definition, OverwritePolicy.REUSE)
 
 
 def test_transient_infrastructure_failure_retries_and_then_succeeds(
@@ -65,3 +65,22 @@ def test_infrastructure_failure_exhausts_retries_and_raises(
     failure_handling = execution.active_config().runtime.failure_handling
     retries = failure_handling.retries_after_initial_infrastructure_failure
     assert calls["count"] == retries + 1
+
+
+def test_source_response_pilot_dispatches_to_its_producer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    layout = build_layout(root=tmp_path)
+    monkeypatch.setattr(execution, "build_layout", lambda: layout)
+    calls = {"count": 0}
+
+    def producer(
+        _store: ArtifactStore,
+        _layout: WorkspaceLayout,
+        _request: ExperimentExecutionRequest,
+    ) -> None:
+        calls["count"] += 1
+
+    monkeypatch.setattr(execution, "execute_source_response_estimator_pilot", producer)
+    run_experiment(_request(ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT))
+    assert calls["count"] == 1

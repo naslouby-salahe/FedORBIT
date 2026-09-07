@@ -12,7 +12,6 @@ from typing import cast
 
 from pydantic import JsonValue
 
-from fedorbit.analysis.evidence import EvidenceClassificationInputs, classify_all_propositions
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config
 from fedorbit.config.models import FedorbitConfig
@@ -22,8 +21,6 @@ from fedorbit.infrastructure.workspace import WorkspaceLayout, results_workspace
 from fedorbit.types import (
     ArtifactIdentifier,
     ClientRole,
-    EvidenceProposition,
-    EvidenceStatus,
     ExperimentName,
     MetricId,
     StableJsonPayload,
@@ -289,20 +286,6 @@ class VerifiedEvidenceWriter:
         )
         return (experiments, evidence_summary, metrics_summary, configuration, execution)
 
-    def write_evidence_classification_table(
-        self,
-        inputs: EvidenceClassificationInputs,
-    ) -> tuple[Path, Path]:
-        statuses = classify_all_propositions(inputs)
-        columns = ("proposition", "status")
-        rows = tuple((proposition.value, status.value) for proposition, status in statuses.items())
-        destination = self._layout.project_summary / "tables" / _project_main_table_directory()
-        csv_path = destination / "evidence_classification.csv"
-        tex_path = destination / "evidence_classification.tex"
-        atomic_write_bytes(csv_path, _csv_bytes(columns, rows))
-        atomic_write_bytes(tex_path, _tex_bytes(columns, rows))
-        return (csv_path, tex_path)
-
     def write_figure(
         self,
         experiment: ExperimentName,
@@ -522,44 +505,6 @@ def dataset_and_client_protocol_table(
             manifest.raw_sha256,
         )
         for manifest in manifests
-    )
-    return EvidenceTable(columns=columns, rows=rows)
-
-
-def proposition_support_table(
-    statuses: Mapping[EvidenceProposition, EvidenceStatus],
-    materiality_result_by_proposition: Mapping[EvidenceProposition, str],
-    statistical_result_by_proposition: Mapping[EvidenceProposition, str],
-    evidence_completeness_by_proposition: Mapping[EvidenceProposition, str],
-    scope_by_proposition: Mapping[EvidenceProposition, str],
-    supporting_table_by_proposition: Mapping[EvidenceProposition, str],
-    supporting_figure_by_proposition: Mapping[EvidenceProposition, str],
-    forbidden_wording_by_proposition: Mapping[EvidenceProposition, str],
-) -> EvidenceTable:
-    columns = (
-        "proposition",
-        "final_state",
-        "materiality_result",
-        "statistical_result",
-        "evidence_completeness",
-        "scope",
-        "supporting_table",
-        "supporting_figure",
-        "forbidden_wording",
-    )
-    rows = tuple(
-        (
-            proposition.value,
-            status.value,
-            materiality_result_by_proposition.get(proposition, ""),
-            statistical_result_by_proposition.get(proposition, ""),
-            evidence_completeness_by_proposition.get(proposition, ""),
-            scope_by_proposition.get(proposition, ""),
-            supporting_table_by_proposition.get(proposition, ""),
-            supporting_figure_by_proposition.get(proposition, ""),
-            forbidden_wording_by_proposition.get(proposition, ""),
-        )
-        for proposition, status in statuses.items()
     )
     return EvidenceTable(columns=columns, rows=rows)
 

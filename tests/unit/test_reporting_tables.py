@@ -27,7 +27,6 @@ from fedorbit.reporting import (
     numerical_constants_and_seeds_table,
     predicted_vs_realized_transfer_figure,
     primary_strict_transfer_results_table,
-    proposition_support_table,
     real_transfer_gain_forest_plot,
     scalability_figure,
     scalability_results_table,
@@ -39,8 +38,6 @@ from fedorbit.reporting import (
 from fedorbit.types import (
     ClientRole,
     DatasetId,
-    EvidenceProposition,
-    EvidenceStatus,
     ExperimentName,
     MetricId,
     MultiplicityFamily,
@@ -155,32 +152,6 @@ def test_dataset_and_client_protocol_table_reflects_manifest_fields() -> None:
     )
     assert table.rows == (
         ("windows10", "host", 100, 100, "0.0..100.0", 2, 2, 1, 1, "primary", "a" * 64),
-    )
-
-
-def test_proposition_support_table_renders_status_rows() -> None:
-    table = proposition_support_table(
-        statuses={EvidenceProposition.EXACT_SPARSE_SEPARATOR_EXACTNESS: EvidenceStatus.SUPPORTED},
-        materiality_result_by_proposition={},
-        statistical_result_by_proposition={},
-        evidence_completeness_by_proposition={},
-        scope_by_proposition={},
-        supporting_table_by_proposition={},
-        supporting_figure_by_proposition={},
-        forbidden_wording_by_proposition={},
-    )
-    assert table.rows == (
-        (
-            EvidenceProposition.EXACT_SPARSE_SEPARATOR_EXACTNESS.value,
-            EvidenceStatus.SUPPORTED.value,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-        ),
     )
 
 

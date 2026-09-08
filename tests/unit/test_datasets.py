@@ -4,10 +4,8 @@ import numpy as np
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.preprocessing import (
-    ABSENT_TOKEN,
     MISSING_TOKEN_VOCABULARY,
-    RARE_TOKEN,
-    UNK_TOKEN,
+    PreprocessingToken,
     TrainingFeatureValues,
     categorical_vocabulary,
     evaluate_feature_quality,
@@ -70,10 +68,16 @@ def test_zero_iqr_constant_feature_is_identified() -> None:
 
 def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
     vocabulary = categorical_vocabulary(("z", "a", "z"))
-    assert vocabulary == (ABSENT_TOKEN, RARE_TOKEN, UNK_TOKEN, "a", "z")
+    assert vocabulary == (
+        PreprocessingToken.ABSENT,
+        PreprocessingToken.RARE,
+        PreprocessingToken.UNKNOWN,
+        "a",
+        "z",
+    )
     fitted = fit_categorical_preprocessor(("a", "a", "b", ""))
-    assert transform_categorical("", fitted) == ABSENT_TOKEN
-    assert transform_categorical("never-seen", fitted) == UNK_TOKEN
+    assert transform_categorical("", fitted) == PreprocessingToken.ABSENT
+    assert transform_categorical("never-seen", fitted) == PreprocessingToken.UNKNOWN
     encoded = one_hot("a", fitted)
     assert len(encoded) == len(fitted.vocabulary)
     assert sum(encoded) == 1.0

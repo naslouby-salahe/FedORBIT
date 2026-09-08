@@ -4,7 +4,14 @@ from dataclasses import dataclass
 
 from fedorbit.optimization.correspondence import BlockCorrespondence
 from fedorbit.optimization.objective import CurriculumAction, RobustActionProblem
-from fedorbit.types import DatasetId, ExperimentName, TransferMethod
+from fedorbit.types import (
+    DatasetId,
+    ExperimentName,
+    MethodName,
+    Score,
+    SupportCount,
+    TransferMethod,
+)
 
 
 class OracleMappingError(ValueError):
@@ -28,7 +35,7 @@ class OracleAccessError(RuntimeError):
     pass
 
 
-ORACLE_METHOD_NAME = TransferMethod.EXACT_MAP_ORACLE.value
+ORACLE_METHOD = TransferMethod.EXACT_MAP_ORACLE
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,9 +45,9 @@ class OracleAccessToken:
 
 def authorize_oracle_access(
     experiment: ExperimentName,
-    registered_methods: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: registered_methods)
+    registered_methods: tuple[MethodName, ...],
 ) -> OracleAccessToken:
-    if ORACLE_METHOD_NAME not in registered_methods:
+    if ORACLE_METHOD not in registered_methods:
         raise OracleAccessError(f"{experiment.value} is not a registered oracle-method experiment")
     return OracleAccessToken(experiment)
 
@@ -48,14 +55,14 @@ def authorize_oracle_access(
 @dataclass(frozen=True, slots=True)
 class ExactMapActionOutcome:
     selected_action: CurriculumAction
-    objective_value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    objective_value: Score
 
 
 def exact_map_action(
     access: OracleAccessToken,
     problem: RobustActionProblem,
     oracle_correspondence: OracleCorrespondence,
-    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
+    support_limit: SupportCount | None = None,
 ) -> ExactMapActionOutcome:
     del access
     from fedorbit.methods.baselines import optimize_against_fixed_matrix

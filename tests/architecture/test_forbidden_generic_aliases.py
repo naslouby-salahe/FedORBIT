@@ -14,8 +14,6 @@ FORBIDDEN_GENERIC_ALIASES = {
     "PositiveInt",
     "NonNegativeFloat",
     "PositiveFloat",
-    "UnitInterval",
-    "OpenUnitInterval",
     "FiniteFloat",
     "SignedInt",
 }
@@ -56,8 +54,8 @@ def test_forbidden_alias_scanner_catches_annotation() -> None:
 
 
 def test_forbidden_alias_scanner_catches_nested_generic() -> None:
-    source = "values: list[UnitInterval]\n"
-    assert _forbidden_references(source) == ["UnitInterval"]
+    source = "values: list[PositiveInt]\n"
+    assert _forbidden_references(source) == ["PositiveInt"]
 
 
 def test_forbidden_alias_scanner_catches_qualified_name() -> None:

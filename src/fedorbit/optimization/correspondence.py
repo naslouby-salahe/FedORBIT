@@ -5,11 +5,20 @@ import math
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from enum import IntEnum
 
 import numpy as np
 from numpy.typing import NDArray
 
 from fedorbit.types import CoarseGroup, Index, SampleCount
+
+
+type BlockCounts = tuple[Index, ...]
+type NodePermutation = tuple[Index, ...]
+type NodeImagePair = tuple[Index, Index]
+type NodeImagePairs = tuple[NodeImagePair, ...]
+type ResponseMatrix = NDArray[np.float64]
+type ActionVector = NDArray[np.float64]
 
 
 class CorrespondenceError(ValueError):
@@ -19,20 +28,13 @@ class CorrespondenceError(ValueError):
 @dataclass(frozen=True, slots=True)
 class BlockNodeCounts:
     blocks: PaddedBlockStructure
-    per_block: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    per_block: BlockCounts
 
     def __post_init__(self) -> None:
         if len(self.per_block) != len(self.blocks.coarse_groups):
             raise CorrespondenceError("block-count length mismatch")
         if any(count < 0 for count in self.per_block):
             raise CorrespondenceError("block counts must be nonnegative")
-
-    def for_block(self, block_index: Index) -> int: #TODO: should be deleted. We don't reference this in code.
-        return self.per_block[block_index]
-
-    def total(self) -> int: #TODO: should be deleted. We don't reference this in code.
-        return sum(self.per_block)
-
 
 @dataclass(frozen=True, slots=True)
 class PaddedBlockStructure:
@@ -53,8 +55,7 @@ class PaddedBlockStructure:
             raise CorrespondenceError("coarse group without real target nodes")
 
     @property
-    def padded_size_tuple(self
-                          ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def padded_size_tuple(self) -> tuple[SampleCount, ...]:
         return tuple(
             max(source_count, target_count)
             for source_count, target_count in zip(
@@ -67,21 +68,18 @@ class PaddedBlockStructure:
         return BlockNodeCounts(blocks=self, per_block=self.padded_size_tuple)
 
     @property
-    def total_padded_nodes(self
-                           ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def total_padded_nodes(self) -> SampleCount:
         return sum(self.padded_size_tuple)
 
     @property
-    def orbit_size(self
-                   ) -> int:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def orbit_size(self) -> SampleCount:
         return math.prod(math.factorial(size) for size in self.padded_size_tuple)
 
     def block_index_range(self, block_index: Index) -> range:
         offset = sum(self.padded_size_tuple[:block_index])
         return range(offset, offset + self.padded_size_tuple[block_index])
 
-    def block_of_node(self, node_index: Index
-                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def block_of_node(self, node_index: Index) -> Index:
         total = self.total_padded_nodes
         if node_index < 0 or node_index >= total:
             raise CorrespondenceError(
@@ -115,8 +113,8 @@ class PaddedBlockStructure:
 
 def build_padded_block_structure(
     coarse_groups: Sequence[CoarseGroup],
-    source_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: source_real_counts)
-    target_real_counts: Mapping[CoarseGroup, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_real_counts)
+    source_real_counts: Mapping[CoarseGroup, SampleCount],
+    target_real_counts: Mapping[CoarseGroup, SampleCount],
 ) -> PaddedBlockStructure:
     ordered_groups = tuple(coarse_groups)
     missing = [
@@ -136,7 +134,7 @@ def build_padded_block_structure(
 @dataclass(frozen=True, slots=True)
 class BlockCorrespondence:
     blocks: PaddedBlockStructure
-    images: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    images: NodePermutation
 
     def __post_init__(self) -> None:
         expected = self.blocks.total_padded_nodes
@@ -144,7 +142,7 @@ class BlockCorrespondence:
             raise CorrespondenceError(
                 f"correspondence length {len(self.images)} does not match padded size {expected}"
             )
-        seen: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        seen: set[Index] = set()
         for target_index, image in enumerate(self.images):
             if image < 0 or image >= expected:
                 raise CorrespondenceError(f"image {image} outside padded space of size {expected}")
@@ -166,17 +164,17 @@ class BlockCorrespondence:
     def lexicographically_smallest(cls, blocks: PaddedBlockStructure) -> BlockCorrespondence:
         return cls.identity(blocks)
 
-    def ordering_key(self) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def ordering_key(self) -> NodePermutation:
         return self.images
 
-    def permutation_matrix(self) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def permutation_matrix(self) -> ResponseMatrix:
         total = self.blocks.total_padded_nodes
         matrix = np.zeros((total, total), dtype=np.float64)
         for target_index, image in enumerate(self.images):
             matrix[image, target_index] = 1.0
         return matrix
 
-    def permute_response_matrix(self, matrix: NDArray[np.float64]) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def permute_response_matrix(self, matrix: ResponseMatrix) -> ResponseMatrix:
         expected = self.blocks.total_padded_nodes
         if matrix.shape != (expected, expected):
             raise CorrespondenceError(
@@ -197,23 +195,29 @@ def enumerate_block_permutations(blocks: PaddedBlockStructure) -> Iterator[Block
         yield BlockCorrespondence(blocks=blocks, images=images)
 
 
+class CorrespondenceOrdering(IntEnum):
+    LESS = -1
+    EQUAL = 0
+    GREATER = 1
+
+
 def compare_correspondences_lexicographically(
     left: BlockCorrespondence, right: BlockCorrespondence
-) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> CorrespondenceOrdering:
     for left_value, right_value in zip(left.images, right.images, strict=True):
         if left_value != right_value:
-            return -1 if left_value < right_value else 1
-    return 0
+            return CorrespondenceOrdering.LESS if left_value < right_value else CorrespondenceOrdering.GREATER
+    return CorrespondenceOrdering.EQUAL
 
 
 @dataclass(frozen=True, slots=True)
 class ActiveImageMap:
     blocks: PaddedBlockStructure
-    assignments: tuple[tuple[int, int], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    assignments: NodeImagePairs
 
     def __post_init__(self) -> None:
-        targets_seen: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        images_seen: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        targets_seen: set[Index] = set()
+        images_seen: set[Index] = set()
         for target, image in self.assignments:
             if target in targets_seen:
                 raise CorrespondenceError(f"active-image map assigns target {target} twice")
@@ -226,26 +230,21 @@ class ActiveImageMap:
                     f"active-image assignment ({target}, {image}) crosses coarse-group boundary"
                 )
 
-    def image_of(self, target_node: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_node)
-                 ) -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def image_of(self, target_node: Index) -> Index | None:
         for target, image in self.assignments:
             if target == target_node:
                 return image
         return None
 
-    def fixed_pairs(self
-                    ) -> tuple[tuple[int, int], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def fixed_pairs(self) -> NodeImagePairs:
         return self.assignments
 
 
-def active_support_of_action(alpha: NDArray[np.float64] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                             ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def active_support_of_action(alpha: ActionVector) -> tuple[Index, ...]:
     return tuple(int(node) for node in np.flatnonzero(alpha > 0.0))
 
 
-def support_per_block(blocks: PaddedBlockStructure,
-                      active_nodes: Sequence[int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
-                      ) -> BlockNodeCounts:
+def support_per_block(blocks: PaddedBlockStructure, active_nodes: Sequence[Index]) -> BlockNodeCounts:
     counts = [0] * len(blocks.padded_size_tuple)
     for node in active_nodes:
         if node < 0 or node >= blocks.total_padded_nodes:
@@ -254,9 +253,7 @@ def support_per_block(blocks: PaddedBlockStructure,
     return BlockNodeCounts(blocks=blocks, per_block=tuple(counts))
 
 
-def falling_factorial(n: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n)
-                      r: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: r)
-                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def falling_factorial(n: Index, r: Index) -> Index:
     if r < 0 or r > n:
         raise CorrespondenceError(f"invalid falling factorial arguments n={n} r={r}")
     result = 1
@@ -267,7 +264,7 @@ def falling_factorial(n: int, #TODO: do not use primitivies. Use an appropriate 
 
 def active_image_assignment_count(
     blocks: PaddedBlockStructure, support_counts: BlockNodeCounts
-) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Index:
     count = 1
     for block_index, support_size in enumerate(support_counts.per_block):
         count *= falling_factorial(blocks.padded_size_tuple[block_index], support_size)
@@ -277,14 +274,14 @@ def active_image_assignment_count(
 @dataclass(frozen=True, slots=True)
 class BlockActiveImageChoice:
     block_index: Index
-    candidate_assignments: tuple[tuple[tuple[int, int], ...], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    candidate_assignments: tuple[NodeImagePairs, ...]
 
 
 def enumerate_active_image_maps(
     blocks: PaddedBlockStructure,
-    active_support_nodes: Sequence[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_support_nodes)
+    active_support_nodes: Sequence[Index],
 ) -> Iterator[ActiveImageMap]:
-    by_block: defaultdict[int, list[int]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    by_block: defaultdict[Index, list[Index]] = defaultdict(list)
     for node in sorted(active_support_nodes):
         by_block.setdefault(blocks.block_of_node(node), []).append(node)
     choices: list[BlockActiveImageChoice] = []
@@ -306,7 +303,7 @@ def enumerate_active_image_maps(
             BlockActiveImageChoice(block_index=block_index, candidate_assignments=candidates)
         )
     for combination in itertools.product(*(choice.candidate_assignments for choice in choices)):
-        assignments: list[tuple[int, int]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        assignments: list[NodeImagePair] = []
         for pairs in combination:
             assignments.extend(pairs)
         yield ActiveImageMap(blocks=blocks, assignments=tuple(assignments))

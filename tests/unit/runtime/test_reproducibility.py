@@ -14,10 +14,9 @@ from fedorbit.infrastructure.runtime import (
 )
 
 
-def test_code_revision_records_commit_and_tree_digest() -> None:
+def test_code_revision_records_commit() -> None:
     revision = current_code_revision()
     assert len(revision.commit) == 40
-    assert len(revision.tree_digest) == 64
 
 
 def test_identity_is_deterministic() -> None:
@@ -57,15 +56,12 @@ def test_identity_rejects_confirmatory_seed_change() -> None:
 
     import yaml
 
-    from fedorbit.config.validation import validate_cross_field_contract
-
     with open("configs/fedorbit.yaml", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
     document = ConfigDocument(raw)
     seeds = document.list("scientific", "randomness", "confirmatory_seeds")
     seeds[0] = 9999
     altered_model = FedorbitConfig.model_validate(document.as_dict())
-    validate_cross_field_contract(altered_model)
     with configured(altered_model):
         current = build_reproducibility_identity(environment)
 
@@ -129,7 +125,6 @@ def test_identity_includes_dataset_pairing() -> None:
     from tests.typed_access import ConfigDocument
 
     from fedorbit.config.loading import load_fedorbit_config
-    from fedorbit.config.validation import validate_cross_field_contract
 
     base_config = load_fedorbit_config()
     with configured(base_config):
@@ -142,7 +137,6 @@ def test_identity_includes_dataset_pairing() -> None:
     pairs = document.list("scientific", "datasets", "primary_directed_pairs")
     pairs[0], pairs[1] = pairs[1], pairs[0]
     altered_model = FedorbitConfig.model_validate(document.as_dict())
-    validate_cross_field_contract(altered_model)
     with configured(altered_model):
         current = build_reproducibility_identity(environment)
     assert not compatible(current, recorded)

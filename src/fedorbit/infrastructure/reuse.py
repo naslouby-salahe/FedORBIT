@@ -1,4 +1,4 @@
-#TODO: should be handled better and more optimized. Maybe inlined elsewhere
+# TODO: should be handled better and more optimized. Maybe inlined elsewhere
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fedorbit.datasets.common import file_sha256
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     ReusableArtifactManifest,
     completion_manifest_self_hash,
-    file_sha256,
 )
 from fedorbit.infrastructure.provenance import STAGE_DEPENDENCIES
 from fedorbit.types import (
@@ -104,7 +104,7 @@ class ExecutionReuse:
                 decisions.append(CellDecision(cell.coordinates, ExecutionAction.EXECUTE))
             elif (
                 overwrite_policy == OverwritePolicy.REPLACE
-                or ArtifactIdentifier(manifest.artifact_id) in stale_artifact_ids
+                or manifest.artifact_id in stale_artifact_ids
             ):
                 decisions.append(
                     CellDecision(cell.coordinates, ExecutionAction.OVERWRITE, manifest)
@@ -116,10 +116,12 @@ class ExecutionReuse:
     def validate_existing(self, decisions: tuple[CellDecision, ...]) -> None:
         for decision in decisions:
             if decision.manifest is not None:
-                self._store.resolve(ArtifactIdentifier(decision.manifest.artifact_id))
+                self._store.resolve(decision.manifest.artifact_id)
 
-    def stale_descendants(self, artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: artifact_id)
-                          ) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def stale_descendants(
+        self,
+        artifact_id: ArtifactIdentifier,
+    ) -> frozenset[ArtifactIdentifier]:
         return frozenset(
             manifest.artifact_id
             for manifest in self._store.all_manifests()
@@ -129,7 +131,7 @@ class ExecutionReuse:
     def promote_completed(self, manifests: tuple[ReusableArtifactManifest, ...]) -> None:
         for manifest in manifests:
             self._store.write_reusable(manifest)
-            self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
+            self._store.resolve(manifest.artifact_id)
 
 
 class SelectiveInvalidation:
@@ -148,11 +150,11 @@ class SelectiveInvalidation:
                 continue
             if (
                 changed_artifact_id is not None
-                and changed_artifact_id.value not in manifest.upstream_artifact_ids
+                and changed_artifact_id not in manifest.upstream_artifact_ids
             ):
                 continue
-            self._store.remove_manifest(ArtifactIdentifier(manifest.artifact_id))
-            invalidated.append(ArtifactIdentifier(manifest.artifact_id))
+            self._store.remove_manifest(manifest.artifact_id)
+            invalidated.append(manifest.artifact_id)
         return tuple(invalidated)
 
     def invalidate_descendants(
@@ -168,9 +170,9 @@ class SelectiveInvalidation:
                 continue
             visited.add(current)
             for manifest in manifests:
-                if current.value not in manifest.upstream_artifact_ids:
+                if current not in manifest.upstream_artifact_ids:
                     continue
-                artifact_identifier = ArtifactIdentifier(manifest.artifact_id)
+                artifact_identifier = manifest.artifact_id
                 if artifact_identifier in visited:
                     continue
                 invalidated.append(artifact_identifier)
@@ -239,7 +241,7 @@ def validate_completed_artifact(
 
 def validate_upstream_lineage(
     manifest: ReusableArtifactManifest,
-    available_artifact_ids: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: available_artifact_ids)
+    available_artifact_ids: frozenset[ArtifactIdentifier],
 ) -> None:
     missing = tuple(
         artifact_id

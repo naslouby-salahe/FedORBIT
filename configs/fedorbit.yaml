@@ -28,6 +28,7 @@ scientific:
     minimum_nontrivial_block_size: 2
 
   datasets:
+    edge_iiotset_network_relative_path: Edge-IIoTset dataset/Selected dataset for ML and DL/DNN-EdgeIIoT-dataset.csv
     clients:
       edge_iiotset_network:
         role: external
@@ -49,6 +50,42 @@ scientific:
         source: ToN_IoT
         component: "network-flow telemetry"
         expected_timestamp_field: "ts"
+    ton_iot_components:
+      ton_iot_windows10_host:
+        component_name: windows10_host
+        relative_paths:
+        - Processed_datasets/Processed_Windows_dataset/windows10_dataset.csv
+      ton_iot_linux_process_host:
+        component_name: linux_process
+        relative_paths:
+        - Processed_datasets/Processed_Linux_dataset/Linux_process_1.csv
+        - Processed_datasets/Processed_Linux_dataset/Linux_process_2.csv
+      ton_iot_network:
+        component_name: network
+        relative_paths:
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_1.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_2.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_3.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_4.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_5.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_6.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_7.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_8.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_9.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_10.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_11.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_12.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_13.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_14.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_15.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_16.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_17.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_18.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_19.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_20.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_21.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_22.csv
+        - Processed_datasets/Processed_Network_dataset/Network_dataset_23.csv
     timestamp_alias_acceptance:
       retained_row_parse_success_minimum: 0.999
     primary_directed_pairs:
@@ -402,6 +439,13 @@ runtime:
   artifact_layout:
     execution_root: outputs
     manuscript_root: results
+    preprocessing_directory: preprocessing
+    artifacts_directory: artifacts
+    experiments_directory: experiments
+    cache_directory: cache
+    staging_directory: staging
+    results_experiments_directory: experiments
+    project_summary_directory: project_summary
     preprocessing_subdirectories:
     - inventories
     - validation
@@ -493,6 +537,15 @@ runtime:
       - seeds
       - software
       - execution
+    reporting_output_directories:
+      manuscript_metric_summary: summary
+      manuscript_supplementary_table: supplementary
+      manuscript_main_figure: main
+      project_metric_summary: summary
+      project_main_table: main
+      project_main_figure: main
+      project_configuration_reproducibility: configuration
+      project_execution_reproducibility: execution
 
 environment:
   python: "3.13.12"
@@ -518,3 +571,5 @@ reporting:
     p_value_less_than_threshold: 0.0001
     runtime_seconds_decimals: 3
     memory_decimals: 1
+paths:
+  raw_dataset_relative_path: "data/raw"

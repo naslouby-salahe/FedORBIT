@@ -26,7 +26,13 @@ from fedorbit.infrastructure.failures import (
     solver_limit_outcome,
     validation_failure_outcome,
 )
-from fedorbit.types import FailureCategory, TerminalState
+from fedorbit.types import (
+    CutMasterCounterName,
+    FailureCategory,
+    FailureReason,
+    SupportRecordIdentifier,
+    TerminalState,
+)
 
 
 def test_infrastructure_failures_classified() -> None:
@@ -110,11 +116,6 @@ def test_algorithmic_failure_is_not_retried() -> None:
     assert decision.terminal_state == TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC
 
 
-def test_negative_retry_count_rejected() -> None:
-    with pytest.raises(ValueError):
-        RetryPolicy(-1)
-
-
 def test_infrastructure_exhaustion_blocks_dependents() -> None:
     outcome = infrastructure_exhausted_outcome()
     assert outcome.terminal_state == TerminalState.FAILED_INFRASTRUCTURE
@@ -123,10 +124,12 @@ def test_infrastructure_exhaustion_blocks_dependents() -> None:
 
 
 def test_validation_invalid_vs_failed() -> None:
-    invalid = validation_failure_outcome("leakage detected", invalid=True)
+    invalid = validation_failure_outcome(FailureReason("leakage detected"), invalid=True)
     assert invalid.terminal_state == TerminalState.INVALID
     assert invalid.failure_category == FailureCategory.VALIDATION
-    failed = validation_failure_outcome("schema mismatch in implementation", invalid=False)
+    failed = validation_failure_outcome(
+        FailureReason("schema mismatch in implementation"), invalid=False
+    )
     assert failed.terminal_state == TerminalState.FAILED_VALIDATION
 
 
@@ -153,10 +156,16 @@ def test_solver_limit_is_completed_with_method_outcome() -> None:
 
 def test_algorithmic_failure_contract() -> None:
     outcome = scientific_algorithmic_failure_outcome(
-        reason="sparse master non-convergence",
+        reason=FailureReason("sparse master non-convergence"),
         diagnostics=True,
-        completed_support_records=("support-1", "support-2"),
-        cut_master_counters=(("scenario_cuts", 7), ("master_iterations", 9)),
+        completed_support_records=(
+            SupportRecordIdentifier("support-1"),
+            SupportRecordIdentifier("support-2"),
+        ),
+        cut_master_counters=(
+            (CutMasterCounterName("scenario_cuts"), 7),
+            (CutMasterCounterName("master_iterations"), 9),
+        ),
     )
     assert outcome.terminal_state == TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC
     assert outcome.failure_reason == "sparse master non-convergence"

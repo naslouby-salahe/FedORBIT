@@ -36,13 +36,23 @@ from fedorbit.optimization.objective import (
     zero_action,
 )
 from fedorbit.types import (
+    AttemptCount,
     CoarseGroup,
+    Coefficient,
     ConceptCount,
     CouplingCompatibility,
+    Discrepancy,
+    Index,
+    NodeIndices,
+    RepetitionCount,
     RngNamespace,
     ScalabilityBlockPattern,
+    Score,
+    SemanticCoordinateText,
     StableJsonPayload,
     SupportCount,
+    Threshold,
+    Tolerance,
     stable_json,
 )
 
@@ -71,10 +81,10 @@ class SyntheticGenerationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ExactSeparatorInstanceRequest:
-    block_pattern: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pattern: tuple[ConceptCount, ...]
     seed: RandomSeed
     active_support_size: SupportCount = 1
-    instance_index: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    instance_index: Index = 0
 
     def __post_init__(self) -> None:
         if not self.block_pattern or any(size < 1 for size in self.block_pattern):
@@ -85,7 +95,7 @@ class ExactSeparatorInstanceRequest:
 
 @dataclass(frozen=True, slots=True)
 class ExactSeparatorInstance:
-    block_pattern: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pattern: tuple[ConceptCount, ...]
     lower_response_matrix: np.ndarray
     upper_response_matrix: np.ndarray
     target_importance: np.ndarray
@@ -129,7 +139,7 @@ def generate_exact_separator_instance(
 
 def _draw_support_restricted_action(
     random: np.random.Generator,
-    size: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: size)
+    size: ConceptCount,
     active_support_size: SupportCount,
 ) -> np.ndarray:
     combinations = tuple(itertools.combinations(range(size), active_support_size))
@@ -164,7 +174,7 @@ class UnresolvedMapWorldRequest:
 
 @dataclass(frozen=True, slots=True)
 class UnresolvedMapWorld:
-    block_pattern: tuple[int, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pattern: tuple[ConceptCount, ConceptCount]
     lower_response_matrix: np.ndarray
     target_importance: np.ndarray
     generation_seed: RandomSeed
@@ -200,8 +210,7 @@ def generate_unresolved_map_world(request: UnresolvedMapWorldRequest) -> Unresol
     )
 
 
-def _max_attempts_for(world_kind: UnresolvedMapWorldKind
-                      ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _max_attempts_for(world_kind: UnresolvedMapWorldKind) -> AttemptCount:
     if world_kind == UnresolvedMapWorldKind.COMMON_ACTION:
         return active_config().generators.common_action_unresolved_map.maximum_attempts
     if world_kind == UnresolvedMapWorldKind.ROBUST_COMPROMISE:
@@ -214,8 +223,7 @@ def _max_attempts_for(world_kind: UnresolvedMapWorldKind
 def _draw_world_response(
     world_kind: UnresolvedMapWorldKind,
     random: np.random.Generator,
-) -> tuple[tuple[int, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-           , np.ndarray]:
+) -> tuple[tuple[ConceptCount, ConceptCount], np.ndarray]:
     if world_kind == UnresolvedMapWorldKind.COMMON_ACTION:
         pattern = active_config().generators.common_action_unresolved_map.block_pattern
         return (pattern[0], pattern[1]), _common_action_response(random, (pattern[0], pattern[1]))
@@ -235,7 +243,7 @@ def _draw_world_response(
 
 
 def _unresolved_map_problem(
-    pattern: tuple[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
+    pattern: tuple[ConceptCount, ConceptCount],
     response: np.ndarray,
     importance: np.ndarray,
 ) -> RobustActionProblem:
@@ -269,7 +277,7 @@ def _map_conditioned_winners_disjoint(
 
 def _world_is_accepted(
     world_kind: UnresolvedMapWorldKind,
-    pattern: tuple[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
+    pattern: tuple[ConceptCount, ConceptCount],
     response: np.ndarray,
     importance: np.ndarray,
 ) -> bool:
@@ -304,7 +312,7 @@ def _world_is_accepted(
 
 def _common_action_response(
     random: np.random.Generator,
-    pattern: tuple[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
+    pattern: tuple[ConceptCount, ConceptCount],
 ) -> np.ndarray:
     lower, upper = (
         active_config().generators.common_action_unresolved_map.block_pair_response_uniform
@@ -321,16 +329,14 @@ def _common_action_response(
 
 def _independent_response(
     random: np.random.Generator,
-    pattern: tuple[int, int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
-    bounds: tuple[float, float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: bounds)
+    pattern: tuple[ConceptCount, ConceptCount],
+    bounds: tuple[Coefficient, Coefficient],
 ) -> np.ndarray:
     size = sum(pattern)
     return random.uniform(bounds[0], bounds[1], size=(size, size)).astype(np.float64)
 
 
-def _gamma_normalized_importance(random: np.random.Generator,
-                                 size: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: size)
-                                 ) -> np.ndarray:
+def _gamma_normalized_importance(random: np.random.Generator, size: ConceptCount) -> np.ndarray:
     gamma = active_config().generators.exact_separator_theorem.target_importance_gamma
     weights = random.gamma(gamma.shape, gamma.scale, size=size).astype(np.float64)
     total = float(weights.sum())
@@ -359,7 +365,7 @@ class ScalabilityInstanceRequest:
 
 @dataclass(frozen=True, slots=True)
 class ScalabilityInstance:
-    block_pattern: tuple[int, int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pattern: tuple[ConceptCount, ConceptCount]
     lower_response_matrix: np.ndarray
     target_importance: np.ndarray
     fixed_action: np.ndarray
@@ -401,8 +407,7 @@ def generate_scalability_instance(request: ScalabilityInstanceRequest) -> Scalab
     )
 
 
-def _block_pattern(request: ScalabilityInstanceRequest
-                   ) -> tuple[int, int]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _block_pattern(request: ScalabilityInstanceRequest) -> tuple[ConceptCount, ConceptCount]:
     if request.block_pattern == ScalabilityBlockPattern.BALANCED:
         lower = request.node_count // 2
         return (lower, request.node_count - lower)
@@ -416,13 +421,13 @@ class CouplingGenerationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class CouplingInstanceRequest:
     compatibility: CouplingCompatibility
-    response_heterogeneity: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_asymmetry: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_sparsity: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    block_pattern: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_heterogeneity: Coefficient
+    directed_asymmetry: Coefficient
+    response_sparsity: Coefficient
+    block_pattern: tuple[ConceptCount, ...]
     support_size: SupportCount
     seed: RandomSeed
-    instance_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    instance_index: Index
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,17 +435,16 @@ class CouplingInstance:
     lower_response_matrix: np.ndarray
     target_importance: np.ndarray
     active_action: np.ndarray
-    block_pattern: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    block_pattern: tuple[ConceptCount, ...]
     classification: CouplingCompatibility
     generation_seed: RandomSeed
 
 
 def _coupling_coordinates(
     request: CouplingInstanceRequest,
-    attempt: int | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: attempt)
-) -> OrderedDict[str, str | int | float | list[int]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    fields: OrderedDict[str, str | int | float | list[int] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                        ] = OrderedDict(
+    attempt: Index | None,
+) -> OrderedDict[str, StableJsonPayload]:
+    fields: OrderedDict[str, StableJsonPayload] = OrderedDict(
         generator="coupling_structure",
         compatibility=request.compatibility.value,
         response_heterogeneity=request.response_heterogeneity,
@@ -456,14 +460,14 @@ def _coupling_coordinates(
 
 
 def _deterministic_sparsity_mask(
-    size: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: size)
-    sparsity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: sparsity)
+    size: ConceptCount,
+    sparsity: Coefficient,
     seed: RandomSeed,
-    coordinates_text: str,#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates_text)
-) -> frozenset[tuple[int, int]]:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    coordinates_text: SemanticCoordinateText,
+) -> frozenset[tuple[Index, Index]]:
     total = size * size
     keep = max(1, round(sparsity * total))
-    ranked: list[tuple[int, int, int]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    ranked: list[tuple[int, Index, Index]] = []
     for a in range(size):
         for b in range(size):
             payload = f"FedORBIT|synthetic-sparsity|{seed}|{coordinates_text}|{a}|{b}"
@@ -478,7 +482,7 @@ def _deterministic_sparsity_mask(
 def _apply_heterogeneity(
     matrix: np.ndarray,
     blocks: PaddedBlockStructure,
-    heterogeneity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: heterogeneity)
+    heterogeneity: Coefficient,
 ) -> np.ndarray:
     result = matrix.copy()
     for g in range(len(blocks.coarse_groups)):
@@ -493,7 +497,7 @@ def _apply_heterogeneity(
 
 def _apply_deterministic_sparsity(
     matrix: np.ndarray,
-    keep_mask: frozenset[tuple[int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: keep_mask)
+    keep_mask: frozenset[tuple[Index, Index]],
 ) -> np.ndarray:
     result = np.zeros_like(matrix)
     for a, b in keep_mask:
@@ -511,7 +515,7 @@ def _active_term_minimizer_sets(
 ) -> tuple[_CorrespondenceImageMinimizerSet, ...]:
     minimizer_sets: list[_CorrespondenceImageMinimizerSet] = []
     for j in alpha.active_support_nodes:
-        column_values: list[tuple[float, tuple[int, ...]]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        column_values: list[tuple[Score, tuple[Index, ...]]] = []
         for correspondence in orbit:
             permuted = correspondence.permute_response_matrix(problem.lower_response_matrix)
             column_value = float(problem.target_importance @ permuted[:, j])
@@ -526,13 +530,12 @@ def _active_term_minimizer_sets(
     return tuple(minimizer_sets)
 
 
-MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION = 2 #TODO: move to constants
+MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION: SupportCount = 2
 
 
 def eligible_coupling_support_sizes(
-    compatibility: CouplingCompatibility,
-    registered_support_sizes: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: registered_support_sizes)
-) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    compatibility: CouplingCompatibility, registered_support_sizes: tuple[SupportCount, ...]
+) -> tuple[SupportCount, ...]:
     if compatibility == CouplingCompatibility.INCOMPATIBLE:
         return tuple(
             support
@@ -542,15 +545,15 @@ def eligible_coupling_support_sizes(
     return registered_support_sizes
 
 
-_JOINT_REALIZABILITY_MAX_ITERATIONS = 100 #TODO: move to constants
+_JOINT_REALIZABILITY_MAX_ITERATIONS: RepetitionCount = 100
 
 
 def _joint_realizability_column_shift(
     q: np.ndarray,
-    keep_mask: frozenset[tuple[int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: keep_mask)
+    keep_mask: frozenset[tuple[Index, Index]],
     importance: np.ndarray,
-    column: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
-    delta: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: delta)
+    column: Index,
+    delta: Discrepancy,
 ) -> bool:
     kept_rows = [row for row in range(q.shape[0]) if (row, column) in keep_mask]
     if not kept_rows:
@@ -567,10 +570,10 @@ def _joint_realizability_column_shift(
 def _rearrange_column_for_mate_pairing(
     q: np.ndarray,
     blocks: PaddedBlockStructure,
-    keep_mask: frozenset[tuple[int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: keep_mask)
+    keep_mask: frozenset[tuple[Index, Index]],
     importance: np.ndarray,
-    column: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
-    target_images: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_images)
+    column: Index,
+    target_images: NodeIndices,
 ) -> None:
     target_source = target_images[column]
     block_index = blocks.block_of_node(column)
@@ -590,14 +593,14 @@ def _rearrange_column_for_mate_pairing(
 
 
 def _enforce_joint_realizability_for_target(
-    target_images: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_images)
-    active_nodes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
+    target_images: NodeIndices,
+    active_nodes: NodeIndices,
     orbit: Sequence[BlockCorrespondence],
     blocks: PaddedBlockStructure,
     q: np.ndarray,
     importance: np.ndarray,
-    keep_mask: frozenset[tuple[int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: keep_mask) 
-    tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: tie_tolerance)  
+    keep_mask: frozenset[tuple[Index, Index]],
+    tie_tolerance: Tolerance,
 ) -> bool:
     for column in active_nodes:
         _rearrange_column_for_mate_pairing(q, blocks, keep_mask, importance, column, target_images)
@@ -623,12 +626,12 @@ def _enforce_joint_realizability_for_target(
 
 
 def _enforce_joint_realizability(
-    active_nodes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: active_nodes)
+    active_nodes: NodeIndices,
     orbit: Sequence[BlockCorrespondence],
     q: np.ndarray,
     importance: np.ndarray,
-    keep_mask: frozenset[tuple[int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: keep_mask)
-    tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: tie_tolerance)
+    keep_mask: frozenset[tuple[Index, Index]],
+    tie_tolerance: Tolerance,
 ) -> bool:
     identity_images = tuple(range(q.shape[0]))
     blocks = orbit[0].blocks
@@ -655,7 +658,7 @@ def _classify_coupling(
     alpha: CurriculumAction,
     orbit: Sequence[BlockCorrespondence],
     hull: RectangularHull,
-    incompatible_gap_threshold: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: incompatible_gap_threshold)
+    incompatible_gap_threshold: Threshold,
 ) -> CouplingCompatibility | None:
     minimizer_sets = _active_term_minimizer_sets(problem, alpha, orbit)
     if not minimizer_sets:
@@ -686,8 +689,8 @@ def generate_coupling_instance(request: CouplingInstanceRequest) -> CouplingInst
     blocks = build_padded_block_structure(groups, counts, counts)
     orbit = tuple(enumerate_block_permutations(blocks))
     size = blocks.total_padded_nodes
-    sparsity_coordinates_text = stable_json(
-        cast(StableJsonPayload, _coupling_coordinates(request, None))
+    sparsity_coordinates_text = SemanticCoordinateText(
+        stable_json(cast(StableJsonPayload, _coupling_coordinates(request, None)))
     )
     keep_mask = _deterministic_sparsity_mask(
         size, request.response_sparsity, request.seed, sparsity_coordinates_text

@@ -5,7 +5,7 @@ import torch
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.learning.pilot import (
-    REFERENCE_LEARNING_RATE,
+    PILOT_REFERENCE_LEARNING_RATE,
     PilotConfiguration,
     PilotFitResult,
     pilot_grid,
@@ -58,11 +58,11 @@ def test_pilot_selection_uses_registered_tie_order() -> None:
     grid = pilot_grid()
     results = tuple(fit for candidate in grid for fit in _fits(candidate, (1.0, 1.0, 1.0)))
     selection = select_pilot_configuration(results)
-    assert selection.configuration == PilotConfiguration(REFERENCE_LEARNING_RATE, 0.0, 0.0)
+    assert selection.configuration == PilotConfiguration(PILOT_REFERENCE_LEARNING_RATE, 0.0, 0.0)
     assert selection.median_valid_macro_cross_entropy == pytest.approx(1.0)
 
 
 def test_pilot_selection_rejects_incomplete_grid() -> None:
-    candidate = PilotConfiguration(REFERENCE_LEARNING_RATE, 0.0, 0.0)
+    candidate = PilotConfiguration(PILOT_REFERENCE_LEARNING_RATE, 0.0, 0.0)
     with pytest.raises(ValueError):
         select_pilot_configuration(_fits(candidate, (1.0, 1.0, 1.0)))

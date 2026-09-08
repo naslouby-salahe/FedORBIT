@@ -35,7 +35,7 @@ from fedorbit.types import (
     WeightDecay,
 )
 
-REFERENCE_LEARNING_RATE = 1.0e-3 #TODO : move to constants
+PILOT_REFERENCE_LEARNING_RATE = LearningRate(1.0e-3)
 NETWORK_DATASETS = frozenset({DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK})
 HOST_DATASETS = frozenset({DatasetId.TON_IOT_WINDOWS10_HOST, DatasetId.TON_IOT_LINUX_PROCESS_HOST})
 
@@ -130,7 +130,7 @@ def run_base_model_pilot(
 
 
 def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSelection:
-    grouped: defaultdict[PilotConfiguration, list[float]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    grouped: defaultdict[PilotConfiguration, list[Score]] = defaultdict(list)
     for result in results:
         grouped.setdefault(result.configuration, []).append(
             result.outcome.valid_macro_cross_entropy
@@ -153,7 +153,7 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
         key=lambda item: (
             item.median_valid_macro_cross_entropy,
             item.valid_macro_cross_entropy_standard_deviation,
-            abs(item.configuration.learning_rate - REFERENCE_LEARNING_RATE),
+            abs(item.configuration.learning_rate - PILOT_REFERENCE_LEARNING_RATE),
             item.configuration.weight_decay,
             item.configuration.dropout,
         ),

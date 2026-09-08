@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 from tests.typed_access import ConfigDocument
+from tests.unit.config.config_contract_checks import (
+    ConfigurationContractError,
+    validate_cross_field_contract,
+)
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.config.validation import ConfigurationContractError, validate_cross_field_contract
 
 
 def _validate_raw(config: ConfigDocument) -> FedorbitConfig:
@@ -167,11 +171,125 @@ def test_retry_count_must_be_nonnegative(mutable_config: ConfigDocument) -> None
     mutable_config.set_value(
         "runtime", "failure_handling", "retries_after_initial_infrastructure_failure", value=-1
     )
-    with pytest.raises(ConfigurationContractError):
+    with pytest.raises(ValidationError):
         _validate_raw(mutable_config)
 
 
 def test_artifact_root_cannot_drift(mutable_config: ConfigDocument) -> None:
     mutable_config.set_value("runtime", "artifact_layout", "manuscript_root", value="artifacts")
     with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_split_intervals_must_stay_contiguous(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific", "split", "duplicate_safe_chronological_intervals", "train", 1, value=0.30
+    )
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_statistical_seed_must_be_positive(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "randomness", "statistical_seed", value=0)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_principal_sparse_support_must_not_exceed_three(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "action", "principal_sparse_support", value=5)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_ton_iot_network_client_must_stay_primary(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "scientific", "datasets", "clients", "ton_iot_network", "role", value="external"
+    )
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_dataloader_workers_must_stay_zero(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "training", "dataloader_workers", value=1)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_simultaneous_confidence_level_must_be_a_probability(
+    mutable_config: ConfigDocument,
+) -> None:
+    mutable_config.set_value(
+        "scientific", "source_response_final", "simultaneous_confidence_level", value=1.5
+    )
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_one_sided_confidence_level_must_be_a_probability(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "confirmation", "one_sided_confidence_level", value=2.0)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_nominal_confidence_level_must_be_a_probability(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("scientific", "statistics", "confidence_level", value=-1.0)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_compared_sparse_support_must_belong_to_registered_set(
+    mutable_config: ConfigDocument,
+) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "evaluation_criteria",
+        "sparse_operational_relevance",
+        "compared_sparse_support",
+        value=5,
+    )
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_generic_qap_dominates_support_maximum_must_belong_to_registered_set(
+    mutable_config: ConfigDocument,
+) -> None:
+    mutable_config.set_value(
+        "scientific",
+        "simplification_rules",
+        "generic_qap_dominates",
+        "intended_sparse_support_maximum",
+        value=5,
+    )
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_coupling_structure_attempt_limit_must_be_positive(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value(
+        "generators", "coupling_structure", "maximum_attempts_per_instance", value=0
+    )
+    with pytest.raises(ValidationError):
+        _validate_raw(mutable_config)
+
+
+def test_exact_sparse_lp_threads_must_stay_one(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("solvers", "exact_sparse", "lp_threads_per_solve", value=2)
+    with pytest.raises(ConfigurationContractError):
+        _validate_raw(mutable_config)
+
+
+def test_map_availability_audit_requires_at_least_one_researcher(
+    mutable_config: ConfigDocument,
+) -> None:
+    mutable_config.set_value(
+        "experiments", "map_availability_applicability_audit", "independent_researchers", value=0
+    )
+    with pytest.raises(ValidationError):
+        _validate_raw(mutable_config)
+
+
+def test_reporting_precision_must_be_nonnegative(mutable_config: ConfigDocument) -> None:
+    mutable_config.set_value("reporting", "precision", "scientific_metric_decimals", value=-1)
+    with pytest.raises(ValidationError):
         _validate_raw(mutable_config)

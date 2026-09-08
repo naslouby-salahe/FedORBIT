@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
-from fedorbit.types import Split
+from fedorbit.types import (
+    DuplicateGroupIdentifier,
+    FiniteFloat,
+    Fraction,
+    NonNegativeInt,
+    Split,
+)
 
 
 class SplitError(ValueError):
@@ -12,7 +18,7 @@ class SplitError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class DuplicateGroupId:
-    value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: DuplicateGroupIdentifier
 
     def __post_init__(self) -> None:
         if not self.value:
@@ -21,7 +27,7 @@ class DuplicateGroupId:
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalFraction:
-    value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: Fraction
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.value <= 1.0:
@@ -30,12 +36,12 @@ class ChronologicalFraction:
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalTimestamp:
-    value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: FiniteFloat
 
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalRowCount:
-    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: NonNegativeInt
 
     def __post_init__(self) -> None:
         if self.value < 0:

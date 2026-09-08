@@ -10,7 +10,16 @@ from typing import cast
 import torch
 
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.types import ClientRole, CoarseGroup, RngNamespace, SampleCount, StableJsonPayload
+from fedorbit.types import (
+    AnonymousNodeDisplayId,
+    AnonymousNodeIndex,
+    ClientRole,
+    CoarseGroup,
+    RngNamespace,
+    SampleCount,
+    StableJsonPayload,
+    is_sha256_digest,
+)
 
 
 class AnonymityError(ValueError):
@@ -39,8 +48,8 @@ class AnonymityCoordinate:
 
 @dataclass(frozen=True, slots=True)
 class AnonymousNodeOrder:
-    permutation: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    display_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    permutation: tuple[AnonymousNodeIndex, ...]
+    display_ids: tuple[AnonymousNodeDisplayId, ...]
 
     def __post_init__(self) -> None:
         expected = tuple(range(len(self.permutation)))
@@ -82,8 +91,12 @@ def anonymous_node_order(
         )
     )
     generator = torch.Generator().manual_seed(seed)
-    permutation = tuple(int(index) for index in torch.randperm(node_count, generator=generator))
-    display_ids = tuple(f"node-{index:04d}" for index in range(1, node_count + 1))
+    permutation: tuple[AnonymousNodeIndex, ...] = tuple(
+        int(index) for index in torch.randperm(node_count, generator=generator)
+    )
+    display_ids = tuple(
+        AnonymousNodeDisplayId(f"node-{index:04d}") for index in range(1, node_count + 1)
+    )
     return AnonymousNodeOrder(permutation, display_ids)
 
 
@@ -173,7 +186,6 @@ class StrictResourcePolicy:
 
 
 _ANONYMOUS_NODE_PATTERN = re.compile(r"^node-[0-9]{4,}$")
-_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +255,7 @@ def validate_anonymous_node_ids(node_ids: tuple[str, ...]) -> None:
 
 
 def validate_sha256(value: str, field_name: str) -> None:
-    if _SHA256_PATTERN.fullmatch(value) is None:
+    if not is_sha256_digest(value):
         raise StrictResourceViolationError(f"{field_name} is not a lowercase SHA-256 digest")
 
 

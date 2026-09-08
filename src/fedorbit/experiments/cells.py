@@ -4,7 +4,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.types import ExperimentName, SemanticCoordinate
+from fedorbit.types import ExperimentCondition, ExperimentName, Index, SemanticCoordinate
 
 
 def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordinate]:
@@ -231,13 +231,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
     return by_experiment.get(experiment, common)
 
 
-@dataclass(frozen=True, slots=True)
-class ConditionLabel:
-    value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-
-    def __post_init__(self) -> None:
-        if not self.value:
-            raise ConditionRegistrationError("registered conditions must be non-empty")
+ConditionLabel = ExperimentCondition
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,7 +251,7 @@ class RegisteredConditions:
         if len(set(self.entries)) != len(self.entries):
             raise ConditionRegistrationError("registered conditions must be distinct")
 
-    def __len__(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def __len__(self) -> Index:
         return len(self.entries)
 
 

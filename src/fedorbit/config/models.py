@@ -17,6 +17,7 @@ from fedorbit.types import (
     CutCount,
     DatasetId,
     DatasetLabel,
+    DatasetRelativePath,
     DecimalPrecision,
     DomainModel,
     DurationMinutes,
@@ -49,7 +50,6 @@ from fedorbit.types import (
     TimeBudgetSeconds,
     TimestampFieldName,
     Tolerance,
-    TransferMethod,
     WeightDecay,
     WorkerCount,
 )
@@ -99,6 +99,11 @@ class ClientConfig(FrozenModel):
     expected_timestamp_field: TimestampFieldName
 
 
+class TonIotComponentConfig(FrozenModel):
+    component_name: ClientComponentName
+    relative_paths: tuple[DatasetRelativePath, ...]
+
+
 class TimestampAliasAcceptance(FrozenModel):
     retained_row_parse_success_minimum: Fraction
 
@@ -110,6 +115,8 @@ class DirectedPairSpec(FrozenModel):
 
 class DatasetsConfig(FrozenModel):
     clients: Mapping[DatasetId, ClientConfig]
+    edge_iiotset_network_relative_path: DatasetRelativePath
+    ton_iot_components: Mapping[DatasetId, TonIotComponentConfig]
     timestamp_alias_acceptance: TimestampAliasAcceptance
     primary_directed_pairs: tuple[DirectedPairSpec, ...]
     secondary_directed_pairs: tuple[DirectedPairSpec, ...]
@@ -617,15 +624,34 @@ class ProjectSummarySubdirectories(FrozenModel):
     reproducibility: tuple[str, ...]
 
 
+class ReportingOutputDirectories(FrozenModel):
+    manuscript_metric_summary: str
+    manuscript_supplementary_table: str
+    manuscript_main_figure: str
+    project_metric_summary: str
+    project_main_table: str
+    project_main_figure: str
+    project_configuration_reproducibility: str
+    project_execution_reproducibility: str
+
+
 class ArtifactLayoutConfig(FrozenModel):
     execution_root: str
     manuscript_root: str
+    preprocessing_directory: str
+    artifacts_directory: str
+    experiments_directory: str
+    cache_directory: str
+    staging_directory: str
+    results_experiments_directory: str
+    project_summary_directory: str
     preprocessing_subdirectories: tuple[str, ...]
     reusable_artifact_subdirectories: tuple[str, ...]
     experiment_subdirectories: ExperimentSubdirectories
     cache_subdirectories: tuple[str, ...]
     manuscript_experiment_subdirectories: ManuscriptExperimentSubdirectories
     project_summary_subdirectories: ProjectSummarySubdirectories
+    reporting_output_directories: ReportingOutputDirectories
 
 
 class RuntimeConfig(FrozenModel):
@@ -670,6 +696,10 @@ class ReportingConfig(FrozenModel):
     precision: ReportingPrecisionConfig
 
 
+class PathsConfig(FrozenModel):
+    raw_dataset_relative_path: DatasetRelativePath
+
+
 class FedorbitConfig(FrozenModel):
     scientific: ScientificConfig
     solvers: SolversConfig
@@ -678,53 +708,4 @@ class FedorbitConfig(FrozenModel):
     runtime: RuntimeConfig
     environment: EnvironmentConfig
     reporting: ReportingConfig
-
-
-def _registered_method_values() -> set[str]: #TODO: should be deleted. We don't reference this in code.
-    return {method.value for method in TransferMethod}
-
-
-def _append_registered_method( #TODO: should be deleted. We don't reference this in code.
-    methods: list[TransferMethod], candidate_name: str, registered_values: set[str]
-) -> None:
-    if candidate_name not in registered_values:
-        return
-    candidate = TransferMethod(candidate_name)
-    if candidate not in methods:
-        methods.append(candidate)
-
-
-def all_registered_methods() -> tuple[TransferMethod, ...]: #TODO: should be deleted. We don't reference this in code.
-    from fedorbit.config.loading import active_config
-
-    config = active_config()
-    experiment_configs: tuple[
-        PrimaryStrictCrossTelemetryTransferConfig
-        | MechanismAblationsConfig
-        | TargetConfirmationAndPortabilityConfig
-        | SecondaryCrossModalityGeneralizationConfig
-        | SemanticSufficiencyFrontierConfig
-        | WeakSignalSupportAndHeterogeneityBoundariesConfig
-        | ExactSparseSolverBenchmarkConfig
-        | SyntheticCouplingMechanismValidationConfig,
-        ...,
-    ] = (
-        config.experiments.primary_strict_cross_telemetry_transfer,
-        config.experiments.mechanism_ablations,
-        config.experiments.target_confirmation_and_portability,
-        config.experiments.secondary_cross_modality_generalization,
-        config.experiments.semantic_sufficiency_frontier,
-        config.experiments.weak_signal_support_and_heterogeneity_boundaries,
-        config.experiments.exact_sparse_solver_benchmark,
-        config.experiments.synthetic_coupling_mechanism_validation,
-    )
-    registered_values = _registered_method_values()
-    methods: list[TransferMethod] = []
-    for experiment in experiment_configs:
-        for method in experiment.methods:
-            _append_registered_method(methods, method, registered_values)
-    for (
-        method
-    ) in config.experiments.map_availability_applicability_audit.packet_only_recovery_methods:
-        _append_registered_method(methods, method, registered_values)
-    return tuple(methods)
+    paths: PathsConfig

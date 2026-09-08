@@ -14,19 +14,22 @@ from fedorbit.learning.training import (
     RngState,
     SelectedHyperparameters,
 )
+from fedorbit.types import EpochCount, Fraction, LearningRate, Score, WeightDecay
+
+type SerializedNamedTensor = tuple[str, torch.Tensor]
 
 
 @dataclass(frozen=True, slots=True)
 class _CheckpointPayload:
-    epoch: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    valid_macro_cross_entropy: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    state_dict: tuple[tuple[str, torch.Tensor], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    epoch: EpochCount
+    valid_macro_cross_entropy: Score
+    state_dict: tuple[SerializedNamedTensor, ...]
     optimizer_state: bytes
     rng_cpu: torch.Tensor
     rng_cuda: tuple[torch.Tensor, ...]
-    learning_rate: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    weight_decay: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    learning_rate: LearningRate
+    weight_decay: WeightDecay
+    dropout_probability: Fraction
     train_class_weights: torch.Tensor
 
 

@@ -9,7 +9,17 @@ import torch
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.response.estimation import shadow_batch_schedule
-from fedorbit.types import BatchSize, RngNamespace, SampleCount
+from fedorbit.types import (
+    BatchSize,
+    ContrastCoordinates,
+    Fraction,
+    RelativeGain,
+    RngNamespace,
+    SampleCount,
+    Score,
+)
+
+type RelativeGainSamples = tuple[RelativeGain, ...]
 
 
 class ConfirmationError(ValueError):
@@ -41,7 +51,7 @@ def confirmation_schedule(
     train_size: SampleCount,
     batch_size: BatchSize,
     seed: RandomSeed,
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
+    coordinates: ContrastCoordinates,
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
         raise ConfirmationError("confirmation TRAIN set is empty")
@@ -53,33 +63,33 @@ def confirmation_schedule(
     return shadow_batch_schedule(train_size, batch_size, rng)
 
 
-def _tensor_mean(values: torch.Tensor) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _tensor_mean(values: torch.Tensor) -> Score:
     if values.shape[0] == 0:
         raise ConfirmationError("resampled class has zero examples")
     total = 0.0
     for position in range(values.shape[0]):
         total += float(values[int(position)])
-    return total / values.shape[0]
+    return Score(total / values.shape[0])
 
 
 def _macro_ce_from_losses(
     losses_by_class: tuple[torch.Tensor, ...],
     resample_indices: tuple[torch.Tensor, ...],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     if len(resample_indices) != len(losses_by_class):
         raise ConfirmationError("class resampling must cover every evaluation class")
     class_entropies = [
         _tensor_mean(losses[indices])
         for losses, indices in zip(losses_by_class, resample_indices, strict=True)
     ]
-    return statistics.fmean(class_entropies)
+    return Score(statistics.fmean(class_entropies))
 
 
 def hierarchical_bootstrap_relative_gains(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
-) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    contrast_coordinates: ContrastCoordinates,
+) -> RelativeGainSamples:
     config = active_config()
     confirmation = config.scientific.confirmation
     denominator_floor = config.scientific.metrics.relative_macro_ce_denominator_floor
@@ -91,10 +101,10 @@ def hierarchical_bootstrap_relative_gains(
             SeedDerivationRequest(seed, RngNamespace.CONFIRMATION_BOOTSTRAP, contrast_coordinates)
         )
     )
-    collected_gains: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    collected_gains: list[RelativeGain] = []
     for _ in range(confirmation.hierarchical_bootstrap_resamples):
         selected = torch.randint(0, replicate_count, (replicate_count,), generator=bootstrap_rng)
-        replicate_gains: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        replicate_gains: list[RelativeGain] = []
         for position in range(replicate_count):
             outcomes = replicate_outcomes[int(selected[position])]
             resample_indices = tuple(
@@ -105,22 +115,29 @@ def hierarchical_bootstrap_relative_gains(
             curriculum = _macro_ce_from_losses(
                 outcomes.curriculum_losses_by_class, resample_indices
             )
-            replicate_gains.append((baseline - curriculum) / max(baseline, denominator_floor))
-        collected_gains.append(statistics.fmean(replicate_gains))
+            replicate_gains.append(
+                RelativeGain((baseline - curriculum) / max(baseline, denominator_floor))
+            )
+        collected_gains.append(RelativeGain(statistics.fmean(replicate_gains)))
     return tuple(collected_gains)
 
 
 def hierarchical_bootstrap_lower_bound(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
-) -> float:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    contrast_coordinates: ContrastCoordinates,
+) -> RelativeGain:
     gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
-    lower_probability = 1.0 - active_config().scientific.confirmation.one_sided_confidence_level
+    lower_probability = Fraction(
+        1.0 - active_config().scientific.confirmation.one_sided_confidence_level
+    )
     return _linear_quantile(sorted(gains), lower_probability)
 
 
-def _linear_quantile(sorted_values: list[float], probability: float) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: sorted_values)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: probability)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _linear_quantile(
+    sorted_values: list[RelativeGain],
+    probability: Fraction,
+) -> RelativeGain:
     if not 0.0 <= probability <= 1.0:
         raise ConfirmationError(f"quantile probability outside [0,1]: {probability}")
     count = len(sorted_values)
@@ -130,15 +147,16 @@ def _linear_quantile(sorted_values: list[float], probability: float) -> float: #
     lower_index = int(position // 1)
     upper_index = min(lower_index + 1, count - 1)
     fraction = position - lower_index
-    return sorted_values[lower_index] + fraction * (
-        sorted_values[upper_index] - sorted_values[lower_index]
+    return RelativeGain(
+        sorted_values[lower_index]
+        + fraction * (sorted_values[upper_index] - sorted_values[lower_index])
     )
 
 
 def confirmation_decision(
     replicate_outcomes: tuple[ConfirmReplicateOutcomes, ...],
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
+    contrast_coordinates: ContrastCoordinates,
 ) -> bool:
     lower_bound = hierarchical_bootstrap_lower_bound(replicate_outcomes, seed, contrast_coordinates)
     threshold = (

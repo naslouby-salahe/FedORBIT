@@ -15,7 +15,16 @@ from fedorbit.learning.training import BaseCheckpoint
 from fedorbit.response.estimation import ShadowSettings
 from fedorbit.response.pilot import PilotData
 from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_response_bands
-from fedorbit.types import Coefficient, Index, RandomSeed, Score, StepCount
+from fedorbit.types import (
+    ClassIndex,
+    Coefficient,
+    Index,
+    RandomSeed,
+    Score,
+    ResponseSeedStage,
+    SourceClientName,
+    StepCount,
+)
 
 
 class TargetImportanceError(ValueError):
@@ -59,7 +68,7 @@ class TargetImportance:
             if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=absolute_tolerance):
                 raise TargetImportanceError("target importance weights must sum to one")
 
-    def weight_of(self, node_index: Index) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def weight_of(self, node_index: Index) -> Coefficient:
         return self.weights_by_node_index[node_index]
 
     def as_vector(self, size: Index) -> NDArray[np.float64]:
@@ -71,7 +80,7 @@ class TargetImportance:
         return vector
 
     @property
-    def actionable_total(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def actionable_total(self) -> Coefficient:
         return sum(self.weights_by_node_index.values())
 
 
@@ -81,9 +90,9 @@ def build_target_importance(
     floor = active_config().scientific.target_importance.class_risk_floor
     if floor <= 0.0:
         raise TargetImportanceError("class risk floor must be positive")
-    seen: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    floored: OrderedDict[int, float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    zero_nodes: OrderedDict[int, float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seen: set[Index] = set()
+    floored: OrderedDict[Index, Coefficient] = OrderedDict()
+    zero_nodes: OrderedDict[Index, Coefficient] = OrderedDict()
     for node_risk in node_risks:
         if node_risk.node_index in seen:
             raise TargetImportanceError(f"node {node_risk.node_index} reported more than once")
@@ -109,7 +118,7 @@ def estimate_target_response_diagnostic(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    intervention_classes: tuple[ClassIndex, ...],
     seed: RandomSeed,
 ) -> FinalResponseEstimate:
     diagnostic = active_config().scientific.target_response_diagnostic
@@ -129,7 +138,7 @@ def estimate_target_response_diagnostic(
         replicate_count=diagnostic.paired_replicates,
         bootstrap_resamples=diagnostic.simultaneous_bootstrap_resamples,
         confidence_level=diagnostic.confidence_level,
-        seed_stage="target-local-diagnostic",
+        seed_stage=ResponseSeedStage("target-local-diagnostic"),
     )
 
 
@@ -139,7 +148,7 @@ class SelectionError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class SourceProposal:
-    source_client_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    source_client_name: SourceClientName
     certified_robust_value: Score
 
 
@@ -152,7 +161,7 @@ class RankedProposal:
 @dataclass(frozen=True, slots=True)
 class SelectionAttempt:
     rank: Index
-    source_client_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    source_client_name: SourceClientName
     accepted: bool
 
 
@@ -176,7 +185,7 @@ def rank_source_proposals(
         raise SelectionError(
             "principal ranking requires zero communication and confirmation cost coefficients"
         )
-    seen_clients: set[str] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seen_clients: set[SourceClientName] = set()
     positive: list[SourceProposal] = []
     for candidate in candidates:
         if candidate.source_client_name in seen_clients:
@@ -254,7 +263,7 @@ class OptimizerStepAllocation:
     live_assimilation: StepCount
     nontransferable_safety_reserve: StepCount
 
-    def for_category(self, category: BudgetCategory) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def for_category(self, category: BudgetCategory) -> StepCount:
         if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
             return self.target_response_diagnostic
         if category == BudgetCategory.CONFIRMATION_CANDIDATES:
@@ -293,7 +302,7 @@ class OptimizerStepAllocation:
         )
 
     @property
-    def total(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def total(self) -> StepCount:
         return (
             self.target_response_diagnostic
             + self.confirmation_candidates
@@ -342,7 +351,7 @@ class TargetOptimizerStepLedger:
             consumed_steps=OptimizerStepAllocation(0, 0, 0, 0),
         )
 
-    def remaining(self, category: BudgetCategory) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def remaining(self, category: BudgetCategory) -> StepCount:
         return self.reserved_steps.for_category(category) - self.consumed_steps.for_category(
             category
         )
@@ -369,7 +378,7 @@ class TargetOptimizerStepLedger:
             )
 
     @property
-    def total_consumed(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def total_consumed(self) -> StepCount:
         return self.consumed_steps.total
 
 

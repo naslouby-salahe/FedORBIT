@@ -16,11 +16,14 @@ from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.types import (
     EpochCount,
+    ConceptCount,
     Floor,
     Fraction,
     Index,
     LearningRate,
+    ModelParameterName,
     RngNamespace,
+    RuntimeDeviceType,
     Score,
     StableJsonPayload,
     WeightDecay,
@@ -37,7 +40,7 @@ class ClassWeights:
 
     @classmethod
     def from_targets(cls, targets: torch.Tensor,
-                     n_classes: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
+                     n_classes: ConceptCount
                      ) -> ClassWeights:
         if targets.ndim != 1 or targets.numel() == 0:
             raise LossContractError("TRAIN targets must be a non-empty one-dimensional tensor")
@@ -131,7 +134,7 @@ def optimizer_step(optimizer: torch.optim.Optimizer) -> None:
 
 @dataclass(frozen=True, slots=True)
 class NamedTensor:
-    name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    name: ModelParameterName
     value: torch.Tensor
 
 
@@ -225,11 +228,11 @@ class TrainingOutcome:
     completed_epochs: EpochCount
 
     @property
-    def epoch(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def epoch(self) -> Index:
         return self.checkpoint.epoch
 
     @property
-    def valid_macro_cross_entropy(self) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def valid_macro_cross_entropy(self) -> Score:
         return self.checkpoint.valid_macro_cross_entropy
 
 
@@ -237,7 +240,7 @@ def macro_cross_entropy(
     logits: torch.Tensor,
     targets: torch.Tensor,
     probability_log_floor: Floor,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     if logits.ndim != 2 or targets.ndim != 1 or logits.shape[0] != targets.shape[0]:
         raise TrainingError("logits and targets have incompatible shapes")
     if targets.numel() == 0:
@@ -276,7 +279,7 @@ def make_adamw(
 def _seed_training_rng(epoch_seed: RandomSeed, device: torch.device) -> None:
     cpu_state = torch.Generator().manual_seed(epoch_seed).get_state()
     torch.set_rng_state(cpu_state)
-    if device.type != "cuda": #TODO: use enum for device type
+    if device.type != RuntimeDeviceType.CUDA:
         return
     states = [
         torch.Generator(device=torch.device("cuda", index)).manual_seed(epoch_seed).get_state()

@@ -11,6 +11,7 @@ from fedorbit.datasets.edge_iiotset.validation import (
     validate_binary_multiclass_consistency,
     validate_edge_schema,
 )
+from fedorbit.types import FineLabel
 
 
 def _schema():
@@ -36,14 +37,14 @@ def test_edge_schema_validation_accepts_excluded_leakage_fields() -> None:
 
 def test_edge_binary_and_multiclass_labels_must_describe_same_partition() -> None:
     validate_binary_multiclass_consistency(
-        (LabelObservation("Normal", 0), LabelObservation("DDoS TCP", 1))
+        (LabelObservation(FineLabel("Normal"), 0), LabelObservation(FineLabel("DDoS TCP"), 1))
     )
     with pytest.raises(EdgeValidationError):
-        validate_binary_multiclass_consistency((LabelObservation("Normal", 1),))
+        validate_binary_multiclass_consistency((LabelObservation(FineLabel("Normal"), 1),))
     with pytest.raises(EdgeValidationError):
-        validate_binary_multiclass_consistency((LabelObservation("DDoS TCP", 0),))
+        validate_binary_multiclass_consistency((LabelObservation(FineLabel("DDoS TCP"), 0),))
 
 
 def test_edge_binary_label_domain_is_closed() -> None:
     with pytest.raises(EdgeValidationError):
-        validate_binary_multiclass_consistency((LabelObservation("Normal", 2),))
+        validate_binary_multiclass_consistency((LabelObservation(FineLabel("Normal"), 2),))

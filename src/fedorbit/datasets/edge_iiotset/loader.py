@@ -4,31 +4,27 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
+from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import file_sha256 as _file_sha256
-from fedorbit.types import ByteCount
+from fedorbit.types import ByteCount, DatasetRelativePath, Sha256Digest, TabularColumnName
 
 
 class EdgeLoaderError(ValueError):
     pass
 
 
-EDGE_NETWORK_RELATIVE_PATH = ( #TODO: should be in yaml and accessed through config
-    "Edge-IIoTset dataset/Selected dataset for ML and DL/DNN-EdgeIIoT-dataset.csv"
-)
-
-
 @dataclass(frozen=True, slots=True)
 class EdgeTabularFile:
-    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relative_path: DatasetRelativePath
     byte_size: ByteCount
-    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    sha256: Sha256Digest
+    columns: tuple[TabularColumnName, ...]
 
 
 def discover_edge_tabular_files(raw_root: Path) -> tuple[Path, ...]:
     if not raw_root.is_dir():
         raise FileNotFoundError(raw_root)
-    selected = raw_root / EDGE_NETWORK_RELATIVE_PATH
+    selected = raw_root / active_config().scientific.datasets.edge_iiotset_network_relative_path
     if not selected.is_file():
         raise EdgeLoaderError(f"selected Edge-IIoTset network table is absent: {selected}")
     return (selected,)
@@ -42,14 +38,14 @@ def inspect_edge_tabular_files(raw_root: Path) -> tuple[EdgeTabularFile, ...]:
             header = next(reader, None)
         if not header:
             raise EdgeLoaderError(f"empty tabular file: {path}")
-        columns = tuple(header)
+        columns = tuple(TabularColumnName(column) for column in header)
         if len(set(columns)) != len(columns):
             raise EdgeLoaderError(f"duplicate columns in {path}")
         inspected.append(
             EdgeTabularFile(
-                path.relative_to(raw_root).as_posix(),
+                DatasetRelativePath(path.relative_to(raw_root).as_posix()),
                 path.stat().st_size,
-                _file_sha256(path),
+                Sha256Digest(_file_sha256(path)),
                 columns,
             )
         )

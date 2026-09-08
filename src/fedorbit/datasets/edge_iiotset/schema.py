@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
-from fedorbit.types import DatasetId
+from fedorbit.types import DatasetId, TabularColumnName
 
 EDGE_EXCLUSIONS = frozenset(
     {
@@ -46,9 +46,12 @@ def edge_iiotset_adapter() -> DatasetAdapter:
     return DatasetAdapter(
         AdapterContract(
             DatasetId.EDGE_IIOTSET_NETWORK,
-            (expected_timestamp,),
-            (EDGE_MULTICLASS_LABEL,),
-            (EDGE_BINARY_LABEL,),
-            EDGE_EXCLUSIONS | EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
+            (TabularColumnName(expected_timestamp),),
+            (TabularColumnName(EDGE_MULTICLASS_LABEL),),
+            (TabularColumnName(EDGE_BINARY_LABEL),),
+            frozenset(
+                TabularColumnName(column)
+                for column in EDGE_EXCLUSIONS | EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS
+            ),
         )
     )

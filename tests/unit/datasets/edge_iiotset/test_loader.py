@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from fedorbit.datasets.edge_iiotset.loader import (
-    EDGE_NETWORK_RELATIVE_PATH,
-    discover_edge_tabular_files,
-    inspect_edge_tabular_files,
-)
+from fedorbit.config.loading import load_fedorbit_config
+from fedorbit.datasets.edge_iiotset.loader import discover_edge_tabular_files, inspect_edge_tabular_files
+
+
+EDGE_NETWORK_RELATIVE_PATH = load_fedorbit_config().scientific.datasets.edge_iiotset_network_relative_path
 
 
 def _write_csv(path: Path, header: str) -> None:

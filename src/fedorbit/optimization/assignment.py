@@ -6,7 +6,10 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import linear_sum_assignment
 
-from fedorbit.types import Score, Tolerance
+from fedorbit.types import Index, Score, Tolerance
+
+type AssignmentCostMatrix = NDArray[np.float64]
+type AssignmentIndexes = tuple[Index, ...]
 
 
 class AssignmentError(ValueError):
@@ -15,28 +18,28 @@ class AssignmentError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class BlockwiseAssignmentResult:
-    column_for_row: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    column_for_row: AssignmentIndexes
     objective_value: Score
 
 
 def _completion_cost(
-    costs: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fixed_rows: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fixed_rows)
-    fixed_columns: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fixed_columns)
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    costs: AssignmentCostMatrix,
+    fixed_rows: AssignmentIndexes,
+    fixed_columns: AssignmentIndexes,
+) -> Score:
     free_rows = [row for row in range(costs.shape[0]) if row not in fixed_rows]
     free_columns = [column for column in range(costs.shape[1]) if column not in fixed_columns]
     if not free_rows:
-        return 0.0
+        return Score(0.0)
     reduced = costs[np.ix_(free_rows, free_columns)]
     row_indices, column_indices = linear_sum_assignment(reduced)
     selected_rows = np.asarray(row_indices, dtype=np.intp)
     selected_columns = np.asarray(column_indices, dtype=np.intp)
-    return float(reduced[selected_rows, selected_columns].sum())
+    return Score(float(reduced[selected_rows, selected_columns].sum()))
 
 
 def solve_minimum_cost_assignment(
-    costs: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    costs: AssignmentCostMatrix,
     tie_tolerance: Tolerance,
 ) -> BlockwiseAssignmentResult:
     if costs.ndim != 2 or costs.shape[0] != costs.shape[1]:
@@ -50,13 +53,13 @@ def solve_minimum_cost_assignment(
     optimum = _completion_cost(costs, (), ())
     if not np.isfinite(optimum):
         raise AssignmentError("assignment optimum is not finite")
-    fixed_rows: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    fixed_columns: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fixed_rows: list[Index] = []
+    fixed_columns: list[Index] = []
     assigned_cost = 0.0
     for row in range(costs.shape[0]):
         for column in sorted(set(range(costs.shape[1])) - set(fixed_columns)):
-            candidate_fixed_rows = (*fixed_rows, row)
-            candidate_fixed_columns = (*fixed_columns, column)
+            candidate_fixed_rows = (*fixed_rows, Index(row))
+            candidate_fixed_columns = (*fixed_columns, Index(column))
             completion = _completion_cost(costs, candidate_fixed_rows, candidate_fixed_columns)
             partial = assigned_cost + float(costs[row, column])
             if partial + completion <= optimum + tie_tolerance:
@@ -68,5 +71,5 @@ def solve_minimum_cost_assignment(
             raise AssignmentError(f"no feasible completion found for assignment row {row}")
     return BlockwiseAssignmentResult(
         column_for_row=tuple(fixed_columns),
-        objective_value=assigned_cost,
+        objective_value=Score(assigned_cost),
     )

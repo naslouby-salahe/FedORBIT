@@ -9,7 +9,7 @@ from fedorbit.datasets.edge_iiotset.schema import (
     EDGE_MULTICLASS_LABEL,
 )
 from fedorbit.datasets.ontology import normalize_label
-from fedorbit.types import Index
+from fedorbit.types import FineLabel, Index
 
 
 class EdgeValidationError(ValueError):
@@ -18,7 +18,7 @@ class EdgeValidationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class LabelObservation:
-    multiclass_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    multiclass_label: FineLabel
     binary_label: Index
 
 

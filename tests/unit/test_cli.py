@@ -4,14 +4,12 @@ import pytest
 from typer.testing import CliRunner
 
 from fedorbit.cli import (
-    EXIT_OK,
-    EXIT_USAGE,
     CliUsageError,
     app,
     dataset_identifier,
     experiment_identifier,
 )
-from fedorbit.types import ExperimentName
+from fedorbit.types import ExitStatus, ExperimentName
 
 runner = CliRunner()
 
@@ -70,14 +68,14 @@ def test_help_lists_only_registered_commands() -> None:
 def test_no_scientific_override_options_exist() -> None:
     for option in ("--method", "--seed", "--support", "--budget", "--threshold"):
         result = runner.invoke(app, ["run", "Primary Strict Cross-Telemetry Transfer", option, "x"])
-        assert result.exit_code == EXIT_USAGE
+        assert result.exit_code == ExitStatus.USAGE
 
 
 def test_doctor_is_read_only_and_validates_environment() -> None:
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code in (0, 1)
     assert "python:" in result.output or "environment mismatch" in result.output
-    assert "lockfile" in result.output
+    assert "dependencies:" in result.output
 
 
 def test_plan_is_read_only_and_derives_catalogue() -> None:
@@ -101,12 +99,12 @@ def test_status_accepts_single_experiment() -> None:
 
 def test_status_rejects_invented_experiment() -> None:
     result = runner.invoke(app, ["status", "Invented Experiment"])
-    assert result.exit_code == EXIT_USAGE
+    assert result.exit_code == ExitStatus.USAGE
 
 
 def test_report_rejects_invented_experiment() -> None:
     result = runner.invoke(app, ["report", "Invented Experiment"])
-    assert result.exit_code == EXIT_USAGE
+    assert result.exit_code == ExitStatus.USAGE
 
 
 def test_preprocess_accepts_registered_dataset() -> None:
@@ -116,7 +114,7 @@ def test_preprocess_accepts_registered_dataset() -> None:
 
 def test_preprocess_rejects_display_name() -> None:
     result = runner.invoke(app, ["preprocess", "Edge-IIoTset"])
-    assert result.exit_code == EXIT_USAGE
+    assert result.exit_code == ExitStatus.USAGE
 
 
 def test_preprocess_accepts_overwrite_flag() -> None:
@@ -126,7 +124,7 @@ def test_preprocess_accepts_overwrite_flag() -> None:
 
 def test_run_accepts_registered_experiment() -> None:
     result = runner.invoke(app, ["run", "Mathematical Primitive Validation"])
-    assert result.exit_code == EXIT_OK
+    assert result.exit_code == ExitStatus.OK
 
 
 def test_smoke_accepts_overwrite_flag() -> None:

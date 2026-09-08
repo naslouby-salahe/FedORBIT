@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from fedorbit.datasets.common import AdapterSchema, FieldRole
 from fedorbit.datasets.ontology import normalize_label
 from fedorbit.datasets.ton_iot.components import TonIotComponent
-from fedorbit.types import Index
+from fedorbit.types import FineLabel, Index
 
 
 class TonIotValidationError(ValueError):
@@ -14,7 +14,7 @@ class TonIotValidationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TonIotLabelObservation:
-    multiclass_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    multiclass_label: FineLabel
     binary_label: Index
 
 

@@ -10,7 +10,7 @@ from fedorbit.datasets.ton_iot.validation import (
     validate_ton_iot_label_consistency,
     validate_ton_iot_schema,
 )
-from fedorbit.types import DatasetId
+from fedorbit.types import DatasetId, FineLabel
 
 
 def test_ton_schema_validation_matches_selected_component() -> None:
@@ -39,7 +39,10 @@ def test_ton_schema_validation_rejects_component_identity_mismatch() -> None:
 
 def test_ton_binary_and_multiclass_labels_must_describe_same_partition() -> None:
     validate_ton_iot_label_consistency(
-        (TonIotLabelObservation("normal", 0), TonIotLabelObservation("ddos", 1))
+        (
+            TonIotLabelObservation(FineLabel("normal"), 0),
+            TonIotLabelObservation(FineLabel("ddos"), 1),
+        )
     )
     with pytest.raises(TonIotValidationError):
-        validate_ton_iot_label_consistency((TonIotLabelObservation("normal", 1),))
+        validate_ton_iot_label_consistency((TonIotLabelObservation(FineLabel("normal"), 1),))

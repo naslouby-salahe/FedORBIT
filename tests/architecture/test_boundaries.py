@@ -11,7 +11,7 @@ from tests.architecture.scan import (
 )
 
 ALLOWED_TEST_IMPORTS = {"tests", "fedorbit"}
-PERMITTED_UPWARD_EDGES = {("datasets.common", "infrastructure.execution")}
+PERMITTED_UPWARD_EDGES: set[tuple[str, str]] = set()
 
 
 def test_no_higher_layer_imports() -> None:
@@ -107,8 +107,7 @@ def test_leaf_packages_do_not_import_execution_or_cli() -> None:
             or (target_package.startswith("analysis.") and target_package != "analysis.metrics")
             or (
                 target_package.startswith("infrastructure.")
-                and target_package != "infrastructure.runtime"
-                and (source_package, target_package) != ("datasets", "infrastructure.execution")
+                and target_package not in ("infrastructure.runtime", "infrastructure.storage")
             )
         ):
             raise AssertionError(

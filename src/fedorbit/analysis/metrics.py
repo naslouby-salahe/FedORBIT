@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
     ByteCount,
+    ClassIndex,
     ElapsedSeconds,
+    EfficiencyMetricName,
     Estimate,
     Fraction,
     Index,
@@ -128,27 +130,31 @@ def relative_macro_ce_gain(
     )
 
 
-def precision_from_counts(true_positives: int, false_positives: int) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: true_positives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: false_positives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def precision_from_counts(true_positives: Index, false_positives: Index) -> Fraction:
     denominator = true_positives + false_positives
     if denominator == 0:
-        return 0.0
-    return true_positives / denominator
+        return Fraction(0.0)
+    return Fraction(true_positives / denominator)
 
 
-def recall_from_counts(true_positives: int, false_negatives: int) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: true_positives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: false_negatives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def recall_from_counts(true_positives: Index, false_negatives: Index) -> Fraction:
     denominator = true_positives + false_negatives
     if denominator == 0:
-        return 0.0
-    return true_positives / denominator
+        return Fraction(0.0)
+    return Fraction(true_positives / denominator)
 
 
-def f1_from_counts(true_positives: int, false_positives: int, false_negatives: int) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: true_positives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: false_positives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: false_negatives)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def f1_from_counts(
+    true_positives: Index,
+    false_positives: Index,
+    false_negatives: Index,
+) -> Fraction:
     precision_value = precision_from_counts(true_positives, false_positives)
     recall_value = recall_from_counts(true_positives, false_negatives)
     denominator = precision_value + recall_value
     if denominator == 0:
-        return 0.0
-    return 2 * precision_value * recall_value / denominator
+        return Fraction(0.0)
+    return Fraction(2 * precision_value * recall_value / denominator)
 
 
 def macro_f1(per_class_f1: ClassF1Set) -> ClassF1:
@@ -161,15 +167,15 @@ def balanced_accuracy(per_class_recall: ClassRecallSet) -> ClassRecall:
 
 @dataclass(frozen=True, slots=True)
 class ConfusionCounts:
-    true_positives: SampleCount
-    false_positives: SampleCount
-    false_negatives: SampleCount
+    true_positives: Index
+    false_positives: Index
+    false_negatives: Index
 
 
 def confusion_counts(
-    predicted_labels: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: predicted_labels)
-    true_labels: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: true_labels)
-    positive_class: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: positive_class)
+    predicted_labels: tuple[ClassIndex, ...],
+    true_labels: tuple[ClassIndex, ...],
+    positive_class: ClassIndex,
 ) -> ConfusionCounts:
     if len(predicted_labels) != len(true_labels):
         raise MetricComputationError("prediction and label counts differ")
@@ -188,30 +194,30 @@ def confusion_counts(
         for predicted, actual in zip(predicted_labels, true_labels, strict=True)
         if actual == positive_class and predicted != positive_class
     )
-    return ConfusionCounts(true_positives, false_positives, false_negatives)
+    return ConfusionCounts(
+        Index(true_positives),
+        Index(false_positives),
+        Index(false_negatives),
+    )
 
 
 def certified_robust_predicted_value(certified_objective: Score) -> Score:
     return certified_objective
 
 
-def fixed_action_rectangularization_gap_metric(gap: float#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: gap)
-                                               ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def fixed_action_rectangularization_gap_metric(gap: Score) -> Score:
     return gap
 
 
-def robust_coupling_value_gap_metric(gap: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: gap)
-                                     ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def robust_coupling_value_gap_metric(gap: Score) -> Score:
     return gap
 
 
-def coupling_upper_bound_diagnostic_metric(value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-                                           ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def coupling_upper_bound_diagnostic_metric(value: Score) -> Score:
     return value
 
 
-def exact_map_action_value_metric(delta_map: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: delta_map)
-                                  ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def exact_map_action_value_metric(delta_map: Score) -> Score:
     return delta_map
 
 
@@ -222,9 +228,9 @@ def absolute_objective_error(objective_value: Score, truth_value: Score) -> Scor
 def relative_objective_error(
     objective_value: Score,
     truth_value: Score,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> RelativeGain:
     floor = active_config().scientific.metrics.relative_solver_error_denominator_floor
-    return abs(objective_value - truth_value) / max(abs(truth_value), floor)
+    return RelativeGain(abs(objective_value - truth_value) / max(abs(truth_value), floor))
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,28 +278,28 @@ def proposal_rates(tally: ProposalOutcomeTally) -> ProposalRates:
     )
 
 
-def confirmation_coverage(live_transfer_decisions: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: live_transfer_decisions)
-                          , eligible_decisions: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: eligible_decisions)
-                          ) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def confirmation_coverage(
+    live_transfer_decisions: Index,
+    eligible_decisions: Index,
+) -> Fraction | None:
     if eligible_decisions == 0:
         return None
-    return live_transfer_decisions / eligible_decisions
+    return Fraction(live_transfer_decisions / eligible_decisions)
 
 
-def no_confirmation_coverage(eligible_decisions: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: eligible_decisions)
-                             ) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None:
     if eligible_decisions == 0:
         return None
-    return 1.0
+    return Fraction(1.0)
 
 
 def coverage_loss(
-    coverage_no_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coverage_no_confirm)
-    coverage_confirm: float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coverage_confirm)
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    coverage_no_confirm: Fraction | None,
+    coverage_confirm: Fraction | None,
+) -> RelativeGain | None:
     if coverage_no_confirm is None or coverage_confirm is None:
         return None
-    return coverage_no_confirm - coverage_confirm
+    return RelativeGain(coverage_no_confirm - coverage_confirm)
 
 
 def harm_indicator(test_gain: RelativeGain, harmful_threshold: Threshold) -> bool:
@@ -302,66 +308,66 @@ def harm_indicator(test_gain: RelativeGain, harmful_threshold: Threshold) -> boo
 
 def seed_harm_rate(
     decision_gains: tuple[RelativeGain, ...], harmful_threshold: Threshold
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Fraction | None:
     if not decision_gains:
         return None
     indicators = [harm_indicator(gain, harmful_threshold) for gain in decision_gains]
-    return sum(1 for indicator in indicators if indicator) / len(indicators)
+    return Fraction(sum(1 for indicator in indicators if indicator) / len(indicators))
 
 
 def absolute_risk_reduction(
-    harm_rate_no_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: harm_rate_no_confirm)
-    harm_rate_confirm: float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: harm_rate_confirm)
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    harm_rate_no_confirm: Fraction | None,
+    harm_rate_confirm: Fraction | None,
+) -> RelativeGain | None:
     if harm_rate_no_confirm is None or harm_rate_confirm is None:
         return None
-    return harm_rate_no_confirm - harm_rate_confirm
+    return RelativeGain(harm_rate_no_confirm - harm_rate_confirm)
 
 
 def relative_risk_reduction(
-    harm_rate_no_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: harm_rate_no_confirm)
-    risk_reduction: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: risk_reduction)
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    harm_rate_no_confirm: Fraction | None,
+    risk_reduction: RelativeGain | None,
+) -> RelativeGain | None:
     if harm_rate_no_confirm is None or risk_reduction is None or harm_rate_no_confirm <= 0.0:
         return None
-    return risk_reduction / harm_rate_no_confirm
+    return RelativeGain(risk_reduction / harm_rate_no_confirm)
 
 
 def beneficial_rejected_rate(
     rejected_with_counterfactual_gain: Index,
     proposed: SampleCount,
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Fraction | None:
     if proposed == 0:
         return None
-    return rejected_with_counterfactual_gain / proposed
+    return Fraction(rejected_with_counterfactual_gain / proposed)
 
 
-def pair_mean(values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)
-              ) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def pair_mean(values: tuple[RelativeGain, ...]) -> RelativeGain | None:
     if not values:
         return None
-    return statistics.fmean(values)
+    return RelativeGain(statistics.fmean(values))
 
 
-def equal_pair_mean(pair_means_values: tuple[float | None, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pair_means_values)
-                    ) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def equal_pair_mean(
+    pair_means_values: tuple[RelativeGain | None, ...],
+) -> RelativeGain | None:
     present = [value for value in pair_means_values if value is not None]
     if not present:
         return None
-    return statistics.fmean(present)
+    return RelativeGain(statistics.fmean(present))
 
 
 def equal_pair_absolute_risk_reduction(
-    equal_pair_harm_no_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: equal_pair_harm_no_confirm)
-    equal_pair_harm_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: equal_pair_harm_confirm)
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    equal_pair_harm_no_confirm: Fraction | None,
+    equal_pair_harm_confirm: Fraction | None,
+) -> RelativeGain | None:
     return absolute_risk_reduction(equal_pair_harm_no_confirm, equal_pair_harm_confirm)
 
 
 def equal_pair_relative_risk_reduction(
-    equal_pair_harm_no_confirm: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: equal_pair_harm_no_confirm)
-    equal_pair_risk_reduction: float | None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: equal_pair_risk_reduction)
-) -> float | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    equal_pair_harm_no_confirm: Fraction | None,
+    equal_pair_risk_reduction: RelativeGain | None,
+) -> RelativeGain | None:
     return relative_risk_reduction(equal_pair_harm_no_confirm, equal_pair_risk_reduction)
 
 
@@ -386,12 +392,12 @@ class EfficiencyRecord:
             raise EfficiencyError("wall time must be finite and nonnegative")
         if not math.isfinite(self.peak_host_rss_mib) or self.peak_host_rss_mib < 0.0:
             raise EfficiencyError("peak host RSS must be finite and nonnegative")
-        for name, value in ( #TODO: name should be enum values
-            ("CUDA bytes", self.peak_cuda_allocated_bytes),
-            ("packet bytes", self.packet_serialized_byte_count),
-            ("source response steps", self.source_response_optimizer_steps),
-            ("confirmation steps", self.target_confirmation_optimizer_steps),
-            ("assimilation steps", self.live_assimilation_optimizer_steps),
+        for name, value in (
+            (EfficiencyMetricName.CUDA_BYTES, self.peak_cuda_allocated_bytes),
+            (EfficiencyMetricName.PACKET_BYTES, self.packet_serialized_byte_count),
+            (EfficiencyMetricName.SOURCE_RESPONSE_STEPS, self.source_response_optimizer_steps),
+            (EfficiencyMetricName.CONFIRMATION_STEPS, self.target_confirmation_optimizer_steps),
+            (EfficiencyMetricName.ASSIMILATION_STEPS, self.live_assimilation_optimizer_steps),
         ):
             if value < 0:
-                raise EfficiencyError(f"{name} must be nonnegative")
+                raise EfficiencyError(f"{name.value} must be nonnegative")

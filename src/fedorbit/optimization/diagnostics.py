@@ -21,38 +21,41 @@ from fedorbit.optimization.objective import (
     robust_post_map_value,
     robust_pre_map_value,
 )
-from fedorbit.types import Index, Score, Tolerance
+from fedorbit.types import Score, Tolerance
+
+type ResponseMatrix = NDArray[np.float64]
+type BlockMeans = tuple[Score, Score]
 
 
 def fixed_action_rectangularization_gap(
     alpha: CurriculumAction,
     orbit: Sequence[BlockCorrespondence],
-    lower_hull: NDArray[np.float64],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    lower_hull: ResponseMatrix,
+) -> Score:
     gap = h_orb(alpha, orbit) - h_rect(alpha, lower_hull)
     if gap < 0.0:
         raise ActionSpaceError(
             f"fixed-action rectangularization gap must be nonnegative, got {gap}"
         )
-    return gap
+    return Score(gap)
 
 
 def _same_group_block_means(
     block_entries: NDArray[np.float64],
-) -> tuple[float, float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> BlockMeans:
     diagonal_mean = float(np.mean(np.diag(block_entries)))
     off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
     off_diagonal_values = block_entries[off_diagonal_mask]
     off_diagonal_mean = float(np.mean(off_diagonal_values)) if off_diagonal_values.size else 0.0
-    return diagonal_mean, off_diagonal_mean
+    return Score(diagonal_mean), Score(off_diagonal_mean)
 
 
 def _fill_target_block(
-    mean: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    mean: ResponseMatrix,
     targets_rows: range,
     targets_columns: range,
-    fill_diagonal: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fill_diagonal)
-    fill_off_diagonal: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fill_off_diagonal)
+    fill_diagonal: Score,
+    fill_off_diagonal: Score,
 ) -> None:
     for target_k in targets_rows:
         for target_j in targets_columns:
@@ -62,8 +65,8 @@ def _fill_target_block(
 
 def analytic_orbit_mean(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_matrix: ResponseMatrix,
+) -> ResponseMatrix:
     size = blocks.total_padded_nodes
     if response_matrix.shape != (size, size):
         raise ActionSpaceError("response matrix shape mismatch for analytic orbit mean")
@@ -78,7 +81,7 @@ def analytic_orbit_mean(
                 diagonal_mean, off_diagonal_mean = _same_group_block_means(block_entries)
                 _fill_target_block(mean, rows, columns, diagonal_mean, off_diagonal_mean)
             else:
-                block_mean = float(np.mean(block_entries))
+                block_mean = Score(float(np.mean(block_entries)))
                 _fill_target_block(mean, rows, columns, block_mean, block_mean)
     return mean
 
@@ -90,7 +93,7 @@ class OrbitRadius:
 
 def orbit_radius_2_norm(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_matrix: ResponseMatrix,
 ) -> OrbitRadius:
     mean = analytic_orbit_mean(blocks, response_matrix)
     radius = 0.0
@@ -98,7 +101,7 @@ def orbit_radius_2_norm(
         permuted = correspondence.permute_response_matrix(response_matrix)
         spectral = float(np.linalg.norm(permuted - mean, ord=2))
         radius = max(radius, spectral)
-    return OrbitRadius(radius=radius)
+    return OrbitRadius(radius=Score(radius))
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,33 +148,3 @@ def map_value_diagnostics(
             f"exact-map action value {delta_map} exceeds orbit-radius bound {bound}"
         )
     return diagnostics
-
-
-@dataclass(frozen=True, slots=True)
-class CouplingUpperBoundDiagnostic: #TODO: DELETE THIS NOW
-    value: Score
-
-
-def coupling_upper_bound_diagnostic( #TODO: DELETE THIS NOW
-    action_candidates: Sequence[CurriculumAction],
-    problem: RobustActionProblem,
-    hull_lower_bounds: NDArray[np.float64],#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    hull_upper_bounds: NDArray[np.float64],#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-) -> CouplingUpperBoundDiagnostic:
-    expected = (problem.size, problem.size)
-    if hull_lower_bounds.shape != expected or hull_upper_bounds.shape != expected:
-        raise ActionSpaceError("hull bounds shape mismatch for coupling upper-bound diagnostic")
-    width = hull_upper_bounds - hull_lower_bounds
-    best = -math.inf
-    for candidate in action_candidates:
-        value = float(problem.target_importance @ width @ candidate.coordinates)
-        best = max(best, value)
-    if math.isinf(best):
-        raise ActionSpaceError(
-            "coupling upper-bound diagnostic requires at least one candidate action"
-        )
-    return CouplingUpperBoundDiagnostic(value=best)
-
-
-def orbit_is_nontrivial(orbit_size: Index) -> bool: #TODO: DELETE THIS NOW
-    return orbit_size > 1

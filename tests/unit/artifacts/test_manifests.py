@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from fedorbit.datasets.common import file_sha256
 from fedorbit.infrastructure.execution import ArtifactStore, StorageError
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
@@ -17,7 +18,6 @@ from fedorbit.infrastructure.manifests import (
     completion_manifest_self_hash,
     dependency_fingerprint,
     eligibility_copy,
-    file_sha256,
 )
 from fedorbit.infrastructure.reuse import ArtifactValidationError
 from fedorbit.types import ArtifactIdentifier, ArtifactStage, ArtifactState, TerminalState
@@ -52,7 +52,7 @@ def _completion_payload() -> dict[str, object]:
 
 def _reusable_payload() -> dict[str, object]:
     return {
-        "artifact_id": "id",
+        "artifact_id": ArtifactIdentifier("id"),
         "artifact_type": "prepared_split",
         "semantic_producer_coordinates": "{}",
         "producer_stage": "preprocessing",
@@ -168,10 +168,10 @@ def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -
         }
     )
     store.write_reusable(manifest)
-    assert store.resolve(ArtifactIdentifier(manifest.artifact_id)) == manifest
+    assert store.resolve(manifest.artifact_id) == manifest
     payload.write_bytes(b"corrupted")
     with pytest.raises(ArtifactValidationError):
-        store.resolve(ArtifactIdentifier(manifest.artifact_id))
+        store.resolve(manifest.artifact_id)
 
 
 def test_completion_manifest_self_hash_excludes_own_field() -> None:
@@ -198,13 +198,17 @@ DATASET_FIELDS = {
     "accepted_schema_aliases": (),
     "adapter_adaptations": (),
     "timestamp_field": "frame.time",
-    "timestamp_range": ("2020-01-01", "2020-01-02"),
+    "timestamp_range": (1577836800.0, 1577923200.0),
     "duplicate_counts": {"group-a": 2},
     "conflicting_duplicate_counts": {},
     "local_class_counts": {"normal": 50, "ddos_tcp": 50},
     "transfer_candidate_counts": {"DDoS": 50},
-    "feature_quality": {"dropped": 0},
-    "preprocessing_state": "completed",
+    "feature_quality": {
+        "dropped_feature_count": 0,
+        "candidate_count_before_filtering": 1,
+        "client_invalid": False,
+    },
+    "preprocessing_state": "materialized",
     "dependency_fingerprint_sha256": "b" * 64,
     "producer_code_sha256": "c" * 64,
 }
@@ -317,11 +321,11 @@ def test_completed_storage_records_matching_completion_last(tmp_path: Path) -> N
     )
     store = ArtifactStore(tmp_path / "outputs")
     store.write_completed(manifest, completion)
-    assert store.read_completion(ArtifactIdentifier(manifest.artifact_id)) == completion
-    assert store.resolve(ArtifactIdentifier(manifest.artifact_id)) == manifest
-    store.completion_path(ArtifactIdentifier(manifest.artifact_id)).unlink()
+    assert store.read_completion(manifest.artifact_id) == completion
+    assert store.resolve(manifest.artifact_id) == manifest
+    store.completion_path(manifest.artifact_id).unlink()
     with pytest.raises(StorageError, match="no completion manifest"):
-        store.resolve(ArtifactIdentifier(manifest.artifact_id))
+        store.resolve(manifest.artifact_id)
 
 
 def test_completed_storage_rejects_incompatible_completion(tmp_path: Path) -> None:

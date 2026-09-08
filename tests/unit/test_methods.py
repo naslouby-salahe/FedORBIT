@@ -8,18 +8,19 @@ from fedorbit.methods.target import (
     select_source_sequentially,
     without_confirmation_selection,
 )
+from fedorbit.types import Score, SourceClientName
 
 
-def _proposal(name: str, value: float) -> SourceProposal:
+def _proposal(name: SourceClientName, value: Score) -> SourceProposal:
     return SourceProposal(source_client_name=name, certified_robust_value=value)
 
 
 def test_nonpositive_proposals_discarded_before_ranking() -> None:
     ranked = rank_source_proposals(
         (
-            _proposal("edge", -0.5),
-            _proposal("windows", 0.0),
-            _proposal("linux", 0.25),
+            _proposal(SourceClientName("edge"), Score(-0.5)),
+            _proposal(SourceClientName("windows"), Score(0.0)),
+            _proposal(SourceClientName("linux"), Score(0.25)),
         ),
     )
     assert len(ranked) == 1
@@ -30,9 +31,9 @@ def test_nonpositive_proposals_discarded_before_ranking() -> None:
 def test_descending_value_order_with_stable_client_name_ties() -> None:
     ranked = rank_source_proposals(
         (
-            _proposal("ton_network", 0.3),
-            _proposal("zeta", 0.5),
-            _proposal("alpha", 0.5),
+            _proposal(SourceClientName("ton_network"), Score(0.3)),
+            _proposal(SourceClientName("zeta"), Score(0.5)),
+            _proposal(SourceClientName("alpha"), Score(0.5)),
         ),
     )
     assert [entry.proposal.source_client_name for entry in ranked] == [
@@ -47,7 +48,9 @@ def test_maximum_proposal_cap_enforced_from_configuration() -> None:
     config = load_fedorbit_config()
     maximum = config.scientific.action.maximum_source_proposals_per_target
     assert maximum == 3
-    candidates = tuple(_proposal(f"source_{i}", 0.9 - i * 0.05) for i in range(6))
+    candidates = tuple(
+        _proposal(SourceClientName(f"source_{i}"), Score(0.9 - i * 0.05)) for i in range(6)
+    )
     ranked = rank_source_proposals(candidates)
     assert len(ranked) == maximum
     assert all(entry.rank <= maximum for entry in ranked)
@@ -56,14 +59,14 @@ def test_maximum_proposal_cap_enforced_from_configuration() -> None:
 def test_sequential_confirmation_stops_at_first_accept() -> None:
     ranked = rank_source_proposals(
         (
-            _proposal("first", 0.9),
-            _proposal("second", 0.7),
-            _proposal("third", 0.5),
+            _proposal(SourceClientName("first"), Score(0.9)),
+            _proposal(SourceClientName("second"), Score(0.7)),
+            _proposal(SourceClientName("third"), Score(0.5)),
         ),
     )
     decision = select_source_sequentially(
         ranked,
-        lambda proposal: proposal.source_client_name == "second",
+        lambda proposal: proposal.source_client_name == SourceClientName("second"),
     )
     assert not decision.remained_local_only
     assert decision.accepted_rank == 2
@@ -75,7 +78,10 @@ def test_sequential_confirmation_stops_at_first_accept() -> None:
 
 def test_no_accepted_candidate_remains_local_only() -> None:
     ranked = rank_source_proposals(
-        tuple(_proposal(f"source_{i}", 0.5 - i * 0.1) for i in range(4)),
+        tuple(
+            _proposal(SourceClientName(f"source_{i}"), Score(0.5 - i * 0.1))
+            for i in range(4)
+        ),
     )
     decision = select_source_sequentially(ranked, lambda _proposal: False)
     assert decision.remained_local_only
@@ -95,8 +101,8 @@ def test_empty_candidates_remain_local_only() -> None:
 def test_without_confirmation_selection_accepts_the_first_positive_proposal() -> None:
     ranked = rank_source_proposals(
         (
-            _proposal("first", 0.9),
-            _proposal("second", 0.5),
+            _proposal(SourceClientName("first"), Score(0.9)),
+            _proposal(SourceClientName("second"), Score(0.5)),
         ),
     )
     decision = without_confirmation_selection(ranked)
@@ -119,7 +125,7 @@ def test_principal_cost_coefficients_are_zero_and_validated() -> None:
     )
     try:
         with configured(nonzero):
-            rank_source_proposals((_proposal("edge", 0.4),))
+            rank_source_proposals((_proposal(SourceClientName("edge"), Score(0.4)),))
     except SelectionError:
         pass
     else:
@@ -128,9 +134,9 @@ def test_principal_cost_coefficients_are_zero_and_validated() -> None:
 
 def test_ranking_is_deterministic() -> None:
     candidates = (
-        _proposal("b", 0.4),
-        _proposal("a", 0.6),
-        _proposal("c", 0.2),
+        _proposal(SourceClientName("b"), Score(0.4)),
+        _proposal(SourceClientName("a"), Score(0.6)),
+        _proposal(SourceClientName("c"), Score(0.2)),
     )
     first = rank_source_proposals(candidates)
     second = rank_source_proposals(tuple(reversed(candidates)))

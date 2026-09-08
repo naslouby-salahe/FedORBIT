@@ -26,13 +26,26 @@ from fedorbit.response.estimation import (
 )
 from fedorbit.response.pilot import PilotData
 from fedorbit.types import (
+    ClassIndex,
     Coefficient,
+    ConfidenceLevel,
     ConceptCount,
     Estimate,
+    Floor,
     Index,
+    InterventionMagnitude,
+    ReplicateCount,
+    ResampleCount,
+    ResponseSeedStage,
     StableJsonPayload,
     StandardError,
 )
+
+
+type NativeClassSet = tuple[ClassIndex, ...]
+type NativeClassSets = tuple[NativeClassSet, ...]
+type DerivativeSeries = tuple[Estimate, ...]
+type EntryDerivatives = tuple[DerivativeSeries, ...]
 
 
 class ResponseUncertaintyError(ValueError):
@@ -60,12 +73,12 @@ class FinalResponseEstimate:
 
 
 def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, resamples) - pure, deterministic (functools.lru_cache)
-    entry_derivatives: tuple[tuple[float, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entry_derivatives)
+    entry_derivatives: EntryDerivatives,
     seed: RandomSeed,
-    resamples: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: resamples)
-    confidence_level: float | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confidence_level)
-    standard_error_floor: float | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: standard_error_floor)
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    resamples: ResampleCount | None = None,
+    confidence_level: ConfidenceLevel | None = None,
+    standard_error_floor: Floor | None = None,
+) -> Estimate:
     final = active_config().scientific.source_response_final
     resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
     level = (
@@ -106,24 +119,24 @@ def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, 
         )
     )
     rng = torch.Generator().manual_seed(bootstrap_seed)
-    maxima: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    for _ in range(resample_count):
-        indices = tuple(
-            int(torch.randint(0, replicate_count, (1,), generator=rng)[0]) #TODO: PERF: draw all replicate indices in one torch.randint((resample_count, replicate_count)) tensor and vectorize the reduction
-            for _ in range(replicate_count)
-        )
-        studentized: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        for entry_index, values in enumerate(entry_derivatives):
-            resampled = tuple(values[index] for index in indices)
-            bootstrap_mean = statistics.fmean(resampled)
-            bootstrap_se = standard_error(resampled)
-            studentized.append(
-                abs(bootstrap_mean - means[entry_index]) / max(bootstrap_se, se_floor)
-            )
-        maxima.append(max(studentized))
+    derivatives = np.asarray(entry_derivatives, dtype=np.float64)
+    bootstrap_indices = torch.randint(
+        0,
+        replicate_count,
+        (resample_count, replicate_count),
+        generator=rng,
+    ).numpy()
+    resampled = derivatives[:, bootstrap_indices]
+    bootstrap_means = np.mean(resampled, axis=2)
+    bootstrap_standard_errors = np.std(resampled, axis=2, ddof=1) / math.sqrt(replicate_count)
+    studentized = np.abs(bootstrap_means - np.asarray(means)[:, None]) / np.maximum(
+        bootstrap_standard_errors,
+        se_floor,
+    )
+    maxima = np.max(studentized, axis=0)
     return float(
         np.quantile(
-            np.asarray(maxima, dtype=np.float64),
+            maxima,
             level,
             method="higher",
         )
@@ -134,7 +147,7 @@ def estimate_final_response(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    intervention_classes: NativeClassSets,
     settings: ShadowSettings,
     seed: RandomSeed,
 ) -> FinalResponseEstimate:
@@ -149,7 +162,7 @@ def estimate_final_response(
         replicate_count=final.paired_replicates_per_intervention,
         bootstrap_resamples=final.max_t_bootstrap_resamples,
         confidence_level=final.simultaneous_confidence_level,
-        seed_stage="final-source-response",
+        seed_stage=ResponseSeedStage("final-source-response"),
     )
 
 
@@ -157,14 +170,14 @@ def estimate_response_bands(
     model: torch.nn.Module,
     checkpoint: BaseCheckpoint,
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    intervention_classes: NativeClassSets,
     settings: ShadowSettings,
     seed: RandomSeed,
     *,
-    replicate_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: replicate_count)
-    bootstrap_resamples: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: bootstrap_resamples)
-    confidence_level: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confidence_level)
-    seed_stage: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed_stage)
+    replicate_count: ReplicateCount,
+    bootstrap_resamples: ResampleCount,
+    confidence_level: ConfidenceLevel,
+    seed_stage: ResponseSeedStage,
 ) -> FinalResponseEstimate:
     final = active_config().scientific.source_response_final
     outcome_count = len(data.outcome_native_class_sets)
@@ -175,7 +188,10 @@ def estimate_response_bands(
         raise ResponseUncertaintyError(
             "response estimation requires at least two paired replicates"
         )
-    accumulated: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this #TODO: PERF: accumulate bootstrap statistics in a preallocated numpy/torch array instead of python list-of-lists append per replicate
+    accumulated = np.empty(
+        (outcome_count * intervention_count, replicate_count),
+        dtype=np.float64,
+    )
     for replicate in range(replicate_count):
         for intervention_index, concept_classes in enumerate(intervention_classes):
             shadow_data = ShadowData(
@@ -225,7 +241,7 @@ def estimate_response_bands(
                         "non-finite shadow state or loss in response estimation"
                     )
                 entry_index = outcome_index * intervention_count + intervention_index
-                accumulated[entry_index].append(derivative)
+                accumulated[entry_index, replicate] = derivative
     entry_derivatives = tuple(tuple(values) for values in accumulated)
     means = tuple(statistics.fmean(values) for values in entry_derivatives)
     standard_errors = tuple(standard_error(values) for values in entry_derivatives)
@@ -260,15 +276,15 @@ def estimate_response_bands(
 
 
 def _build_final_entries(
-    outcome_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: outcome_count)
-    intervention_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_count)
-    means: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: means)
-    standard_errors: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: standard_errors)
-    critical: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: critical)
-) -> tuple[list[FinalResponseEntry], set[int]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    outcome_count: ConceptCount,
+    intervention_count: ConceptCount,
+    means: DerivativeSeries,
+    standard_errors: tuple[StandardError, ...],
+    critical: Estimate,
+) -> tuple[list[FinalResponseEntry], set[Index]]:
     final = active_config().scientific.source_response_final
     entries: list[FinalResponseEntry] = []
-    useful_columns: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    useful_columns: set[Index] = set()
     for outcome in range(outcome_count):
         for intervention in range(intervention_count):
             entry_index = outcome * intervention_count + intervention

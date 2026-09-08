@@ -4,46 +4,28 @@ from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
-from fedorbit.types import DatasetId
+from fedorbit.types import ClientComponentName, DatasetId, DatasetRelativePath, TabularColumnName
 
 
 @dataclass(frozen=True, slots=True)
 class TonIotComponent:
     dataset_id: DatasetId
-    component_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    relative_paths: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    component_name: ClientComponentName
+    relative_paths: tuple[DatasetRelativePath, ...]
 
 
-TON_COMPONENTS = ( #TODO: should be in yaml and accessed through config
-    TonIotComponent(
-        DatasetId.TON_IOT_WINDOWS10_HOST,
-        "windows10_host",
-        ("Processed_datasets/Processed_Windows_dataset/windows10_dataset.csv",),
-    ),
-    TonIotComponent(
-        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
-        "linux_process",
-        (
-            "Processed_datasets/Processed_Linux_dataset/Linux_process_1.csv",
-            "Processed_datasets/Processed_Linux_dataset/Linux_process_2.csv",
-        ),
-    ),
-    TonIotComponent(
-        DatasetId.TON_IOT_NETWORK,
-        "network",
-        tuple(
-            f"Processed_datasets/Processed_Network_dataset/Network_dataset_{index}.csv"
-            for index in range(1, 24)
-        ),
-    ),
-)
+def ton_iot_components() -> tuple[TonIotComponent, ...]:
+    return tuple(
+        TonIotComponent(dataset_id, component.component_name, component.relative_paths)
+        for dataset_id, component in active_config().scientific.datasets.ton_iot_components.items()
+    )
 
 
 def component_for(dataset_id: DatasetId) -> TonIotComponent:
-    for component in TON_COMPONENTS:
-        if component.dataset_id == dataset_id:
-            return component
-    raise ValueError(f"dataset is not a ToN-IoT client: {dataset_id.value}")
+    component = active_config().scientific.datasets.ton_iot_components.get(dataset_id)
+    if component is None:
+        raise ValueError(f"dataset is not a ToN-IoT client: {dataset_id.value}")
+    return TonIotComponent(dataset_id, component.component_name, component.relative_paths)
 
 
 def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
@@ -53,8 +35,8 @@ def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
     return DatasetAdapter(
         AdapterContract(
             dataset_id,
-            (expected_timestamp,),
-            ("type",),
-            ("label",),
+            (TabularColumnName(expected_timestamp),),
+            (TabularColumnName("type"),),
+            (TabularColumnName("label"),),
         )
     )

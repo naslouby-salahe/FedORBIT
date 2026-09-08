@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 import resource
 import subprocess
 import time
@@ -13,20 +12,62 @@ from datetime import datetime
 from typing import cast
 
 import numpy as np
+import psutil
+import structlog
 import torch
+from structlog.typing import FilteringBoundLogger
 
 from fedorbit.config.loading import active_config, repository_root
 from fedorbit.infrastructure.environment import EnvironmentSnapshot
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactState,
+    ByteCount,
+    DatasetId,
     DerivedSeed,
+    ElapsedSeconds,
+    ExecutionStageName,
+    ExperimentName,
+    GitRevision,
+    MemoryMib,
     RandomSeed,
+    ReuseDecision,
     RngNamespace,
     SemanticCoordinates,
+    SerializedPacket,
+    Sha256Digest,
     StableJsonPayload,
+    TorchPrecision,
     stable_json,
 )
+
+OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO = 35.0
+MAXIMUM_MEMORY_BUDGET_FRACTION = 0.65
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryBudgetEstimate:
+    raw_bytes: ByteCount
+    estimated_peak_bytes: ByteCount
+    available_bytes: ByteCount
+    budget_bytes: ByteCount
+
+    @property
+    def within_budget(self) -> bool:
+        return self.estimated_peak_bytes <= self.budget_bytes
+
+
+def estimate_memory_budget(raw_bytes: ByteCount) -> MemoryBudgetEstimate:
+    available_bytes: ByteCount = psutil.virtual_memory().available
+    estimated_peak_bytes: ByteCount = round(raw_bytes * OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO)
+    budget_bytes: ByteCount = round(available_bytes * MAXIMUM_MEMORY_BUDGET_FRACTION)
+    return MemoryBudgetEstimate(
+        raw_bytes=raw_bytes,
+        estimated_peak_bytes=estimated_peak_bytes,
+        available_bytes=available_bytes,
+        budget_bytes=budget_bytes,
+    )
+
 
 _set_deterministic_algorithms = cast(Callable[[bool], None], torch.use_deterministic_algorithms)
 
@@ -42,11 +83,11 @@ class DeterministicBackendState:
     cudnn_deterministic: bool
     matmul_allow_tf32: bool
     cudnn_allow_tf32: bool
-    matmul_fp32_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    conv_fp32_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    matmul_fp32_precision: TorchPrecision
+    conv_fp32_precision: TorchPrecision
     stochastic_rounding: bool
-    default_dtype: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    float32_matmul_precision: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    default_dtype: TorchPrecision
+    float32_matmul_precision: TorchPrecision
 
 
 def require_cuda() -> None:
@@ -93,9 +134,9 @@ def test_determinism() -> Generator[None]:
 
 @dataclass(slots=True)
 class EfficiencyMeasurement:
-    wall_time_seconds: float = 0.0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    peak_host_rss_mib: float = 0.0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    peak_cuda_allocated_bytes: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    wall_time_seconds: ElapsedSeconds = 0.0
+    peak_host_rss_mib: MemoryMib = 0.0
+    peak_cuda_allocated_bytes: ByteCount = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,8 +144,8 @@ class _EfficiencyMeasurementHandle:
     result: EfficiencyMeasurement = field(default_factory=EfficiencyMeasurement)
 
 
-def _peak_host_rss_mib() -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+def _peak_host_rss_mib() -> MemoryMib:
+    return MemoryMib(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0)
 
 
 @contextmanager
@@ -122,20 +163,20 @@ def measure_efficiency() -> Generator[_EfficiencyMeasurementHandle]:
             handle.result.peak_cuda_allocated_bytes = torch.cuda.max_memory_allocated()
 
 
-def _conv_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _conv_fp32_precision() -> TorchPrecision:
     conv = getattr(torch.backends.cudnn, "conv", None)
     if conv is not None:
         precision = getattr(conv, "fp32_precision", None)
         if precision is not None:
-            return str(precision)
-    return "absent"
+            return TorchPrecision(str(precision))
+    return TorchPrecision("absent")
 
 
-def _matmul_fp32_precision() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _matmul_fp32_precision() -> TorchPrecision:
     precision = getattr(torch.backends.cuda.matmul, "fp32_precision", None)
     if precision is not None:
-        return str(precision)
-    return "absent"
+        return TorchPrecision(str(precision))
+    return TorchPrecision("absent")
 
 
 def _stochastic_rounding() -> bool:
@@ -154,8 +195,8 @@ def deterministic_backend_state() -> DeterministicBackendState:
         matmul_fp32_precision=_matmul_fp32_precision(),
         conv_fp32_precision=_conv_fp32_precision(),
         stochastic_rounding=_stochastic_rounding(),
-        default_dtype=str(torch.get_default_dtype()),
-        float32_matmul_precision=torch.get_float32_matmul_precision(),
+        default_dtype=TorchPrecision(str(torch.get_default_dtype())),
+        float32_matmul_precision=TorchPrecision(torch.get_float32_matmul_precision()),
     )
 
 
@@ -175,38 +216,36 @@ class ExecutionLogEvent:
     cell_coordinates: SemanticCoordinates
     artifact_id: ArtifactIdentifier | None
     state: ArtifactState
-    stage: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    experiment: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dataset: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    seed: int | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    elapsed_seconds: float | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reuse_decision: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    stage: ExecutionStageName | None = None
+    experiment: ExperimentName | None = None
+    dataset: DatasetId | None = None
+    seed: RandomSeed | None = None
+    elapsed_seconds: ElapsedSeconds | None = None
+    reuse_decision: ReuseDecision | None = None
 
 
 class ExecutionLogger:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(self, logger: FilteringBoundLogger) -> None:
         self._logger = logger
 
     def record(self, event: ExecutionLogEvent) -> None:
         self._logger.info(
             "execution_event",
-            extra=OrderedDict(
-                occurred_at=event.occurred_at.isoformat(),
-                cell_coordinates=event.cell_coordinates.value,
-                artifact_id=event.artifact_id.value if event.artifact_id is not None else None,
-                state=event.state.value,
-                stage=event.stage,
-                experiment=event.experiment,
-                dataset=event.dataset,
-                seed=event.seed,
-                elapsed_seconds=event.elapsed_seconds,
-                reuse_decision=event.reuse_decision,
-            ),
+            occurred_at=event.occurred_at.isoformat(),
+            cell_coordinates=event.cell_coordinates.value,
+            artifact_id=event.artifact_id.value if event.artifact_id is not None else None,
+            state=event.state.value,
+            stage=event.stage,
+            experiment=event.experiment.value if event.experiment is not None else None,
+            dataset=event.dataset.value if event.dataset is not None else None,
+            seed=event.seed,
+            elapsed_seconds=event.elapsed_seconds,
+            reuse_decision=event.reuse_decision,
         )
 
 
 def execution_logger() -> ExecutionLogger:
-    return ExecutionLogger(logging.getLogger("fedorbit.execution")) #TODO: structured key/value logging via structlog
+    return ExecutionLogger(cast(FilteringBoundLogger, structlog.get_logger("fedorbit.execution")))
 
 
 class IncompatibleIdentityError(ValueError):
@@ -215,16 +254,13 @@ class IncompatibleIdentityError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class CodeRevision:
-    commit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dirty: bool #TODO: do not check for dirty, delete this
-    tree_digest: str #TODO: delete this
+    commit: GitRevision
 
-    def identity(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        suffix = "-dirty" if self.dirty else ""
-        return f"{self.commit}{suffix}"
+    def identity(self) -> GitRevision:
+        return self.commit
 
 
-def _git_head() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _git_head() -> GitRevision:
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repository_root(),
@@ -233,80 +269,57 @@ def _git_head() -> str: #TODO: do not use primitivies. Use an appropriate alias 
         timeout=30,
     )
     if result.returncode != 0:
-        return "no-git"
-    return result.stdout.strip()
-
-
-def _git_dirty() -> bool: #TODO: do not check for dirty, delete this
-    result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=repository_root(),
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    return result.returncode == 0 and bool(result.stdout.strip())
-
-
-def _source_tree_digest() -> str: #TODO: delete this
-    digest = hashlib.sha256()
-    source_root = repository_root() / "src"
-    for path in sorted(source_root.rglob("*.py")):
-        if "__pycache__" in path.parts:
-            continue
-        digest.update(str(path.relative_to(source_root)).encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-    return digest.hexdigest()
+        return GitRevision("no-git")
+    return GitRevision(result.stdout.strip())
 
 
 def current_code_revision() -> CodeRevision:
-    return CodeRevision(
-        commit=_git_head(),
-        dirty=_git_dirty(),
-        tree_digest=_source_tree_digest(),
-    )
+    return CodeRevision(commit=_git_head())
 
 
-def _seed_digest() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _seed_digest() -> Sha256Digest:
     randomness = active_config().scientific.randomness
-    return hashlib.sha256(
-        stable_json(
-            cast(
-                StableJsonPayload,
-                OrderedDict(
-                    pilot_seeds=list(randomness.pilot_seeds),
-                    confirmatory_seeds=list(randomness.confirmatory_seeds),
-                    statistical_seed=randomness.statistical_seed,
-                ),
-            )
-        ).encode("utf-8")
-    ).hexdigest()
+    return Sha256Digest(
+        hashlib.sha256(
+            stable_json(
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        pilot_seeds=list(randomness.pilot_seeds),
+                        confirmatory_seeds=list(randomness.confirmatory_seeds),
+                        statistical_seed=randomness.statistical_seed,
+                    ),
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class ReproducibilityIdentity:
-    config_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    seed_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    environment_fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    code_revision: CodeRevision #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    statistical_identity_digest: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    config_digest: Sha256Digest
+    seed_digest: Sha256Digest
+    environment_fingerprint: Sha256Digest
+    code_revision: CodeRevision
+    statistical_identity_digest: Sha256Digest
 
-    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return hashlib.sha256(
-            "|".join(
-                (
-                    self.config_digest,
-                    self.seed_digest,
-                    self.environment_fingerprint,
-                    self.code_revision.identity(),
-                    self.statistical_identity_digest,
-                )
-            ).encode("utf-8")
-        ).hexdigest()
+    def fingerprint(self) -> Sha256Digest:
+        return Sha256Digest(
+            hashlib.sha256(
+                "|".join(
+                    (
+                        self.config_digest,
+                        self.seed_digest,
+                        self.environment_fingerprint,
+                        self.code_revision.identity(),
+                        self.statistical_identity_digest,
+                    )
+                ).encode("utf-8")
+            ).hexdigest()
+        )
 
 
-def statistical_identity_digest(environment: EnvironmentSnapshot) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def statistical_identity_digest(environment: EnvironmentSnapshot) -> Sha256Digest:
     scientific = active_config().scientific
     statistics = scientific.statistics
     payload = stable_json(
@@ -334,16 +347,16 @@ def statistical_identity_digest(environment: EnvironmentSnapshot) -> str: #TODO:
             ),
         )
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())
 
 
 def build_reproducibility_identity(environment: EnvironmentSnapshot) -> ReproducibilityIdentity:
     code_revision = current_code_revision()
     config = active_config()
     return ReproducibilityIdentity(
-        config_digest=hashlib.sha256(
-            stable_json(config.model_dump(mode="json")).encode("utf-8")
-        ).hexdigest(),
+        config_digest=Sha256Digest(
+            hashlib.sha256(stable_json(config.model_dump(mode="json")).encode("utf-8")).hexdigest()
+        ),
         seed_digest=_seed_digest(),
         environment_fingerprint=environment.fingerprint_sha256,
         code_revision=code_revision,
@@ -388,7 +401,7 @@ def derive_seed32(request: SeedDerivationRequest) -> DerivedSeed:
 @dataclass(frozen=True, slots=True)
 class SeedPlan:
     base_seed: RandomSeed
-    coordinates_json: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coordinates_json: SerializedPacket
     streams: tuple[SeedStream, ...]
 
     def seed_for(self, namespace: RngNamespace) -> DerivedSeed:
@@ -414,7 +427,7 @@ def seed_plan(request: SeedPlanRequest) -> SeedPlan:
     coordinates_json_value = stable_json(request.coordinates)
     return SeedPlan(
         base_seed=request.base_seed,
-        coordinates_json=coordinates_json_value,
+        coordinates_json=SerializedPacket(coordinates_json_value),
         streams=tuple(
             SeedStream(
                 namespace,

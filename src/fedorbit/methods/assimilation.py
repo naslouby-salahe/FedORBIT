@@ -4,6 +4,7 @@ import itertools
 from collections import OrderedDict
 from collections.abc import Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import cast
 
 import torch
@@ -27,7 +28,23 @@ from fedorbit.methods.confirmation import (
 )
 from fedorbit.methods.target import CurriculumMultipliers
 from fedorbit.response.estimation import shadow_batch_schedule
-from fedorbit.types import RngNamespace, StableJsonPayload
+from fedorbit.types import (
+    ArtifactIdentifier,
+    BatchSize,
+    ClassIndex,
+    ContrastCoordinates,
+    DirectedPairName,
+    EvaluationConditionName,
+    Floor,
+    RandomSeed,
+    RelativeGain,
+    ReplicateCount,
+    RngNamespace,
+    Sha256Digest,
+    SourceClientName,
+    StableJsonPayload,
+    StepCount,
+)
 
 
 class AssimilationError(ValueError):
@@ -44,32 +61,34 @@ class PreConfirmStatePair:
     curriculum: PreConfirmTargetState
 
 
-ASSIMILATION_COORDINATE_KEYS = ( #TODO: use enums
-    "target_client",
-    "directed_pair",
-    "condition",
-    "seed",
-    "clean_pretransfer_checkpoint_artifact_id",
-    "source_packet_artifact_id",
-    "action_artifact_sha256",
-)
+class AssimilationCoordinateKey(StrEnum):
+    TARGET_CLIENT = "target_client"
+    DIRECTED_PAIR = "directed_pair"
+    CONDITION = "condition"
+    SEED = "seed"
+    CLEAN_PRETRANSFER_CHECKPOINT_ARTIFACT_ID = "clean_pretransfer_checkpoint_artifact_id"
+    SOURCE_PACKET_ARTIFACT_ID = "source_packet_artifact_id"
+    ACTION_ARTIFACT_SHA256 = "action_artifact_sha256"
+
+
+ASSIMILATION_COORDINATE_KEYS = tuple(AssimilationCoordinateKey)
 
 
 @dataclass(frozen=True, slots=True)
 class AssimilationCoordinates:
-    target_client: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    seed: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    clean_pretransfer_checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_packet_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    action_artifact_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_client: SourceClientName
+    directed_pair: DirectedPairName
+    condition: EvaluationConditionName
+    seed: RandomSeed
+    clean_pretransfer_checkpoint_artifact_id: ArtifactIdentifier
+    source_packet_artifact_id: ArtifactIdentifier
+    action_artifact_sha256: Sha256Digest
 
     def __post_init__(self) -> None:
-        for name in ASSIMILATION_COORDINATE_KEYS:
-            if not getattr(self, name):
+        for key in ASSIMILATION_COORDINATE_KEYS:
+            if key is not AssimilationCoordinateKey.SEED and not getattr(self, key.value):
                 raise AssimilationError(
-                    f"assimilation coordinate {name} must be a non-empty string"
+                    f"assimilation coordinate {key.value} must be non-empty"
                 )
 
 
@@ -120,11 +139,11 @@ def capture_pre_confirm_pair(
 def _confirmation_batches_for_replicate(
     features: torch.Tensor,
     targets: torch.Tensor,
-    batch_size: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: batch_size)
+    batch_size: BatchSize,
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
-    replicate_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: replicate_index)
-    horizon: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: horizon)
+    contrast_coordinates: ContrastCoordinates,
+    replicate_index: ReplicateCount,
+    horizon: StepCount,
 ) -> tuple[ShadowBatch, ...]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
@@ -185,8 +204,8 @@ def _confirm_class_losses(
     model: torch.nn.Module,
     confirm_features: torch.Tensor,
     confirm_targets: torch.Tensor,
-    class_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: class_count)
-    log_floor: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: log_floor)
+    class_count: ClassIndex,
+    log_floor: Floor,
 ) -> tuple[torch.Tensor, ...]:
     device = next(model.parameters()).device
     model.eval()
@@ -209,8 +228,8 @@ def _confirm_class_losses(
 @dataclass(frozen=True, slots=True)
 class ConfirmationVerdict:
     accepted: bool
-    lower_bound: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    acceptance_threshold: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    lower_bound: RelativeGain
+    acceptance_threshold: RelativeGain
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,12 +245,12 @@ class ConfirmationRequest:
     curriculum_multipliers: CurriculumMultipliers
     selected_hyperparameters: SelectedHyperparameters
     seed: RandomSeed
-    contrast_coordinates: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_coordinates: ContrastCoordinates
 
 
 def run_proposal_confirmation(
     request: ConfirmationRequest,
-    batch_size: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: batch_size)
+    batch_size: BatchSize | None = None,
 ) -> ConfirmationVerdict:
     config = active_config()
     confirmation = config.scientific.confirmation
@@ -241,7 +260,7 @@ def run_proposal_confirmation(
     if request.confirm_features.shape[0] == 0 or request.confirm_targets.shape[0] == 0:
         raise AssimilationError("CONFIRM split is empty")
     model = request.model
-    class_count = int(request.base_class_weights.values.shape[0])
+    class_count = ClassIndex(request.base_class_weights.values.shape[0])
     neutral = CurriculumMultipliers(torch.ones_like(request.base_class_weights.values))
     replicated: list[ConfirmReplicateOutcomes] = []
     for replicate_index in range(confirmation.paired_replicates):
@@ -301,7 +320,11 @@ def run_proposal_confirmation(
         request.contrast_coordinates,
     )
     threshold = confirmation.lower_bound_acceptance_threshold_relative_macro_ce
-    return ConfirmationVerdict(lower_bound >= threshold, lower_bound, threshold)
+    return ConfirmationVerdict(
+        lower_bound >= threshold,
+        RelativeGain(lower_bound),
+        RelativeGain(threshold),
+    )
 
 
 def settle_rejected_proposal(
@@ -315,9 +338,9 @@ def settle_rejected_proposal(
 def _assimilation_batches(
     features: torch.Tensor,
     targets: torch.Tensor,
-    batch_size: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: batch_size)
+    batch_size: BatchSize,
     generator: torch.Generator,
-    total_steps: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: total_steps)
+    total_steps: StepCount,
 ) -> Iterator[ShadowBatch]:
     train_size = int(features.shape[0])
     if train_size <= 0:
@@ -337,16 +360,19 @@ def apply_accepted_assimilation(
     curriculum_multipliers: CurriculumMultipliers,
     seed: RandomSeed,
     assimilation_coordinates: AssimilationCoordinates,
-    batch_size: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: batch_size)
-) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    batch_size: BatchSize | None = None,
+) -> StepCount:
     config = active_config()
     effective_batch = batch_size or config.scientific.training.batch_size
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")
     total_steps = config.scientific.confirmation.accepted_live_assimilation_steps
-    coordinates_payload = OrderedDict(
-        (name, getattr(assimilation_coordinates, name)) for name in ASSIMILATION_COORDINATE_KEYS
-    )
+    coordinates_payload: OrderedDict[str, str | int] = OrderedDict()
+    for key in ASSIMILATION_COORDINATE_KEYS:
+        value = getattr(assimilation_coordinates, key.value)
+        coordinates_payload[key.value] = (
+            value.value if isinstance(value, ArtifactIdentifier) else value
+        )
     rng_seed = derive_seed32(
         SeedDerivationRequest(
             seed,
@@ -358,7 +384,7 @@ def apply_accepted_assimilation(
     pre_confirm.restore_into(model, optimizer)
     model.train()
     device = next(model.parameters()).device
-    steps_executed = 0
+    steps_executed = StepCount(0)
     for batch in _assimilation_batches(
         train_features,
         train_targets,
@@ -385,7 +411,7 @@ def apply_accepted_assimilation(
             norm_type=2.0,
         )
         optimizer_step(optimizer)
-        steps_executed += 1
+        steps_executed = StepCount(steps_executed + 1)
     if steps_executed != total_steps:
         raise AssimilationError(
             f"live assimilation executed {steps_executed} of {total_steps} steps"
@@ -393,26 +419,28 @@ def apply_accepted_assimilation(
     return steps_executed
 
 
-_PRE_TEST_PHASES = ( #TODO: use enums for this
-    "source_selection_finalized",
-    "action_finalized",
-    "confirmation_decision_finalized",
-    "assimilation_settled",
-    "pre_test_artifacts_committed",
-)
+class PreTestPhase(StrEnum):
+    SOURCE_SELECTION_FINALIZED = "source_selection_finalized"
+    ACTION_FINALIZED = "action_finalized"
+    CONFIRMATION_DECISION_FINALIZED = "confirmation_decision_finalized"
+    ASSIMILATION_SETTLED = "assimilation_settled"
+    PRE_TEST_ARTIFACTS_COMMITTED = "pre_test_artifacts_committed"
+
+
+_PRE_TEST_PHASES = tuple(PreTestPhase)
 
 
 @dataclass(frozen=True, slots=True)
 class TestAccessGrant:
-    completed_phases: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    completed_phases: tuple[PreTestPhase, ...]
 
 
 class PreTestLifecycle:
     def __init__(self) -> None:
-        self._completed: list[str] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        self._completed: list[PreTestPhase] = []
         self._opened = False
 
-    def complete_phase(self, phase: str) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: phase)
+    def complete_phase(self, phase: PreTestPhase) -> None:
         if phase not in _PRE_TEST_PHASES:
             raise TestOpeningRuleError(f"unknown pre-TEST phase: {phase}")
         if phase in self._completed:
@@ -427,8 +455,7 @@ class PreTestLifecycle:
     def opened(self) -> bool:
         return self._opened
 
-    def require_closed_before(self, phase: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: phase)
-                              ) -> None:
+    def require_closed_before(self, phase: PreTestPhase) -> None:
         if self._opened:
             raise TestOpeningRuleError(f"TEST already opened before {phase}")
 

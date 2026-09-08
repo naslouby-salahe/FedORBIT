@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass, fields
+from enum import StrEnum
 from pathlib import Path
 
 import numpy as np
@@ -29,26 +30,67 @@ from fedorbit.response.uncertainty import (
     FinalResponseEstimate,
     estimate_final_response,
 )
-from fedorbit.types import ClientRole, CoarseGroup, DatasetId, Index, RandomSeed, stable_json
-
-RESPONSE_PACKET_SCHEMA = "source-response-packet/v1" #TODO: use enums
-PACKET_PERMITTED_FIELDS = frozenset( #TODO: use enums
-    {
-        "anonymous_fine_node_ids",
-        "exposed_coarse_group_id",
-        "L",
-        "U",
-        "per_node_train_support",
-        "per_node_meta_support",
-        "per_node_effective_replicate_count",
-        "packet_schema_metadata",
-        "source_checkpoint_sha256",
-        "response_configuration_sha256",
-        "packet_integrity_sha256",
-        "packet_validity_state",
-        "technical_creation_timestamp",
-    }
+from fedorbit.types import (
+    AnonymousNodeDisplayId,
+    ClientRole,
+    CoarseGroup,
+    DatasetId,
+    Estimate,
+    ExposedCoarseGroupId,
+    FeatureCount,
+    Index,
+    NonNegativeInt,
+    RandomSeed,
+    ReplicateCount,
+    Rfc3339UtcTimestamp,
+    SerializedPacket,
+    Sha256Digest,
+    stable_json,
 )
+
+
+type NodeDisplayIds = tuple[AnonymousNodeDisplayId, ...]
+type ResponseBounds = tuple[Estimate, ...]
+type PerNodeSupport = tuple[NonNegativeInt, ...]
+type PerNodeReplicateCounts = tuple[ReplicateCount, ...]
+type ArrayShape = tuple[Index, ...]
+type Float64ArrayData = tuple[Estimate, ...]
+
+class ResponsePacketSchema(StrEnum):
+    V1 = "source-response-packet/v1"
+
+
+class PacketField(StrEnum):
+    ANONYMOUS_FINE_NODE_IDS = "anonymous_fine_node_ids"
+    EXPOSED_COARSE_GROUP_ID = "exposed_coarse_group_id"
+    LOWER_BOUNDS = "L"
+    UPPER_BOUNDS = "U"
+    PER_NODE_TRAIN_SUPPORT = "per_node_train_support"
+    PER_NODE_META_SUPPORT = "per_node_meta_support"
+    PER_NODE_EFFECTIVE_REPLICATE_COUNT = "per_node_effective_replicate_count"
+    SCHEMA_METADATA = "packet_schema_metadata"
+    SOURCE_CHECKPOINT_SHA256 = "source_checkpoint_sha256"
+    RESPONSE_CONFIGURATION_SHA256 = "response_configuration_sha256"
+    INTEGRITY_SHA256 = "packet_integrity_sha256"
+    VALIDITY_STATE = "packet_validity_state"
+    TECHNICAL_CREATION_TIMESTAMP = "technical_creation_timestamp"
+
+
+class PacketArrayDtype(StrEnum):
+    FLOAT64 = "float64"
+
+
+class PacketArrayOrder(StrEnum):
+    C = "C"
+
+
+class PacketValidityState(StrEnum):
+    STABLE = "stable"
+    UNSTABLE = "unstable"
+
+
+RESPONSE_PACKET_SCHEMA = ResponsePacketSchema.V1
+PACKET_PERMITTED_FIELDS = frozenset(field.value for field in PacketField)
 
 
 class PacketError(ValueError):
@@ -57,91 +99,91 @@ class PacketError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class Float64ArrayPayload:
-    dtype: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    order: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    shape: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    data: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dtype: PacketArrayDtype
+    order: PacketArrayOrder
+    shape: ArrayShape
+    data: Float64ArrayData
 
 
 class PacketArrayDocument(FrozenModel):
-    dtype: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    order: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    shape: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    data: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dtype: PacketArrayDtype
+    order: PacketArrayOrder
+    shape: ArrayShape
+    data: Float64ArrayData
 
 
 class PacketDocument(FrozenModel):
-    anonymous_fine_node_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    exposed_coarse_group_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    anonymous_fine_node_ids: NodeDisplayIds
+    exposed_coarse_group_id: ExposedCoarseGroupId
     L: PacketArrayDocument
     U: PacketArrayDocument
     per_node_train_support: PacketArrayDocument
     per_node_meta_support: PacketArrayDocument
     per_node_effective_replicate_count: PacketArrayDocument
-    packet_schema_metadata: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_integrity_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_validity_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    technical_creation_timestamp: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    packet_schema_metadata: ResponsePacketSchema
+    source_checkpoint_sha256: Sha256Digest
+    response_configuration_sha256: Sha256Digest
+    packet_integrity_sha256: Sha256Digest
+    packet_validity_state: PacketValidityState
+    technical_creation_timestamp: Rfc3339UtcTimestamp
 
 
 @dataclass(frozen=True, slots=True)
 class PacketIntegrityPayload:
-    anonymous_fine_node_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    exposed_coarse_group_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    anonymous_fine_node_ids: NodeDisplayIds
+    exposed_coarse_group_id: ExposedCoarseGroupId
     L: Float64ArrayPayload
     U: Float64ArrayPayload
     per_node_train_support: Float64ArrayPayload
     per_node_meta_support: Float64ArrayPayload
     per_node_effective_replicate_count: Float64ArrayPayload
-    packet_schema_metadata: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_validity_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    packet_schema_metadata: ResponsePacketSchema
+    source_checkpoint_sha256: Sha256Digest
+    response_configuration_sha256: Sha256Digest
+    packet_validity_state: PacketValidityState
 
 
 @dataclass(frozen=True, slots=True)
 class PacketWirePayload:
-    anonymous_fine_node_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    exposed_coarse_group_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    anonymous_fine_node_ids: NodeDisplayIds
+    exposed_coarse_group_id: ExposedCoarseGroupId
     L: Float64ArrayPayload
     U: Float64ArrayPayload
     per_node_train_support: Float64ArrayPayload
     per_node_meta_support: Float64ArrayPayload
     per_node_effective_replicate_count: Float64ArrayPayload
-    packet_schema_metadata: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_integrity_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_validity_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    technical_creation_timestamp: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    packet_schema_metadata: ResponsePacketSchema
+    source_checkpoint_sha256: Sha256Digest
+    response_configuration_sha256: Sha256Digest
+    packet_integrity_sha256: Sha256Digest
+    packet_validity_state: PacketValidityState
+    technical_creation_timestamp: Rfc3339UtcTimestamp
 
 
 @dataclass(frozen=True, slots=True)
 class SourcePacket:
-    anonymous_fine_node_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    exposed_coarse_group_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    L: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    U: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    per_node_train_support: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    per_node_meta_support: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    per_node_effective_replicate_count: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_schema_metadata: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_integrity_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    packet_validity_state: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    technical_creation_timestamp: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    anonymous_fine_node_ids: NodeDisplayIds
+    exposed_coarse_group_id: ExposedCoarseGroupId
+    L: ResponseBounds
+    U: ResponseBounds
+    per_node_train_support: PerNodeSupport
+    per_node_meta_support: PerNodeSupport
+    per_node_effective_replicate_count: PerNodeReplicateCounts
+    packet_schema_metadata: ResponsePacketSchema
+    source_checkpoint_sha256: Sha256Digest
+    response_configuration_sha256: Sha256Digest
+    packet_integrity_sha256: Sha256Digest
+    packet_validity_state: PacketValidityState
+    technical_creation_timestamp: Rfc3339UtcTimestamp
 
-    def integrity_payload(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return stable_json(self._integrity_payload())
+    def integrity_payload(self) -> SerializedPacket:
+        return SerializedPacket(stable_json(self._integrity_payload()))
 
-    def serialized(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return stable_json(self._wire_payload())
+    def serialized(self) -> SerializedPacket:
+        return SerializedPacket(stable_json(self._wire_payload()))
 
     @classmethod
-    def from_serialized(cls, payload: str) -> SourcePacket: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: payload)
+    def from_serialized(cls, payload: SerializedPacket) -> SourcePacket:
         try:
             document = PacketDocument.model_validate_json(payload)
         except ValidationError as error:
@@ -194,11 +236,11 @@ class SourcePacket:
         packet.validate()
         return packet
 
-    def compute_integrity_sha256(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest()
+    def compute_integrity_sha256(self) -> Sha256Digest:
+        return Sha256Digest(hashlib.sha256(self.integrity_payload().encode("utf-8")).hexdigest())
 
-    def payload_sha256(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return hashlib.sha256(self.serialized().encode("utf-8")).hexdigest()
+    def payload_sha256(self) -> Sha256Digest:
+        return Sha256Digest(hashlib.sha256(self.serialized().encode("utf-8")).hexdigest())
 
     def lower_matrix(self) -> np.ndarray:
         return self._response_matrix(self.L)
@@ -219,7 +261,7 @@ class SourcePacket:
             "response configuration SHA-256",
         )
         validate_sha256(self.packet_integrity_sha256, "packet integrity SHA-256")
-        if self.packet_schema_metadata != RESPONSE_PACKET_SCHEMA:
+        if self.packet_schema_metadata is not RESPONSE_PACKET_SCHEMA:
             raise PacketError("unrecognized source-response packet schema")
         node_count = len(self.anonymous_fine_node_ids)
         if not all(
@@ -241,7 +283,7 @@ class SourcePacket:
             raise PacketError("per-node support must be nonnegative")
         if any(value <= 0 for value in self.per_node_effective_replicate_count):
             raise PacketError("effective replicate counts must be positive")
-        if self.packet_validity_state not in {"stable", "unstable"}:
+        if self.packet_validity_state not in set(PacketValidityState):
             raise PacketError("invalid packet validity state")
         if self.packet_integrity_sha256 != self.compute_integrity_sha256():
             raise PacketError("packet integrity SHA-256 mismatch")
@@ -281,7 +323,7 @@ class SourcePacket:
             technical_creation_timestamp=self.technical_creation_timestamp,
         )
 
-    def _response_matrix(self, entries: tuple[float, ...]) -> np.ndarray: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entries)
+    def _response_matrix(self, entries: ResponseBounds) -> np.ndarray:
         node_count = len(self.anonymous_fine_node_ids)
         if len(entries) != node_count * node_count:
             raise PacketError("packet response entries do not form a square node matrix")
@@ -291,14 +333,14 @@ class SourcePacket:
 @dataclass(frozen=True, slots=True)
 class PacketConstructionContext:
     dataset: DatasetId
-    input_dimension: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    n_classes: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    input_dimension: FeatureCount
+    n_classes: Index
     coarse_group_id: CoarseGroup
-    fine_node_order: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    per_node_train_support: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    per_node_meta_support: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_checkpoint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    response_configuration_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    fine_node_order: NodeDisplayIds
+    per_node_train_support: PerNodeSupport
+    per_node_meta_support: PerNodeSupport
+    source_checkpoint_sha256: Sha256Digest
+    response_configuration_sha256: Sha256Digest
     seed: RandomSeed
 
 
@@ -326,11 +368,11 @@ def construct_source_packet(
     train_targets: torch.Tensor,
     meta_features: torch.Tensor,
     meta_targets: torch.Tensor,
-    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
-    outcome_native_class_sets: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: outcome_native_class_sets)
+    intervention_classes: tuple[tuple[Index, ...], ...],
+    outcome_native_class_sets: tuple[tuple[Index, ...], ...],
     base_class_weights: ClassWeights,
     selected_configuration: ResponseCandidate,
-    creation_timestamp: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: creation_timestamp)
+    creation_timestamp: Rfc3339UtcTimestamp,
 ) -> ConstructedPacket:
     _validate_context(context)
     hyperparameters = checkpoint.selected_hyperparameters
@@ -395,7 +437,7 @@ def construct_source_packet(
     packet = build_source_packet(
         complete_estimate,
         anonymous_fine_node_ids=ordering.display_ids,
-        exposed_coarse_group_id=context.coarse_group_id.value,
+        exposed_coarse_group_id=ExposedCoarseGroupId(context.coarse_group_id.value),
         per_node_train_support=ordering.reorder(context.per_node_train_support),
         per_node_meta_support=ordering.reorder(context.per_node_meta_support),
         per_node_effective_replicate_count=ordering.reorder(
@@ -411,16 +453,16 @@ def construct_source_packet(
 
 def build_source_packet(
     estimate: FinalResponseEstimate,
-    anonymous_fine_node_ids: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: anonymous_fine_node_ids)
-    exposed_coarse_group_id: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: exposed_coarse_group_id)
-    per_node_train_support: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: per_node_train_support)
-    per_node_meta_support: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: per_node_meta_support)
-    per_node_effective_replicate_count: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: per_node_effective_replicate_count)
-    source_checkpoint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: source_checkpoint_sha256)
-    response_configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: response_configuration_sha256)
-    creation_timestamp: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: creation_timestamp)
+    anonymous_fine_node_ids: NodeDisplayIds,
+    exposed_coarse_group_id: ExposedCoarseGroupId,
+    per_node_train_support: PerNodeSupport,
+    per_node_meta_support: PerNodeSupport,
+    per_node_effective_replicate_count: PerNodeReplicateCounts,
+    source_checkpoint_sha256: Sha256Digest,
+    response_configuration_sha256: Sha256Digest,
+    creation_timestamp: Rfc3339UtcTimestamp,
 ) -> SourcePacket:
-    def create(integrity: str) -> SourcePacket: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: integrity)
+    def create(integrity: Sha256Digest) -> SourcePacket:
         return SourcePacket(
             anonymous_fine_node_ids=anonymous_fine_node_ids,
             exposed_coarse_group_id=exposed_coarse_group_id,
@@ -433,11 +475,15 @@ def build_source_packet(
             source_checkpoint_sha256=source_checkpoint_sha256,
             response_configuration_sha256=response_configuration_sha256,
             packet_integrity_sha256=integrity,
-            packet_validity_state="stable" if estimate.stability_rule_passed else "unstable",
+            packet_validity_state=(
+                PacketValidityState.STABLE
+                if estimate.stability_rule_passed
+                else PacketValidityState.UNSTABLE
+            ),
             technical_creation_timestamp=creation_timestamp,
         )
 
-    packet = create("")
+    packet = create(Sha256Digest(""))
     return create(packet.compute_integrity_sha256())
 
 
@@ -484,11 +530,11 @@ def _validate_context(context: PacketConstructionContext) -> None:
         raise PacketConstructionError("META support count differs from source fine-node count")
 
 
-def _float64_array(values: tuple[int | float, ...]) -> Float64ArrayPayload: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)
+def _float64_array(values: tuple[NonNegativeInt | Estimate, ...]) -> Float64ArrayPayload:
     array = np.asarray(values, dtype=np.float64, order="C")
     return Float64ArrayPayload(
-        dtype="float64",
-        order="C",
+        dtype=PacketArrayDtype.FLOAT64,
+        order=PacketArrayOrder.C,
         shape=tuple(int(size) for size in array.shape),
         data=tuple(float(value) for value in array.ravel(order="C")),
     )

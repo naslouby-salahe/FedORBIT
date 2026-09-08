@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fedorbit.datasets.common import file_sha256 as _file_sha256
 from fedorbit.datasets.ton_iot.components import TonIotComponent
-from fedorbit.types import ByteCount
+from fedorbit.types import ByteCount, DatasetRelativePath, Sha256Digest, TabularColumnName
 
 
 class TonIotLoaderError(ValueError):
@@ -15,10 +15,10 @@ class TonIotLoaderError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class TonIotTabularFile:
-    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relative_path: DatasetRelativePath
     byte_size: ByteCount
-    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    sha256: Sha256Digest
+    columns: tuple[TabularColumnName, ...]
 
 
 def discover_ton_iot_component_files(
@@ -48,14 +48,14 @@ def inspect_ton_iot_component_files(
             header = next(reader, None)
         if not header:
             raise TonIotLoaderError(f"empty tabular file: {path}")
-        columns = tuple(header)
+        columns = tuple(TabularColumnName(column) for column in header)
         if len(set(columns)) != len(columns):
             raise TonIotLoaderError(f"duplicate columns in {path}")
         inspected.append(
             TonIotTabularFile(
-                path.relative_to(raw_root).as_posix(),
+                DatasetRelativePath(path.relative_to(raw_root).as_posix()),
                 path.stat().st_size,
-                _file_sha256(path),
+                Sha256Digest(_file_sha256(path)),
                 columns,
             )
         )

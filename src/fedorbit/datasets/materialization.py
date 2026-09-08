@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +8,6 @@ from typing import cast
 
 import numpy as np
 import pandas as pd
-import psutil
 import torch
 
 from fedorbit.config.loading import active_config
@@ -19,14 +18,19 @@ from fedorbit.datasets.common import (
     file_sha256,
     reconcile_component_columns,
 )
-from fedorbit.datasets.ontology import normalize_label, transfer_concept_for, transfer_eligibility
+from fedorbit.datasets.ontology import (
+    NORMAL_LABEL,
+    normalize_label,
+    transfer_concept_for,
+    transfer_eligibility,
+)
 from fedorbit.datasets.preprocessing import (
     CategoricalPreprocessor,
     FeatureQualityReport,
+    FeatureValue,
     NormalizedFeatureVector,
     NormalizedRow,
     NumericPreprocessor,
-    RawFeatureValue,
     TrainingFeatureValues,
     evaluate_feature_quality,
     fit_categorical_preprocessor,
@@ -40,7 +44,36 @@ from fedorbit.datasets.preprocessing import (
 from fedorbit.datasets.splitting import DuplicateGroupId
 from fedorbit.datasets.ton_iot.components import component_for, ton_iot_adapter
 from fedorbit.datasets.ton_iot.loader import discover_ton_iot_component_files
-from fedorbit.types import DatasetId, OracleTransferConcept, RawDatasetDirectory, Split
+from fedorbit.infrastructure.runtime import estimate_memory_budget
+from fedorbit.types import (
+    ByteCount,
+    ClassCount,
+    ClassIndex,
+    ClientComponentName,
+    DatasetId,
+    DatasetLabel,
+    DuplicateGroupIdentifier,
+    ExcludedLocalClasses,
+    FeatureName,
+    FeatureNames,
+    FineLabel,
+    LocalClassNames,
+    NonNegativeInt,
+    NormalizedGroupIdentifier,
+    NumericFeatureValue,
+    OracleTransferConcept,
+    RawCellText,
+    RawDatasetDirectory,
+    RawDatasetPath,
+    RawTabularColumns,
+    RawTabularRows,
+    Sha256Digest,
+    Split,
+    TabularColumnName,
+    TabularColumns,
+    TimestampRange,
+    TimestampSeconds,
+)
 
 
 class MaterializationError(ValueError):
@@ -53,16 +86,15 @@ class MaterializationResourceLimitError(MaterializationError):
 
 @dataclass(frozen=True, slots=True)
 class LocalClassManifest:
-    class_names: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    excluded_classes: tuple[tuple[str, int], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    class_names: LocalClassNames
+    excluded_classes: ExcludedLocalClasses
 
-    def index_of(self, normalized_label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
-                 ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return self.class_names.index(normalized_label)
+    def index_of(self, normalized_label: FineLabel) -> ClassIndex:
+        return ClassIndex(self.class_names.index(normalized_label))
 
     @property
-    def class_count(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return len(self.class_names)
+    def class_count(self) -> ClassCount:
+        return ClassCount(len(self.class_names))
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,19 +105,19 @@ class SplitTensors:
 
 @dataclass(frozen=True, slots=True)
 class RawFileProvenance:
-    path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    row_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    path: RawDatasetPath
+    sha256: Sha256Digest
+    row_count: NonNegativeInt
 
 
 @dataclass(frozen=True, slots=True)
 class DatasetProvenance:
-    component: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    component: ClientComponentName
     raw_files: tuple[RawFileProvenance, ...]
-    accepted_timestamp_column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    timestamp_range: tuple[float, float] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    duplicate_group_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    conflicting_duplicate_group_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    accepted_timestamp_column: TabularColumnName
+    timestamp_range: TimestampRange
+    duplicate_group_count: NonNegativeInt
+    conflicting_duplicate_group_count: NonNegativeInt
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,23 +125,21 @@ class MaterializedClient:
     dataset: DatasetId
     schema: AdapterSchema
     class_manifest: LocalClassManifest
-    feature_names: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    feature_names: FeatureNames
     splits: Mapping[Split, SplitTensors]
     feature_quality: FeatureQualityReport
-    class_row_counts: Mapping[str, Mapping[Split, int]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    class_row_counts: Mapping[FineLabel, Mapping[Split, NonNegativeInt]]
     provenance: DatasetProvenance
 
 
 def _read_component_rows(
     paths: tuple[Path, ...],
-) -> tuple[tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-           , list[dict[str, str]],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-           tuple[RawFileProvenance, ...]]:
+) -> tuple[TabularColumns, RawTabularRows, tuple[RawFileProvenance, ...]]:
     frames: list[pd.DataFrame] = []
-    per_file_columns: list[tuple[str, ...]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    per_file_columns: list[TabularColumns] = []
     raw_files: list[RawFileProvenance] = []
     for path in paths:
-        frame = pd.read_csv( #TODO: evaluate polars streaming CSV read for the large raw lineage (lower peak memory, faster)
+        frame = pd.read_csv(  # TODO: evaluate polars streaming CSV read for the large raw lineage (lower peak memory, faster)
             path,
             dtype=object,
             keep_default_na=False,
@@ -117,50 +147,51 @@ def _read_component_rows(
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed: tuple[str, ...] = tuple(frame.columns) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        observed = tuple(TabularColumnName(column) for column in frame.columns)
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)
         frames.append(frame)
-        raw_files.append(RawFileProvenance(str(path), file_sha256(path), len(frame))) #TODO: PERF: hashing triggers a second full disk read of every raw file - hash during the read pass (wrap the handle) or reuse persisted RawFileProvenance.sha256 while (size, mtime) is unchanged
+        raw_files.append(
+            RawFileProvenance(RawDatasetPath(str(path)), file_sha256(path), len(frame))
+        )
     columns = reconcile_component_columns(tuple(per_file_columns))
     combined = pd.concat(
         [frame.reindex(columns=list(columns)) for frame in frames],
         ignore_index=True,
     )
-    column_arrays: list[list[str]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        [cast(str, value) for value in combined[column].to_numpy(dtype=object)]
+    column_arrays: list[RawTabularColumns] = [
+        [RawCellText(cast(str, value)) for value in combined[column].to_numpy(dtype=object)]
         for column in columns
     ]
-    rows = [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)] #TODO: PERF: keep the raw lineage columnar - one dict per row for the whole dataset dominates runtime; use column arrays (pandas/polars) and build row objects only where mandatory
+    rows: RawTabularRows = [
+        dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)
+    ]  # TODO: PERF: keep the raw lineage columnar - one dict per row for the whole dataset dominates runtime; use column arrays (pandas/polars) and build row objects only where mandatory
     return columns, rows, tuple(raw_files)
 
 
-class _LazyColumnSamples(Mapping[str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                                 tuple[str, ...]]): #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    def __init__(self, rows: list[dict[str, str]],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                 columns: tuple[str, ...]) -> None:  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+class _LazyColumnSamples(Mapping[TabularColumnName, tuple[RawCellText, ...]]):
+    def __init__(self, rows: RawTabularRows, columns: TabularColumns) -> None:
         self._rows = rows
         self._columns = columns
-        self._cache: dict[str, tuple[str, ...]] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        self._cache: dict[TabularColumnName, tuple[RawCellText, ...]] = OrderedDict()
 
-    def __getitem__(self, key: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def __getitem__(self, key: TabularColumnName) -> tuple[RawCellText, ...]:
         if key not in self._cache:
-            self._cache[key] = tuple(row.get(key, "") for row in self._rows)
+            self._cache[key] = tuple(row.get(key, RawCellText("")) for row in self._rows)
         return self._cache[key]
 
     def __iter__(self):
         return iter(self._columns)
 
-    def __len__(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    def __len__(self) -> NonNegativeInt:
         return len(self._columns)
 
 
 def _resolve_schema(
     dataset: DatasetId,
-    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: columns)
-    , rows: list[dict[str, str]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: rows)
+    columns: TabularColumns,
+    rows: RawTabularRows,
 ) -> AdapterSchema:
     adapter = ton_iot_adapter(dataset)
     samples = ObservedColumnSamples(_LazyColumnSamples(rows, columns))
@@ -172,17 +203,16 @@ def _resolve_schema(
     )
 
 
-def _parse_epoch_seconds(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-                         ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _parse_epoch_seconds(value: RawCellText) -> TimestampSeconds:
     try:
-        return float(value)
+        return TimestampSeconds(float(value))
     except ValueError as error:
         raise MaterializationError(f"unparseable event-time cell: {value!r}") from error
 
 
 def _build_normalized_rows(
     schema: AdapterSchema,
-    rows: list[dict[str, str]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: rows)
+    rows: RawTabularRows,
 ) -> tuple[NormalizedRow, ...]:
     behavioral = schema.behavioral_features()
     categorical_columns = frozenset(
@@ -196,18 +226,20 @@ def _build_normalized_rows(
     label_column = schema.multiclass_label_column
     normalized_rows: list[NormalizedRow] = []
     for row in rows:
-        normalized_label = normalize_label(row[label_column])
+        normalized_label = normalize_label(DatasetLabel(row[label_column]))
         timestamp = _parse_epoch_seconds(row[timestamp_column])
-        values: OrderedDict[str, RawFeatureValue] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        values: OrderedDict[TabularColumnName, FeatureValue] = OrderedDict()
         for column in behavioral:
             is_categorical = column in categorical_columns
-            values[column] = normalize_value(row.get(column, ""), is_categorical) #TODO: PERF: normalize column-wise with numpy/pandas vector ops instead of per-row, per-value Python normalization
+            values[column] = normalize_value(
+                row.get(column, RawCellText("")), is_categorical
+            )  # TODO: PERF: normalize column-wise with numpy/pandas vector ops instead of per-row, per-value Python normalization
         normalized_rows.append(
             NormalizedRow(
                 features=NormalizedFeatureVector(values),
                 label=normalized_label,
                 timestamp_fraction=timestamp,
-                group_id="",
+                group_id=NormalizedGroupIdentifier(""),
             )
         )
     return tuple(normalized_rows)
@@ -217,16 +249,16 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
     minimum = (
         active_config().scientific.transfer_support.local_prediction_attack_class_total_rows_minimum
     )
-    counts: defaultdict[str, int] = defaultdict(int) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    for row in rows:
-        counts[row.label] += 1 #TODO: PERF: replace the per-row class counter with pandas value_counts / groupby on a category dtype
+    counts: Counter[FineLabel] = Counter(row.label for row in rows)
     retained = sorted(
-        label for label, count in counts.items() if label == "normal" or count >= minimum
+        label
+        for label, count in counts.items()
+        if label == FineLabel(NORMAL_LABEL) or count >= minimum
     )
     excluded = tuple(
         sorted((label, count) for label, count in counts.items() if label not in retained)
     )
-    if "normal" not in retained:
+    if FineLabel(NORMAL_LABEL) not in retained:
         raise MaterializationError("retained local class set does not contain Normal")
     return LocalClassManifest(tuple(retained), excluded)
 
@@ -234,8 +266,8 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
 @dataclass(frozen=True, slots=True)
 class SplitAssignmentResult:
     buckets: Mapping[Split, tuple[NormalizedRow, ...]]
-    duplicate_group_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    conflicting_duplicate_group_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    duplicate_group_count: NonNegativeInt
+    conflicting_duplicate_group_count: NonNegativeInt
 
 
 def _assign_splits(
@@ -244,7 +276,7 @@ def _assign_splits(
     manifest: LocalClassManifest,
 ) -> SplitAssignmentResult:
     buckets: dict[Split, list[NormalizedRow]] = OrderedDict((split, []) for split in Split)
-    by_class: defaultdict[str, list[NormalizedRow]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    by_class: defaultdict[FineLabel, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
         if row.label in manifest.class_names:
             by_class[row.label].append(row)
@@ -256,7 +288,9 @@ def _assign_splits(
             duplicate_group_count += 1
             if len({member.label for member in members}) > 1:
                 conflicting_duplicate_group_count += 1
-            split = normalized.split_assignment.split_of(DuplicateGroupId(group_sha256))
+            split = normalized.split_assignment.split_of(
+                DuplicateGroupId(DuplicateGroupIdentifier(group_sha256))
+            )
             if split is None:
                 raise MaterializationError("duplicate group received no split assignment")
             buckets[split].extend(members)
@@ -266,44 +300,41 @@ def _assign_splits(
     )
 
 
-def _numeric_array(rows: Sequence[NormalizedRow], 
-                   column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
-                   ) -> np.ndarray:
-    return np.array([row.features.value_of(column) for row in rows], dtype=object) #TODO: PERF: build numeric arrays column-wise once instead of per-row feature.value_of lookups
+def _numeric_array(rows: Sequence[NormalizedRow], column: TabularColumnName) -> np.ndarray:
+    return np.array(
+        [row.features.value_of(column) for row in rows], dtype=object
+    )  # TODO: PERF: build numeric arrays column-wise once instead of per-row feature.value_of lookups
 
 
-def _categorical_array(rows: Sequence[NormalizedRow], 
-                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
-                       ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return tuple(str(row.features.value_of(column)) for row in rows) #TODO: PERF: build categorical arrays column-wise once instead of per-row feature.value_of lookups
+def _categorical_array(
+    rows: Sequence[NormalizedRow], column: TabularColumnName
+) -> tuple[RawCellText, ...]:
+    return tuple(
+        RawCellText(str(row.features.value_of(column))) for row in rows
+    )  # TODO: PERF: build categorical arrays column-wise once instead of per-row feature.value_of lookups
 
 
-def _missing_indicator(rows: Sequence[NormalizedRow], 
-                       column: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: column)
-                       ) -> np.ndarray:
+def _missing_indicator(rows: Sequence[NormalizedRow], column: TabularColumnName) -> np.ndarray:
     indicator = np.zeros(len(rows), dtype=np.float32)
     for index, row in enumerate(rows):
         value = row.features.value_of(column)
         numeric = float("nan") if value is None or isinstance(value, str) else float(value)
-        is_missing = not (np.isfinite(numeric) or numeric_zero_is_not_missing(numeric))
+        is_missing = not (
+            np.isfinite(numeric) or numeric_zero_is_not_missing(NumericFeatureValue(numeric))
+        )
         indicator[index] = 1.0 if is_missing else 0.0
     return indicator
 
 
-_OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO = 15.0 #TODO: should be in constants
-_MAXIMUM_MEMORY_BUDGET_FRACTION = 0.65 #TODO: should be in constants
-
-
-def require_safe_memory_budget(dataset: DatasetId, paths: tuple[Path, ...]) -> None: #TODO: should be in runtime
-    raw_bytes = sum(path.stat().st_size for path in paths)
-    estimated_peak_bytes = raw_bytes * _OBSERVED_PEAK_MEMORY_TO_RAW_BYTES_RATIO #TODO: verify the peak-memory estimate with tracemalloc / memory-profiler
-    available_bytes = psutil.virtual_memory().available
-    budget_bytes = available_bytes * _MAXIMUM_MEMORY_BUDGET_FRACTION
-    if estimated_peak_bytes > budget_bytes:
+def require_safe_memory_budget(dataset: DatasetId, paths: tuple[Path, ...]) -> None:
+    raw_bytes: ByteCount = sum(path.stat().st_size for path in paths)
+    estimate = estimate_memory_budget(raw_bytes)
+    if not estimate.within_budget:
         raise MaterializationResourceLimitError(
             f"{dataset.value} materialization is estimated to need "
-            f"{estimated_peak_bytes / 1e9:.1f} GB, exceeding the safe budget of "
-            f"{budget_bytes / 1e9:.1f} GB ({available_bytes / 1e9:.1f} GB currently available); "
+            f"{estimate.estimated_peak_bytes / 1e9:.1f} GB, exceeding the safe budget of "
+            f"{estimate.budget_bytes / 1e9:.1f} GB "
+            f"({estimate.available_bytes / 1e9:.1f} GB currently available); "
             "refusing to proceed to avoid an out-of-memory crash"
         )
 
@@ -321,10 +352,12 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
     rows = _build_normalized_rows(schema, raw_rows)
     del raw_rows
     assert schema.timestamp_column is not None
-    timestamp_range = ( #TODO: PERF: compute timestamp bounds on the parsed column array instead of min/max over row objects
-        min(row.timestamp_fraction for row in rows),
-        max(row.timestamp_fraction for row in rows),
+    timestamp_column_array = np.fromiter(
+        (row.timestamp_fraction for row in rows), dtype=np.float64, count=len(rows)
     )
+    timestamp_lower: TimestampSeconds = float(timestamp_column_array.min())
+    timestamp_upper: TimestampSeconds = float(timestamp_column_array.max())
+    timestamp_range: TimestampRange = (timestamp_lower, timestamp_upper)
     manifest = _retained_local_classes(rows)
     split_result = _assign_splits(schema, rows, manifest)
     buckets = split_result.buckets
@@ -337,12 +370,11 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         duplicate_group_count=split_result.duplicate_group_count,
         conflicting_duplicate_group_count=split_result.conflicting_duplicate_group_count,
     )
+    class_counts_by_split = {split: Counter(row.label for row in buckets[split]) for split in Split}
     class_row_counts = OrderedDict(
         (
             label,
-            OrderedDict(
-                (split, sum(1 for row in buckets[split] if row.label == label)) for split in Split #TODO: PERF: derive per-split class counts with vectorized groupby/value_counts instead of nested per-row sums
-            ),
+            OrderedDict((split, class_counts_by_split[split][label]) for split in Split),
         )
         for label in manifest.class_names
     )
@@ -371,9 +403,11 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         raise MaterializationError(
             f"{dataset.value} is Invalid Data: {quality.client_invalid_reason}"
         )
-    numeric_preprocessors: OrderedDict[str, NumericPreprocessor] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    categorical_preprocessors: OrderedDict[str, CategoricalPreprocessor] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    missing_indicator_columns: list[str] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    numeric_preprocessors: OrderedDict[TabularColumnName, NumericPreprocessor] = OrderedDict()
+    categorical_preprocessors: OrderedDict[TabularColumnName, CategoricalPreprocessor] = (
+        OrderedDict()
+    )
+    missing_indicator_columns: list[TabularColumnName] = []
     for candidate in quality.candidate_features:
         if candidate.dropped:
             continue
@@ -388,16 +422,17 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
             numeric_preprocessors[candidate.name] = fitted
             if candidate.missing_indicator:
                 missing_indicator_columns.append(candidate.name)
-    feature_names = (
-        *numeric_preprocessors.keys(),
-        *(f"{name}__missing" for name in missing_indicator_columns),
+    feature_names: FeatureNames = (
+        *(FeatureName(name) for name in numeric_preprocessors),
+        *(FeatureName(f"{name}__missing") for name in missing_indicator_columns),
         *(
-            f"{name}={category}"
+            FeatureName(f"{name}={category}")
             for name in categorical_preprocessors
             for category in categorical_preprocessors[name].vocabulary
         ),
     )
     splits: dict[Split, SplitTensors] = OrderedDict()
+    class_indices = OrderedDict((label, manifest.index_of(label)) for label in manifest.class_names)
     for split in Split:
         split_rows = buckets[split]
         if not split_rows:
@@ -423,7 +458,11 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         matrix = (
             np.stack(blocks, axis=1) if blocks else np.empty((len(split_rows), 0), dtype=np.float32)
         )
-        targets = np.array([manifest.index_of(row.label) for row in split_rows], dtype=np.int64) #TODO: PERF: convert labels to integer codes once (vectorized) instead of per-row manifest.index_of
+        targets = np.fromiter(
+            (class_indices[row.label] for row in split_rows),
+            dtype=np.int64,
+            count=len(split_rows),
+        )
         splits[split] = SplitTensors(
             torch.from_numpy(matrix.astype(np.float32, copy=False)),
             torch.from_numpy(targets),
@@ -443,9 +482,9 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
 @dataclass(frozen=True, slots=True)
 class TransferConceptGroup:
     concept: OracleTransferConcept
-    native_class_indices: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    train_support: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    meta_support: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    native_class_indices: tuple[ClassIndex, ...]
+    train_support: NonNegativeInt
+    meta_support: NonNegativeInt
     source_eligible: bool
 
 
@@ -453,11 +492,11 @@ def transfer_concept_groups(
     dataset: DatasetId,
     materialized: MaterializedClient,
 ) -> tuple[TransferConceptGroup, ...]:
-    grouped: OrderedDict[OracleTransferConcept, list[int]] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    grouped: OrderedDict[OracleTransferConcept, list[ClassIndex]] = OrderedDict()
     for index, label in enumerate(materialized.class_manifest.class_names):
-        concept = transfer_concept_for(dataset, label)
+        concept = transfer_concept_for(dataset, FineLabel(label))
         if concept is not None:
-            grouped.setdefault(concept, []).append(index)
+            grouped.setdefault(concept, []).append(ClassIndex(index))
     groups: list[TransferConceptGroup] = []
     for concept in OracleTransferConcept:
         indices = grouped.get(concept)
@@ -486,9 +525,3 @@ def transfer_concept_groups(
             )
         )
     return tuple(groups)
-
-
-def eligible_source_transfer_node_classes( #TODO: should be deleted. We don't reference this in code.
-    groups: tuple[TransferConceptGroup, ...],
-) -> tuple[tuple[int, ...], ...]:
-    return tuple(group.native_class_indices for group in groups if group.source_eligible)

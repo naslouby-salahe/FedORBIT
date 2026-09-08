@@ -1,68 +1,91 @@
 from __future__ import annotations
 
-import logging
 from collections import OrderedDict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import NoReturn, cast
 
+import structlog
 import typer
 from typer import Argument, Exit
 
 from fedorbit.analysis.records import MetricRecord
-from fedorbit.config.loading import active_config
-from fedorbit.experiments.catalogue import build_catalogue
+from fedorbit.config.loading import active_config, raw_dataset_root
+from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
 from fedorbit.infrastructure.environment import (
-    EnvironmentMismatchError,
     environment_snapshot,
     reference_gpu_matches,
-    validate_lockfile,
 )
 from fedorbit.infrastructure.execution import (
     ArtifactStore,
     DatasetPreparationRequest,
     ExecutionError,
     ExperimentExecutionRequest,
+    completed_primary_transfer_comparison_records,
+    completed_primary_transfer_metric_records,
     execution_store,
     preprocess_datasets,
     run_experiment,
     run_smoke_validation,
 )
 from fedorbit.infrastructure.failures import validation_failure_outcome
-from fedorbit.infrastructure.manifests import ReusableArtifactManifest
-from fedorbit.infrastructure.planner import build_plan
-from fedorbit.infrastructure.workspace import build_layout, safe_slug
-from fedorbit.reporting import VerifiedEvidenceWriter
-from fedorbit.types import (
-    ArtifactIdentifier,
-    ArtifactState,
-    DatasetId,
-    ExperimentName,
-    OverwritePolicy,
-    StableJsonPayload,
+from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
+from fedorbit.infrastructure.runtime import current_code_revision
+from fedorbit.infrastructure.workspace import (
+    WorkspaceLayout,
+    build_layout,
+    experiment_workspace,
+    safe_slug,
 )
-
-EXIT_OK = 0 #TODO: should be enum and moved to types or enum file
-EXIT_RUNTIME = 1 #TODO: should be enum and moved to types or enum file
-EXIT_USAGE = 2 #TODO: should be enum and moved to types or enum file
+from fedorbit.reporting import (
+    FigureSeries,
+    TableScalar,
+    VerifiedEvidenceWriter,
+    dataset_and_client_protocol_table,
+    experiment_matrix_table,
+    numerical_constants_and_seeds_table,
+    primary_strict_transfer_results_table,
+    real_transfer_gain_forest_plot,
+)
+from fedorbit.types import (
+    ArtifactState,
+    CliCommand,
+    ClientRole,
+    DatasetId,
+    DatasetIdentifierText,
+    DirectedPairName,
+    ExitStatus,
+    ExperimentIdentifierText,
+    ExperimentName,
+    FailureReason,
+    OverwritePolicy,
+    RelativeGain,
+    ReportArtifactName,
+    ReportSeriesName,
+    StableJsonPayload,
+    TransferMethod,
+)
 
 
 class CliUsageError(ValueError):
     pass
 
 
+OPTIONAL_ARGUMENT = Argument(None)
+
+
 def exit_from_error(error: BaseException) -> NoReturn:
     if isinstance(error, CliUsageError):
-        raise Exit(EXIT_USAGE) from error
+        raise Exit(ExitStatus.USAGE) from error
     if isinstance(error, ExecutionError):
-        outcome = validation_failure_outcome(str(error), invalid=False)
+        outcome = validation_failure_outcome(FailureReason(str(error)), invalid=False)
         typer.echo(f"error [{outcome.terminal_state.value}]: {error}", err=True)
     else:
         typer.echo(f"error: {error}", err=True)
-    raise Exit(EXIT_RUNTIME) from error
+    raise Exit(ExitStatus.RUNTIME) from error
 
 
-def dataset_identifier(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                       ) -> DatasetId:
+def dataset_identifier(name: DatasetIdentifierText) -> DatasetId:
     for candidate in DatasetId:
         if candidate.value == name:
             return candidate
@@ -73,8 +96,7 @@ def dataset_identifier(name: str #TODO: do not use primitivies. Use an appropria
     )
 
 
-def experiment_identifier(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                          ) -> ExperimentName:
+def experiment_identifier(name: ExperimentIdentifierText) -> ExperimentName:
     for candidate in ExperimentName:
         if candidate.value == name:
             return candidate
@@ -84,43 +106,35 @@ def experiment_identifier(name: str #TODO: do not use primitivies. Use an approp
 
 
 def doctor() -> None:
-    try:
-        snapshot = environment_snapshot()
-        lockfile = validate_lockfile() #TODO DELETE #TODO DELETE
-        gpu_ok = reference_gpu_matches()
-        raw_root = Path("data/raw")
-        typer.echo(f"python: {snapshot.python_version}")
-        typer.echo(f"dependencies: {len(snapshot.dependencies)} registered")
-        typer.echo(f"lockfile packages: {lockfile.hashed_package_count} hashed")
-        typer.echo(f"reference gpu matches: {gpu_ok}")
-        typer.echo(f"raw data root present: {raw_root.is_dir()}")
-    except (EnvironmentMismatchError, CliUsageError) as error:
-        typer.echo(f"environment mismatch: {error}")
-        raise Exit(EXIT_RUNTIME) from error
+    snapshot = environment_snapshot()
+    gpu_ok = reference_gpu_matches()
+    raw_root = raw_dataset_root()
+    typer.echo(f"python: {snapshot.python_version}")
+    typer.echo(f"dependencies: {len(snapshot.dependencies)} registered")
+    typer.echo(f"reference gpu matches: {gpu_ok}")
+    typer.echo(f"raw data root present: {raw_root.is_dir()}")
     if not gpu_ok or not raw_root.is_dir():
-        raise Exit(EXIT_RUNTIME)
+        raise Exit(ExitStatus.RUNTIME)
 
 
 def plan() -> None:
-    rows = build_plan()
-    typer.echo(f"registered experiments: {len(rows)}")
-    for row in rows:
+    catalogue = build_catalogue()
+    names = catalogue.registered_names()
+    typer.echo(f"registered experiments: {len(names)}")
+    for name in names:
+        definition = catalogue.definition(name)
         typer.echo(
-            f"{row.experiment.value} | {row.classification.value} | "
-            f"planned cells: {row.planned_cells}"
+            f"{name.value} | {definition.classification.value} | "
+            f"planned cells: {definition.derived_planned_cells}"
         )
 
 
 def preprocess(
-    dataset_name: str | None = Argument(None), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    dataset_name: DatasetId | None = OPTIONAL_ARGUMENT,
     overwrite: bool = False,
 ) -> None:
     try:
-        selected = (
-            (dataset_identifier(dataset_name),)
-            if dataset_name is not None
-            else _registered_datasets()
-        )
+        selected = (dataset_name,) if dataset_name is not None else _registered_datasets()
         result = preprocess_datasets(
             DatasetPreparationRequest(
                 datasets=selected,
@@ -153,7 +167,7 @@ def _verified_manifest(
         if experiment.value not in manifest.semantic_producer_coordinates:
             continue
         try:
-            resolved = store.resolve(ArtifactIdentifier(manifest.artifact_id))
+            resolved = store.resolve(manifest.artifact_id)
         except ValueError:
             continue
         if resolved.state == ArtifactState.COMPLETED:
@@ -178,16 +192,94 @@ def _blocked_experiment(layout_root: Path, experiment: ExperimentName) -> bool:
     ).is_file()
 
 
+def _experiment_state(
+    store: ArtifactStore,
+    layout_root: Path,
+    experiment: ExperimentName,
+) -> ArtifactState:
+    if _blocked_experiment(layout_root, experiment):
+        return ArtifactState.BLOCKED
+    candidates = tuple(
+        manifest
+        for manifest in store.all_manifests()
+        if experiment.value in manifest.semantic_producer_coordinates
+    )
+    if not candidates:
+        return ArtifactState.MISSING
+    latest = max(candidates, key=_manifest_payload_mtime_ns)
+    try:
+        resolved = store.resolve(latest.artifact_id)
+    except ValueError:
+        return ArtifactState.INVALID
+    if resolved.created_git_commit != current_code_revision().commit:
+        return ArtifactState.STALE
+    return resolved.state
+
+
+def _base_model_pilot_dataset_manifests(layout: WorkspaceLayout) -> tuple[DatasetManifest, ...]:
+    workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
+    manifests: list[DatasetManifest] = []
+    for dataset in DatasetId:
+        path = workspace / "artifacts" / "derived" / f"dataset-manifest.{dataset.value}.json"
+        if path.is_file():
+            manifests.append(DatasetManifest.model_validate_json(path.read_text(encoding="utf-8")))
+    return tuple(manifests)
+
+
+def _dataset_client_roles() -> Mapping[str, ClientRole]:
+    return OrderedDict(
+        (dataset.value, client.role)
+        for dataset, client in active_config().scientific.datasets.clients.items()
+    )
+
+
+def _experiment_matrix_rows(
+    catalogue: ExperimentCatalogue,
+) -> tuple[Mapping[str, TableScalar], ...]:
+    rows: list[Mapping[str, TableScalar]] = []
+    for name in catalogue.registered_names():
+        definition = catalogue.definition(name)
+        rows.append(
+            OrderedDict(
+                experiment=name.value,
+                classification=definition.classification.value,
+                datasets_or_pairs=", ".join(scope.value for scope in definition.datasets_or_pairs),
+                methods=", ".join(str(method) for method in definition.methods),
+                registered_seeds=", ".join(str(seed) for seed in definition.seeds),
+                conditions=str(definition.conditions),
+                derived_planned_cells=int(definition.derived_planned_cells),
+                prerequisites=", ".join(
+                    str(prerequisite) for prerequisite in definition.prerequisites
+                ),
+                evidence_relationship=None,
+            )
+        )
+    return tuple(rows)
+
+
+def _real_transfer_gain_series(
+    comparisons: Mapping[DirectedPairName, RelativeGain],
+) -> tuple[FigureSeries, ...]:
+    if not comparisons:
+        return ()
+    pairs = sorted(comparisons)
+    return (
+        FigureSeries(
+            name=ReportSeriesName(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value),
+            x=tuple(comparisons[pair] for pair in pairs),
+            y=tuple(float(index) for index in range(len(pairs))),
+        ),
+    )
+
+
 def report(
-    experiment_name: str | None = Argument(None),
+    experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT,
     overwrite: bool = False,
 ) -> None:
     try:
         catalogue = build_catalogue()
         selected = (
-            (experiment_identifier(experiment_name),)
-            if experiment_name is not None
-            else catalogue.registered_names()
+            (experiment_name,) if experiment_name is not None else catalogue.registered_names()
         )
         layout = build_layout()
         store = ArtifactStore(layout.execution_root)
@@ -201,7 +293,7 @@ def report(
                 continue
             destination = writer.write(
                 experiment,
-                ArtifactIdentifier(manifest.artifact_id),
+                manifest.artifact_id,
                 cast(
                     StableJsonPayload,
                     OrderedDict(
@@ -216,10 +308,10 @@ def report(
             typer.echo(str(destination))
             for metric_path in writer.write_metric_exports(
                 experiment,
-                ArtifactIdentifier(manifest.artifact_id),
+                manifest.artifact_id,
             ):
                 typer.echo(str(metric_path))
-            metric = writer.metric_record(ArtifactIdentifier(manifest.artifact_id))
+            metric = writer.metric_record(manifest.artifact_id)
             if metric is not None:
                 exported_metrics.append(metric)
             exported_manifests.append(manifest)
@@ -230,6 +322,55 @@ def report(
                 tuple(exported_metrics),
             ):
                 typer.echo(str(summary_path))
+            for table, name in (
+                (
+                    numerical_constants_and_seeds_table(),
+                    ReportArtifactName("numerical-constants-and-seeds"),
+                ),
+                (
+                    experiment_matrix_table(_experiment_matrix_rows(catalogue)),
+                    ReportArtifactName("experiment-matrix"),
+                ),
+                (
+                    dataset_and_client_protocol_table(
+                        _base_model_pilot_dataset_manifests(layout),
+                        modality_by_dataset=OrderedDict(),
+                        role_by_dataset=_dataset_client_roles(),
+                        excluded_class_counts=OrderedDict(),
+                    ),
+                    ReportArtifactName("dataset-and-client-protocol"),
+                ),
+            ):
+                typer.echo(str(writer.write_project_evidence_table(table, name)))
+            primary_transfer_metrics = completed_primary_transfer_metric_records(store)
+            primary_transfer_comparisons = completed_primary_transfer_comparison_records(store)
+            typer.echo(
+                str(
+                    writer.write_project_evidence_table(
+                        primary_strict_transfer_results_table(
+                            primary_transfer_metrics, primary_transfer_comparisons
+                        ),
+                        ReportArtifactName("primary-strict-transfer-results"),
+                    )
+                )
+            )
+            gain_by_pair = OrderedDict(
+                (comparison.pair, comparison.mean_difference)
+                for comparison in primary_transfer_comparisons
+                if comparison.method_a == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+                and comparison.method_b == TransferMethod.LOCAL_ONLY
+                and comparison.mean_difference is not None
+            )
+            gain_series = _real_transfer_gain_series(gain_by_pair)
+            if gain_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            real_transfer_gain_forest_plot(gain_series),
+                            ReportArtifactName("real-transfer-gain-forest-plot"),
+                        )
+                    )
+                )
         if exported == 0:
             typer.echo("no verified persisted evidence available for report generation")
     except CliUsageError as error:
@@ -237,15 +378,14 @@ def report(
 
 
 def run(
-    experiment_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    experiment_name: ExperimentName,
     overwrite: bool = False,
 ) -> None:
     try:
-        experiment = experiment_identifier(experiment_name)
-        definition = build_catalogue().definition(experiment)
+        definition = build_catalogue().definition(experiment_name)
         run_experiment(
             ExperimentExecutionRequest(
-                experiment=experiment,
+                experiment=experiment_name,
                 definition=definition,
                 overwrite_policy=OverwritePolicy.REPLACE if overwrite else OverwritePolicy.REUSE,
             )
@@ -261,32 +401,25 @@ def smoke(overwrite: bool = False) -> None:
         exit_from_error(error)
 
 
-def status(experiment_name: str | None = Argument(None) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-           ) -> None:
+def status(experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT) -> None:
     try:
-        rows = build_plan()
-        selected = (
-            {experiment_identifier(experiment_name)}
-            if experiment_name is not None
-            else {row.experiment for row in rows}
-        )
+        catalogue = build_catalogue()
+        names = catalogue.registered_names()
+        selected = {experiment_name} if experiment_name is not None else set(names)
         store = execution_store()
         layout = build_layout()
         typer.echo(
             f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} {'Est-run':<8} {'Est-end':<8}"
         )
         index = 0
-        for row in rows:
-            if row.experiment not in selected:
+        for name in names:
+            if name not in selected:
                 continue
-            status_value = "pending"
-            if _verified_manifest(store, row.experiment) is not None:
-                status_value = "completed"
-            elif _blocked_experiment(layout.execution_root, row.experiment):
-                status_value = "blocked"
+            definition = catalogue.definition(name)
+            status_value = _experiment_state(store, layout.execution_root, name)
             typer.echo(
-                f"{index:>2} {row.experiment.value:<50} {row.classification.value:<22} "
-                f"{status_value:<10} {'-':<8} {'-':<8}"
+                f"{index:>2} {name.value:<50} {definition.classification.value:<22} "
+                f"{status_value.value:<10} {'-':<8} {'-':<8}"
             )
             index += 1
     except CliUsageError as error:
@@ -294,29 +427,24 @@ def status(experiment_name: str | None = Argument(None) #TODO: do not use primit
 
 
 app = typer.Typer(name="fedorbit", no_args_is_help=True)
-app.command("doctor")(doctor) #TODO: Use enum values
-app.command("preprocess")(preprocess) #TODO: Use enum values
-app.command("plan")(plan) #TODO: Use enum values
-app.command("smoke")(smoke) #TODO: Use enum values
-app.command("run")(run) #TODO: Use enum values
-app.command("status")(status) #TODO: Use enum values
-app.command("report")(report) #TODO: Use enum values
+app.command(CliCommand.DOCTOR.value)(doctor)
+app.command(CliCommand.PREPROCESS.value)(preprocess)
+app.command(CliCommand.PLAN.value)(plan)
+app.command(CliCommand.SMOKE.value)(smoke)
+app.command(CliCommand.RUN.value)(run)
+app.command(CliCommand.STATUS.value)(status)
+app.command(CliCommand.REPORT.value)(report)
 
 
-_EXECUTION_LOG_FORMAT = (
-    "%(asctime)s %(experiment)s stage=%(stage)s state=%(state)s "
-    "cell=%(cell_coordinates)s dataset=%(dataset)s seed=%(seed)s "
-    "elapsed=%(elapsed_seconds)s %(reuse_decision)s"
-)
-
-
-def _configure_execution_logging() -> None: #TODO: structured key/value logging via structlog
-    execution_logger = logging.getLogger("fedorbit.execution")
-    execution_logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(_EXECUTION_LOG_FORMAT))
-    execution_logger.addHandler(handler)
-    execution_logger.propagate = False
+def _configure_execution_logging() -> None:
+    structlog.configure(
+        processors=(
+            structlog.contextvars.merge_contextvars,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.JSONRenderer(sort_keys=True),
+        ),
+        wrapper_class=structlog.make_filtering_bound_logger(20),
+    )
 
 
 def main() -> None:

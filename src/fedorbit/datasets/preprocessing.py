@@ -7,6 +7,8 @@ import unicodedata
 from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,15 +23,62 @@ from fedorbit.datasets.splitting import (
     DuplicateGroupSplitAssignment,
     assign_duplicate_groups_chronologically,
 )
-from fedorbit.types import Coefficient, Fraction, Index, ScaleFactor
+from fedorbit.types import (
+    Coefficient,
+    CategoryName,
+    CategorySet,
+    CategoryVocabulary,
+    DuplicateGroupIdentifier,
+    FeatureCount,
+    FeatureValue,
+    FeatureValueMap,
+    Fraction,
+    FineLabel,
+    Index,
+    LocalClassNames,
+    NonNegativeInt,
+    NumericFeatureValue,
+    NormalizedGroupIdentifier,
+    RawCellText,
+    ScaleFactor,
+    Sha256Digest,
+    TabularColumnName,
+    TabularColumns,
+    TabularColumnSet,
+    TextToken,
+    ValidationReason,
+)
 
 if TYPE_CHECKING:
     from fedorbit.datasets.preprocessing import DuplicateGroups, NormalizedRow
 
-MISSING_TOKEN_VOCABULARY = frozenset({"", "0", "0.0", "nan", "none", "null"}) #TODO: should be in enums
-ABSENT_TOKEN = "<ABSENT>" #TODO: should be in enums
-RARE_TOKEN = "<RARE>" #TODO: should be in enums
-UNK_TOKEN = "<UNK>" #TODO: should be in enums
+class PreprocessingToken(StrEnum):
+    EMPTY = ""
+    ZERO = "0"
+    DECIMAL_ZERO = "0.0"
+    NAN = "nan"
+    NONE = "none"
+    NULL = "null"
+    ABSENT = "<ABSENT>"
+    RARE = "<RARE>"
+    UNKNOWN = "<UNK>"
+
+
+class UnicodeNormalizationForm(StrEnum):
+    NFC = "NFC"
+
+
+MISSING_TOKEN_VOCABULARY = frozenset(
+    token.value
+    for token in (
+        PreprocessingToken.EMPTY,
+        PreprocessingToken.ZERO,
+        PreprocessingToken.DECIMAL_ZERO,
+        PreprocessingToken.NAN,
+        PreprocessingToken.NONE,
+        PreprocessingToken.NULL,
+    )
+)
 
 
 class PreprocessingError(ValueError):
@@ -44,7 +93,7 @@ class NormalizedSplitRows:
 
 @dataclass(frozen=True, slots=True)
 class CandidateFeature:
-    name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    name: TabularColumnName
     is_categorical: bool
     train_missing_fraction: Fraction
     train_nonfinite_fraction: Fraction
@@ -57,20 +106,18 @@ class FeatureQualityReport:
     candidate_features: tuple[CandidateFeature, ...]
     dropped_feature_count: Index
     client_invalid: bool
-    client_invalid_reason: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    client_invalid_reason: ValidationReason | None = None
 
     @property
-    def candidate_count_before_filtering(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return len(self.candidate_features)
+    def candidate_count_before_filtering(self) -> FeatureCount:
+        return FeatureCount(len(self.candidate_features))
 
 
 @dataclass(frozen=True, slots=True)
 class TrainingFeatureValues:
-    arrays_by_feature: Mapping[str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                               np.ndarray]
+    arrays_by_feature: Mapping[TabularColumnName, np.ndarray]
 
-    def array_of(self, feature_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: feature_name)
-                 ) -> np.ndarray:
+    def array_of(self, feature_name: TabularColumnName) -> np.ndarray:
         return self.arrays_by_feature[feature_name]
 
 
@@ -84,45 +131,53 @@ class NumericPreprocessor:
 
 @dataclass(frozen=True, slots=True)
 class CategoricalPreprocessor:
-    vocabulary: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    rare_categories: frozenset[str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    vocabulary: CategoryVocabulary
+    rare_categories: CategorySet
 
 
-def is_missing_token(token: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: token)
-                     , categorical: bool) -> bool:
+def is_missing_token(token: TextToken, categorical: bool) -> bool:
     lowered = token.strip().casefold()
-    if lowered in ("nan", "none", "null", ""): #TODO: should be in enums
+    if lowered in {
+        PreprocessingToken.NAN,
+        PreprocessingToken.NONE,
+        PreprocessingToken.NULL,
+        PreprocessingToken.EMPTY,
+    }:
         return True
-    return categorical and lowered in ("0", "0.0") #TODO: should be in enums
+    return categorical and lowered in {
+        PreprocessingToken.ZERO,
+        PreprocessingToken.DECIMAL_ZERO,
+    }
 
 
-def numeric_zero_is_not_missing(value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-                                ) -> bool:
+def numeric_zero_is_not_missing(value: NumericFeatureValue) -> bool:
     return not math.isnan(value) and value == 0.0
 
 
-def _missing_fraction(values: np.ndarray, categorical: bool) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _missing_fraction(values: np.ndarray, categorical: bool) -> Fraction:
     if values.size == 0:
-        return 1.0
+        return Fraction(1.0)
     if categorical:
-        return sum(is_missing_token(str(value), True) for value in values) / values.size
+        return Fraction(
+            sum(is_missing_token(RawCellText(str(value)), True) for value in values) / values.size
+        )
     numeric = values.astype(np.float64)
-    return float(np.isnan(numeric).mean())
+    return Fraction(float(np.isnan(numeric).mean()))
 
 
 def _nonfinite_fraction(values: np.ndarray, categorical: bool
-                        ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+                        ) -> Fraction:
     if categorical:
-        return 0.0
+        return Fraction(0.0)
     numeric = values.astype(np.float64)
-    return float(np.logical_and(~np.isfinite(numeric), ~np.isnan(numeric)).mean())
+    return Fraction(float(np.logical_and(~np.isfinite(numeric), ~np.isnan(numeric)).mean()))
 
 
 def evaluate_feature_quality(
-    feature_names: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: feature_names)
-    categorical_features: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: categorical_features)
+    feature_names: TabularColumns,
+    categorical_features: TabularColumnSet,
     train_values: TrainingFeatureValues,
-    excluded_features: frozenset[str] = frozenset(), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: excluded_features)
+    excluded_features: TabularColumnSet = frozenset(),
 ) -> FeatureQualityReport:
     settings = active_config().scientific.preprocessing
     candidates: list[CandidateFeature] = []
@@ -150,7 +205,10 @@ def evaluate_feature_quality(
     dropped_count = sum(candidate.dropped for candidate in candidates)
     if not candidates:
         return FeatureQualityReport(
-            (), 0, True, "zero candidate features after mandatory semantic exclusions"
+            (),
+            0,
+            True,
+            ValidationReason("zero candidate features after mandatory semantic exclusions"),
         )
     invalid = (
         dropped_count / len(candidates)
@@ -160,7 +218,9 @@ def evaluate_feature_quality(
         tuple(candidates),
         dropped_count,
         invalid,
-        "dropped-feature fraction exceeds the client-invalidity threshold" if invalid else None,
+        ValidationReason("dropped-feature fraction exceeds the client-invalidity threshold")
+        if invalid
+        else None,
     )
 
 
@@ -178,7 +238,7 @@ def normalize_training_rows(
 def assign_duplicate_groups(groups: DuplicateGroups) -> DuplicateGroupSplitAssignment:
     chronology = tuple(
         DuplicateGroupChronology(
-            DuplicateGroupId(group_sha256),
+            DuplicateGroupId(DuplicateGroupIdentifier(group_sha256)),
             ChronologicalTimestamp(min(member.timestamp_fraction for member in members)),
             ChronologicalRowCount(len(members)),
         )
@@ -218,16 +278,26 @@ def transform_numeric(values: np.ndarray, fitted: NumericPreprocessor) -> np.nda
     return np.clip(scaled, clip.lower, clip.upper).astype(np.float64, copy=False)
 
 
-def categorical_vocabulary(train_categories: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: train_categories)
-                           ) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def categorical_vocabulary(train_categories: CategoryVocabulary) -> CategoryVocabulary:
     normalized = tuple(sorted(set(train_categories), key=lambda token: token.encode("utf-8")))
-    return (ABSENT_TOKEN, RARE_TOKEN, UNK_TOKEN, *normalized)
+    return (
+        CategoryName(PreprocessingToken.ABSENT),
+        CategoryName(PreprocessingToken.RARE),
+        CategoryName(PreprocessingToken.UNKNOWN),
+        *normalized,
+    )
 
 
-def fit_categorical_preprocessor(values: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)
-                                 ) -> CategoricalPreprocessor:
-    observed = tuple(ABSENT_TOKEN if is_missing_token(value, True) else value for value in values)
-    non_missing = tuple(value for value in observed if value != ABSENT_TOKEN)
+def fit_categorical_preprocessor(values: tuple[RawCellText, ...]) -> CategoricalPreprocessor:
+    observed = tuple(
+        CategoryName(PreprocessingToken.ABSENT)
+        if is_missing_token(value, True)
+        else CategoryName(value)
+        for value in values
+    )
+    non_missing = tuple(
+        value for value in observed if value != CategoryName(PreprocessingToken.ABSENT)
+    )
     total = len(observed)
     counts = OrderedDict((value, non_missing.count(value)) for value in set(non_missing))
     threshold = active_config().scientific.preprocessing.rare_category_train_frequency_threshold
@@ -236,74 +306,66 @@ def fit_categorical_preprocessor(values: tuple[str, ...] #TODO: do not use primi
     return CategoricalPreprocessor(categorical_vocabulary(retained), rare)
 
 
-def transform_categorical(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-                          , fitted: CategoricalPreprocessor
-                          ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def transform_categorical(
+    value: RawCellText, fitted: CategoricalPreprocessor
+) -> CategoryName:
     if is_missing_token(value, True):
-        return ABSENT_TOKEN
-    if value in fitted.rare_categories:
-        return RARE_TOKEN
-    if value not in fitted.vocabulary:
-        return UNK_TOKEN
-    return value
+        return CategoryName(PreprocessingToken.ABSENT)
+    category = CategoryName(value)
+    if category in fitted.rare_categories:
+        return CategoryName(PreprocessingToken.RARE)
+    if category not in fitted.vocabulary:
+        return CategoryName(PreprocessingToken.UNKNOWN)
+    return category
 
 
-def one_hot(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-            , fitted: CategoricalPreprocessor
-            ) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def one_hot(
+    value: RawCellText, fitted: CategoricalPreprocessor
+) -> tuple[Coefficient, ...]:
     transformed = transform_categorical(value, fitted)
-    return tuple(1.0 if candidate == transformed else 0.0 for candidate in fitted.vocabulary)
+    return tuple(
+        Coefficient(1.0 if candidate == transformed else 0.0) for candidate in fitted.vocabulary
+    )
 
 
 class RowNormalizationError(ValueError):
     pass
 
 
-RawFeatureValue = str | int | float | np.float64 | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-
-
 @dataclass(frozen=True, slots=True)
 class NormalizedFeatureVector:
-    values_by_feature: Mapping[str, RawFeatureValue] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    values_by_feature: FeatureValueMap
 
-    def value_of(self, feature_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: feature_name)
-                 ) -> RawFeatureValue:
+    def value_of(self, feature_name: TabularColumnName) -> FeatureValue:
         return self.values_by_feature[feature_name]
-
-
-@dataclass(frozen=True, slots=True)
-class PartitionedFeatureValues: #TODO: should be deleted. We don't reference this in code.
-    numeric: NormalizedFeatureVector
-    categorical: NormalizedFeatureVector
 
 
 @dataclass(frozen=True, slots=True)
 class NormalizedRow:
     features: NormalizedFeatureVector
-    label: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    label: FineLabel
     timestamp_fraction: Fraction
-    group_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    group_id: NormalizedGroupIdentifier
 
 
 @dataclass(frozen=True, slots=True)
 class DuplicateGroupMembers:
-    group_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    group_sha256: Sha256Digest
     members: tuple[NormalizedRow, ...]
 
     def has_conflicting_labels(self) -> bool:
         return len({member.label for member in self.members}) > 1
 
-    def conflicting_labels(self) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def conflicting_labels(self) -> LocalClassNames:
         return tuple(sorted({member.label for member in self.members}))
 
 
 @dataclass(frozen=True, slots=True)
 class DuplicateGroups:
-    groups: tuple[tuple[str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                        , tuple[NormalizedRow, ...]], ...]
+    groups: tuple[tuple[Sha256Digest, tuple[NormalizedRow, ...]], ...]
 
     def __post_init__(self) -> None:
-        seen: set[str] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        seen: set[Sha256Digest] = set()
         for group_sha256, _ in self.groups:
             if group_sha256 in seen:
                 raise RowNormalizationError(
@@ -312,11 +374,10 @@ class DuplicateGroups:
             seen.add(group_sha256)
 
     @property
-    def group_count(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def group_count(self) -> NonNegativeInt:
         return len(self.groups)
 
-    def members_of(self, group_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: group_sha256)
-                   ) -> tuple[NormalizedRow, ...] | None:
+    def members_of(self, group_sha256: Sha256Digest) -> tuple[NormalizedRow, ...] | None:
         for candidate_sha256, members in self.groups:
             if candidate_sha256 == group_sha256:
                 return members
@@ -328,34 +389,27 @@ class DuplicateGroups:
         )
 
 
-def normalized_missing_value(is_categorical: bool) -> RawFeatureValue:
-    return "" if is_categorical else np.float64(np.nan)
+def normalized_missing_value(is_categorical: bool) -> FeatureValue:
+    return RawCellText("") if is_categorical else float("nan")
 
 
-def normalize_value(value: RawFeatureValue, is_categorical: bool) -> RawFeatureValue:
-    if is_missing_token(str(value).strip(), categorical=is_categorical):
+def normalize_value(value: FeatureValue, is_categorical: bool) -> FeatureValue:
+    if is_missing_token(RawCellText(str(value).strip()), categorical=is_categorical):
         return normalized_missing_value(is_categorical)
     if isinstance(value, str):
-        return unicodedata.normalize("NFC", value) #TODO: use enum
+        return RawCellText(unicodedata.normalize(UnicodeNormalizationForm.NFC, value))
     if isinstance(value, float) and not math.isfinite(float(value)):
         return normalized_missing_value(False)
     return value
 
 
-def _arrow_column_value(value: RawFeatureValue, role: FieldRole
-                        ) -> float | str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    if role == FieldRole.BEHAVIORAL_NUMERIC:
-        if value is None:
-            return float("nan")
-        return float(value)
-    return unicodedata.normalize("NFC", str(value))
-
-
-def _numeric_scalar_bytes(value: float) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value) #TODO: PERF: encode each distinct value once (lru_cache keyed by value) - currently re-encoded per row over the whole lineage
+@lru_cache(maxsize=None)
+def _numeric_scalar_bytes(value: NumericFeatureValue) -> bytes:
     return struct.pack("<d", value)
 
 
-def _categorical_scalar_bytes(value: str) -> bytes: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value) #TODO: PERF: encode each distinct value once (lru_cache keyed by value) - currently re-encoded per row over the whole lineage
+@lru_cache(maxsize=None)
+def _categorical_scalar_bytes(value: RawCellText) -> bytes:
     encoded = value.encode("utf-8")
     return struct.pack("<i", len(encoded)) + encoded
 
@@ -366,23 +420,28 @@ def normalized_row_bytes(row_features: NormalizedFeatureVector, schema: AdapterS
         role = schema.role_of(column)
         if role not in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL):
             continue
-        value = _arrow_column_value(row_features.value_of(column), role)
+        value = row_features.value_of(column)
         if role == FieldRole.BEHAVIORAL_NUMERIC:
-            assert isinstance(value, float)
-            parts.append(_numeric_scalar_bytes(value))
+            numeric_value = NumericFeatureValue(
+                float("nan") if value is None else float(value)
+            )
+            parts.append(_numeric_scalar_bytes(numeric_value))
         else:
-            assert isinstance(value, str)
-            parts.append(_categorical_scalar_bytes(value))
+            categorical_value = RawCellText(
+                unicodedata.normalize(UnicodeNormalizationForm.NFC, str(value))
+            )
+            parts.append(_categorical_scalar_bytes(categorical_value))
     return b"".join(parts)
 
 
-def exact_duplicate_hash(row_features: NormalizedFeatureVector, schema: AdapterSchema
-                         ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return hashlib.sha256(normalized_row_bytes(row_features, schema)).hexdigest()
+def exact_duplicate_hash(
+    row_features: NormalizedFeatureVector, schema: AdapterSchema
+) -> Sha256Digest:
+    return Sha256Digest(hashlib.sha256(normalized_row_bytes(row_features, schema)).hexdigest())
 
 
 def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> DuplicateGroups:
-    groups: defaultdict[str, list[NormalizedRow]] = defaultdict(list) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    groups: defaultdict[Sha256Digest, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
         row_hash = exact_duplicate_hash(row.features, schema) #TODO: PERF: group duplicate rows column-wise (sort/tabulate normalized column tuples) instead of one sha256 per row; encode each distinct row once
         groups.setdefault(row_hash, []).append(row)
@@ -398,18 +457,3 @@ def validate_duplicate_groups(groups: DuplicateGroups) -> None:
                 f"duplicate group {members.group_sha256[:16]} contains conflicting labels: "
                 f"{members.conflicting_labels()}"
             )
-
-
-def partition_features(schema: AdapterSchema, row: NormalizedRow) -> PartitionedFeatureValues: #TODO: should be deleted. We don't reference this in code.
-    numeric: OrderedDict[str, RawFeatureValue] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    categorical: OrderedDict[str, RawFeatureValue] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    for column in schema.feature_order:
-        role = schema.role_of(column)
-        if role == FieldRole.BEHAVIORAL_NUMERIC:
-            numeric[column] = row.features.value_of(column)
-        elif role == FieldRole.BEHAVIORAL_CATEGORICAL:
-            categorical[column] = row.features.value_of(column)
-    return PartitionedFeatureValues(
-        NormalizedFeatureVector(numeric),
-        NormalizedFeatureVector(categorical),
-    )

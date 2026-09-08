@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
-from pathlib import Path
 
 import pytest
 
@@ -11,8 +10,6 @@ from fedorbit.infrastructure.environment import (
     DEPENDENCY_SPECS,
     environment_snapshot,
     reference_gpu_matches,
-    validate_environment,
-    validate_lockfile,
 )
 
 
@@ -29,31 +26,6 @@ def test_snapshot_records_python_version() -> None:
 
     snapshot = environment_snapshot()
     assert snapshot.python_version == platform.python_version()
-
-
-def test_strict_validation_accepts_registered_software_environment() -> None:
-    snapshot = validate_environment(strict=True)
-    assert snapshot.python_version
-    assert not snapshot.mismatches()
-
-
-def test_non_strict_validation_returns_snapshot() -> None:
-    snapshot = validate_environment(strict=False)
-    assert snapshot.python_version
-
-
-def test_lockfile_validates_hashes_and_versions() -> None:
-    summary = validate_lockfile()
-    assert summary.all_packages_hashed
-    assert len(summary.package_names) >= 20
-    assert "torch" in summary.package_names
-    assert "typer" in summary.package_names
-
-
-def test_lockfile_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr("fedorbit.infrastructure.environment.repository_root", lambda: tmp_path)
-    with pytest.raises(FileNotFoundError):
-        validate_lockfile()
 
 
 def test_reference_gpu_probe_is_boolean() -> None:

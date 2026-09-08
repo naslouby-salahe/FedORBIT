@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
+from enum import StrEnum
 from itertools import product
 
 import numpy as np
@@ -29,7 +30,45 @@ from fedorbit.optimization.objective import (
     rounded_action_vector,
     zero_action,
 )
-from fedorbit.types import Score, TerminalState
+from fedorbit.types import (
+    MonotonicDeadline,
+    Index,
+    Score,
+    SolverStatus,
+    SolverVariablePrefix,
+    SupportCount,
+    TerminalState,
+    Tolerance,
+)
+
+
+type AssignmentKey = tuple[int, int]
+type ProductKey = tuple[int, int, int, int]
+type AssignmentVariables = Mapping[AssignmentKey, Expr]
+type ProductCoefficients = Mapping[ProductKey, Score]
+type MutableProductCoefficients = MutableMapping[ProductKey, Score]
+type NodePermutation = tuple[int, ...]
+type ScoredAction = tuple[Score, CurriculumAction]
+
+
+class ScipStatus(StrEnum):
+    OPTIMAL = "optimal"
+    TIME_LIMIT = "timelimit"
+    MEMORY_LIMIT = "memlimit"
+    NODE_LIMIT = "nodelimit"
+    GAP_LIMIT = "gaplimit"
+
+
+class ScipRealParameter(StrEnum):
+    TIME_LIMIT = "limits/time"
+    FEASIBILITY_TOLERANCE = "numerics/feastol"
+    RELATIVE_GAP = "limits/gap"
+
+
+class ScipIntegerParameter(StrEnum):
+    MAX_THREADS = "parallel/maxnthreads"
+    RANDOM_SEED_SHIFT = "randomization/randomseedshift"
+    PERMUTATION_SEED = "randomization/permutationseed"
 
 
 class QapUncertifiedError(RuntimeError):
@@ -67,35 +106,34 @@ class QapRobustOutcome:
         return self.certified_solution is not None
 
 
-def _terminal_state_for(status: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                        ) -> TerminalState | None:
-    if status == "timelimit":  #TODO: use enums
+def _terminal_state_for(status: SolverStatus) -> TerminalState | None:
+    if status == ScipStatus.TIME_LIMIT:
         return TerminalState.TIME_LIMIT
-    if status in {"memlimit", "nodelimit", "gaplimit"}: #TODO: use enum for status codes instead of raw strings
+    if status in {ScipStatus.MEMORY_LIMIT, ScipStatus.NODE_LIMIT, ScipStatus.GAP_LIMIT}:
         return TerminalState.RESOURCE_LIMIT
     return None
 
 
-def _configure_model(model: Model, deadline: float | None) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
+def _configure_model(model: Model, deadline: MonotonicDeadline | None) -> None:
     settings = active_config().solvers.generic_exact_qap
     model.hideOutput()
     remaining = settings.wall_time_seconds_per_solve
     if deadline is not None:
         remaining = min(remaining, max(0.0, deadline - time.monotonic()))
-    model.setRealParam("limits/time", float(remaining)) #TODO: use enums instead of hardcoded strings
-    model.setIntParam("parallel/maxnthreads", int(settings.threads)) #TODO: use enums instead of hardcoded strings
-    model.setIntParam("randomization/randomseedshift", int(settings.random_seed)) #TODO: use enums instead of hardcoded strings
-    model.setIntParam("randomization/permutationseed", int(settings.random_seed)) #TODO: use enums instead of hardcoded strings
-    model.setRealParam("numerics/feastol", float(settings.feasibility_tolerance)) #TODO: use enums instead of hardcoded strings
-    model.setRealParam("limits/gap", float(settings.relative_mip_gap)) #TODO: use enums instead of hardcoded strings
+    model.setRealParam(ScipRealParameter.TIME_LIMIT.value, float(remaining))
+    model.setIntParam(ScipIntegerParameter.MAX_THREADS.value, int(settings.threads))
+    model.setIntParam(ScipIntegerParameter.RANDOM_SEED_SHIFT.value, int(settings.random_seed))
+    model.setIntParam(ScipIntegerParameter.PERMUTATION_SEED.value, int(settings.random_seed))
+    model.setRealParam(ScipRealParameter.FEASIBILITY_TOLERANCE.value, float(settings.feasibility_tolerance))
+    model.setRealParam(ScipRealParameter.RELATIVE_GAP.value, float(settings.relative_mip_gap))
 
 
 def _build_assignment_structure(
     model: Model,
     blocks: PaddedBlockStructure,
-    prefix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prefix)
-) -> Mapping[tuple[int, int], Expr]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    assignment_variables: OrderedDict[tuple[int, int], Expr] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    prefix: SolverVariablePrefix,
+) -> AssignmentVariables:
+    assignment_variables: OrderedDict[AssignmentKey, Expr] = OrderedDict()
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
         sources = list(blocks.block_index_range(block_index))
@@ -116,11 +154,11 @@ def _build_assignment_structure(
 
 def _add_mccormick_products(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
-    coefficients: Mapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients)
-    prefix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prefix)
+    assignment_variables: AssignmentVariables,
+    coefficients: ProductCoefficients,
+    prefix: SolverVariablePrefix,
 ) -> list[Expr]:
-    product_variables: OrderedDict[tuple[int, int, int, int], Expr] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    product_variables: OrderedDict[ProductKey, Expr] = OrderedDict()
     objective_terms: list[Expr] = []
     for key, coefficient in sorted(coefficients.items()):
         source_a, source_b, target_k, target_j = key
@@ -142,9 +180,9 @@ def _add_mccormick_products(
 def _append_products_for_target_pair(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    target_k: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_k)
-    target_j: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_j)
-    coefficients: MutableMapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients)
+    target_k: Index,
+    target_j: Index,
+    coefficients: MutableProductCoefficients,
 ) -> None:
     blocks = problem.blocks
     lower = problem.lower_response_matrix
@@ -162,9 +200,9 @@ def _append_products_for_target_pair(
 def _fixed_action_product_coefficients(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-) -> Mapping[tuple[int, int, int, int], float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> ProductCoefficients:
     blocks = problem.blocks
-    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coefficients: OrderedDict[ProductKey, Score] = OrderedDict()
     for target_k in range(blocks.total_padded_nodes):
         for target_j in alpha.active_support_nodes:
             _append_products_for_target_pair(problem, alpha, target_k, target_j, coefficients)
@@ -190,15 +228,19 @@ def fixed_action_worst_correspondence_qap(
         raise SolverExecutionError("QAP separator requires a nonzero action")
     blocks = problem.blocks
     coefficients = _fixed_action_product_coefficients(problem, alpha)
-    deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
+    deadline = MonotonicDeadline(
+        time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
+    )
     model = Model("qap_fixed_action")
     _configure_model(model, deadline)
-    assignment_variables = _build_assignment_structure(model, blocks, "fa")
-    objective_terms = _add_mccormick_products(model, assignment_variables, coefficients, "fa")
+    assignment_variables = _build_assignment_structure(model, blocks, SolverVariablePrefix("fa"))
+    objective_terms = _add_mccormick_products(
+        model, assignment_variables, coefficients, SolverVariablePrefix("fa")
+    )
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
     model.optimize()
-    status = model.getStatus()
-    if status != "optimal":
+    status = SolverStatus(model.getStatus())
+    if status != ScipStatus.OPTIMAL:
         return _uncertified_result(_terminal_state_for(status))
     gap = float(model.getGap())
     if not math.isfinite(gap) or gap > config.solvers.generic_exact_qap.relative_mip_gap:
@@ -222,7 +264,7 @@ def point_correspondence_commitment(
     size = blocks.total_padded_nodes
     if source_response_matrix.shape != (size, size) or target_response_matrix.shape != (size, size):
         raise SolverExecutionError("point-correspondence matrices must match padded size")
-    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coefficients: OrderedDict[ProductKey, Score] = OrderedDict()
     for source_a, source_b, target_k, target_j in product(range(size), repeat=4):
         if blocks.block_of_node(source_a) != blocks.block_of_node(target_k):
             continue
@@ -233,16 +275,20 @@ def point_correspondence_commitment(
         )
         if coefficient:
             coefficients[(source_a, source_b, target_k, target_j)] = coefficient
-    deadline = time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
+    deadline = MonotonicDeadline(
+        time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
+    )
     model = Model("qap_point_correspondence")
     _configure_model(model, deadline)
-    assignment_variables = _build_assignment_structure(model, blocks, "pc")
-    objective_terms = _add_mccormick_products(model, assignment_variables, coefficients, "pc")
+    assignment_variables = _build_assignment_structure(model, blocks, SolverVariablePrefix("pc"))
+    objective_terms = _add_mccormick_products(
+        model, assignment_variables, coefficients, SolverVariablePrefix("pc")
+    )
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
     model.optimize()
-    status = model.getStatus()
+    status = SolverStatus(model.getStatus())
     limit_state = _terminal_state_for(status)
-    if status != "optimal":
+    if status != ScipStatus.OPTIMAL:
         return QapSeparatorResult(
             correspondence=None,
             objective_value=None,
@@ -283,20 +329,20 @@ def point_correspondence_commitment(
 
 def _refine_lexicographic_correspondence(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
+    assignment_variables: AssignmentVariables,
     objective_terms: list[Expr],
     blocks: PaddedBlockStructure,
-    best_objective: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: best_objective)
-    tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: tie_tolerance)
-    deadline: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
-) -> tuple[tuple[int, ...], float] | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    best_objective: Score,
+    tie_tolerance: Tolerance,
+    deadline: MonotonicDeadline,
+) -> tuple[NodePermutation, Score] | None:
     model.freeTransform()
     model.addCons(
         quicksum(objective_terms) <= best_objective + tie_tolerance,
         name="tie_bound",
         removable=True,
     )
-    chosen_images: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    chosen_images: list[Index] = []
     for target in range(blocks.total_padded_nodes):
         block_sources = list(blocks.block_index_range(blocks.block_of_node(target)))
         fixed = False
@@ -309,8 +355,8 @@ def _refine_lexicographic_correspondence(
             )
             _configure_model(model, deadline)
             model.optimize()
-            status = model.getStatus()
-            if status == "optimal":
+            status = SolverStatus(model.getStatus())
+            if status == ScipStatus.OPTIMAL:
                 fixed = True
                 break
             model.freeTransform()
@@ -383,13 +429,13 @@ def solve_support_master_qap(
 
 def solve_robust_action_qap(
     problem: RobustActionProblem,
-    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
+    support_limit: SupportCount | None = None,
 ) -> QapRobustOutcome:
     settings = active_config().solvers.exact_sparse
     supports = enumerate_support_coordinate_sets(problem, support_limit)
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     zero_candidate = zero_action(problem)
-    candidates: list[tuple[float, CurriculumAction]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    candidates: list[ScoredAction] = [
         (evaluate_objective(zero_candidate, identity), zero_candidate)
     ]
     solutions: list[SupportMasterSolution] = []
@@ -428,10 +474,10 @@ def solve_robust_action_qap(
 
 def _extract_images(
     model: Model,
-    assignment_variables: Mapping[tuple[int, int], Expr], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: assignment_variables)
+    assignment_variables: AssignmentVariables,
     blocks: PaddedBlockStructure,
-) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    images: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> NodePermutation:
+    images: list[Index] = []
     for target in range(blocks.total_padded_nodes):
         selected = [
             source

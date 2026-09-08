@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -9,20 +8,49 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from fedorbit.types import (
     Estimate,
+    ArtifactIdentifier,
+    ContrastName,
+    DirectedPairName,
+    EvaluationConditionName,
+    FieldDescription,
+    FineLabel,
     ExperimentName,
     Index,
+    InvalidReason,
     MetricId,
+    MetricUnit,
     MultiplicityFamily,
     RandomSeed,
     RelativeGain,
     ResampleCount,
     SampleCount,
+    Fraction,
+    Sha256Digest,
     SignificanceLevel,
     Split,
+    StatisticalTestName,
     TransferMethod,
+    is_sha256_digest,
 )
 
-_SHA256 = re.compile(r"^[0-9a-f]{64}$") #TODO: centralize this. Seems duplicated
+type PredictionSemanticIdentity = tuple[
+    ExperimentName,
+    DirectedPairName,
+    TransferMethod,
+    EvaluationConditionName,
+    RandomSeed,
+    Split,
+    Sha256Digest,
+]
+type MetricSemanticIdentity = tuple[
+    ExperimentName,
+    DirectedPairName,
+    TransferMethod,
+    EvaluationConditionName,
+    RandomSeed,
+    MetricId,
+]
+type EvaluationSemanticIdentity = PredictionSemanticIdentity | MetricSemanticIdentity
 
 
 class MetricDirection(StrEnum):
@@ -58,25 +86,25 @@ class FrozenRecord(BaseModel):
 
 class PredictionRecord(FrozenRecord):
     experiment: ExperimentName
-    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    pair: DirectedPairName
     method: TransferMethod
-    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    condition: EvaluationConditionName
     seed: RandomSeed
-    row_hash: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    row_hash: Sha256Digest
     split: Split
-    true_local_class_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    predicted_local_class_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    probabilities: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    loss: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    processed_split_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    true_local_class_id: FineLabel
+    predicted_local_class_id: FineLabel
+    probabilities: tuple[Fraction, ...]
+    loss: Estimate
+    checkpoint_artifact_id: ArtifactIdentifier
+    processed_split_artifact_id: ArtifactIdentifier
+    dependency_fingerprint_sha256: Sha256Digest
 
     @model_validator(mode="after")
     def validate_record(self) -> PredictionRecord:
         if not self.pair or not self.condition:
             raise ValueError("prediction pair and condition must be non-empty")
-        _require_sha256(self.row_hash, "prediction row hash")
+        _require_sha256(self.row_hash, FieldDescription("prediction row hash"))
         if not self.true_local_class_id or not self.predicted_local_class_id:
             raise ValueError("prediction class identities must be non-empty")
         if not self.checkpoint_artifact_id or not self.processed_split_artifact_id:
@@ -93,32 +121,41 @@ class PredictionRecord(FrozenRecord):
             raise ValueError("prediction probabilities must sum to one")
         if not math.isfinite(self.loss) or self.loss < 0.0:
             raise ValueError("prediction loss must be finite and nonnegative")
-        _require_sha256(self.dependency_fingerprint_sha256, "prediction dependency fingerprint")
+        _require_sha256(
+            self.dependency_fingerprint_sha256,
+            FieldDescription("prediction dependency fingerprint"),
+        )
         return self
 
 
 class MetricRecord(FrozenRecord):
     experiment: ExperimentName
-    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    pair: DirectedPairName
     method: TransferMethod
-    condition: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    condition: EvaluationConditionName
     seed: RandomSeed
     metric_name: MetricId
     metric_value: Estimate | None
-    metric_unit: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    metric_unit: MetricUnit
     direction: MetricDirection
-    evaluation_class_set_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    input_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    evaluation_class_set_sha256: Sha256Digest
+    input_artifact_ids: tuple[ArtifactIdentifier, ...]
+    dependency_fingerprint_sha256: Sha256Digest
     valid: bool
-    invalid_reason: str | None#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    invalid_reason: InvalidReason | None
 
     @model_validator(mode="after")
     def validate_record(self) -> MetricRecord:
         if not self.pair or not self.condition or not self.metric_unit:
             raise ValueError("metric identity/unit fields must be non-empty")
-        _require_sha256(self.evaluation_class_set_sha256, "evaluation class-set SHA-256")
-        _require_sha256(self.dependency_fingerprint_sha256, "metric dependency fingerprint")
+        _require_sha256(
+            self.evaluation_class_set_sha256,
+            FieldDescription("evaluation class-set SHA-256"),
+        )
+        _require_sha256(
+            self.dependency_fingerprint_sha256,
+            FieldDescription("metric dependency fingerprint"),
+        )
         if self.valid:
             if self.metric_value is None or not math.isfinite(self.metric_value):
                 raise ValueError("valid metric requires a finite metric value")
@@ -134,9 +171,9 @@ class MetricRecord(FrozenRecord):
 
 
 class PairedComparisonRecord(FrozenRecord):
-    contrast_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    contrast_name: ContrastName
     family: MultiplicityFamily
-    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    pair: DirectedPairName
     method_a: TransferMethod
     method_b: TransferMethod
     metric: MetricId
@@ -150,8 +187,8 @@ class PairedComparisonRecord(FrozenRecord):
     materiality_threshold: RelativeGain | None
     equivalence_margin_low: RelativeGain | None
     equivalence_margin_high: RelativeGain | None
-    input_metric_artifact_ids: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dependency_fingerprint_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    input_metric_artifact_ids: tuple[ArtifactIdentifier, ...]
+    dependency_fingerprint_sha256: Sha256Digest
     decision: ComparisonDecision
 
     @model_validator(mode="after")
@@ -196,12 +233,15 @@ class PairedComparisonRecord(FrozenRecord):
             not value for value in self.input_metric_artifact_ids
         ):
             raise ValueError("comparison requires non-empty input metric artifact identities")
-        _require_sha256(self.dependency_fingerprint_sha256, "comparison dependency fingerprint")
+        _require_sha256(
+            self.dependency_fingerprint_sha256,
+            FieldDescription("comparison dependency fingerprint"),
+        )
         return self
 
 
 class StatisticalMetadataRecord(FrozenRecord):
-    test_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    test_name: StatisticalTestName
     exact_or_asymptotic: StatisticalExactness
     alternative: StatisticalAlternative
     zero_difference_count: Index
@@ -209,7 +249,7 @@ class StatisticalMetadataRecord(FrozenRecord):
     bootstrap_seed: RandomSeed | None
     holm_rank: Index | None
     family_size: SampleCount
-    statistical_code_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    statistical_code_sha256: Sha256Digest
 
     @model_validator(mode="after")
     def validate_record(self) -> StatisticalMetadataRecord:
@@ -225,14 +265,18 @@ class StatisticalMetadataRecord(FrozenRecord):
             raise ValueError("multiplicity family size must be positive")
         if self.holm_rank is not None and not 1 <= self.holm_rank <= self.family_size:
             raise ValueError("Holm rank must lie within the multiplicity family")
-        _require_sha256(self.statistical_code_sha256, "statistical code SHA-256")
+        _require_sha256(
+            self.statistical_code_sha256,
+            FieldDescription("statistical code SHA-256"),
+        )
         return self
 
 
-def _require_sha256(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-, field_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: field_name)
+def _require_sha256(
+    value: Sha256Digest,
+    field_name: FieldDescription,
 ) -> None:
-    if _SHA256.fullmatch(value) is None:
+    if not is_sha256_digest(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
@@ -254,41 +298,49 @@ def validate_prediction_records(
     records: PredictionRecordCollection,
 ) -> PredictionRecordCollection:
     materialized = records.records
-    identities: set[tuple[str, str, str, str, int, str, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    ] = set()
-    for record in materialized:
-        identity = (
-            record.experiment.value,
-            record.pair,
-            record.method.value,
-            record.condition,
-            record.seed,
-            record.split.value,
-            record.row_hash,
-        )
-        if identity in identities:
-            raise EvaluationValidationError("duplicate prediction semantic identity")
-        identities.add(identity)
+    _require_unique_semantic_identities(
+        tuple(
+            (
+                record.experiment,
+                record.pair,
+                record.method,
+                record.condition,
+                record.seed,
+                record.split,
+                record.row_hash,
+            )
+            for record in materialized
+        ),
+        "duplicate prediction semantic identity",
+    )
     return PredictionRecordCollection(materialized)
 
 
-def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection: #TODO: is this duplicated?? Should be handled better
+def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection:
     materialized = records.records
-    identities: set[tuple[str, str, str, str, int, str] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                    ] = set()
-    for record in materialized:
-        identity = (
-            record.experiment.value,
-            record.pair,
-            record.method.value,
-            record.condition,
-            record.seed,
-            record.metric_name.value,
-        )
-        if identity in identities:
-            raise EvaluationValidationError("duplicate metric semantic identity")
-        identities.add(identity)
+    _require_unique_semantic_identities(
+        tuple(
+            (
+                record.experiment,
+                record.pair,
+                record.method,
+                record.condition,
+                record.seed,
+                record.metric_name,
+            )
+            for record in materialized
+        ),
+        "duplicate metric semantic identity",
+    )
     return MetricRecordCollection(materialized)
+
+
+def _require_unique_semantic_identities(
+    identities: tuple[EvaluationSemanticIdentity, ...],
+    error_message: str,
+) -> None:
+    if len(set(identities)) != len(identities):
+        raise EvaluationValidationError(error_message)
 
 
 def validate_comparison_metadata(

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fedorbit.datasets.common import file_sha256
 from fedorbit.infrastructure.execution import ArtifactStore, RecoveryBoundary
-from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id, file_sha256
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id
 from fedorbit.infrastructure.reuse import (
     SelectiveInvalidation,
     changed_stage_affects,
@@ -32,7 +33,7 @@ def _manifest(
     artifact_type: str,
     stage: str,
     fingerprint: str,
-    upstream: tuple[str, ...] = (),
+    upstream: tuple[ArtifactIdentifier, ...] = (),
 ) -> ReusableArtifactManifest:
     return ReusableArtifactManifest.model_validate(
         {
@@ -78,12 +79,12 @@ def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
     train_payload = _payload(tmp_path, "train.pt")
     report_payload = _payload(tmp_path, "report.json")
     store.write_reusable(
-        _manifest(raw_payload, "prepared_split", "preprocessing", "fp-pre", ("raw-up",))
+        _manifest(raw_payload, "prepared_split", "preprocessing", "fp-pre", (ArtifactIdentifier("raw-up"),))
     )
     store.write_reusable(
-        _manifest(train_payload, "checkpoint", "training", "fp-train", ("pre-up",))
+        _manifest(train_payload, "checkpoint", "training", "fp-train", (ArtifactIdentifier("pre-up"),))
     )
-    store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", ("stat-up",)))
+    store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", (ArtifactIdentifier("stat-up"),)))
     invalidated = SelectiveInvalidation(store).invalidate_stage(ArtifactStage.TRAINING)
     assert len(invalidated) == 2
     remaining = {path.stem for path in store.manifest_dir().glob("*.json")}
@@ -94,20 +95,22 @@ def test_invalidation_keeps_siblings_and_unrelated(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     training_a = _payload(tmp_path, "a.pt")
     training_b = _payload(tmp_path, "b.pt")
-    first = _manifest(training_a, "checkpoint", "training", "fp-a", ("pre-a",))
-    second = _manifest(training_b, "checkpoint", "training", "fp-b", ("pre-b",))
+    first = _manifest(training_a, "checkpoint", "training", "fp-a", (ArtifactIdentifier("pre-a"),))
+    second = _manifest(training_b, "checkpoint", "training", "fp-b", (ArtifactIdentifier("pre-b"),))
     store.write_reusable(first)
     store.write_reusable(second)
     invalidated = SelectiveInvalidation(store).invalidate_descendants(ArtifactIdentifier("pre-a"))
-    assert invalidated == (ArtifactIdentifier(first.artifact_id),)
-    assert {path.stem for path in store.manifest_dir().glob("*.json")} == {second.artifact_id}
+    assert invalidated == (first.artifact_id,)
+    assert {path.stem for path in store.manifest_dir().glob("*.json")} == {
+        second.artifact_id.value
+    }
 
 
 def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     mid = _payload(tmp_path, "mid.bin")
     leaf = _payload(tmp_path, "leaf.bin")
-    mid_manifest = _manifest(mid, "response_packet", "response", "fp-mid", ("target-up",))
+    mid_manifest = _manifest(mid, "response_packet", "response", "fp-mid", (ArtifactIdentifier("target-up"),))
     leaf_manifest = _manifest(
         leaf, "confirmation_input", "confirmation", "fp-leaf", (mid_manifest.artifact_id,)
     )
@@ -117,8 +120,8 @@ def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
         ArtifactIdentifier("target-up")
     )
     assert set(invalidated) == {
-        ArtifactIdentifier(mid_manifest.artifact_id),
-        ArtifactIdentifier(leaf_manifest.artifact_id),
+        mid_manifest.artifact_id,
+        leaf_manifest.artifact_id,
     }
     assert not list(store.manifest_dir().glob("*.json"))
 
@@ -132,7 +135,7 @@ def test_recovery_boundary_finds_first_incomplete_cell(tmp_path: Path) -> None:
         (
             ExecutionCell(
                 SemanticCoordinates("cell-1"),
-                ArtifactIdentifier(manifest.artifact_id),
+                manifest.artifact_id,
                 ArtifactFingerprint("fp-ok"),
             ),
             ExecutionCell(
@@ -160,7 +163,7 @@ def test_recovery_boundary_all_valid(tmp_path: Path) -> None:
         (
             ExecutionCell(
                 SemanticCoordinates("cell-1"),
-                ArtifactIdentifier(manifest.artifact_id),
+                manifest.artifact_id,
                 ArtifactFingerprint("fp-ok"),
             ),
         )

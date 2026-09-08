@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fedorbit.infrastructure.planner import build_plan
+from fedorbit.experiments.catalogue import build_catalogue
 
 
 def test_execution_plan_exposes_complete_registered_catalogue() -> None:
-    rows = build_plan()
-    assert len(rows) == 26
-    assert len({row.experiment for row in rows}) == 26
-    assert all(row.classification.value for row in rows)
+    catalogue = build_catalogue()
+    names = catalogue.registered_names()
+    assert len(names) == 26
+    assert len(set(names)) == 26
+    assert all(catalogue.definition(name).classification.value for name in names)

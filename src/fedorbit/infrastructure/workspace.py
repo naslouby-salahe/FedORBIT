@@ -11,17 +11,27 @@ from pathlib import Path
 from typing import cast
 
 import pandas as pd
+from filelock import FileLock
 
 from fedorbit.config.loading import active_config, repository_root
 from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
+from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.types import (
+    ArtifactFileSuffix,
     ByteCount,
     DatasetId,
+    DatasetRelativePath,
+    DuplicateReportColumn,
     ExperimentName,
+    FilesystemSlug,
     RawDatasetDirectory,
+    RawInventoryArtifact,
+    SemanticCoordinates,
+    Sha256Digest,
     StableJsonPayload,
+    TabularColumnName,
     stable_json,
 )
 
@@ -32,24 +42,22 @@ class WorkspaceError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceLayout:
-    execution_root: Path #TODO: should be in config
-    manuscript_root: Path #TODO: delete this from code
-    preprocessing: Path #TODO: should be in config
-    artifacts: Path#TODO: should be in config
-    experiments: Path #TODO: should be in config
-    cache: Path #TODO: should be in config
-    staging: Path #TODO: should be in config
-    results_experiments: Path #TODO: should be in config
-    project_summary: Path #TODO: should be in config
+    execution_root: Path
+    preprocessing: Path
+    artifacts: Path
+    experiments: Path
+    cache: Path
+    staging: Path
+    results_experiments: Path
+    project_summary: Path
 
 
-def safe_slug(value: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: value)
-              ) -> str:#TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def safe_slug(value: str) -> FilesystemSlug:
     normalized = unicodedata.normalize("NFC", value).casefold()
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
     if not slug:
         raise WorkspaceError("descriptive name does not produce a filesystem slug")
-    return slug
+    return FilesystemSlug(slug)
 
 
 def build_layout(root: Path | None = None) -> WorkspaceLayout:
@@ -59,14 +67,13 @@ def build_layout(root: Path | None = None) -> WorkspaceLayout:
     manuscript_root = base / layout.manuscript_root
     return WorkspaceLayout(
         execution_root=execution_root,
-        manuscript_root=manuscript_root,
-        preprocessing=execution_root / "preprocessing", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        artifacts=execution_root / "artifacts", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        experiments=execution_root / "experiments", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        cache=execution_root / "cache", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        staging=execution_root / "cache" / "staging", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        results_experiments=manuscript_root / "experiments", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
-        project_summary=manuscript_root / "project_summary", #TODO: should be retrieved from config yml and converted in Paths and accessed through config
+        preprocessing=execution_root / layout.preprocessing_directory,
+        artifacts=execution_root / layout.artifacts_directory,
+        experiments=execution_root / layout.experiments_directory,
+        cache=execution_root / layout.cache_directory,
+        staging=execution_root / layout.cache_directory / layout.staging_directory,
+        results_experiments=manuscript_root / layout.results_experiments_directory,
+        project_summary=manuscript_root / layout.project_summary_directory,
     )
 
 
@@ -81,24 +88,14 @@ def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Pa
 def leaf_path(
     layout: WorkspaceLayout,
     workspace: Path,
-    semantic_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: semantic_coordinates)
-    fingerprint_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint_sha256)
-    suffix: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: suffix)
+    semantic_coordinates: SemanticCoordinates,
+    fingerprint_sha256: Sha256Digest,
+    suffix: ArtifactFileSuffix,
 ) -> Path:
     if not workspace.is_absolute():
         workspace = layout.execution_root / workspace
-    semantic_slug = safe_slug(semantic_coordinates)
+    semantic_slug = safe_slug(semantic_coordinates.value)
     return workspace / f"{semantic_slug}.{fingerprint_sha256[:16]}{suffix}"
-
-
-def enforce_workspace_boundary(layout: WorkspaceLayout, path: Path) -> None:
-    resolved = path.resolve()
-    execution = layout.execution_root.resolve()
-    manuscript = layout.manuscript_root.resolve()
-    if resolved in (execution, manuscript):
-        raise WorkspaceError(f"path is a workspace root, not an artifact: {path}")
-    if execution not in resolved.parents and manuscript not in resolved.parents:
-        raise WorkspaceError(f"path outside stable workspace: {path}")
 
 
 class RawInventoryError(ValueError):
@@ -113,10 +110,10 @@ class RawInventoryRequest:
 
 @dataclass(frozen=True, slots=True)
 class RawFileInventory:
-    relative_path: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    relative_path: DatasetRelativePath
     byte_size: ByteCount
-    sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    columns: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    sha256: Sha256Digest
+    columns: tuple[TabularColumnName, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,8 +125,10 @@ class RawDatasetInventory:
         if not self.files:
             raise RawInventoryError("raw dataset inventory requires at least one file")
 
-    def fingerprint(self) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return hashlib.sha256(stable_json(self.serialization_payload()).encode("utf-8")).hexdigest()
+    def fingerprint(self) -> Sha256Digest:
+        return Sha256Digest(
+            hashlib.sha256(stable_json(self.serialization_payload()).encode("utf-8")).hexdigest()
+        )
 
     def serialization_payload(self) -> StableJsonPayload:
         file_entries: list[StableJsonPayload] = []
@@ -167,21 +166,40 @@ class RawDuplicateReportRequest:
     preprocessing_root: Path
 
 
-def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
-    from fedorbit.infrastructure.execution import atomic_write_json
+def _promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path:
+    target = destination / filename
+    with FileLock(str(destination / f"{filename}.lock")):
+        descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        try:
+            frame.to_parquet(temporary, index=False, compression="zstd")
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+    return target
 
-    destination = request.preprocessing_root / "inventories" / request.inventory.dataset.value #TODO: use enums
+
+def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
+    destination = (
+        request.preprocessing_root
+        / RawInventoryArtifact.INVENTORIES
+        / request.inventory.dataset.value
+    )
     destination.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(destination / "manifest.json", request.inventory.serialization_payload())
     atomic_write_json(
-        destination / "checksums.json", #TODO: use enums
+        destination / RawInventoryArtifact.MANIFEST_JSON,
+        request.inventory.serialization_payload(),
+    )
+    atomic_write_json(
+        destination / RawInventoryArtifact.CHECKSUMS_JSON,
         cast(
             StableJsonPayload,
             OrderedDict((entry.relative_path, entry.sha256) for entry in request.inventory.files),
         ),
     )
     atomic_write_json(
-        destination / "schema.json",#TODO: use enums
+        destination / RawInventoryArtifact.SCHEMA_JSON,
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -197,15 +215,8 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
             columns=[list(entry.columns) for entry in request.inventory.files],
         )
     )
-    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet") #TODO: use enums
-    os.close(descriptor)
-    temporary = Path(temporary_name)
-    try:
-        frame.to_parquet(temporary, index=False, compression="zstd") #TODO: guard concurrent artifact promotion with filelock
-        os.replace(temporary, destination / "files.parquet") #TODO: use enums
-    finally:
-        temporary.unlink(missing_ok=True)
-    return destination / "manifest.json" #TODO: use enums
+    _promote_parquet(frame, destination, "files.parquet")
+    return destination / RawInventoryArtifact.MANIFEST_JSON
 
 
 def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
@@ -226,17 +237,13 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
     )
     frame = pd.DataFrame(
         duplicate_rows,
-        columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count"), #TODO: use enums
+        columns=(
+            DuplicateReportColumn.RAW_ROW_SHA256,
+            DuplicateReportColumn.OCCURRENCE_COUNT,
+            DuplicateReportColumn.DUPLICATE_ROW_COUNT,
+        ),
     )
-    descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet") #TODO: use enums
-    os.close(descriptor)
-    temporary = Path(temporary_name)
-    try:
-        frame.to_parquet(temporary, index=False, compression="zstd") #TODO: guard concurrent artifact promotion with filelock
-        os.replace(temporary, destination / "duplicates.parquet") #TODO: use enums
-    finally:
-        temporary.unlink(missing_ok=True)
-    return destination / "duplicates.parquet" #TODO: use enums
+    return _promote_parquet(frame, destination, "duplicates.parquet")
 
 
 def _selected_raw_paths(dataset: DatasetId, raw_root: Path) -> tuple[Path, ...]:

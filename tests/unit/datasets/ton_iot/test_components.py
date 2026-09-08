@@ -4,12 +4,16 @@ import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.common import DatasetSchemaError, FieldRole
-from fedorbit.datasets.ton_iot.components import TON_COMPONENTS, component_for, ton_iot_adapter
+from fedorbit.datasets.ton_iot.components import (
+    component_for,
+    ton_iot_adapter,
+    ton_iot_components,
+)
 from fedorbit.types import DatasetId
 
 
 def test_ton_iot_component_registry_is_exact() -> None:
-    assert tuple(component.dataset_id for component in TON_COMPONENTS) == (
+    assert tuple(component.dataset_id for component in ton_iot_components()) == (
         DatasetId.TON_IOT_WINDOWS10_HOST,
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
         DatasetId.TON_IOT_NETWORK,

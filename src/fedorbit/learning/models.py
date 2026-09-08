@@ -3,11 +3,18 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from fedorbit.types import ConceptCount, FeatureCount, Fraction
+
+
+HOST_BLOCK_WIDTHS = (192, 96, 48)
+HOST_BATCH_NORM_EPSILON = 1e-5
+HOST_BATCH_NORM_MOMENTUM = 0.1
+
 
 class NetworkFlowClassifier(nn.Module):
-    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: input_dim)
-                 n_classes: int,  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
-                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: dropout_probability)
+    def __init__(self, input_dim: FeatureCount,
+                 n_classes: ConceptCount,
+                 dropout_probability: Fraction
                  ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
@@ -45,9 +52,9 @@ class NetworkFlowClassifier(nn.Module):
 
 
 class HostClassifier(nn.Module):
-    def __init__(self, input_dim: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: input_dim)
-                 n_classes: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: n_classes)
-                 dropout_probability: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: dropout_probability)
+    def __init__(self, input_dim: FeatureCount,
+                 n_classes: ConceptCount,
+                 dropout_probability: Fraction
                  ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
@@ -55,25 +62,26 @@ class HostClassifier(nn.Module):
         if not 0.0 <= dropout_probability < 1.0:
             raise ValueError("dropout probability must be in [0, 1)")
         self.dropout_probability = dropout_probability
+        first_width, second_width, third_width = HOST_BLOCK_WIDTHS
         self.block1 = nn.Sequential(
-            nn.Linear(input_dim, 192), #TODO: move to constants
+            nn.Linear(input_dim, first_width),
             nn.ReLU(inplace=False),
             nn.BatchNorm1d(
-                192, #TODO: move to constants
-                eps=1e-5, #TODO: move to constants
-                momentum=0.1, #TODO: move to constants
+                first_width,
+                eps=HOST_BATCH_NORM_EPSILON,
+                momentum=HOST_BATCH_NORM_MOMENTUM,
                 affine=True,
                 track_running_stats=True,
             ),
             nn.Dropout(dropout_probability),
         )
         self.block2 = nn.Sequential(
-            nn.Linear(192, 96), #TODO: move to constants
+            nn.Linear(first_width, second_width),
             nn.ReLU(inplace=False),
             nn.Dropout(dropout_probability),
         )
-        self.block3 = nn.Sequential(nn.Linear(96, 48), nn.ReLU(inplace=False)) #TODO: move to constants
-        self.classifier = nn.Linear(48, n_classes) #TODO: move to constants
+        self.block3 = nn.Sequential(nn.Linear(second_width, third_width), nn.ReLU(inplace=False))
+        self.classifier = nn.Linear(third_width, n_classes)
         self.to(dtype=torch.float32)
 
     def initialize(self, generator: torch.Generator) -> None:

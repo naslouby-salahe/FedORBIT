@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, fields
+from enum import StrEnum
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,7 +21,22 @@ from fedorbit.optimization.objective import (
     rounded_action_vector,
     zero_action,
 )
-from fedorbit.types import Budget, RngNamespace, Score, StepCount, SupportCount, TransferMethod
+from fedorbit.types import (
+    ArtifactIdentifier,
+    Budget,
+    ContrastCoordinates,
+    Index,
+    RngNamespace,
+    Score,
+    Sha256Digest,
+    StepCount,
+    SupportCount,
+    TransferMethod,
+)
+
+
+type ResponseMatrix = NDArray[np.float64]
+type ScoredAction = tuple[Score, CurriculumAction]
 
 
 class CouplingDestructionError(ValueError):
@@ -40,10 +56,10 @@ class CommittedMapAction:
 
 
 def _block_pair_permutation(
-    entry_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entry_count)
+    entry_count: Index,
     seed: RandomSeed,
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
-    block_pair_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pair_index)
+    coordinates: ContrastCoordinates,
+    block_pair_index: Index,
 ) -> NDArray[np.intp]:
     rng_seed = derive_seed32(
         SeedDerivationRequest(
@@ -58,8 +74,8 @@ def _block_pair_permutation(
 
 def coupling_destroyed_matrices(
     blocks: PaddedBlockStructure,
-    lower_response_matrix: NDArray[np.float64],
-    upper_response_matrix: NDArray[np.float64],
+    lower_response_matrix: ResponseMatrix,
+    upper_response_matrix: ResponseMatrix,
     seed: RandomSeed,
     contrast_coordinates: str,
 ) -> CouplingDestroyedMatrices:
@@ -94,8 +110,8 @@ def coupling_destroyed_matrices(
 
 def committed_map_action(
     problem: RobustActionProblem,
-    source_matrix: NDArray[np.float64],
-    target_matrix: NDArray[np.float64],
+    source_matrix: ResponseMatrix,
+    target_matrix: ResponseMatrix,
 ) -> CommittedMapAction:
     from fedorbit.methods.baselines import optimize_against_fixed_matrix
     from fedorbit.optimization.exact_qap import point_correspondence_commitment
@@ -113,9 +129,9 @@ class FairnessViolationError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ComparatorResources:
-    source_packet_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    target_checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    target_importance_vector_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    source_packet_id: ArtifactIdentifier
+    target_checkpoint_artifact_id: ArtifactIdentifier
+    target_importance_vector_sha256: Sha256Digest
     action_budget_cap: Budget
     support_cap: SupportCount
     seed: RandomSeed
@@ -123,7 +139,7 @@ class ComparatorResources:
     live_assimilation_step_allowance: StepCount
     test_access_granted: bool
     extra_target_labels: bool
-    additional_tuning_seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    additional_tuning_seeds: tuple[RandomSeed, ...]
     local_base_checkpoint_favorable: bool
 
     def validate_contract(self) -> None:
@@ -159,8 +175,7 @@ def assert_identical_resources(
 REGISTERED_METHOD_NAMES = frozenset(method.value for method in TransferMethod)
 
 
-def assert_registered_method_name(name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
-                                  ) -> None:
+def assert_registered_method_name(name: TransferMethod) -> None:
     if name not in REGISTERED_METHOD_NAMES:
         raise FairnessViolationError(f"unregistered comparator name: {name}")
 
@@ -169,22 +184,37 @@ class FixedMatrixOptimizationError(ValueError):
     pass
 
 
+class HighsOption(StrEnum):
+    OUTPUT_FLAG = "output_flag"
+    SOLVER = "solver"
+    PRESOLVE = "presolve"
+    THREADS = "threads"
+    RANDOM_SEED = "random_seed"
+    PRIMAL_FEASIBILITY_TOLERANCE = "primal_feasibility_tolerance"
+
+
+class HighsSolver(StrEnum):
+    SIMPLEX = "simplex"
+
+
+class HighsPresolve(StrEnum):
+    ON = "on"
+
+
 @dataclass(frozen=True, slots=True)
 class FixedMatrixActionSolution:
     selected_action: CurriculumAction
     objective_value: Score
 
 
-def linear_objective_row(
-    problem: RobustActionProblem, matrix: NDArray[np.float64]
-) -> NDArray[np.float64]:
+def linear_objective_row(problem: RobustActionProblem, matrix: ResponseMatrix) -> ResponseMatrix:
     return np.asarray(problem.target_importance @ matrix) - problem.linear_costs
 
 
 def _solve_support_lp(
     problem: RobustActionProblem,
     support: SupportCoordinateSet,
-    objective_row: NDArray[np.float64],
+    objective_row: ResponseMatrix,
 ) -> CurriculumAction:
     settings = active_config().solvers.exact_sparse
     import highspy
@@ -210,12 +240,15 @@ def _solve_support_lp(
     lp.a_matrix_.index_ = list(range(columns))
     lp.a_matrix_.value_ = budget_coefficients
     highs = highspy.Highs()
-    highs.setOptionValue("output_flag", False) #TODO: use enums for these strings
-    highs.setOptionValue("solver", "simplex") #TODO: use enums for these strings
-    highs.setOptionValue("presolve", "on") #TODO: use enums for these strings
-    highs.setOptionValue("threads", settings.lp_threads_per_solve) #TODO: use enums for these strings
-    highs.setOptionValue("random_seed", settings.deterministic_random_seed) #TODO: use enums for these strings
-    highs.setOptionValue("primal_feasibility_tolerance", settings.lp_primal_feasibility_tolerance) #TODO: use enums for these strings
+    highs.setOptionValue(HighsOption.OUTPUT_FLAG.value, False)
+    highs.setOptionValue(HighsOption.SOLVER.value, HighsSolver.SIMPLEX.value)
+    highs.setOptionValue(HighsOption.PRESOLVE.value, HighsPresolve.ON.value)
+    highs.setOptionValue(HighsOption.THREADS.value, settings.lp_threads_per_solve)
+    highs.setOptionValue(HighsOption.RANDOM_SEED.value, settings.deterministic_random_seed)
+    highs.setOptionValue(
+        HighsOption.PRIMAL_FEASIBILITY_TOLERANCE.value,
+        settings.lp_primal_feasibility_tolerance,
+    )
     highs.passModel(lp)
     highs.run()
     if highs.getModelStatus() != highspy.HighsModelStatus.kOptimal:
@@ -230,8 +263,8 @@ def _solve_support_lp(
 
 def optimize_against_fixed_matrix(
     problem: RobustActionProblem,
-    matrix: NDArray[np.float64],
-    support_limit: int | None = None, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
+    matrix: ResponseMatrix,
+    support_limit: SupportCount | None = None,
 ) -> FixedMatrixActionSolution:
     expected_shape = (problem.size, problem.size)
     if matrix.shape != expected_shape:
@@ -242,11 +275,11 @@ def optimize_against_fixed_matrix(
     objective_row = linear_objective_row(problem, matrix)
     supports = enumerate_support_coordinate_sets(problem, support_limit)
 
-    def objective_of(action: CurriculumAction) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return float(objective_row @ action.coordinates)
+    def objective_of(action: CurriculumAction) -> Score:
+        return Score(float(objective_row @ action.coordinates))
 
     zero_candidate = zero_action(problem)
-    candidates: list[tuple[float, CurriculumAction]] = [ #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    candidates: list[ScoredAction] = [
         (objective_of(zero_candidate), zero_candidate)
     ]
     candidates.extend(
@@ -274,7 +307,7 @@ def optimize_against_fixed_matrix(
 
 def local_sir_action(
     problem: RobustActionProblem,
-    target_local_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_local_response_matrix: ResponseMatrix,
 ) -> FixedMatrixActionSolution:
     return optimize_against_fixed_matrix(problem, target_local_response_matrix)
 
@@ -284,23 +317,20 @@ class CoarseBlockSummary:
     matrix: NDArray[np.float64]
 
 
-def _real_source_indices(blocks: PaddedBlockStructure,
-                         block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_index)
-                         ) -> range:
+def _real_source_indices(blocks: PaddedBlockStructure, block_index: Index) -> range:
     return range(
         blocks.block_index_range(block_index).start,
         blocks.block_index_range(block_index).start + blocks.source_real_counts[block_index],
     )
 
 
-def _target_block_range(blocks: PaddedBlockStructure, block_index: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_index)
-                        ) -> range:
+def _target_block_range(blocks: PaddedBlockStructure, block_index: Index) -> range:
     return blocks.block_index_range(block_index)
 
 
 def coarse_block_mean_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_matrix: ResponseMatrix,
 ) -> CoarseBlockSummary:
     size = blocks.total_padded_nodes
     summary = np.zeros((size, size), dtype=np.float64)
@@ -321,7 +351,7 @@ def coarse_block_mean_matrix(
 
 def coarse_block_min_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_matrix: ResponseMatrix,
 ) -> CoarseBlockSummary:
     size = blocks.total_padded_nodes
     summary = np.zeros((size, size), dtype=np.float64)
@@ -342,15 +372,15 @@ def coarse_block_min_matrix(
 
 def orbit_mean_matrix(
     blocks: PaddedBlockStructure,
-    response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    response_matrix: ResponseMatrix,
 ) -> CoarseBlockSummary:
     return CoarseBlockSummary(matrix=analytic_orbit_mean(blocks, response_matrix))
 
 
 def matched_resource_rectangular_lower_bounds(
     blocks: PaddedBlockStructure,
-    lower_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    upper_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    lower_response_matrix: ResponseMatrix,
+    upper_response_matrix: ResponseMatrix,
 ) -> CoarseBlockSummary:
     hull = build_rectangular_hull(blocks, lower_response_matrix, upper_response_matrix)
     return CoarseBlockSummary(matrix=hull.lower_bounds)

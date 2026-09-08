@@ -1,25 +1,32 @@
 from __future__ import annotations
 
 import math
-import re
 import statistics
-from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
-    DirectedPair,
-    MultiplicityFamily,
+    ArtifactIdentifier,
+    Coefficient,
+    DirectedPairName,
+    Index,
+    NonNegativeFloat,
     RandomSeed,
+    RelativeGain,
+    SampleCount,
+    Score,
+    Sha256Digest,
+    SignificanceLevel,
     Split,
+    StrictResourceValidity,
     TransferMethod,
+    is_sha256_digest,
 )
 
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
-
-
-class ContrastRegistryError(ValueError):
-    pass
+type ScoreSeries = tuple[Score, ...]
+type RankSeries = tuple[Score, ...]
+type PairSeedIdentity = tuple[DirectedPairName, RandomSeed]
+type IndexedPairedObservations = tuple[tuple[PairSeedIdentity, PairedObservation], ...]
 
 
 class PairingError(ValueError):
@@ -28,28 +35,28 @@ class PairingError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class PairingLineage:
-    raw_dataset_lineage_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    raw_dataset_lineage_sha256: Sha256Digest
+    directed_pair: DirectedPairName
     seed: RandomSeed
     split: Split
-    target_pre_transfer_checkpoint_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    target_importance_artifact_id: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    source_packet_artifact_id: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    action_budget: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    support_budget: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    confirmation_budget: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    environment_lineage_sha256: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    target_pre_transfer_checkpoint_artifact_id: ArtifactIdentifier
+    target_importance_artifact_id: ArtifactIdentifier
+    source_packet_artifact_id: ArtifactIdentifier | None
+    action_budget: NonNegativeFloat
+    support_budget: Index
+    confirmation_budget: Index
+    environment_lineage_sha256: Sha256Digest
 
     def __post_init__(self) -> None:
-        if _SHA256.fullmatch(self.raw_dataset_lineage_sha256) is None:
+        if not is_sha256_digest(self.raw_dataset_lineage_sha256):
             raise PairingError("raw dataset lineage must be lowercase SHA-256 hex")
-        if _SHA256.fullmatch(self.environment_lineage_sha256) is None:
+        if not is_sha256_digest(self.environment_lineage_sha256):
             raise PairingError("environment lineage must be lowercase SHA-256 hex")
         if not self.directed_pair:
             raise PairingError("directed pair must be non-empty")
-        if not self.target_pre_transfer_checkpoint_artifact_id:
+        if not self.target_pre_transfer_checkpoint_artifact_id.value:
             raise PairingError("target checkpoint identity must be non-empty")
-        if not self.target_importance_artifact_id:
+        if not self.target_importance_artifact_id.value:
             raise PairingError("target importance identity must be non-empty")
         if not math.isfinite(self.action_budget) or self.action_budget < 0.0:
             raise PairingError("action budget must be finite and nonnegative")
@@ -60,7 +67,7 @@ class PairingLineage:
 @dataclass(frozen=True, slots=True)
 class PairedObservation:
     method: TransferMethod
-    value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: Score
     lineage: PairingLineage
 
     def __post_init__(self) -> None:
@@ -70,10 +77,10 @@ class PairedObservation:
 
 @dataclass(frozen=True, slots=True)
 class PairedValues:
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    method_values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reference_values: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    directed_pair: DirectedPairName
+    seeds: tuple[RandomSeed, ...]
+    method_values: ScoreSeries
+    reference_values: ScoreSeries
 
 
 def validate_paired_observations(
@@ -88,10 +95,10 @@ def validate_paired_observations(
     reference_index = _index_observations(reference_observations)
     if tuple(key for key, _ in method_index) != tuple(key for key, _ in reference_index):
         raise PairingError("paired comparison pair/seed identities differ")
-    method_values: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    reference_values: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    seeds: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    method_values: list[Score] = []
+    reference_values: list[Score] = []
+    seeds: list[RandomSeed] = []
+    directed_pair: DirectedPairName | None = None
     for (method_key, method_observation), (reference_key, reference_observation) in zip(
         method_index, reference_index, strict=True
     ):
@@ -118,7 +125,7 @@ def validate_paired_observations(
 
 def _index_observations(
     observations: tuple[PairedObservation, ...],
-) -> tuple[tuple[tuple[str, int], PairedObservation], ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> IndexedPairedObservations:
     indexed = tuple(
         sorted(
             (
@@ -136,12 +143,12 @@ def _index_observations(
 
 @dataclass(frozen=True, slots=True)
 class PairContrastEvidence:
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    mean_gain: float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    holm_p: float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    bca_lower: float | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    strict_resource_valid: bool #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    valid_seed_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    directed_pair: DirectedPairName
+    mean_gain: RelativeGain | None
+    holm_p: SignificanceLevel | None
+    bca_lower: RelativeGain | None
+    strict_resource_valid: StrictResourceValidity
+    valid_seed_count: Index
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,309 +161,21 @@ class PairContrastEvidenceSet:
             raise ValueError("pair-contrast evidence contains duplicate directed pairs")
 
 
-@dataclass(frozen=True, slots=True)
-class RegisteredContrast:
-    family: MultiplicityFamily
-    name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    statistic: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-
-    @property
-    def key(self) -> tuple[MultiplicityFamily, str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return self.family, self.name, self.directed_pair
-
-
-@dataclass(frozen=True, slots=True)
-class RegisteredFamily:
-    family: MultiplicityFamily
-    contrasts: tuple[RegisteredContrast, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class RegisteredFamilyInputs:
-    entries: tuple[RegisteredFamily, ...]
-
-    def contrasts_for(self, family: MultiplicityFamily) -> tuple[RegisteredContrast, ...]:
-        for entry in self.entries:
-            if entry.family == family:
-                return entry.contrasts
-        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
-
-    def registered_keys(self) -> frozenset[tuple[MultiplicityFamily, str, str]]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return frozenset(contrast.key for entry in self.entries for contrast in entry.contrasts)
-
-
-@dataclass(frozen=True, slots=True)
-class ContrastPValue:
-    family: MultiplicityFamily
-    contrast_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    directed_pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    raw_p_value: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    valid_seed_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-
-    def __post_init__(self) -> None:
-        if not self.contrast_name or not self.directed_pair:
-            raise ContrastRegistryError("contrast p-value identity must be non-empty")
-        if not math.isfinite(self.raw_p_value) or not 0.0 <= self.raw_p_value <= 1.0:
-            raise ContrastRegistryError("raw p-value must be finite and lie in [0,1]")
-        if self.valid_seed_count < 0:
-            raise ContrastRegistryError("valid seed count must be nonnegative")
-
-    @property
-    def key(self) -> tuple[MultiplicityFamily, str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return self.family, self.contrast_name, self.directed_pair
-
-
-@dataclass(frozen=True, slots=True)
-class ContrastPValueSet:
-    entries: tuple[ContrastPValue, ...]
-
-    def __post_init__(self) -> None:
-        keys = tuple(entry.key for entry in self.entries)
-        if len(set(keys)) != len(keys):
-            raise ContrastRegistryError("duplicate pair-specific multiplicity input")
-
-    def value_for(self, contrast: RegisteredContrast) -> ContrastPValue | None:
-        for entry in self.entries:
-            if entry.key == contrast.key:
-                return entry
-        return None
-
-
-@dataclass(frozen=True, slots=True)
-class FamilyInputState:
-    contrast: RegisteredContrast
-    available: bool
-    unavailable_reason: str | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    raw_p_value: float | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    holm_p_value: float | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    holm_rank: int | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    family_size: int = 0 #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-
-
-@dataclass(frozen=True, slots=True)
-class FamilyStateGroup:
-    family: MultiplicityFamily
-    states: tuple[FamilyInputState, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class FamilyStates:
-    entries: tuple[FamilyStateGroup, ...]
-
-    def states_for(self, family: MultiplicityFamily) -> tuple[FamilyInputState, ...]:
-        for entry in self.entries:
-            if entry.family == family:
-                return entry.states
-        raise ContrastRegistryError(f"unregistered multiplicity family: {family.value}")
-
-
-def primary_pair_names() -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return tuple(
-        DirectedPair(spec.source, spec.target).direction
-        for spec in active_config().scientific.datasets.primary_directed_pairs
-    )
-
-
-def _pair_contrast(
-    family: MultiplicityFamily,
-    name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: name)
-    pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pair)
-    statistic: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: statistic)
-) -> RegisteredContrast:
-    return RegisteredContrast(family, name, pair, statistic) #TODO: what's the point of such wrapper. Just inline
-
-
-def registered_family_inputs() -> RegisteredFamilyInputs: #TODO: DELETE THIS. NOT NEEDED. DELETE ALL USAGES OF SUCH A THING
-    families: defaultdict[MultiplicityFamily, list[RegisteredContrast]] = defaultdict(list)
-    solver = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value
-    for pair in primary_pair_names():
-        families[MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY].append(
-            _pair_contrast(
-                MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
-                f"{solver} vs Local-Only — TEST relative macro-CE gain",
-                pair,
-                "sign_flip_superiority", #TODO: should be enum
-            )
-        )
-        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
-            _pair_contrast(
-                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
-                f"{solver} vs Local-SIR — TEST relative macro-CE gain superiority",
-                pair,
-                "sign_flip_superiority", #TODO: should be enum
-            )
-        )
-        families[MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR].append(
-            _pair_contrast(
-                MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
-                f"{solver} vs Local-SIR — TEST relative macro-CE gain TOST equivalence",
-                pair,
-                "tost_equivalence", #TODO: should be enum
-            )
-        )
-        families[MultiplicityFamily.COUPLING_MECHANISM].append(
-            _pair_contrast(
-                MultiplicityFamily.COUPLING_MECHANISM,
-                (
-                    "Exact correspondence orbit vs Matched-Resource Rectangular — "
-                    "robust coupling value gap"
-                ),
-                pair,
-                "sign_flip_against_zero", #TODO: should be enum
-            )
-        )
-        for suffix in ("difference", "TOST equivalence"): #TODO: should be enum
-            statistic = (
-                "tost_equivalence" if suffix == "TOST equivalence" else "sign_flip_superiority" #TODO: should be enum
-            )
-            families[MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY].append(
-                _pair_contrast(
-                    MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
-                    (
-                        f"{solver} vs Point-Correspondence Commitment — "
-                        f"TEST relative macro-CE {suffix}"
-                    ),
-                    pair,
-                    statistic,
-                )
-            )
-            families[MultiplicityFamily.MECHANISM_ABLATIONS].append(
-                _pair_contrast(
-                    MultiplicityFamily.MECHANISM_ABLATIONS,
-                    f"{solver} vs Coupling-Destroyed FedORBIT — TEST relative macro-CE {suffix}",
-                    pair,
-                    statistic,
-                )
-            )
-        for sparsity_name in (
-            "exact sparse s=1 vs exact sparse s=2",
-            "exact sparse s=3 vs exact sparse s=2",
-            "dense CCP vs exact sparse s=2",
-        ):
-            families[MultiplicityFamily.SPARSITY_SENSITIVITY].append(
-                _pair_contrast(
-                    MultiplicityFamily.SPARSITY_SENSITIVITY,
-                    sparsity_name,
-                    pair,
-                    "sign_flip_difference_common_reference",
-                )
-            )
-        families[MultiplicityFamily.CONFIRMATION_SAFETY].append(
-            _pair_contrast(
-                MultiplicityFamily.CONFIRMATION_SAFETY,
-                (
-                    "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with "
-                    "confirmation — harmful-transfer rate difference"
-                ),
-                pair,
-                "seed_level_rate_difference_sign_flip",
-            )
-        )
-    return RegisteredFamilyInputs(
-        tuple(RegisteredFamily(family, tuple(families[family])) for family in MultiplicityFamily)
-    )
-
-
-def build_family_states(
-    available_p_values: ContrastPValueSet,
-) -> FamilyStates:
-    registry = registered_family_inputs()
-    registered_keys = registry.registered_keys()
-    unknown = tuple(
-        entry.key for entry in available_p_values.entries if entry.key not in registered_keys
-    )
-    if unknown:
-        raise ContrastRegistryError("unregistered confirmatory multiplicity input")
-    groups = tuple(
-        FamilyStateGroup(
-            family_entry.family,
-            _family_states(family_entry, available_p_values),
-        )
-        for family_entry in registry.entries
-    )
-    if not any(state.available for group in groups for state in group.states):
-        raise ContrastRegistryError("no registered family input has enough valid paired seeds")
-    return FamilyStates(groups)
-
-
-def _family_states(
-    family_entry: RegisteredFamily,
-    available_p_values: ContrastPValueSet,
-) -> tuple[FamilyInputState, ...]:
-    minimum = active_config().scientific.statistics.minimum_valid_paired_seeds
-    present = tuple(
-        entry
-        for contrast in family_entry.contrasts
-        if (entry := available_p_values.value_for(contrast)) is not None
-        and entry.valid_seed_count >= minimum
-    )
-    ordered = sorted(
-        present,
-        key=lambda entry: (entry.raw_p_value, entry.contrast_name, entry.directed_pair),
-    )
-    family_size = len(ordered)
-    adjusted_by_key: OrderedDict[tuple[MultiplicityFamily, str, str], tuple[float, int]] = ( #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-        OrderedDict()
-    )
-    running_max = 0.0
-    for index, entry in enumerate(ordered):
-        scaled = min(1.0, entry.raw_p_value * (family_size - index))
-        running_max = max(running_max, scaled)
-        adjusted_by_key[entry.key] = (running_max, index + 1)
-    states: list[FamilyInputState] = []
-    for contrast in family_entry.contrasts:
-        entry = available_p_values.value_for(contrast)
-        if entry is None:
-            states.append(
-                FamilyInputState(
-                    contrast,
-                    False,
-                    unavailable_reason="registered input missing",
-                    family_size=family_size,
-                )
-            )
-            continue
-        if entry.valid_seed_count < minimum:
-            states.append(
-                FamilyInputState(
-                    contrast,
-                    False,
-                    unavailable_reason="insufficient valid paired seeds",
-                    raw_p_value=entry.raw_p_value,
-                    family_size=family_size,
-                )
-            )
-            continue
-        holm_p, rank = adjusted_by_key[entry.key]
-        states.append(
-            FamilyInputState(
-                contrast,
-                True,
-                raw_p_value=entry.raw_p_value,
-                holm_p_value=holm_p,
-                holm_rank=rank,
-                family_size=family_size,
-            )
-        )
-    return tuple(states)
-
-
 class SpearmanError(ValueError):
     pass
 
 
 @dataclass(frozen=True, slots=True)
 class SpearmanReport:
-    rho: float #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    point_count: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    pair: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    rho: Coefficient
+    point_count: SampleCount
+    pair: DirectedPairName
 
 
 def descriptive_spearman(
-    predicted_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: predicted_values)
-    realized_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: realized_values)
-    directed_pair: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: directed_pair)
+    predicted_values: ScoreSeries,
+    realized_values: ScoreSeries,
+    directed_pair: DirectedPairName,
 ) -> SpearmanReport | None:
     minimum = active_config().scientific.statistics.spearman_minimum_valid_points
     if len(predicted_values) != len(realized_values):
@@ -466,12 +185,16 @@ def descriptive_spearman(
     ranked_predicted = _ranks(predicted_values)
     ranked_realized = _ranks(realized_values)
     rho = _pearson(ranked_predicted, ranked_realized)
-    return SpearmanReport(rho=rho, point_count=len(predicted_values), pair=directed_pair)
+    return SpearmanReport(
+        rho=Coefficient(rho),
+        point_count=SampleCount(len(predicted_values)),
+        pair=directed_pair,
+    )
 
 
-def _ranks(values: tuple[float, ...]) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _ranks(values: ScoreSeries) -> RankSeries:
     order = sorted(range(len(values)), key=lambda index: values[index])
-    ranks: list[float] = [0.0] * len(values) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    ranks: list[Score] = [Score(0.0)] * len(values)
     position = 0
     while position < len(order):
         block_end = position
@@ -486,7 +209,7 @@ def _ranks(values: tuple[float, ...]) -> tuple[float, ...]: #TODO: do not use pr
     return tuple(ranks)
 
 
-def _pearson(left: tuple[float, ...], right: tuple[float, ...]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: left)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: right)  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _pearson(left: RankSeries, right: RankSeries) -> Coefficient:
     mean_left = statistics.fmean(left)
     mean_right = statistics.fmean(right)
     covariance = sum((a - mean_left) * (b - mean_right) for a, b in zip(left, right, strict=True))
@@ -494,5 +217,5 @@ def _pearson(left: tuple[float, ...], right: tuple[float, ...]) -> float: #TODO:
     variance_right = sum((b - mean_right) ** 2 for b in right)
     denominator = math.sqrt(variance_left * variance_right)
     if denominator == 0.0:
-        return 0.0
-    return covariance / denominator
+        return Coefficient(0.0)
+    return Coefficient(covariance / denominator)

@@ -25,10 +25,12 @@ from fedorbit.response.estimation import (
     standard_error,
 )
 from fedorbit.types import (
+    ClassIndex,
     Discrepancy,
     Estimate,
     Fraction,
     Index,
+    IneligibilityReason,
     InterventionMagnitude,
     LearningRate,
     Score,
@@ -37,6 +39,12 @@ from fedorbit.types import (
     StepCount,
     WeightDecay,
 )
+
+
+type NativeClassSet = tuple[ClassIndex, ...]
+type NativeClassSets = tuple[NativeClassSet, ...]
+type DerivativeSeries = tuple[Estimate, ...]
+type ShadowRiskTriple = tuple[Score, Score, Score]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +59,7 @@ class PilotData:
     train_targets: torch.Tensor
     meta_features: torch.Tensor
     meta_targets: torch.Tensor
-    outcome_native_class_sets: tuple[tuple[int, ...], ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    outcome_native_class_sets: NativeClassSets
     base_class_weights: ClassWeights
     learning_rate: LearningRate
     weight_decay: WeightDecay
@@ -82,7 +90,7 @@ class CandidateResult:
     candidate: ResponseCandidate
     entries: tuple[PilotEntry, ...]
     eligible: bool
-    ineligibility_reasons: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    ineligibility_reasons: tuple[IneligibilityReason, ...]
     pilot_score: Score
 
 
@@ -93,7 +101,7 @@ class ResponsePilotError(ValueError):
 def run_pooled_source_response_pilot(
     pilot_checkpoints: tuple[PilotCheckpoint, ...],
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    intervention_classes: NativeClassSets,
 ) -> tuple[CandidateResult, ...]:
     if len(pilot_checkpoints) != 3:
         raise ResponsePilotError("source-response pilot requires exactly three checkpoints")
@@ -130,14 +138,18 @@ def select_response_configuration(results: tuple[CandidateResult, ...]) -> Respo
 def _evaluate_candidate(
     pilot_checkpoints: tuple[PilotCheckpoint, ...],
     data: PilotData,
-    intervention_classes: tuple[tuple[int, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_classes)
+    intervention_classes: NativeClassSets,
     candidate: ResponseCandidate,
-    replicate_count: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: replicate_count)
+    replicate_count: ReplicateCount,
 ) -> CandidateResult:
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    full_values: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    half_values: list[list[float]] = [[] for _ in range(outcome_count * intervention_count)] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    full_values: list[list[Estimate]] = [
+        [] for _ in range(outcome_count * intervention_count)
+    ]
+    half_values: list[list[Estimate]] = [
+        [] for _ in range(outcome_count * intervention_count)
+    ]
     all_finite = True
     full_settings = ShadowSettings(
         candidate.intervention_magnitude,
@@ -209,7 +221,7 @@ def _evaluate_candidate(
     except NonFiniteShadowLossError:
         all_finite = False
     entries: list[PilotEntry] = []
-    useful_columns: set[int] = set() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    useful_columns: set[Index] = set()
     for outcome_index in range(outcome_count):
         for intervention_index in range(intervention_count):
             entry_index = outcome_index * intervention_count + intervention_index
@@ -235,9 +247,9 @@ def _evaluate_candidate(
 
 
 def _derivative(
-    risks: tuple[float, float, float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: risks)
-    epsilon: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: epsilon)
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    risks: ShadowRiskTriple,
+    epsilon: InterventionMagnitude,
+) -> Estimate:
     positive, negative, baseline = risks
     if not all(math.isfinite(value) for value in risks):
         return math.nan
@@ -251,10 +263,10 @@ def _derivative(
 
 
 def _build_pilot_entry(
-    outcome_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: outcome_index)
-    intervention_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: intervention_index)
-    full_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: full_values)
-    half_values: tuple[float, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: half_values)
+    outcome_index: Index,
+    intervention_index: Index,
+    full_values: DerivativeSeries,
+    half_values: DerivativeSeries,
 ) -> PilotEntry:
     pilot = active_config().scientific.source_response_pilot
     if not full_values or not half_values:
@@ -292,34 +304,34 @@ def _build_pilot_entry(
 def _eligibility_reasons(
     all_finite: bool,
     entries: list[PilotEntry],
-    useful_columns: set[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: useful_columns)
-) -> list[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    useful_columns: set[Index],
+) -> list[IneligibilityReason]:
     pilot = active_config().scientific.source_response_pilot
-    reasons: list[str] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    reasons: list[IneligibilityReason] = []
     if not all_finite:
-        reasons.append("non-finite shadow state or loss")
+        reasons.append(IneligibilityReason("non-finite shadow state or loss"))
     useful_entries = tuple(entry for entry in entries if entry.useful)
     if not useful_entries:
-        reasons.append("no useful entries")
+        reasons.append(IneligibilityReason("no useful entries"))
         return reasons
     if (
         statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
         > pilot.relative_derivative_discrepancy_ceiling
     ):
-        reasons.append("median derivative discrepancy above ceiling")
+        reasons.append(IneligibilityReason("median derivative discrepancy above ceiling"))
     if (
         statistics.median(tuple(entry.sign_agreement for entry in useful_entries))
         < pilot.sign_agreement_minimum
     ):
-        reasons.append("median sign agreement below minimum")
+        reasons.append(IneligibilityReason("median sign agreement below minimum"))
     if len(useful_columns) < pilot.minimum_useful_intervention_columns:
-        reasons.append("too few useful intervention columns")
+        reasons.append(IneligibilityReason("too few useful intervention columns"))
     return reasons
 
 
 def _pilot_score(
     useful_entries: tuple[PilotEntry, ...],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     pilot = active_config().scientific.source_response_pilot
     if not useful_entries:
         return math.nan
@@ -333,7 +345,7 @@ def _pilot_score(
     return signal - pilot.curvature_penalty_coefficient * curvature
 
 
-def sign_agreement(values: tuple[float, ...]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: values) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def sign_agreement(values: DerivativeSeries) -> Fraction:
     if not values:
         return 0.0
     positive = sum(1 for value in values if value > 0.0)

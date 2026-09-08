@@ -17,40 +17,7 @@ from fedorbit.optimization.objective import (
     CurriculumAction,
     RobustActionProblem,
 )
-from fedorbit.types import Coefficient, Index, SampleCount, Tolerance
-
-
-class CertificateError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class SeparatorWorkCertificate: #TODO: DELETE THIS NOW
-    active_image_candidates: SampleCount
-    lap_calls: Index
-
-    def verify_against(
-        self,
-        blocks: PaddedBlockStructure,
-        support_block_counts: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    ) -> bool:
-        from fedorbit.optimization.correspondence import (
-            BlockNodeCounts,
-            active_image_assignment_count,
-        )
-
-        expected_candidates = active_image_assignment_count(
-            blocks, BlockNodeCounts(blocks=blocks, per_block=support_block_counts)
-        )
-        expected_lap_calls = expected_candidates * sum(
-            1
-            for block_index, size in enumerate(blocks.padded_size_tuple)
-            if size - support_block_counts[block_index] > 0
-        )
-        return (
-            self.active_image_candidates == expected_candidates
-            and self.lap_calls == expected_lap_calls
-        )
+from fedorbit.types import Coefficient, Score, Tolerance
 
 
 def verify_correspondence_certificate(
@@ -71,16 +38,6 @@ def verify_exactness_certificate(
     exact_tolerance: Tolerance,
 ) -> bool:
     return abs(solver_value - exhaustive_truth_value) <= exact_tolerance
-
-
-def require_valid_images(images: Sequence[int], blocks: PaddedBlockStructure) -> None: #TODO: DELETE THIS NOW
-    total = blocks.total_padded_nodes
-    if sorted(images) != list(range(total)):
-        raise CertificateError("certificate images are not a padded-space bijection")
-
-
-def certificate_residual(reported: float, recomputed: float) -> float: #TODO: DELETE THIS NOW
-    return float(np.abs(reported - recomputed))
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,16 +72,15 @@ def build_rectangular_hull(
     return RectangularHull(blocks=blocks, lower_bounds=lower, upper_bounds=upper)
 
 
-def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull
-                     ) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates)
+def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull) -> Score:
+    return Score(float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates))
 
 
 def orbit_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     best = -math.inf
     for candidate in action_candidates:
         minimum_response = math.inf
@@ -136,14 +92,14 @@ def orbit_value_over_candidates(
         best = max(best, objective)
     if math.isinf(best):
         raise ActionSpaceError("orbit value requires at least one candidate action")
-    return best
+    return Score(best)
 
 
 def rectangular_value_over_candidates(
     action_candidates: Sequence[CurriculumAction],
     problem: RobustActionProblem,
     hull: RectangularHull,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     best = -math.inf
     for candidate in action_candidates:
         objective = h_rect_from_hull(candidate, hull) - float(
@@ -152,7 +108,7 @@ def rectangular_value_over_candidates(
         best = max(best, objective)
     if math.isinf(best):
         raise ActionSpaceError("rectangular value requires at least one candidate action")
-    return best
+    return Score(best)
 
 
 def robust_coupling_gap(
@@ -160,7 +116,8 @@ def robust_coupling_gap(
     problem: RobustActionProblem,
     orbit: Sequence[BlockCorrespondence],
     hull: RectangularHull,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return orbit_value_over_candidates(action_candidates, problem, orbit) - (
-        rectangular_value_over_candidates(action_candidates, problem, hull)
+) -> Score:
+    return Score(
+        orbit_value_over_candidates(action_candidates, problem, orbit)
+        - rectangular_value_over_candidates(action_candidates, problem, hull)
     )

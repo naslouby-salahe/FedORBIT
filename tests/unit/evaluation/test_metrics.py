@@ -42,6 +42,7 @@ from fedorbit.analysis.metrics import (
 )
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.types import ClassIndex
 
 
 @pytest.fixture
@@ -105,9 +106,21 @@ def test_precision_recall_f1_with_zero_denominator_rule(config: FedorbitConfig) 
 def test_confusion_counts_partition_predictions(config: FedorbitConfig) -> None:
     del config
     counts = confusion_counts(
-        predicted_labels=(1, 1, 0, 0, 1),
-        true_labels=(1, 0, 0, 1, 1),
-        positive_class=1,
+        predicted_labels=(
+            ClassIndex(1),
+            ClassIndex(1),
+            ClassIndex(0),
+            ClassIndex(0),
+            ClassIndex(1),
+        ),
+        true_labels=(
+            ClassIndex(1),
+            ClassIndex(0),
+            ClassIndex(0),
+            ClassIndex(1),
+            ClassIndex(1),
+        ),
+        positive_class=ClassIndex(1),
     )
     assert counts == ConfusionCounts(true_positives=2, false_positives=1, false_negatives=1)
 

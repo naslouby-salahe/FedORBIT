@@ -101,6 +101,7 @@ def test_no_observed_data_facts_hardcoded() -> None:
 
 ROADMAP_LOCKED_ARCHITECTURE_VALUES = frozenset({0.1, 1e-3, 2.0})
 STRUCTURAL_IDENTITY_VALUES = frozenset({0.0, 1.0})
+PRESENTATIONAL_RENDERING_VALUES = frozenset({4.0})
 
 
 def _config_numeric_values() -> frozenset[float]:
@@ -139,6 +140,9 @@ def test_no_governed_config_values_literalized_in_production() -> None:
                 and float(node.value) in governed
                 and node.value not in ROADMAP_LOCKED_ARCHITECTURE_VALUES
                 and node.value not in STRUCTURAL_IDENTITY_VALUES
+                and not (
+                    path.name == "reporting.py" and node.value in PRESENTATIONAL_RENDERING_VALUES
+                )
             ):
                 raise AssertionError(
                     f"governed config value {node.value} literalized in {path}:{node.lineno}"

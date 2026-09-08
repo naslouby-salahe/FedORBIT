@@ -2,23 +2,28 @@ from __future__ import annotations
 
 import hashlib
 import importlib.metadata
-import json
 import platform
 import subprocess
-import tomllib
 from collections import OrderedDict
-from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 
 import psutil
 import torch
-from pydantic import ConfigDict
 
-from fedorbit.config.loading import active_config, repository_root
-from fedorbit.config.models import FrozenModel
-from fedorbit.types import ByteCount, Index
+from fedorbit.config.loading import active_config
+from fedorbit.types import (
+    ByteCount,
+    CpuName,
+    CudaVersion,
+    GpuName,
+    OperatingSystemRelease,
+    PythonVersion,
+    Sha256Digest,
+    stable_json,
+)
 
-DEPENDENCY_SPECS = ( #TODO: remove this from the code compeletely and any callers
+DEPENDENCY_SPECS = (
     ("pytorch", "torch"),
     ("numpy", "numpy"),
     ("scipy", "scipy"),
@@ -33,12 +38,8 @@ DEPENDENCY_SPECS = ( #TODO: remove this from the code compeletely and any caller
 )
 
 
-class EnvironmentMismatchError(RuntimeError):
-    pass
-
-
 @dataclass(frozen=True, slots=True)
-class DependencyVersion: #TODO: remove this from code
+class DependencyVersion:
     configured_key: str
     distribution: str
     configured: str
@@ -51,32 +52,29 @@ class DependencyVersion: #TODO: remove this from code
 
 @dataclass(frozen=True, slots=True)
 class HardwareIdentity:
-    gpu_name: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    gpu_name: GpuName | None
     gpu_memory_bytes: ByteCount | None
     cuda_available: bool
-    driver_cuda_version: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    torch_cuda_version: str | None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    cpu_name: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    driver_cuda_version: CudaVersion | None
+    torch_cuda_version: CudaVersion | None
+    cpu_name: CpuName
     ram_bytes: ByteCount
-    os_release: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    os_release: OperatingSystemRelease
 
 
 @dataclass(frozen=True, slots=True)
 class EnvironmentSnapshot:
-    python_version: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    dependencies: tuple[DependencyVersion, ...] #TODO: remove this from code
+    python_version: PythonVersion
+    dependencies: tuple[DependencyVersion, ...]
     hardware: HardwareIdentity
-    fingerprint_sha256: str #TODO: remove this from code
-
-    def mismatches(self) -> tuple[DependencyVersion, ...]: #TODO: remove this from code
-        return tuple(dependency for dependency in self.dependencies if not dependency.matches)
+    fingerprint_sha256: Sha256Digest
 
 
-def observed_python_version() -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return platform.python_version()
+def observed_python_version() -> PythonVersion:
+    return PythonVersion(platform.python_version())
 
 
-def observed_dependencies() -> tuple[DependencyVersion, ...]:#TODO remove this from code
+def observed_dependencies() -> tuple[DependencyVersion, ...]:
     environment = active_config().environment
     observed: list[DependencyVersion] = []
     for configured_key, distribution in DEPENDENCY_SPECS:
@@ -97,49 +95,70 @@ def observed_hardware() -> HardwareIdentity:
     gpu_name = None
     gpu_memory = None
     if cuda_available:
-        gpu_name = torch.cuda.get_device_name(0)
+        gpu_name = GpuName(torch.cuda.get_device_name(0))
         gpu_memory = _gpu_memory_bytes()
     return HardwareIdentity(
         gpu_name=gpu_name,
         gpu_memory_bytes=gpu_memory,
         cuda_available=cuda_available,
         driver_cuda_version=_driver_version(),
-        torch_cuda_version=torch.version.cuda,
-        cpu_name=platform.processor() or platform.machine(),
+        torch_cuda_version=(
+            CudaVersion(torch.version.cuda) if torch.version.cuda is not None else None
+        ),
+        cpu_name=CpuName(platform.processor() or platform.machine()),
         ram_bytes=psutil.virtual_memory().total,
-        os_release=platform.platform(),
+        os_release=OperatingSystemRelease(platform.platform()),
     )
 
 
-def _gpu_memory_bytes() -> int | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+class NvidiaSmiQuery(StrEnum):
+    GPU_MEMORY_TOTAL = "memory.total"
+    DRIVER_VERSION = "driver_version"
+
+
+class NvidiaSmiFormat(StrEnum):
+    CSV_NO_HEADER_NO_UNITS = "csv,noheader,nounits"
+    CSV_NO_HEADER = "csv,noheader"
+
+
+def _gpu_memory_bytes() -> ByteCount | None:
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"], #TODO: use enums
+            [
+                "nvidia-smi",
+                f"--query-gpu={NvidiaSmiQuery.GPU_MEMORY_TOTAL.value}",
+                f"--format={NvidiaSmiFormat.CSV_NO_HEADER_NO_UNITS.value}",
+            ],
             capture_output=True,
             text=True,
             check=True,
             timeout=10,
         )
-        return int(result.stdout.strip()) * 1024 * 1024
+        memory_bytes: ByteCount = int(result.stdout.strip()) * 1024 * 1024
+        return memory_bytes
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
 
 
-def _driver_version() -> str | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _driver_version() -> CudaVersion | None:
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], #TODO: use enums
+            [
+                "nvidia-smi",
+                f"--query-gpu={NvidiaSmiQuery.DRIVER_VERSION.value}",
+                f"--format={NvidiaSmiFormat.CSV_NO_HEADER.value}",
+            ],
             capture_output=True,
             text=True,
             check=True,
             timeout=10,
         )
-        return result.stdout.strip()
+        return CudaVersion(result.stdout.strip())
     except (OSError, subprocess.SubprocessError):
         return None
 
 
-def _fingerprint(snapshot: EnvironmentSnapshot) -> str: #TODO: remove this from code #TODO: consolidate the duplicate canonical-JSON encoders into one helper (types.stable_json / msgspec)
+def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
     dependencies = OrderedDict(
         (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
     )
@@ -161,8 +180,8 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> str: #TODO: remove this from 
         dependencies=dependencies,
         hardware=hardware,
     )
-    stable = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(stable.encode("utf-8")).hexdigest()
+    stable = stable_json(payload)
+    return Sha256Digest(hashlib.sha256(stable.encode("utf-8")).hexdigest())
 
 
 def environment_snapshot() -> EnvironmentSnapshot:
@@ -172,7 +191,7 @@ def environment_snapshot() -> EnvironmentSnapshot:
         python_version=observed_python_version(),
         dependencies=dependencies,
         hardware=hardware,
-        fingerprint_sha256="",
+        fingerprint_sha256=Sha256Digest(""),
     )
     return EnvironmentSnapshot(
         python_version=snapshot.python_version,
@@ -182,135 +201,7 @@ def environment_snapshot() -> EnvironmentSnapshot:
     )
 
 
-def validate_environment(strict: bool = True) -> EnvironmentSnapshot: #TODO: remove this from code
-    snapshot = environment_snapshot()
-    deviations: list[str] = []
-    configured_python = active_config().environment.python
-    if snapshot.python_version != configured_python:
-        deviations.append(
-            f"python: configured {configured_python}, observed {snapshot.python_version}"
-        )
-    for dependency in snapshot.dependencies:
-        if not dependency.matches:
-            deviations.append(
-                f"{dependency.configured_key}: configured {dependency.configured}, "
-                f"observed {dependency.observed}"
-            )
-    if strict and deviations:
-        raise EnvironmentMismatchError("; ".join(deviations))
-    return snapshot
-
-
-@dataclass(frozen=True, slots=True)
-class LockfileSummary: #TODO: remove this from code
-    hashed_package_count: Index
-    package_names: tuple[str, ...]
-
-    @property
-    def all_packages_hashed(self) -> bool:
-        return self.hashed_package_count == len(self.package_names)
-
-
-class LockfileSource(FrozenModel): #TODO: remove this from code
-    model_config = ConfigDict(frozen=True, extra="ignore")
-
-    editable: str | None = None
-    path: str | None = None
-    git: str | None = None
-    url: str | None = None
-
-
-class LockfileDistribution(FrozenModel): #TODO: remove this from code
-    model_config = ConfigDict(frozen=True, extra="ignore")
-
-    hash: str | None = None
-
-
-class LockfilePackage(FrozenModel): #TODO: remove this from code
-    model_config = ConfigDict(frozen=True, extra="ignore")
-
-    name: str
-    version: str | None = None
-    source: LockfileSource | None = None
-    sdist: LockfileDistribution | None = None
-    wheels: tuple[LockfileDistribution, ...] = ()
-
-
-class LockfileDocument(FrozenModel): #TODO: remove this from code
-    model_config = ConfigDict(frozen=True, extra="ignore")
-
-    package: tuple[LockfilePackage, ...] = ()
-
-
-SOURCE_MARKERS = frozenset({"editable", "path", "git", "url"}) #TODO: use enums
-
-
-def _package_has_hash(package: LockfilePackage) -> bool: #TODO: remove this from code
-    source = package.source
-    if source is not None and any(getattr(source, marker) is not None for marker in SOURCE_MARKERS):
-        return True
-    if package.sdist is not None and package.sdist.hash is not None:
-        return True
-    return any(wheel.hash is not None for wheel in package.wheels)
-
-
-def _collect_locked_packages(  #TODO: remove this from code
-    packages: tuple[LockfilePackage, ...],
-) -> tuple[list[str], Mapping[str, str]]:
-    package_names: list[str] = []
-    locked_versions: OrderedDict[str, str] = OrderedDict()
-    for package in packages:
-        name = package.name
-        if not _package_has_hash(package):
-            raise ValueError(f"uv.lock package without hashes: {name}")
-        package_names.append(name)
-        version = package.version
-        if version is not None:
-            locked_versions[name] = version
-    return package_names, locked_versions
-
-
-def validate_lockfile(allow_deviations: frozenset[str] = frozenset()) -> LockfileSummary: #TODO: remove this from code
-    lock_path = repository_root() / "uv.lock"
-    if not lock_path.is_file():
-        raise FileNotFoundError("uv.lock is missing; the dependency lock is required")
-    with lock_path.open("rb") as handle:
-        lock = tomllib.load(handle)
-    document = LockfileDocument.model_validate(lock)
-    if not document.package:
-        raise ValueError("uv.lock contains no package entries")
-    package_names, locked_versions = _collect_locked_packages(document.package)
-    environment = active_config().environment
-    expected: OrderedDict[str, str] = OrderedDict(
-        (
-            ("torch", environment.pytorch),
-            ("numpy", environment.numpy),
-            ("scipy", environment.scipy),
-            ("scikit-learn", environment.scikit_learn),
-            ("pandas", environment.pandas),
-            ("pyarrow", environment.pyarrow),
-            ("highspy", environment.highspy_highs),
-            ("pyscipopt", environment.pyscipopt),
-            ("pydantic", environment.pydantic),
-            ("typer", environment.typer),
-            ("psutil", environment.psutil),
-            ("pytest", environment.pytest),
-            ("pytest-cov", environment.pytest_cov),
-        )
-    )
-    for distribution, configured in expected.items():
-        locked = locked_versions.get(distribution)
-        if locked != configured and distribution not in allow_deviations:
-            raise EnvironmentMismatchError(
-                f"lockfile version for {distribution} is {locked}, configured {configured}"
-            )
-    return LockfileSummary(
-        hashed_package_count=len(package_names),
-        package_names=tuple(package_names),
-    )
-
-
-def reference_gpu_matches() -> bool: #TODO: remove from code
+def reference_gpu_matches() -> bool:
     hardware = observed_hardware()
     reference = active_config().runtime.reference_model_gpu
     if hardware.gpu_name is None or hardware.gpu_memory_bytes is None:

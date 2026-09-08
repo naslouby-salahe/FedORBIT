@@ -2,20 +2,166 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, is_dataclass
-from enum import Enum, StrEnum
+from enum import Enum, IntEnum, StrEnum
 from pathlib import Path
 from typing import Annotated, ClassVar, NewType, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+
+
+def is_sha256_digest(value: str) -> bool:
+    return SHA256_HEX.fullmatch(value) is not None
+
+
 ClientComponentName = NewType("ClientComponentName", str)
-SourceLabel = NewType("SourceLabel", str) #TODO: use enums
+DatasetRelativePath = NewType("DatasetRelativePath", str)
+RawDatasetPath = NewType("RawDatasetPath", str)
+DuplicateGroupIdentifier = NewType("DuplicateGroupIdentifier", str)
+Sha256Digest = NewType("Sha256Digest", str)
+TabularColumnName = NewType("TabularColumnName", str)
+ValidationReason = NewType("ValidationReason", str)
+ModelParameterName = NewType("ModelParameterName", str)
+DirectedPairName = NewType("DirectedPairName", str)
+EvaluationConditionName = NewType("EvaluationConditionName", str)
+MetricUnit = NewType("MetricUnit", str)
+InvalidReason = NewType("InvalidReason", str)
+ContrastName = NewType("ContrastName", str)
+StatisticalTestName = NewType("StatisticalTestName", str)
+FieldDescription = NewType("FieldDescription", str)
+FailureReason = NewType("FailureReason", str)
+SupportRecordIdentifier = NewType("SupportRecordIdentifier", str)
+CutMasterCounterName = NewType("CutMasterCounterName", str)
+AvailabilityReason = NewType("AvailabilityReason", str)
+ResourceLimitReason = NewType("ResourceLimitReason", str)
+StrictResourceValidity = NewType("StrictResourceValidity", bool)
+PValueName = NewType("PValueName", str)
+BootstrapPurpose = NewType("BootstrapPurpose", str)
+BootstrapDegeneracy = NewType("BootstrapDegeneracy", bool)
+ArrayAxis = NewType("ArrayAxis", int)
+ClassIndex = NewType("ClassIndex", int)
+ContrastCoordinates = NewType("ContrastCoordinates", str)
+SourceClientName = NewType("SourceClientName", str)
+IneligibilityReason = NewType("IneligibilityReason", str)
+ResponseSeedStage = NewType("ResponseSeedStage", str)
+Rfc3339UtcTimestamp = NewType("Rfc3339UtcTimestamp", str)
+SerializedPacket = NewType("SerializedPacket", str)
+ExposedCoarseGroupId = NewType("ExposedCoarseGroupId", str)
+GpuName = NewType("GpuName", str)
+CudaVersion = NewType("CudaVersion", str)
+CpuName = NewType("CpuName", str)
+OperatingSystemRelease = NewType("OperatingSystemRelease", str)
+PythonVersion = NewType("PythonVersion", str)
+FilesystemSlug = NewType("FilesystemSlug", str)
+ArtifactFileSuffix = NewType("ArtifactFileSuffix", str)
+ArtifactSchemaVersion = NewType("ArtifactSchemaVersion", str)
+ArtifactTypeName = NewType("ArtifactTypeName", str)
+ArtifactPathText = NewType("ArtifactPathText", str)
+ManifestValidationState = NewType("ManifestValidationState", str)
+ArtifactLineage = NewType("ArtifactLineage", str)
+SemanticCoordinateText = NewType("SemanticCoordinateText", str)
+SolverVariablePrefix = NewType("SolverVariablePrefix", str)
+MonotonicDeadline = NewType("MonotonicDeadline", float)
+SolverStatus = NewType("SolverStatus", str)
+TorchPrecision = NewType("TorchPrecision", str)
+ExecutionStageName = NewType("ExecutionStageName", str)
+ReuseDecision = NewType("ReuseDecision", str)
+GitRevision = NewType("GitRevision", str)
+ReportSeriesName = NewType("ReportSeriesName", str)
+ReportAxisLabel = NewType("ReportAxisLabel", str)
+ReportColumnName = NewType("ReportColumnName", str)
+ReportArtifactName = NewType("ReportArtifactName", str)
+ProducerModuleName = NewType("ProducerModuleName", str)
+
+
+class StorageLayoutSegment(StrEnum):
+    MANIFESTS = "manifests"
+    COMPLETIONS = "completions"
+    STAGING = "staging"
+    PREPROCESSING = "preprocessing"
+    ARTIFACTS = "artifacts"
+    DERIVED = "derived"
+    MANIFEST_GLOB = "*.json"
+    TEMPORARY_FILE_PREFIX = ".tmp-"
+
+
+class CheckpointDirectorySegment(StrEnum):
+    PILOT = "pilot"
+    TRAINING = "training"
+
+
+class InfrastructureLogCoordinate(StrEnum):
+    RETRY = "infrastructure-retry"
+
+
+class DatasetPreprocessingState(StrEnum):
+    MATERIALIZED = "materialized"
+
+
+class RawInventoryArtifact(StrEnum):
+    INVENTORIES = "inventories"
+    MANIFEST_JSON = "manifest.json"
+    CHECKSUMS_JSON = "checksums.json"
+    SCHEMA_JSON = "schema.json"
+
+
+class DuplicateReportColumn(StrEnum):
+    RAW_ROW_SHA256 = "raw_row_sha256"
+    OCCURRENCE_COUNT = "occurrence_count"
+    DUPLICATE_ROW_COUNT = "duplicate_row_count"
+
+
+class FedorbitConfigSection(StrEnum):
+    SCIENTIFIC = "scientific"
+    SOLVERS = "solvers"
+
+
+class RiskReductionColumn(StrEnum):
+    ABSOLUTE_RISK_REDUCTION = "arr"
+    RELATIVE_RISK_REDUCTION = "rrr"
+
+
+class ProjectSummaryColumn(StrEnum):
+    ARTIFACT_ID = "artifact_id"
+    SEMANTIC_PRODUCER_COORDINATES = "semantic_producer_coordinates"
+    PRODUCER_STAGE = "producer_stage"
+    DEPENDENCY_FINGERPRINT_SHA256 = "dependency_fingerprint_sha256"
+
+
+class SourceLabel(StrEnum):
+    EDGE_IIOTSET = "Edge-IIoTset"
+    TON_IOT = "ToN_IoT"
+
+
+class ReportingPathSegment(StrEnum):
+    METRICS = "metrics"
+    TABLES = "tables"
+    FIGURES = "figures"
+    REPRODUCIBILITY = "reproducibility"
+    EVIDENCE_SUFFIX = ".evidence.json"
+    TABLE_SUFFIX = ".table.json"
+    FIGURE_SUFFIX = ".figure.json"
+    SUMMARY_JSON = "summary.json"
+    METRIC_RECORDS_CSV = "metric_records.csv"
+    METRIC_RECORDS_TEX = "metric_records.tex"
+    METRIC_VALUE_SVG = "metric_value.svg"
+    METRIC_VALUE_PDF = "metric_value.pdf"
+    EXPERIMENTS_CSV = "experiments.csv"
+    EVIDENCE_SUMMARY_CSV = "evidence_summary.csv"
+    SCIENTIFIC_CONFIGURATION_JSON = "scientific_configuration.json"
+    EXECUTION_JSON = "execution.json"
+
+
 TimestampFieldName = NewType("TimestampFieldName", str)
 DatasetLabel = NewType("DatasetLabel", str)
-MethodName = NewType("MethodName", str) #TODO: use enums
+FineLabel = NewType("FineLabel", str)
+type DatasetIdentifierText = str
+type ExperimentIdentifierText = str
 
 
 NonNegativeInt = Annotated[int, Field(ge=0)]
@@ -23,12 +169,13 @@ PositiveInt = Annotated[int, Field(gt=0)]
 NonNegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 PositiveFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
-UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)] #TODO: should be deleted. We don't reference this in code.
-OpenUnitInterval = Annotated[float, Field(ge=0.0, lt=1.0, allow_inf_nan=False)] #TODO: should be deleted. We don't reference this in code.
+UINT32_LIMIT = 2**32
 
 
-SupportCount = PositiveInt #TODO: is this duplicated?? Should be handled better
+SupportCount = PositiveInt
 ConceptCount = PositiveInt
+FeatureCount = PositiveInt
+ClassCount = PositiveInt
 SampleCount = PositiveInt
 ProposalCount = PositiveInt
 EpochCount = PositiveInt
@@ -49,11 +196,18 @@ PatienceCount = NonNegativeInt
 WorkerCount = NonNegativeInt
 DecimalPrecision = NonNegativeInt
 InvalidPermutationCount = NonNegativeInt
-RandomSeed = Annotated[int, Field(ge=0, lt=2**32)] #TODO: centralize this. Seems duplicated
-DerivedSeed = Annotated[int, Field(ge=0, lt=2**32)]
+RandomSeed = Annotated[int, Field(ge=0, lt=UINT32_LIMIT)]
+DerivedSeed = Annotated[int, Field(ge=0, lt=UINT32_LIMIT)]
 Index = NonNegativeInt
+type CutMasterCounter = tuple[CutMasterCounterName, Index]
+type CutMasterCounters = tuple[CutMasterCounter, ...]
 ByteCount = NonNegativeInt
-RetryCount = NewType("RetryCount", int) #TODO: is this duplicated?? Should be handled better
+RetryCount = NonNegativeInt
+AnonymousNodeIndex = Index
+AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str)
+type NodeIndices = tuple[Index, ...]
+type NodeIndexList = list[Index]
+type NodeImageMap = Mapping[Index, Index]
 
 
 LearningRate = PositiveFloat
@@ -76,14 +230,68 @@ Score = FiniteFloat
 ConfidenceLevel = FiniteFloat
 SignificanceLevel = FiniteFloat
 Fraction = FiniteFloat
+type ReportCoordinates = tuple[Coefficient, ...]
+type ReportColumns = tuple[ReportColumnName, ...]
+type RawCellValue = str | int | float | None
+RawCellText = NewType("RawCellText", str)
+CategoryName = NewType("CategoryName", str)
+type RawNumericCellValue = str | int | float
+type RawCellSamples = tuple[RawCellValue, ...]
+type TabularColumns = tuple[TabularColumnName, ...]
+type TabularColumnSet = frozenset[TabularColumnName]
+type ComponentColumns = tuple[TabularColumns, ...]
+type LabelCounts = tuple[tuple[DatasetLabel, NonNegativeInt], ...]
+type LabelText = DatasetLabel | FineLabel
+type NativeLabels = tuple[FineLabel, ...]
+type NativeLabelSet = frozenset[FineLabel]
+type LocalClassNames = tuple[FineLabel, ...]
+type ExcludedLocalClasses = tuple[tuple[FineLabel, NonNegativeInt], ...]
+FeatureName = NewType("FeatureName", str)
+NumericFeatureValue = NewType("NumericFeatureValue", float)
+type FeatureNames = tuple[FeatureName, ...]
+type RawTabularRow = dict[TabularColumnName, RawCellText]
+type RawTabularRows = list[RawTabularRow]
+type RawTabularColumns = list[RawCellText]
+TimestampSeconds = FiniteFloat
+type TimestampRange = tuple[TimestampSeconds, TimestampSeconds]
+type CategoryVocabulary = tuple[CategoryName, ...]
+type CategorySet = frozenset[CategoryName]
+type TextToken = RawCellText | CategoryName
+type FeatureValue = str | int | float | None
+type FeatureValueMap = Mapping[TabularColumnName, FeatureValue]
+type FeatureValuePartitions = tuple[FeatureValueMap, FeatureValueMap]
+NormalizedGroupIdentifier = DuplicateGroupIdentifier
+type NormalizedGroupIdentifiers = tuple[NormalizedGroupIdentifier, ...]
+type ArtifactIdentifiers = tuple[ArtifactIdentifier, ...]
+type ArtifactPathTexts = tuple[ArtifactPathText, ...]
 
 
 class ClientRole(StrEnum):
     PRIMARY = "primary"
-    SECONDARY = "secondary" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    SECONDARY = "secondary"
     EXTERNAL = "external"
     SOURCE = "source"
     TARGET = "target"
+
+
+class ExitStatus(IntEnum):
+    OK = 0
+    RUNTIME = 1
+    USAGE = 2
+
+
+class CliCommand(StrEnum):
+    DOCTOR = "doctor"
+    PREPROCESS = "preprocess"
+    PLAN = "plan"
+    SMOKE = "smoke"
+    RUN = "run"
+    STATUS = "status"
+    REPORT = "report"
+
+
+class RuntimeDeviceType(StrEnum):
+    CUDA = "cuda"
 
 
 class DatasetId(StrEnum):
@@ -139,6 +347,34 @@ class TransferMethod(StrEnum):
     COUPLING_DESTROYED_FEDORBIT = "Coupling-Destroyed FedORBIT"
 
 
+class ExperimentLocalMethod(StrEnum):
+    EXACT_ORBIT = "exact_orbit"
+
+
+type MethodName = TransferMethod | ExperimentLocalMethod
+
+
+class ComparisonStatistic(StrEnum):
+    SIGN_FLIP_SUPERIORITY = "sign_flip_superiority"
+    TOST_EQUIVALENCE = "tost_equivalence"
+    SIGN_FLIP_AGAINST_ZERO = "sign_flip_against_zero"
+    SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE = "sign_flip_difference_common_reference"
+    SEED_LEVEL_RATE_DIFFERENCE_SIGN_FLIP = "seed_level_rate_difference_sign_flip"
+
+
+class ComparisonContrastSuffix(StrEnum):
+    DIFFERENCE = "difference"
+    TOST_EQUIVALENCE = "TOST equivalence"
+
+
+class EfficiencyMetricName(StrEnum):
+    CUDA_BYTES = "CUDA bytes"
+    PACKET_BYTES = "packet bytes"
+    SOURCE_RESPONSE_STEPS = "source response steps"
+    CONFIRMATION_STEPS = "confirmation steps"
+    ASSIMILATION_STEPS = "assimilation steps"
+
+
 class ExperimentName(StrEnum):
     MATHEMATICAL_PRIMITIVE_VALIDATION = "Mathematical Primitive Validation"
     EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION = "Exact Sparse Theorem Exhaustive Validation"
@@ -183,15 +419,15 @@ class ExperimentClassification(StrEnum):
     ABLATION = "Ablation"
     ROBUSTNESS = "Robustness"
     GENERALIZATION = "Generalization"
-    FINAL_EVIDENCE = "FINAL EVIDENCE" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    FINAL_EVIDENCE = "FINAL EVIDENCE"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     CONFIRMATORY_ANALYSIS = "Confirmatory ANALYSIS"
-    EFFICIENCY = "EFFICIENCY" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    ROBUSTNESS_EFFICIENCY = "Robustness / EFFICIENCY"
 
 
 class ScalabilityBlockPattern(StrEnum):
     BALANCED = "balanced"
     MAXIMALLY_SKEWED = "maximally_skewed"
-    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two_block" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    MAXIMALLY_SKEWED_TWO_BLOCK = "maximally_skewed_two_block"
 
 
 class CouplingCompatibility(StrEnum):
@@ -200,12 +436,12 @@ class CouplingCompatibility(StrEnum):
 
 
 class ArtifactState(StrEnum):
-    MISSING = "Missing" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    MISSING = "Missing"
     RUNNING = "Running"
     COMPLETED = "Completed"
     FAILED = "Failed"
     INVALID = "Invalid"
-    STALE = "Stale" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    STALE = "Stale"
     BLOCKED = "Blocked"
 
 
@@ -214,7 +450,7 @@ class OverwritePolicy(StrEnum):
     REPLACE = "replace"
 
 
-class TerminalState(StrEnum): #TODO: is this duplicated?? Should be handled better
+class TerminalState(StrEnum):
     COMPLETED = "Completed"
     FAILED_INFRASTRUCTURE = "Failed / Infrastructure Failure"
     INVALID = "Invalid"
@@ -240,7 +476,7 @@ class RngNamespace(StrEnum):
     DENSE_START = "dense_start"
 
 
-class ArtifactType(StrEnum): #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+class ArtifactType(StrEnum):
     PREPARED_SPLIT = "prepared_split"
     CHECKPOINT = "checkpoint"
     PREDICTION = "prediction"
@@ -269,19 +505,18 @@ class ArtifactStage(StrEnum):
 
 
 class ConfigurationSection(StrEnum):
-    ACTION = "action" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
-    GENERATORS = "generators" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    ACTION = "action"
+    GENERATORS = "generators"
     MODELS = "models"
     RESPONSE = "response"
-    SOLVERS = "solvers" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
-    METRICS = "metrics" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    SOLVERS = "solvers"
+    METRICS = "metrics"
 
 
 class SemanticCoordinate(StrEnum):
     EXPERIMENT = "experiment"
     DATASET = "dataset"
     SOURCE_CLIENT = "source_client"
-    TARGET_CLIENT = "target_client" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     DIRECTED_PAIR = "directed_pair"
     METHOD = "method"
     CONDITION = "condition"
@@ -294,8 +529,8 @@ class FailureCategory(StrEnum):
     VALIDATION = "validation"
     SCIENTIFIC_NULL = "scientific_null"
     SCIENTIFIC_BOUNDARY = "scientific_boundary"
-    SOLVER_TIME_LIMIT = "solver_time_limit" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
-    RESOURCE_LIMIT = "resource_limit" #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    SOLVER_TIME_LIMIT = "solver_time_limit"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    RESOURCE_LIMIT = "resource_limit"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     SCIENTIFIC_ALGORITHMIC = "scientific_algorithmic"
 
 
@@ -309,7 +544,7 @@ class MultiplicityFamily(StrEnum):
     CONFIRMATION_SAFETY = "Confirmation Safety"
 
 
-class MetricId(StrEnum): #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+class MetricId(StrEnum):
     CLASS_CONDITIONAL_CROSS_ENTROPY = "Class-Conditional Cross-Entropy"
     MACRO_CROSS_ENTROPY = "Macro Cross-Entropy"
     RELATIVE_MACRO_CE_GAIN = "Relative Macro-CE Gain"
@@ -364,6 +599,11 @@ class DomainModel(BaseModel):
     )
 
 
+def _nonempty_text(value: str, label: str) -> None:
+    if not value:
+        raise ValueError(f"{label} must not be empty")
+
+
 @dataclass(frozen=True, slots=True)
 class ArtifactPath:
     value: Path
@@ -374,12 +614,11 @@ class ArtifactPath:
 
 
 @dataclass(frozen=True, slots=True)
-class ArtifactIdentifier: #TODO: centralize this. Seems duplicated
+class ArtifactIdentifier:
     value: str
 
     def __post_init__(self) -> None:
-        if not self.value:
-            raise ValueError("artifact identifier must not be empty")
+        _nonempty_text(self.value, "artifact identifier")
 
 
 @dataclass(frozen=True, slots=True)
@@ -387,21 +626,19 @@ class ArtifactFingerprint:
     value: str
 
     def __post_init__(self) -> None:
-        if not self.value:
-            raise ValueError("artifact fingerprint must not be empty")
+        _nonempty_text(self.value, "artifact fingerprint")
 
 
 @dataclass(frozen=True, slots=True)
-class SemanticCoordinates: #TODO: handle this better
+class SemanticCoordinates:
     value: str
 
     def __post_init__(self) -> None:
-        if not self.value:
-            raise ValueError("semantic coordinates must not be empty")
+        _nonempty_text(self.value, "semantic coordinates")
 
 
 @dataclass(frozen=True, slots=True)
-class ExperimentCondition: #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+class ExperimentCondition:
     value: str
 
     def __post_init__(self) -> None:
@@ -410,7 +647,7 @@ class ExperimentCondition: #TODO: unreferenced — likely serialized-schema or d
 
 
 @dataclass(frozen=True, slots=True)
-class SupportSize: #TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+class SupportSize:  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
     value: int
 
     def __post_init__(self) -> None:
@@ -418,12 +655,12 @@ class SupportSize: #TODO: unreferenced — likely serialized-schema or deferred-
             raise ValueError("support size must be positive")
 
 
-@dataclass(frozen=True, slots=True) #TODO: is this duplicated?? Should be handled better
+@dataclass(frozen=True, slots=True)
 class ExperimentSeed:
     value: int
 
     def __post_init__(self) -> None:
-        if not 0 <= self.value < 2**32: #TODO: move to constants
+        if not 0 <= self.value < UINT32_LIMIT:
             raise ValueError("experiment seed must be in the unsigned 32-bit range")
 
 
@@ -449,7 +686,6 @@ class SemanticCell:
     experiment: ExperimentName
     dataset: DatasetId | None = None
     source_client: DatasetId | None = None
-    target_client: DatasetId | None = None #TODO: delete this
     directed_pair: DirectedPair | None = None
     method: TransferMethod | None = None
     condition: ExperimentCondition | None = None
@@ -457,10 +693,9 @@ class SemanticCell:
     seed: ExperimentSeed | None = None
 
     def identity_json(self, relevance: frozenset[SemanticCoordinate]) -> str:
-        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( #TODO: handle this better
+        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
             dataset=self.dataset.value if self.dataset is not None else None,
             source_client=self.source_client.value if self.source_client is not None else None,
-            target_client=self.target_client.value if self.target_client is not None else None,
             method=self.method.value if self.method is not None else None,
             condition=self.condition.value if self.condition is not None else None,
             support=self.support.value if self.support is not None else None,
@@ -485,12 +720,12 @@ class StableSerializationError(ValueError):
     pass
 
 
-class StableJsonPayload(Protocol): #TODO: this does not seem safe, nor clean #TODO: type the JSON boundary with msgspec (replaces empty Protocol + unchecked casts)
+class StableJsonPayload(Protocol):
     __slots__ = ()
 
 
-def stable_json(value: StableJsonPayload) -> str: #TODO: is this duplicated?? Should be handled better #TODO: consolidate the duplicate canonical-JSON encoders into one helper (types.stable_json / msgspec)
-    return json.dumps(_stable_value(value), sort_keys=True, separators=(",", ":")) #TODO: is this duplicated?? Should be handled better
+def stable_json(value: StableJsonPayload) -> str:
+    return json.dumps(_stable_value(value), sort_keys=True, separators=(",", ":"))
 
 
 def _stable_value(value: StableJsonPayload) -> JsonValue:
@@ -499,13 +734,13 @@ def _stable_value(value: StableJsonPayload) -> JsonValue:
             (field.name, _stable_value(getattr(value, field.name))) for field in fields(value)
         )
     if isinstance(value, Mapping):
-        mapping = cast(Mapping[str, StableJsonPayload], value) #TODO: this does not seem safe, nor clean
+        mapping = cast(Mapping[str, StableJsonPayload], value)
         return OrderedDict(
             (str(key), _stable_value(item))
             for key, item in sorted(mapping.items(), key=lambda pair: str(pair[0]))
         )
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        sequence = cast(Sequence[StableJsonPayload], value) #TODO: this does not seem safe, nor clean
+        sequence = cast(Sequence[StableJsonPayload], value)
         return [_stable_value(item) for item in sequence]
     if isinstance(value, Enum):
         return _stable_value(value.value)

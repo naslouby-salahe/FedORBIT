@@ -14,10 +14,15 @@ from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, d
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
+    NodePermutation,
     PaddedBlockStructure,
+    ResponseMatrix,
     enumerate_block_permutations,
 )
 from fedorbit.optimization.exact_sparse import (
+    HighsOption,
+    HighsPresolve,
+    HighsSolver,
     run_support_master_lp,
     scenario_cut_row,
 )
@@ -29,7 +34,25 @@ from fedorbit.optimization.objective import (
     evaluate_objective,
     zero_action,
 )
-from fedorbit.types import Discrepancy, Index, RngNamespace, Score, TerminalState
+from fedorbit.types import (
+    Coefficient,
+    Discrepancy,
+    Index,
+    MonotonicDeadline,
+    RngNamespace,
+    ScaleFactor,
+    Score,
+    SemanticCoordinates,
+    TerminalState,
+)
+
+
+type ProductKey = tuple[Index, Index, Index, Index]
+type ProductCoefficients = Mapping[ProductKey, Coefficient]
+type MutableProductCoefficients = MutableMapping[ProductKey, Coefficient]
+type LiftedRow = Mapping[Index, Coefficient]
+type LiftedRowAppender = Callable[[LiftedRow, Coefficient, Coefficient], None]
+type LiftedVector = NDArray[np.float64]
 
 
 class DenseCcpError(ValueError):
@@ -61,11 +84,10 @@ class AssignmentVariableLayout:
         return cls(blocks=blocks, columns=tuple(columns), column_index=index_map)
 
     @property
-    def size(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def size(self) -> Index:
         return len(self.columns)
 
-    def column_of(self, key: AssignmentVariableKey
-                  ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def column_of(self, key: AssignmentVariableKey) -> Index:
         return self.column_index[key]
 
     def zeros(self) -> NDArray[np.float64]:
@@ -121,10 +143,10 @@ def assignment_variable_keys(
 def _collect_block_products_for_target_pair(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    target_k: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_k)
-    target_j: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: target_j)
-    block_index: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_index)
-    coefficients: MutableMapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coefficients)
+    target_k: Index,
+    target_j: Index,
+    block_index: Index,
+    coefficients: MutableProductCoefficients,
 ) -> None:
     blocks = problem.blocks
     weight = float(problem.target_importance[target_k])
@@ -140,8 +162,8 @@ def _collect_block_products_for_target_pair(
 
 def _nonzero_product_coefficients(
     problem: RobustActionProblem, alpha: CurriculumAction
-) -> Mapping[tuple[int, int, int, int], float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    coefficients: OrderedDict[tuple[int, int, int, int], float] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> ProductCoefficients:
+    coefficients: OrderedDict[ProductKey, Coefficient] = OrderedDict()
     blocks = problem.blocks
     for target_k in range(blocks.total_padded_nodes):
         block_of_k = blocks.block_of_node(target_k)
@@ -154,7 +176,7 @@ def _nonzero_product_coefficients(
     return coefficients
 
 
-def penalty_scale(problem: RobustActionProblem, alpha: CurriculumAction) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def penalty_scale(problem: RobustActionProblem, alpha: CurriculumAction) -> ScaleFactor:
     largest = max(
         (abs(value) for value in _nonzero_product_coefficients(problem, alpha).values()),
         default=0.0,
@@ -162,7 +184,7 @@ def penalty_scale(problem: RobustActionProblem, alpha: CurriculumAction) -> floa
     return max(1.0, largest)
 
 
-def integrality_residual(assignment_values: NDArray[np.float64]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def integrality_residual(assignment_values: LiftedVector) -> Discrepancy:
     if assignment_values.size == 0:
         raise DenseCcpError("empty assignment vector has no integrality residual")
     distances = np.minimum(assignment_values, 1.0 - assignment_values)
@@ -171,17 +193,17 @@ def integrality_residual(assignment_values: NDArray[np.float64]) -> float: #TODO
 
 @dataclass(frozen=True, slots=True)
 class _LiftedConstraintMatrix:
-    row_lower: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    row_upper: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    start: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    index: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    value: tuple[float, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    row_lower: tuple[Coefficient, ...]
+    row_upper: tuple[Coefficient, ...]
+    start: tuple[Index, ...]
+    index: tuple[Index, ...]
+    value: tuple[Coefficient, ...]
 
 
 def _append_lifted_assignment_rows(
     blocks: PaddedBlockStructure,
     layout: AssignmentVariableLayout,
-    add_row: Callable[[Mapping[int, float], float, float], None], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: add_row)
+    add_row: LiftedRowAppender,
 ) -> None:
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
@@ -209,19 +231,17 @@ def _append_lifted_assignment_rows(
 def _build_lifted_constraint_matrix(
     blocks: PaddedBlockStructure,
     layout: AssignmentVariableLayout,
-    product_keys: list[tuple[int, int, int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: product_keys)
-    product_column: Mapping[tuple[int, int, int, int], int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: product_column)
+    product_keys: list[ProductKey],
+    product_column: Mapping[ProductKey, Index],
 ) -> _LiftedConstraintMatrix:
     infinity = highspy.kHighsInf
-    row_lower: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    row_upper: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    start: list[int] = [0] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    index: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    value: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    row_lower: list[Coefficient] = []
+    row_upper: list[Coefficient] = []
+    start: list[Index] = [0]
+    index: list[Index] = []
+    value: list[Coefficient] = []
 
-    def add_row(entries: Mapping[int, float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                lower: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                upper: float) -> None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: entries) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lower) #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: upper)
+    def add_row(entries: LiftedRow, lower: Coefficient, upper: Coefficient) -> None:
         for column in sorted(entries):
             index.append(column)
             value.append(entries[column])
@@ -253,7 +273,7 @@ def _build_lifted_constraint_matrix(
             -infinity,
             0.0,
         )
-        lower_combined: OrderedDict[int, float] = OrderedDict()
+        lower_combined: OrderedDict[Index, Coefficient] = OrderedDict()
         for node_pair in (
             AssignmentVariableKey(source_a, target_k),
             AssignmentVariableKey(source_b, target_j),
@@ -273,11 +293,11 @@ def _build_lifted_constraint_matrix(
 
 def _lifted_objective_vector(
     layout: AssignmentVariableLayout,
-    product_map: Mapping[tuple[int, int, int, int], float], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: product_map)
-    product_keys: list[tuple[int, int, int, int]], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: product_keys)
-    penalty_coefficient: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: penalty_coefficient)
-    linearization_point: NDArray[np.float64],
-) -> list[float]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    product_map: ProductCoefficients,
+    product_keys: list[ProductKey],
+    penalty_coefficient: Coefficient,
+    linearization_point: LiftedVector,
+) -> list[Coefficient]:
     product_column = OrderedDict(
         (key, layout.size + offset) for offset, key in enumerate(product_keys)
     )
@@ -295,8 +315,8 @@ def solve_lifted_lp(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     layout: AssignmentVariableLayout,
-    penalty_coefficient: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: penalty_coefficient)
-    linearization_point: NDArray[np.float64],
+    penalty_coefficient: Coefficient,
+    linearization_point: LiftedVector,
 ) -> LiftedRelaxationSolution:
     config = active_config()
     product_map = _nonzero_product_coefficients(problem, alpha)
@@ -328,10 +348,10 @@ def solve_lifted_lp(
     lp.a_matrix_.value_ = list(matrix.value)
 
     highs = highspy.Highs()
-    highs.setOptionValue("output_flag", False) #TODO: use enums for this
-    highs.setOptionValue("solver", "simplex") #TODO: use enums for this
-    highs.setOptionValue("presolve", "on") #TODO: use enums for this
-    highs.setOptionValue("threads", config.solvers.dense_ccp.lp_threads) #TODO: use enums for this
+    highs.setOptionValue(HighsOption.OUTPUT_FLAG.value, False)
+    highs.setOptionValue(HighsOption.SOLVER.value, HighsSolver.SIMPLEX.value)
+    highs.setOptionValue(HighsOption.PRESOLVE.value, HighsPresolve.ON.value)
+    highs.setOptionValue(HighsOption.THREADS.value, config.solvers.dense_ccp.lp_threads)
     highs.passModel(lp)
     highs.run()
     status = highs.getModelStatus()
@@ -361,8 +381,8 @@ def unpenalized_fixed_action_objective(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     layout: AssignmentVariableLayout,
-    assignment_values: NDArray[np.float64],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    assignment_values: LiftedVector,
+) -> Score:
     total = 0.0
     for (source_a, source_b, target_k, target_j), coefficient in _nonzero_product_coefficients(
         problem, alpha
@@ -373,18 +393,26 @@ def unpenalized_fixed_action_objective(
     return total
 
 
+@dataclass(frozen=True, slots=True)
+class _PenaltyLevelResult:
+    assignment: LiftedVector
+    residual: Discrepancy
+    iterations: Index
+    converged: bool
+
+
 def _run_penalty_level(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     layout: AssignmentVariableLayout,
-    penalty: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: penalty)
-    start_assignment: NDArray[np.float64],
-    start_residual: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: start_residual)
-    start_iterations: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: start_iterations)
-) -> tuple[NDArray[np.float64], float, int, bool]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    penalty: Coefficient,
+    start_assignment: LiftedVector,
+    start_residual: Discrepancy,
+    start_iterations: Index,
+) -> _PenaltyLevelResult:
     settings = active_config().solvers.dense_ccp
     current = start_assignment.copy()
-    previous_objective: float | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    previous_objective: Score | None = None
     residual = start_residual
     iterations = start_iterations
     for _ in range(settings.maximum_iterations_per_penalty_level):
@@ -401,9 +429,9 @@ def _run_penalty_level(
                 relative_change <= settings.relative_objective_convergence_tolerance
                 and residual <= settings.assignment_integrality_residual
             ):
-                return current, residual, iterations, True
+                return _PenaltyLevelResult(current, residual, iterations, True)
         previous_objective = objective
-    return current, residual, iterations, False
+    return _PenaltyLevelResult(current, residual, iterations, False)
 
 
 def ccp_trajectory(
@@ -419,7 +447,7 @@ def ccp_trajectory(
     iterations = 0
     converged_final_level = False
     for multiplier in settings.penalty_multipliers_relative_to_scale:
-        current, residual, iterations, level_converged = _run_penalty_level(
+        level = _run_penalty_level(
             problem,
             alpha,
             layout,
@@ -428,7 +456,10 @@ def ccp_trajectory(
             residual,
             iterations,
         )
-        converged_final_level = level_converged
+        current = level.assignment
+        residual = level.residual
+        iterations = level.iterations
+        converged_final_level = level.converged
     final_objective = unpenalized_fixed_action_objective(problem, alpha, layout, current)
     return CcpTrajectoryOutcome(
         final_assignment=current,
@@ -440,17 +471,16 @@ def ccp_trajectory(
 
 
 def permutation_to_vector(
-    images: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: images)
+    images: NodePermutation,
     layout: AssignmentVariableLayout,
-) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+) -> LiftedVector:
     vector = layout.zeros()
     for target, image in enumerate(images):
         vector[layout.column_of(AssignmentVariableKey(image, target))] = 1.0
     return vector
 
 
-def barycenter_start(layout: AssignmentVariableLayout
-                     ) -> NDArray[np.float64]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+def barycenter_start(layout: AssignmentVariableLayout) -> LiftedVector:
     vector = layout.zeros()
     for block_index, size in enumerate(layout.blocks.padded_size_tuple):
         uniform = 1.0 / size
@@ -463,9 +493,9 @@ def barycenter_start(layout: AssignmentVariableLayout
 def dense_starts(
     layout: AssignmentVariableLayout,
     seed: RandomSeed,
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
+    coordinates: SemanticCoordinates,
 ) -> tuple[NDArray[np.float64], ...]:
-    unique_permutations: OrderedDict[tuple[int, ...], NDArray[np.float64]] = OrderedDict() #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    unique_permutations: OrderedDict[NodePermutation, LiftedVector] = OrderedDict()
     for correspondence in enumerate_block_permutations(layout.blocks):
         unique_permutations.setdefault(
             correspondence.images,
@@ -480,11 +510,11 @@ def dense_starts(
     starts.append(unique_permutations[ordered_permutations[0]].copy())
     rng_seed = derive_seed32(SeedDerivationRequest(seed, RngNamespace.DENSE_START, coordinates))
     rng = np.random.default_rng(rng_seed)
-    seen_orders: list[tuple[int, ...]] = [ordered_permutations[0]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seen_orders: list[NodePermutation] = [ordered_permutations[0]]
     attempts = 0
     while len(starts) < 5 and attempts < 24:
         attempts += 1
-        order: list[int] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+        order: list[Index] = []
         for block_index in range(len(layout.blocks.padded_size_tuple)):
             sources = [int(node) for node in layout.blocks.block_index_range(block_index)]
             shuffled = [int(node) for node in rng.permutation(sources)]
@@ -502,7 +532,7 @@ def project_to_permutation(
     assignment_values: NDArray[np.float64],
 ) -> BlockCorrespondence:
     blocks = layout.blocks
-    images: list[int] = [-1] * blocks.total_padded_nodes #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    images: list[Index] = [-1] * blocks.total_padded_nodes
     lap_tie_tolerance = active_config().solvers.exact_sparse.lap_objective_tie_tolerance
     for block_index in range(len(blocks.padded_size_tuple)):
         targets = list(blocks.block_index_range(block_index))
@@ -524,7 +554,7 @@ def response_only_objective(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
     correspondence: BlockCorrespondence,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     permuted = correspondence.permute_response_matrix(problem.lower_response_matrix)
     return float(problem.target_importance @ permuted @ alpha.coordinates)
 
@@ -534,8 +564,8 @@ def _evaluate_projected_candidates(
     layout: AssignmentVariableLayout,
     alpha: CurriculumAction,
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
-    deadline: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
+    contrast_coordinates: SemanticCoordinates,
+    deadline: MonotonicDeadline,
 ) -> tuple[list[ProjectedCandidate], bool]:
     candidates: list[ProjectedCandidate] = []
     for start in dense_starts(layout, seed, contrast_coordinates):
@@ -580,11 +610,11 @@ class OuterIterationOutcome:
 def _classify_outer_iteration(
     problem: RobustActionProblem,
     scenarios: list[BlockCorrespondence],
-    scenario_rows: list[NDArray[np.float64]],
+    scenario_rows: list[ResponseMatrix],
     alpha: CurriculumAction,
     correspondence: BlockCorrespondence,
-    master_objective: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: master_objective)
-    deadline: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: deadline)
+    master_objective: Score,
+    deadline: MonotonicDeadline,
 ) -> OuterIterationOutcome:
     settings = active_config().solvers
     dense_settings = settings.dense_ccp
@@ -626,7 +656,7 @@ def _action_relaxation_bound(
     problem: RobustActionProblem,
     layout: AssignmentVariableLayout,
     alpha: CurriculumAction,
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     return relaxed_fixed_action_lower_bound(problem, alpha, layout).objective_value
 
 
@@ -639,7 +669,7 @@ class _LoopAccounting:
 
 def _apply_outer_outcome(
     outcome: OuterIterationOutcome,
-    cuts_so_far: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: cuts_so_far)
+    cuts_so_far: Index,
     previously_converged: bool,
 ) -> _LoopAccounting:
     cut_count = cuts_so_far + (1 if outcome.cut_added else 0)
@@ -651,11 +681,11 @@ def _apply_outer_outcome(
 def _run_dense_outer_loop(
     problem: RobustActionProblem,
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
+    contrast_coordinates: SemanticCoordinates,
 ) -> DenseOuterLoopResult:
     config = active_config()
     settings = config.solvers.dense_ccp
-    deadline = time.monotonic() + settings.wall_time_seconds
+    deadline = MonotonicDeadline(time.monotonic() + settings.wall_time_seconds)
     layout = AssignmentVariableLayout.build(problem.blocks)
     actionable = tuple(problem.actionable_nodes())
     full_support = SupportCoordinateSet(problem=problem, nodes=actionable)
@@ -715,7 +745,7 @@ def _run_dense_outer_loop(
 def solve_dense_ccp(
     problem: RobustActionProblem,
     seed: RandomSeed,
-    contrast_coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: contrast_coordinates)
+    contrast_coordinates: SemanticCoordinates,
 ) -> DenseCcpOutcome:
     result = _run_dense_outer_loop(problem, seed, contrast_coordinates)
     best_candidate = result.best_candidate

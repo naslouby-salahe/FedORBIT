@@ -4,6 +4,7 @@ import itertools
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,25 +12,35 @@ from numpy.typing import NDArray
 from fedorbit.config.loading import active_config
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
-    BlockNodeCounts,
     PaddedBlockStructure,
-    support_per_block,
 )
-from fedorbit.types import Budget, Coefficient, Score, SupportCount, Tolerance
+from fedorbit.types import Budget, Coefficient, Index, Score, SupportCount, Tolerance
+
+type ResponseMatrix = NDArray[np.float64]
+type TargetImportanceVector = NDArray[np.float64]
+type CurriculumCoordinates = NDArray[np.float64]
 
 
 class ActionSpaceError(ValueError):
     pass
 
 
+class ActionArrayName(StrEnum):
+    LOWER_RESPONSE_MATRIX = "lower_response_matrix"
+    UPPER_RESPONSE_MATRIX = "upper_response_matrix"
+    TARGET_IMPORTANCE = "target_importance"
+    COORDINATE_CAPS = "coordinate_caps"
+    LINEAR_COSTS = "linear_costs"
+
+
 @dataclass(frozen=True, slots=True)
 class RobustActionProblem:
     blocks: PaddedBlockStructure
-    lower_response_matrix: NDArray[np.float64]
-    upper_response_matrix: NDArray[np.float64]
-    target_importance: NDArray[np.float64]
-    coordinate_caps: NDArray[np.float64]
-    linear_costs: NDArray[np.float64]
+    lower_response_matrix: ResponseMatrix
+    upper_response_matrix: ResponseMatrix
+    target_importance: TargetImportanceVector
+    coordinate_caps: CurriculumCoordinates
+    linear_costs: CurriculumCoordinates
     total_budget: Budget
     principal_support: SupportCount
 
@@ -37,21 +48,21 @@ class RobustActionProblem:
         size = self.blocks.total_padded_nodes
         expected = (size, size)
         for name, matrix in (
-            ("lower_response_matrix", self.lower_response_matrix), #TODO: use enum
-            ("upper_response_matrix", self.upper_response_matrix), #TODO: use enum
+            (ActionArrayName.LOWER_RESPONSE_MATRIX, self.lower_response_matrix),
+            (ActionArrayName.UPPER_RESPONSE_MATRIX, self.upper_response_matrix),
         ):
             if matrix.shape != expected:
                 raise ActionSpaceError(
-                    f"{name} shape {matrix.shape} does not match padded size {expected}"
+                    f"{name.value} shape {matrix.shape} does not match padded size {expected}"
                 )
         for name, vector in (
-            ("target_importance", self.target_importance), #TODO: use enum
-            ("coordinate_caps", self.coordinate_caps), #TODO: use enum
-            ("linear_costs", self.linear_costs), #TODO: use enum
+            (ActionArrayName.TARGET_IMPORTANCE, self.target_importance),
+            (ActionArrayName.COORDINATE_CAPS, self.coordinate_caps),
+            (ActionArrayName.LINEAR_COSTS, self.linear_costs),
         ):
             if vector.shape != (size,):
                 raise ActionSpaceError(
-                    f"{name} length {vector.shape[0]} does not match padded size {size}"
+                    f"{name.value} length {vector.shape[0]} does not match padded size {size}"
                 )
         if np.any(self.target_importance < 0.0):
             raise ActionSpaceError("target importance must be coordinatewise nonnegative")
@@ -69,17 +80,17 @@ class RobustActionProblem:
             raise ActionSpaceError("principal support must be at least one")
 
     @property
-    def size(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def size(self) -> Index:
         return self.blocks.total_padded_nodes
 
-    def actionable_nodes(self) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def actionable_nodes(self) -> tuple[Index, ...]:
         return tuple(int(node) for node in np.flatnonzero(self.coordinate_caps > 0.0))
 
 
 @dataclass(frozen=True, slots=True)
 class CurriculumAction:
     problem: RobustActionProblem
-    coordinates: NDArray[np.float64] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    coordinates: CurriculumCoordinates
 
     def __post_init__(self) -> None:
         if self.coordinates.shape != (self.problem.size,):
@@ -93,28 +104,20 @@ class CurriculumAction:
             raise ActionSpaceError("curriculum action violates a coordinate cap")
 
     @property
-    def realized_support_size(self
-                              ) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def realized_support_size(self) -> Index:
         return int(np.count_nonzero(self.coordinates))
 
     @property
-    def active_support_nodes(self
-                             ) -> tuple[int, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def active_support_nodes(self) -> tuple[Index, ...]:
         return tuple(int(node) for node in np.flatnonzero(self.coordinates > 0.0))
-
-    def is_within_budget(self) -> bool: #TODO: should be deleted. We don't reference this in code.
-        return bool(float(np.sum(self.coordinates)) <= self.problem.total_budget + 0.0)
-
-    def is_support_limited(self, support_limit: SupportCount) -> bool: #TODO: should be deleted. We don't reference this in code.
-        return self.realized_support_size <= support_limit
 
 
 def build_robust_action_problem(
     blocks: PaddedBlockStructure,
-    lower_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    upper_response_matrix: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    target_importance: NDArray[np.float64], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    actionable_nodes: Sequence[int], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: actionable_nodes)
+    lower_response_matrix: ResponseMatrix,
+    upper_response_matrix: ResponseMatrix,
+    target_importance: TargetImportanceVector,
+    actionable_nodes: Sequence[Index],
 ) -> RobustActionProblem:
     action_config = active_config().scientific.action
     size = blocks.total_padded_nodes
@@ -144,7 +147,7 @@ def zero_action(problem: RobustActionProblem) -> CurriculumAction:
 
 
 def curriculum_action_from_entries(
-    problem: RobustActionProblem, nonzero_entries: Sequence[tuple[int, float]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: nonzero_entries)
+    problem: RobustActionProblem, nonzero_entries: Sequence[tuple[Index, Coefficient]]
 ) -> CurriculumAction:
     vector = np.zeros(problem.size, dtype=np.float64)
     for node, value in nonzero_entries:
@@ -156,21 +159,17 @@ def curriculum_action_from_entries(
     return CurriculumAction(problem=problem, coordinates=vector)
 
 
-def evaluate_objective(alpha: CurriculumAction, correspondence: BlockCorrespondence) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def evaluate_objective(alpha: CurriculumAction, correspondence: BlockCorrespondence) -> Score:
     permuted = correspondence.permute_response_matrix(alpha.problem.lower_response_matrix)
     response_term = float(alpha.problem.target_importance @ permuted @ alpha.coordinates)
     cost_term = float(alpha.problem.linear_costs @ alpha.coordinates)
     return response_term - cost_term
 
 
-def zero_action_objective() -> float: #TODO: DELETE THIS NOW
-    return 0.0
-
-
 def orbit_response_minimum(
     alpha: CurriculumAction,
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     minimum = math.inf
     for correspondence in orbit:
         permuted = correspondence.permute_response_matrix(alpha.problem.lower_response_matrix)
@@ -181,11 +180,11 @@ def orbit_response_minimum(
     return minimum
 
 
-def h_orb(alpha: CurriculumAction, orbit: Sequence[BlockCorrespondence]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def h_orb(alpha: CurriculumAction, orbit: Sequence[BlockCorrespondence]) -> Score:
     return orbit_response_minimum(alpha, orbit)
 
 
-def h_rect(alpha: CurriculumAction, lower_hull: NDArray[np.float64]) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def h_rect(alpha: CurriculumAction, lower_hull: NDArray[np.float64]) -> Score:
     expected = (alpha.problem.size, alpha.problem.size)
     if lower_hull.shape != expected:
         raise ActionSpaceError(
@@ -197,7 +196,7 @@ def h_rect(alpha: CurriculumAction, lower_hull: NDArray[np.float64]) -> float: #
 def map_conditioned_optimum(
     correspondence: BlockCorrespondence,
     action_candidates: Sequence[CurriculumAction],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     values = [evaluate_objective(candidate, correspondence) for candidate in action_candidates]
     if not values:
         raise ActionSpaceError("map-conditioned optimum requires at least one candidate action")
@@ -207,7 +206,7 @@ def map_conditioned_optimum(
 def robust_pre_map_value(
     action_candidates: Sequence[CurriculumAction],
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     best = -math.inf
     for candidate in action_candidates:
         conditioned_min = min(
@@ -222,7 +221,7 @@ def robust_pre_map_value(
 def robust_post_map_value(
     action_candidates: Sequence[CurriculumAction],
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     per_map_values = [
         map_conditioned_optimum(correspondence, action_candidates) for correspondence in orbit
     ]
@@ -232,7 +231,7 @@ def robust_post_map_value(
 def exact_map_action_value(
     action_candidates: Sequence[CurriculumAction],
     orbit: Sequence[BlockCorrespondence],
-) -> float: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> Score:
     return robust_post_map_value(action_candidates, orbit) - robust_pre_map_value(
         action_candidates, orbit
     )
@@ -241,7 +240,7 @@ def exact_map_action_value(
 @dataclass(frozen=True, slots=True)
 class SupportCoordinateSet:
     problem: RobustActionProblem
-    nodes: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    nodes: tuple[Index, ...]
 
     def __post_init__(self) -> None:
         if len(set(self.nodes)) != len(self.nodes):
@@ -251,20 +250,13 @@ class SupportCoordinateSet:
         if outside:
             raise ActionSpaceError(f"support coordinates without action eligibility: {outside}")
 
-    @classmethod
-    def empty(cls, problem: RobustActionProblem) -> SupportCoordinateSet: #TODO: should be deleted. We don't reference this in code.
-        return cls(problem=problem, nodes=())
-
     @property
-    def size(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+    def size(self) -> Index:
         return len(self.nodes)
-
-    def block_support_counts(self) -> BlockNodeCounts: #TODO: should be deleted. We don't reference this in code.
-        return support_per_block(self.problem.blocks, self.nodes)
 
 
 def enumerate_support_coordinate_sets(
-    problem: RobustActionProblem, support_limit: int | None = None #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support_limit)
+    problem: RobustActionProblem, support_limit: SupportCount | None = None
 ) -> tuple[SupportCoordinateSet, ...]:
     limit = support_limit if support_limit is not None else problem.principal_support
     actionable = list(problem.actionable_nodes())
@@ -279,7 +271,7 @@ def enumerate_support_coordinate_sets(
 
 def rounded_action_vector(
     alpha: CurriculumAction, rounding_precision: Tolerance
-) -> tuple[float, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+) -> tuple[Coefficient, ...]:
     if rounding_precision <= 0.0:
         raise ActionSpaceError("action tie comparison rounding precision must be positive")
     decimals = max(0, round(-math.log10(rounding_precision)))
@@ -292,46 +284,3 @@ def actions_tied_within_tolerance(
     if tolerance < 0.0:
         raise ActionSpaceError("tie tolerance must be nonnegative")
     return abs(left - right) <= tolerance
-
-
-@dataclass(frozen=True, slots=True, order=True)
-class CertifiedActionOrderingKey: #TODO: DELETE THIS NOW
-    negated_certified_value: Score
-    realized_support_size: SupportCount
-    target_node_sequence: tuple[int, ...]
-    rounded_coordinates: tuple[float, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class CertifiedActionCandidate: #TODO: DELETE THIS NOW
-    action: CurriculumAction
-    certified_robust_value: Score
-    target_node_sequence: tuple[int, ...]
-
-    def deterministic_ordering_key(
-        self, rounding_precision: Tolerance
-    ) -> CertifiedActionOrderingKey:
-        return CertifiedActionOrderingKey(
-            negated_certified_value=-self.certified_robust_value,
-            realized_support_size=self.action.realized_support_size,
-            target_node_sequence=self.target_node_sequence,
-            rounded_coordinates=rounded_action_vector(self.action, rounding_precision),
-        )
-
-
-def select_deterministic_candidate( #TODO: DELETE THIS NOW
-    candidates: Sequence[CertifiedActionCandidate],
-    tie_tolerance: Tolerance,
-    rounding_precision: Tolerance,
-) -> CertifiedActionCandidate | None:
-    if not candidates:
-        return None
-    best_value = max(candidate.certified_robust_value for candidate in candidates)
-    tied = [
-        candidate
-        for candidate in candidates
-        if actions_tied_within_tolerance(
-            candidate.certified_robust_value, best_value, tie_tolerance
-        )
-    ]
-    return min(tied, key=lambda candidate: candidate.deterministic_ordering_key(rounding_precision))

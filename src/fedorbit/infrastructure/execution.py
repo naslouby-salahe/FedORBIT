@@ -3,12 +3,14 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import math
 import os
 import shutil
+import statistics
 import tempfile
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,18 +21,40 @@ import pandas as pd
 import torch
 from torch import nn
 
-from fedorbit.analysis.metrics import EfficiencyRecord
+from fedorbit.analysis.metrics import (
+    ClassF1,
+    ClassF1Set,
+    ClassRecall,
+    ClassRecallSet,
+    EfficiencyRecord,
+    balanced_accuracy,
+    confusion_counts,
+    f1_from_counts,
+    macro_f1,
+    recall_from_counts,
+)
 from fedorbit.analysis.records import (
+    ComparisonDecision,
     MetricDirection,
     MetricRecord,
     MetricRecordCollection,
+    PairedComparisonRecord,
     validate_metric_records,
 )
-from fedorbit.config.loading import active_config, repository_root
+from fedorbit.analysis.statistics import (
+    NamedPValue,
+    PValueSet,
+    exact_sign_flip_test,
+    holm_step_down,
+    paired_bca_interval,
+    statistical_bootstrap_seed,
+)
+from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.datasets.common import (
     DatasetInspectionRequest,
     DatasetObservation,
     DatasetObservationPersistenceRequest,
+    file_sha256,
     inspect_dataset,
     persist_dataset_observation,
 )
@@ -38,6 +62,7 @@ from fedorbit.datasets.materialization import (
     MaterializationError,
     MaterializationResourceLimitError,
     MaterializedClient,
+    SplitTensors,
     TransferConceptGroup,
     materialize_client,
     transfer_concept_groups,
@@ -68,10 +93,10 @@ from fedorbit.infrastructure.failures import (
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     DatasetManifest,
+    FeatureQualityManifest,
     ReusableArtifactManifest,
     artifact_id,
     completion_manifest_self_hash,
-    file_sha256,
 )
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
@@ -80,7 +105,6 @@ from fedorbit.infrastructure.provenance import (
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.reuse import (
-    CellDecision,
     ExecutionAction,
     ExecutionReuse,
     validate_completed_artifact,
@@ -96,6 +120,7 @@ from fedorbit.infrastructure.runtime import (
     measure_efficiency,
     principal_determinism,
 )
+from fedorbit.infrastructure.storage import StorageError, atomic_write_bytes, atomic_write_json
 from fedorbit.infrastructure.workspace import (
     RawDuplicateReportRequest,
     RawInventoryPersistenceRequest,
@@ -115,8 +140,36 @@ from fedorbit.learning.pilot import (
     select_pilot_configuration,
 )
 from fedorbit.learning.scoring import LocalClassCount, ScoreArtifact, ScoringRequest, score_model
-from fedorbit.learning.training import BaseCheckpoint, ClassWeights, train_base_model
-from fedorbit.methods.assimilation import capture_pre_confirm_pair
+from fedorbit.learning.training import (
+    BaseCheckpoint,
+    ClassWeights,
+    make_adamw,
+    train_base_model,
+)
+from fedorbit.methods.assimilation import (
+    AssimilationCoordinates,
+    ConfirmationRequest,
+    PreTestLifecycle,
+    PreTestPhase,
+    apply_accepted_assimilation,
+    capture_pre_confirm_pair,
+    run_proposal_confirmation,
+    settle_rejected_proposal,
+)
+from fedorbit.methods.baselines import (
+    coarse_block_mean_matrix,
+    coarse_block_min_matrix,
+    coupling_destroyed_matrices,
+    local_sir_action,
+    optimize_against_fixed_matrix,
+    orbit_mean_matrix,
+)
+from fedorbit.methods.target import (
+    CurriculumMultipliers,
+    TargetImportanceError,
+    TransferNodeRisk,
+    build_target_importance,
+)
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.certificates import (
     build_rectangular_hull,
@@ -126,20 +179,30 @@ from fedorbit.optimization.certificates import (
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     PaddedBlockStructure,
+    ResponseMatrix,
     build_padded_block_structure,
     enumerate_block_permutations,
 )
 from fedorbit.optimization.dense_ccp import solve_dense_ccp
 from fedorbit.optimization.diagnostics import fixed_action_rectangularization_gap
-from fedorbit.optimization.exact_sparse import fixed_action_worst_correspondence
+from fedorbit.optimization.exact_qap import (
+    point_correspondence_commitment,
+    solve_robust_action_qap,
+)
+from fedorbit.optimization.exact_sparse import (
+    fixed_action_worst_correspondence,
+    solve_robust_action,
+)
 from fedorbit.optimization.objective import (
     CurriculumAction,
+    RobustActionProblem,
     build_robust_action_problem,
     curriculum_action_from_entries,
     evaluate_objective,
 )
 from fedorbit.response.packet import (
     PacketConstructionContext,
+    SourcePacket,
     build_source_packet,
     construct_source_packet,
 )
@@ -152,63 +215,81 @@ from fedorbit.response.pilot import (
 from fedorbit.response.pilot import PilotData as ResponsePilotData
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
 from fedorbit.types import (
+    AnonymousNodeDisplayId,
     ArtifactFingerprint,
     ArtifactIdentifier,
+    ArtifactIdentifiers,
     ArtifactPath,
+    ArtifactSchemaVersion,
     ArtifactStage,
     ArtifactState,
     ArtifactType,
+    ArtifactTypeName,
+    BootstrapPurpose,
+    CheckpointDirectorySegment,
+    ClassCount,
+    ClassIndex,
     ClientRole,
     CoarseGroup,
+    Coefficient,
+    ConceptCount,
     ConfigurationSection,
+    ContrastCoordinates,
+    ContrastName,
     CouplingCompatibility,
     DatasetId,
+    DatasetPreprocessingState,
+    DirectedPair,
+    DirectedPairName,
+    EvaluationConditionName,
     ExecutionCell,
+    ExecutionStageName,
     ExperimentName,
     ExperimentSeed,
+    ExposedCoarseGroupId,
+    Index,
+    InfrastructureLogCoordinate,
+    InvalidReason,
     MetricId,
+    MetricUnit,
+    MultiplicityFamily,
     OverwritePolicy,
+    ProducerModuleName,
+    PValueName,
+    ReplicateCount,
+    ResourceLimitReason,
+    ReuseDecision,
+    Rfc3339UtcTimestamp,
+    SampleCount,
     ScalabilityBlockPattern,
     SemanticCell,
     SemanticCoordinate,
     SemanticCoordinates,
+    SemanticCoordinateText,
+    SerializedPacket,
+    Sha256Digest,
+    SourceClientName,
     Split,
     StableJsonPayload,
+    StorageLayoutSegment,
+    SupportCount,
     TerminalState,
+    Threshold,
+    Tolerance,
     TransferMethod,
+    ValidationReason,
     stable_json,
 )
 
-
-class StorageError(ValueError):
-    pass
-
-
-def atomic_write_json(path: Path, payload: StableJsonPayload) -> None: #TODO: should be in paths/storage package #TODO: guard concurrent artifact promotion with filelock
-    atomic_write_bytes(path, (stable_json(payload) + "\n").encode("utf-8"))
-
-
-def atomic_write_bytes(path: Path, data: bytes) -> None: #TODO: guard concurrent artifact promotion with filelock
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=".tmp-") #TODO: use enum
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(temporary_name)
-        raise
+_MODULE_NAME = ProducerModuleName("fedorbit.infrastructure.execution")
 
 
 class ArtifactStore:
     def __init__(self, root: Path) -> None:
         self._root = root
-        self._manifests = root / "manifests" #TODO: use enums
-        self._completions = root / "completions" #TODO: use enums
-        self._staging = root / "staging" #TODO: use enums
+        self._manifests = root / StorageLayoutSegment.MANIFESTS
+        self._completions = root / StorageLayoutSegment.COMPLETIONS
+        self._staging = root / StorageLayoutSegment.STAGING
 
     @property
     def root(self) -> Path:
@@ -228,7 +309,7 @@ class ArtifactStore:
 
     def write_reusable(self, manifest: ReusableArtifactManifest) -> None:
         atomic_write_json(
-            self.manifest_path(ArtifactIdentifier(manifest.artifact_id)),
+            self.manifest_path(manifest.artifact_id),
             manifest.model_dump(mode="json"),
         )
 
@@ -245,7 +326,7 @@ class ArtifactStore:
             raise StorageError(str(error)) from error
         self.write_reusable(manifest)
         atomic_write_json(
-            self.completion_path(ArtifactIdentifier(manifest.artifact_id)),
+            self.completion_path(manifest.artifact_id),
             completion.model_dump(mode="json"),
         )
 
@@ -276,14 +357,14 @@ class ArtifactStore:
     ) -> ReusableArtifactManifest | None:
         if not self._manifests.is_dir():
             return None
-        for path in sorted(self._manifests.glob("*.json")): #TODO: use enums
+        for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
             manifest = ReusableArtifactManifest.model_validate_json(
                 path.read_text(encoding="utf-8")
             )
             if manifest.dependency_fingerprint_sha256 != fingerprint_sha256.value:
                 continue
             try:
-                self.resolve(ArtifactIdentifier(manifest.artifact_id))
+                self.resolve(manifest.artifact_id)
             except ValueError:
                 return None
             return manifest
@@ -298,7 +379,7 @@ class ArtifactStore:
             return ()
         return tuple(
             ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in sorted(self._manifests.glob("*.json")) #TODO: use enums
+            for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB))
         )
 
 
@@ -322,11 +403,11 @@ class RecoveryBoundary:
         valid: list[ArtifactIdentifier] = []
         for manifest in self._store.all_manifests():
             try:
-                resolved = self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
+                resolved = self._store.resolve(manifest.artifact_id)
             except ValueError:
                 continue
             if resolved.state == ArtifactState.COMPLETED:
-                valid.append(ArtifactIdentifier(resolved.artifact_id))
+                valid.append(resolved.artifact_id)
         return tuple(sorted(valid, key=lambda identifier: identifier.value))
 
     def next_resume(self, ordered_cells: tuple[ExecutionCell, ...]) -> RecoveryRecord:
@@ -360,17 +441,11 @@ class ExperimentExecutionRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionResult:
-    decision: CellDecision
-    manifest: ReusableArtifactManifest | None
-
-
-@dataclass(frozen=True, slots=True)
 class DatasetPreparationResult:
     observations: tuple[DatasetObservation, ...]
     validation_artifact_paths: tuple[ArtifactPath, ...]
     duplicate_artifact_paths: tuple[ArtifactPath, ...]
-    resource_blocked_datasets: tuple[tuple[DatasetId, str], ...] = () #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    resource_blocked_datasets: tuple[tuple[DatasetId, ResourceLimitReason], ...] = ()
 
     @property
     def blocked_datasets(self) -> tuple[DatasetId, ...]:
@@ -379,47 +454,6 @@ class DatasetPreparationResult:
             for observation in self.observations
             if not observation.valid_for_chronological_preprocessing
         )
-
-
-class ExecutionExecutor: #TODO: should be deleted. We don't reference this in code.
-    def __init__(self, store: ArtifactStore, logger: ExecutionLogger | None = None) -> None:
-        self._store = store
-        self._logger = logger if logger is not None else execution_logger()
-
-    def execute(
-        self,
-        decisions: tuple[CellDecision, ...],
-        producer: Callable[[CellDecision], ReusableArtifactManifest],
-    ) -> tuple[ExecutionResult, ...]:
-        results: list[ExecutionResult] = []
-        for decision in decisions:
-            if decision.action == ExecutionAction.REUSE:
-                if decision.manifest is None:
-                    raise ExecutionError("reuse decision has no manifest")
-                manifest = self._store.resolve(ArtifactIdentifier(decision.manifest.artifact_id))
-                results.append(ExecutionResult(decision, manifest))
-                self._logger.record(
-                    ExecutionLogEvent(
-                        occurred_at=datetime.now(UTC),
-                        cell_coordinates=decision.cell_coordinates,
-                        artifact_id=ArtifactIdentifier(manifest.artifact_id),
-                        state=ArtifactState.COMPLETED,
-                    )
-                )
-                continue
-            manifest = producer(decision)
-            self._store.write_reusable(manifest)
-            validated = self._store.resolve(ArtifactIdentifier(manifest.artifact_id))
-            results.append(ExecutionResult(decision, validated))
-            self._logger.record(
-                ExecutionLogEvent(
-                    occurred_at=datetime.now(UTC),
-                    cell_coordinates=decision.cell_coordinates,
-                    artifact_id=ArtifactIdentifier(validated.artifact_id),
-                    state=ArtifactState.COMPLETED,
-                )
-            )
-        return tuple(results)
 
 
 def execution_store() -> ArtifactStore:
@@ -433,7 +467,7 @@ def _recover(store: ArtifactStore, cells: tuple[ExecutionCell, ...]) -> None:
 
 
 def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparationResult:
-    raw_root = repository_root() / "data" / "raw" #TODO: should be in yaml
+    raw_root = raw_dataset_root()
     inventories = tuple(
         inspect_raw_inventory(RawInventoryRequest(dataset, raw_root))
         for dataset in request.datasets
@@ -443,7 +477,9 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     store = execution_store()
     persisted_inventory_paths = tuple(
         persist_raw_inventory(
-            RawInventoryPersistenceRequest(inventory, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
+            RawInventoryPersistenceRequest(
+                inventory, store.root / StorageLayoutSegment.PREPROCESSING
+            )
         )
         for inventory in inventories
     )
@@ -456,27 +492,31 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
         raise ExecutionError("dataset observation collection did not cover every requested dataset")
     validation_paths = tuple(
         persist_dataset_observation(
-            DatasetObservationPersistenceRequest(observation, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
+            DatasetObservationPersistenceRequest(
+                observation, store.root / StorageLayoutSegment.PREPROCESSING
+            )
         )
         for observation in observations
     )
     duplicate_paths = tuple(
         persist_raw_duplicate_report(
-            RawDuplicateReportRequest(dataset, raw_root, store.root / "preprocessing") #TODO: should be enum value. Not hardcoded
+            RawDuplicateReportRequest(
+                dataset, raw_root, store.root / StorageLayoutSegment.PREPROCESSING
+            )
         )
         for dataset in request.datasets
     )
     if len(duplicate_paths) != len(request.datasets):
         raise ExecutionError("duplicate diagnostics did not cover every requested dataset")
     layout = build_layout()
-    resource_blocked: list[tuple[DatasetId, str]] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    resource_blocked: list[tuple[DatasetId, ResourceLimitReason]] = []
     for observation in observations:
         if not observation.valid_for_chronological_preprocessing:
             continue
         try:
             materialized = materialize_client(observation.dataset, raw_root)
-        except MaterializationResourceLimitError as error: #TODO: back the resource-limit decision with tracemalloc/memory-profiler measurements
-            resource_blocked.append((observation.dataset, str(error)))
+        except MaterializationResourceLimitError as error:
+            resource_blocked.append((observation.dataset, ResourceLimitReason(str(error))))
             continue
         except MaterializationError as error:
             raise ExecutionError(
@@ -491,7 +531,9 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     )
 
 
-def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:  #TODO: remove this from code and move to tests
+def run_smoke_validation(
+    overwrite_policy: OverwritePolicy,
+) -> None:
     del overwrite_policy
     seed = active_config().scientific.randomness.pilot_seeds[0]
     exact = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 2), seed))
@@ -516,14 +558,16 @@ def run_smoke_validation(overwrite_policy: OverwritePolicy) -> None:  #TODO: rem
     )
     packet = build_source_packet(
         estimate,
-        anonymous_fine_node_ids=("node-0001",),
-        exposed_coarse_group_id="smoke",
+        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),),
+        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"),
         per_node_train_support=(1,),
         per_node_meta_support=(1,),
         per_node_effective_replicate_count=(1,),
-        source_checkpoint_sha256="0" * 64,
-        response_configuration_sha256="1" * 64,
-        creation_timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        source_checkpoint_sha256=Sha256Digest("0" * 64),
+        response_configuration_sha256=Sha256Digest("1" * 64),
+        creation_timestamp=Rfc3339UtcTimestamp(
+            datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        ),
     )
     packet.validate()
     model = nn.Linear(2, 2)
@@ -551,10 +595,10 @@ def _execute_producer_with_retry(producer: Callable[[], ReusableArtifactManifest
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
-                    cell_coordinates=SemanticCoordinates("infrastructure-retry"), #TODO: should be enum
+                    cell_coordinates=SemanticCoordinates(InfrastructureLogCoordinate.RETRY),
                     artifact_id=None,
                     state=ArtifactState.RUNNING if decision.retry else ArtifactState.FAILED,
-                    reuse_decision=(
+                    reuse_decision=ReuseDecision(
                         f"attempt {attempt + 1}: {type(error).__name__}: {error} -> "
                         f"{'retry' if decision.retry else 'exhausted'}"
                     ),
@@ -567,44 +611,61 @@ def _execute_producer_with_retry(producer: Callable[[], ReusableArtifactManifest
             attempt += 1
 
 
-def run_experiment(request: ExperimentExecutionRequest) -> None: #TODO: should be handled better
+def _registered_experiment_producers(
+    store: ArtifactStore, layout: WorkspaceLayout, request: ExperimentExecutionRequest
+) -> Mapping[ExperimentName, Callable[[], ReusableArtifactManifest | None]]:
+    producers: OrderedDict[ExperimentName, Callable[[], ReusableArtifactManifest | None]] = (
+        OrderedDict()
+    )
+    producers[ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION] = lambda: (
+        execute_primitive_validation(store, layout, request.overwrite_policy)
+    )
+    producers[ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION] = lambda: (
+        execute_exact_sparse_theorem_exhaustive_validation(store, layout, request)
+    )
+    producers[ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION] = lambda: (
+        execute_coupling_and_map_bound_validation(store, layout, request)
+    )
+    producers[ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION] = lambda: (
+        execute_dataset_client_and_resource_validation(store, layout, request)
+    )
+    for synthetic_experiment in _SYNTHETIC_EXPERIMENTS:
+        producers[synthetic_experiment] = lambda: execute_synthetic_experiment(
+            store, layout, request
+        )
+    producers[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT] = lambda: execute_base_model_pilot(
+        store, layout, request
+    )
+    producers[ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT] = lambda: (
+        execute_source_response_estimator_pilot(store, layout, request)
+    )
+    producers[ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION] = lambda: (
+        execute_final_source_response_band_validation(store, layout, request)
+    )
+    producers[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER] = lambda: (
+        execute_primary_strict_cross_telemetry_transfer(store, layout, request)
+    )
+    producers[ExperimentName.STATISTICAL_SYNTHESIS] = lambda: execute_statistical_synthesis(
+        store, layout, request
+    )
+    producers[ExperimentName.MECHANISM_ABLATIONS] = lambda: execute_mechanism_ablations(
+        store, layout, request
+    )
+    producers[ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY] = lambda: (
+        execute_target_confirmation_and_portability(store, layout, request)
+    )
+    producers[ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION] = lambda: (
+        execute_secondary_cross_modality_generalization(store, layout, request)
+    )
+    return producers
+
+
+def run_experiment(request: ExperimentExecutionRequest) -> None:
     store = execution_store()
     layout = build_layout()
-    if request.experiment == ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION:
-        _execute_producer_with_retry(
-            lambda: execute_primitive_validation(store, layout, request.overwrite_policy)
-        )
-        return
-    if request.experiment == ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION:
-        _execute_producer_with_retry(
-            lambda: execute_exact_sparse_theorem_exhaustive_validation(store, layout, request)
-        )
-        return
-    if request.experiment == ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION:
-        _execute_producer_with_retry(
-            lambda: execute_coupling_and_map_bound_validation(store, layout, request)
-        )
-        return
-    if request.experiment == ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION:
-        _execute_producer_with_retry(
-            lambda: execute_dataset_client_and_resource_validation(store, layout, request)
-        )
-        return
-    if request.experiment in _SYNTHETIC_EXPERIMENTS:
-        _execute_producer_with_retry(lambda: execute_synthetic_experiment(store, layout, request))
-        return
-    if request.experiment == ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT:
-        _execute_producer_with_retry(lambda: execute_base_model_pilot(store, layout, request))
-        return
-    if request.experiment == ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT:
-        _execute_producer_with_retry(
-            lambda: execute_source_response_estimator_pilot(store, layout, request)
-        )
-        return
-    if request.experiment == ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION:
-        _execute_producer_with_retry(
-            lambda: execute_final_source_response_band_validation(store, layout, request)
-        )
+    producer = _registered_experiment_producers(store, layout, request).get(request.experiment)
+    if producer is not None:
+        _execute_producer_with_retry(producer)
         return
     blocked = _chronology_block_reasons()
     if blocked:
@@ -649,7 +710,7 @@ def execute_dataset_client_and_resource_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
-    raw_root = repository_root() / "data" / "raw"  #TODO: should be in yaml and centralized and accessed from config
+    raw_root = raw_dataset_root()
     datasets: list[StableJsonPayload] = []
     materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
     for dataset in active_config().scientific.datasets.clients:
@@ -725,13 +786,13 @@ def execute_dataset_client_and_resource_validation(
             ),
         ),
         frozenset(),
-        "fedorbit.infrastructure.execution", #TODO: should be deleted. We don't reference this in code. 
+        _MODULE_NAME,
         "dataset-client-resource-validation",
     )
 
 
-def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    raw_root = repository_root() / "data" / "raw"
+def _chronology_block_reasons() -> OrderedDict[DatasetId, ValidationReason]:
+    raw_root = raw_dataset_root()
     primary_datasets = tuple(
         dataset
         for dataset, client in active_config().scientific.datasets.clients.items()
@@ -741,7 +802,7 @@ def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use prim
         inspect_dataset(DatasetInspectionRequest(dataset, raw_root)) for dataset in primary_datasets
     )
     return OrderedDict(
-        (observation.dataset.value, observation.event_time.reason)
+        (observation.dataset, observation.event_time.reason)
         for observation in observations
         if not observation.valid_for_chronological_preprocessing
     )
@@ -750,9 +811,13 @@ def _chronology_block_reasons() -> OrderedDict[str, str]: #TODO: do not use prim
 def _persist_blocked_experiment(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    reasons: OrderedDict[str, str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reasons)
+    reasons: OrderedDict[DatasetId, ValidationReason],
 ) -> None:
-    destination = experiment_workspace(layout, request.experiment) / "artifacts" / "derived" #TODO: should be enum value. Not hardcoded
+    destination = (
+        experiment_workspace(layout, request.experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+    )
     payload = cast(
         StableJsonPayload,
         OrderedDict(
@@ -770,21 +835,23 @@ def _persist_synthetic_experiment_payload(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
     seed: ExperimentSeed,
-    payload_builder: Callable[[str], StableJsonPayload],  #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    configuration_sections: frozenset[str], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: configuration_sections)
-    producer_module: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: producer_module)
-    artifact_name: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: artifact_name)
+    payload_builder: Callable[[Sha256Digest], StableJsonPayload],
+    configuration_sections: frozenset[ConfigurationSection],
+    producer_module: ProducerModuleName,
+    artifact_name: str,
 ) -> ReusableArtifactManifest:
     cell = SemanticCell(experiment=request.experiment, seed=seed)
     relevance = experiment_relevance(request.experiment)
-    coordinates = cell.identity_json(relevance)
-    fingerprint = stage_dependency_fingerprint(
-        ArtifactStage.EVALUATION,
-        cell,
-        relevance,
-        (),
-        configuration_sections,
-        producer_module,
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.EVALUATION,
+            cell,
+            relevance,
+            (),
+            configuration_sections,
+            producer_module,
+        )
     )
     if request.overwrite_policy == OverwritePolicy.REUSE:
         existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -793,19 +860,19 @@ def _persist_synthetic_experiment_payload(
     payload = payload_builder(fingerprint)
     payload_path = (
         experiment_workspace(layout, request.experiment)
-        / "artifacts" #TODO: use enum. Not hardcoded values
-        / "derived" #TODO: use enum. Not hardcoded values
-        / f"{artifact_name}.{fingerprint[:16]}.json" #TODO: use enum. Not hardcoded values
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"{artifact_name}.{fingerprint[:16]}.json"
     )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = configuration_subset_digest(configuration_sections)
-    code_sha256 = implementation_fingerprint(producer_module)
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.EVALUATION).sha256
+    configuration_sha256 = Sha256Digest(configuration_subset_digest(configuration_sections))
+    code_sha256 = Sha256Digest(implementation_fingerprint(producer_module))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
     completion = _completion(
         coordinates,
         fingerprint,
-        payload_path,
+        ArtifactPath(payload_path),
         payload_sha256,
         configuration_sha256,
         code_sha256,
@@ -813,7 +880,9 @@ def _persist_synthetic_experiment_payload(
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
-            artifact_id=artifact_id("other", payload, fingerprint),
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
             artifact_type="other",
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
@@ -852,13 +921,14 @@ def execute_synthetic_experiment(
             request.experiment, pattern, seed.value, fingerprint
         ),
         _CONFIGURATION_SECTIONS,
-        _PRODUCER_MODULE,
+        _MODULE_NAME,
         "synthetic-validation",
     )
 
 
-_THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
-_THEOREM_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. THis is horrible
+_THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset(
+    {ConfigurationSection.ACTION, ConfigurationSection.GENERATORS, ConfigurationSection.SOLVERS}
+)
 
 
 def execute_exact_sparse_theorem_exhaustive_validation(
@@ -874,13 +944,12 @@ def execute_exact_sparse_theorem_exhaustive_validation(
         seed,
         _theorem_exhaustive_validation_payload,
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-        _THEOREM_VALIDATION_PRODUCER_MODULE,
+        _MODULE_NAME,
         "theorem-exhaustive-validation",
     )
 
 
-def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
-                                           ) -> StableJsonPayload:
+def _theorem_exhaustive_validation_payload(fingerprint: Sha256Digest) -> StableJsonPayload:
     generator_config = active_config().generators.exact_separator_theorem
     solver_config = active_config().solvers.exact_sparse
     seeds = active_config().scientific.randomness.confirmatory_seeds
@@ -923,15 +992,15 @@ def _theorem_exhaustive_validation_payload(fingerprint: str #TODO: do not use pr
 
 
 def _theorem_exhaustive_validation_cell(
-    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
-    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support)
+    pattern: tuple[ConceptCount, ...],
+    support: SupportCount,
     seeds: tuple[RandomSeed, ...],
-    instances_per_seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: instances_per_seed)
+    instances_per_seed: ReplicateCount,
     blocks: PaddedBlockStructure,
     orbit: tuple[BlockCorrespondence, ...],
-    lap_objective_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: lap_objective_tie_tolerance)
-    action_tie_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: action_tie_tolerance)
-    exact_validation_absolute_tolerance: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: exact_validation_absolute_tolerance)
+    lap_objective_tie_tolerance: Tolerance,
+    action_tie_tolerance: Tolerance,
+    exact_validation_absolute_tolerance: Tolerance,
 ) -> StableJsonPayload:
     total_nodes = sum(pattern)
     max_absolute_objective_error = 0.0
@@ -983,11 +1052,12 @@ def _theorem_exhaustive_validation_cell(
     )
 
 
-_COUPLING_VALIDATION_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "solvers"})
-_COUPLING_VALIDATION_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
+_COUPLING_VALIDATION_CONFIGURATION_SECTIONS = frozenset(
+    {ConfigurationSection.ACTION, ConfigurationSection.GENERATORS, ConfigurationSection.SOLVERS}
+)
 
 
-def execute_coupling_and_map_bound_validation( #TODO: DELETE THIS NOW
+def execute_coupling_and_map_bound_validation(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
@@ -1000,13 +1070,12 @@ def execute_coupling_and_map_bound_validation( #TODO: DELETE THIS NOW
         seed,
         _coupling_and_map_bound_validation_payload,
         _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
-        _COUPLING_VALIDATION_PRODUCER_MODULE,
+        _MODULE_NAME,
         "coupling-and-map-bound-validation",
     )
 
 
-def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
-                                               ) -> StableJsonPayload:
+def _coupling_and_map_bound_validation_payload(fingerprint: Sha256Digest) -> StableJsonPayload:
     coupling_config = active_config().generators.coupling_structure
     seeds = active_config().scientific.randomness.confirmatory_seeds
     incompatible_gap_threshold = coupling_config.incompatible_fixed_action_gap_strictly_greater_than
@@ -1043,10 +1112,10 @@ def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not us
                                     ),
                                     artifact_id=None,
                                     state=ArtifactState.RUNNING,
-                                    stage=ArtifactStage.EVALUATION.value,
-                                    experiment=experiment.value,
+                                    stage=ExecutionStageName(ArtifactStage.EVALUATION.value),
+                                    experiment=experiment,
                                     elapsed_seconds=time.monotonic() - started_at,
-                                    reuse_decision=(
+                                    reuse_decision=ReuseDecision(
                                         f"{cells_started}/{total_cells} cells, "
                                         f"{total_generated}/{total_planned} instances, "
                                         f"{total_generation_failures} generation failures"
@@ -1075,8 +1144,8 @@ def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not us
             cell_coordinates=SemanticCoordinates(f"{experiment.value}:map_bound_fixtures"),
             artifact_id=None,
             state=ArtifactState.RUNNING,
-            stage=ArtifactStage.EVALUATION.value,
-            experiment=experiment.value,
+            stage=ExecutionStageName(ArtifactStage.EVALUATION.value),
+            experiment=experiment,
             elapsed_seconds=time.monotonic() - started_at,
         )
     )
@@ -1087,10 +1156,10 @@ def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not us
             cell_coordinates=SemanticCoordinates(f"{experiment.value}"),
             artifact_id=None,
             state=ArtifactState.COMPLETED,
-            stage=ArtifactStage.EVALUATION.value,
-            experiment=experiment.value,
+            stage=ExecutionStageName(ArtifactStage.EVALUATION.value),
+            experiment=experiment,
             elapsed_seconds=time.monotonic() - started_at,
-            reuse_decision=(
+            reuse_decision=ReuseDecision(
                 f"{total_generated}/{total_planned} instances, "
                 f"{total_generation_failures} generation failures, "
                 f"{total_incompatible_gap_failures} gap failures"
@@ -1112,13 +1181,13 @@ def _coupling_and_map_bound_validation_payload(fingerprint: str #TODO: do not us
 
 def _coupling_validation_instance(
     compatibility: CouplingCompatibility,
-    heterogeneity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: heterogeneity)
-    asymmetry: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: asymmetry)
-    sparsity: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: sparsity)
-    block_pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pattern)
-    support: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: support)
+    heterogeneity: Coefficient,
+    asymmetry: Coefficient,
+    sparsity: Coefficient,
+    block_pattern: tuple[ConceptCount, ...],
+    support: SupportCount,
     seed: RandomSeed,
-    incompatible_gap_threshold: float, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: incompatible_gap_threshold)
+    incompatible_gap_threshold: Threshold,
 ) -> tuple[bool, bool]:
     request = CouplingInstanceRequest(
         compatibility=compatibility,
@@ -1184,9 +1253,9 @@ def _map_bound_fixture_results(seeds: tuple[RandomSeed, ...]) -> StableJsonPaylo
 
 def _synthetic_experiment_payload(
     experiment: ExperimentName,
-    pattern: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pattern)
+    pattern: tuple[ConceptCount, ...],
     seed: RandomSeed,
-    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
+    fingerprint: Sha256Digest,
 ) -> StableJsonPayload:
     instance = generate_exact_separator_instance(ExactSeparatorInstanceRequest(pattern, seed))
     groups = tuple(CoarseGroup)[: len(pattern)]
@@ -1210,24 +1279,26 @@ def _synthetic_experiment_payload(
     )
     metric = MetricRecord(
         experiment=experiment,
-        pair="synthetic",
+        pair=DirectedPairName("synthetic"),
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-        condition="generated",
+        condition=EvaluationConditionName("generated"),
         seed=seed,
         metric_name=MetricId.ACTIVE_IMAGE_CANDIDATES,
         metric_value=float(outcome.active_image_candidates),
-        metric_unit="count",
+        metric_unit=MetricUnit("count"),
         direction=MetricDirection.DESCRIPTIVE,
-        evaluation_class_set_sha256=hashlib.sha256(b"synthetic-correspondence").hexdigest(),
-        input_artifact_ids=("synthetic-generator",),
-        dependency_fingerprint_sha256=fingerprint,
+        evaluation_class_set_sha256=Sha256Digest(
+            hashlib.sha256(b"synthetic-correspondence").hexdigest()
+        ),
+        input_artifact_ids=(ArtifactIdentifier("synthetic-generator"),),
+        dependency_fingerprint_sha256=Sha256Digest(fingerprint),
         valid=True,
         invalid_reason=None,
     )
     validate_metric_records(MetricRecordCollection((metric,)))
     dense = None
     if experiment == ExperimentName.SPARSITY_AND_DENSE_FALLBACK:
-        dense = solve_dense_ccp(problem, seed, experiment.value)
+        dense = solve_dense_ccp(problem, seed, SemanticCoordinates(experiment.value))
     return cast(
         StableJsonPayload,
         OrderedDict(
@@ -1255,16 +1326,19 @@ def _synthetic_experiment_payload(
     )
 
 
-_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({"models"})
-_BASE_MODEL_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
+_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.MODELS})
 
 
 def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
     provenance = materialized.provenance
     raw_files = tuple(entry.path for entry in provenance.raw_files)
-    raw_sha256 = hashlib.sha256(
-        ",".join(f"{entry.path}:{entry.sha256}" for entry in provenance.raw_files).encode("utf-8")
-    ).hexdigest()
+    raw_sha256 = Sha256Digest(
+        hashlib.sha256(
+            ",".join(f"{entry.path}:{entry.sha256}" for entry in provenance.raw_files).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+    )
     raw_counts = OrderedDict((entry.path, entry.row_count) for entry in provenance.raw_files)
     adapter_feature_roles = OrderedDict(
         (column, materialized.schema.role_of(column).value)
@@ -1273,24 +1347,23 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
     local_class_counts = OrderedDict(
         (label, sum(counts.values())) for label, counts in materialized.class_row_counts.items()
     )
-    transfer_candidate_counts: Mapping[str, int] = OrderedDict( #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    transfer_candidate_counts: Mapping[str, SampleCount] = OrderedDict(
         (str(group.concept.value), group.train_support)
         for group in transfer_concept_groups(materialized.dataset, materialized)
     )
-    feature_quality = cast(
-        Mapping[str, str | int | float | bool | None],
-        OrderedDict(
-            dropped_feature_count=materialized.feature_quality.dropped_feature_count,
-            candidate_count_before_filtering=(
-                materialized.feature_quality.candidate_count_before_filtering
-            ),
-            client_invalid=materialized.feature_quality.client_invalid,
-            client_invalid_reason=materialized.feature_quality.client_invalid_reason,
+    feature_quality = FeatureQualityManifest(
+        dropped_feature_count=materialized.feature_quality.dropped_feature_count,
+        candidate_count_before_filtering=(
+            materialized.feature_quality.candidate_count_before_filtering
         ),
+        client_invalid=materialized.feature_quality.client_invalid,
+        client_invalid_reason=materialized.feature_quality.client_invalid_reason,
     )
-    dependency_fingerprint_sha256 = hashlib.sha256(
-        f"{raw_sha256}|{','.join(materialized.schema.feature_order)}".encode()
-    ).hexdigest()
+    dependency_fingerprint_sha256 = Sha256Digest(
+        hashlib.sha256(
+            f"{raw_sha256}|{','.join(materialized.schema.feature_order)}".encode()
+        ).hexdigest()
+    )
     return DatasetManifest.model_validate(
         OrderedDict(
             dataset=materialized.dataset,
@@ -1298,16 +1371,13 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
             raw_files=raw_files,
             raw_sha256=raw_sha256,
             raw_counts=raw_counts,
-            schema="1.0",
+            schema=ArtifactSchemaVersion("1.0"),
             adapter_feature_order=materialized.schema.feature_order,
             adapter_feature_roles=adapter_feature_roles,
             accepted_schema_aliases=(provenance.accepted_timestamp_column,),
             adapter_adaptations=(),
             timestamp_field=provenance.accepted_timestamp_column,
-            timestamp_range=(
-                str(provenance.timestamp_range[0]),
-                str(provenance.timestamp_range[1]),
-            ),
+            timestamp_range=provenance.timestamp_range,
             duplicate_counts=OrderedDict(total=provenance.duplicate_group_count),
             conflicting_duplicate_counts=OrderedDict(
                 total=provenance.conflicting_duplicate_group_count
@@ -1315,9 +1385,11 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
             local_class_counts=local_class_counts,
             transfer_candidate_counts=transfer_candidate_counts,
             feature_quality=feature_quality,
-            preprocessing_state="materialized",
+            preprocessing_state=DatasetPreprocessingState.MATERIALIZED,
             dependency_fingerprint_sha256=dependency_fingerprint_sha256,
-            producer_code_sha256=implementation_fingerprint("fedorbit.datasets.materialization"),
+            producer_code_sha256=Sha256Digest(
+                implementation_fingerprint("fedorbit.datasets.materialization")
+            ),
         )
     )
 
@@ -1334,7 +1406,7 @@ def persist_dataset_manifest(
         / "derived"
         / f"dataset-manifest.{dataset.value}.json"
     )
-    atomic_write_json(destination, cast(StableJsonPayload, manifest.model_dump(mode="json"))) #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
+    atomic_write_json(destination, manifest.model_dump(mode="json"))
     return destination
 
 
@@ -1368,7 +1440,7 @@ def persist_materialized_client(
     manifest = build_dataset_manifest(materialized)
     atomic_write_json(
         layout.preprocessing / "prepared" / dataset.value / "data.json",
-        cast(StableJsonPayload, manifest.model_dump(mode="json")), #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
+        manifest.model_dump(mode="json"),
     )
     eligibility = tuple(
         cast(
@@ -1402,7 +1474,7 @@ def _persist_client_invalid(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     dataset: DatasetId,
-    reason: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: reason)
+    reason: InvalidReason,
 ) -> None:
     destination = experiment_workspace(layout, experiment) / "artifacts" / "derived"
     payload = cast(
@@ -1424,7 +1496,7 @@ def execute_base_model_pilot(
 ) -> None:
     experiment = request.experiment
     relevance = experiment_relevance(experiment)
-    raw_root = repository_root() / "data" / "raw"
+    raw_root = raw_dataset_root()
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     device = torch.device("cuda")
     logger = execution_logger()
@@ -1435,9 +1507,9 @@ def execute_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                 artifact_id=None,
                 state=ArtifactState.RUNNING,
-                stage=ArtifactStage.PREPROCESSING.value,
-                experiment=experiment.value,
-                dataset=dataset.value,
+                stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                experiment=experiment,
+                dataset=dataset,
             )
         )
 
@@ -1445,16 +1517,16 @@ def execute_base_model_pilot(
         try:
             materialized = materialize_client(dataset, raw_root)
         except MaterializationError as error:
-            _persist_client_invalid(layout, experiment, dataset, str(error))
+            _persist_client_invalid(layout, experiment, dataset, InvalidReason(str(error)))
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
                     cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                     artifact_id=None,
                     state=ArtifactState.INVALID,
-                    stage=ArtifactStage.PREPROCESSING.value,
-                    experiment=experiment.value,
-                    dataset=dataset.value,
+                    stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                    experiment=experiment,
+                    dataset=dataset,
                     elapsed_seconds=time.monotonic() - materialize_started_at,
                 )
             )
@@ -1465,9 +1537,9 @@ def execute_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                 artifact_id=None,
                 state=ArtifactState.COMPLETED,
-                stage=ArtifactStage.PREPROCESSING.value,
-                experiment=experiment.value,
-                dataset=dataset.value,
+                stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                experiment=experiment,
+                dataset=dataset,
                 elapsed_seconds=time.monotonic() - materialize_started_at,
             )
         )
@@ -1489,7 +1561,6 @@ def execute_base_model_pilot(
 _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.MODELS, ConfigurationSection.RESPONSE}
 )
-_SOURCE_RESPONSE_PILOT_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
 
 
 def execute_source_response_estimator_pilot(
@@ -1505,7 +1576,7 @@ def execute_source_response_estimator_pilot(
         seed,
         lambda fingerprint: _source_response_estimator_payload(layout, request, fingerprint),
         _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
-        _SOURCE_RESPONSE_PILOT_PRODUCER_MODULE,
+        _MODULE_NAME,
         "source-response-pilot",
     )
 
@@ -1513,7 +1584,7 @@ def execute_source_response_estimator_pilot(
 def _source_response_estimator_payload(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
+    fingerprint: Sha256Digest,
 ) -> StableJsonPayload:
     return _source_response_estimator_client_results(layout, request, fingerprint)
 
@@ -1522,7 +1593,7 @@ def _execute_final_source_response_band_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> None:
-    raw_root = repository_root() / "data" / "raw"
+    raw_root = raw_dataset_root()
     selected_root = (
         experiment_workspace(layout, ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
         / "artifacts"
@@ -1537,7 +1608,7 @@ def _execute_final_source_response_band_validation(
         try:
             materialized = materialize_client(dataset, raw_root)
         except MaterializationError as error:
-            _persist_client_invalid(layout, request.experiment, dataset, str(error))
+            _persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             continue
         selected_path = selected_root / f"{dataset.value}.json"
         if not selected_path.is_file():
@@ -1572,11 +1643,11 @@ def _execute_final_source_response_band_validation(
                         materialized.splits[Split.TRAIN].features.shape[1],
                         materialized.class_manifest.class_count,
                         coarse_group,
-                        tuple(group.concept.value for group in groups),
+                        tuple(AnonymousNodeDisplayId(group.concept.value) for group in groups),
                         tuple(group.train_support for group in groups),
                         tuple(group.meta_support for group in groups),
                         file_sha256(checkpoint_path),
-                        hashlib.sha256(selected_path.read_bytes()).hexdigest(),
+                        Sha256Digest(hashlib.sha256(selected_path.read_bytes()).hexdigest()),
                         seed,
                     ),
                     checkpoint,
@@ -1589,7 +1660,7 @@ def _execute_final_source_response_band_validation(
                     node_classes,
                     checkpoint.train_class_weights,
                     candidate,
-                    datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    Rfc3339UtcTimestamp(datetime.now(UTC).isoformat().replace("+00:00", "Z")),
                 ).packet
                 destination = (
                     experiment_workspace(layout, request.experiment)
@@ -1605,9 +1676,9 @@ def _execute_final_source_response_band_validation(
 def _source_response_estimator_client_results(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
+    fingerprint: Sha256Digest,
 ) -> StableJsonPayload:
-    raw_root = repository_root() / "data" / "raw"
+    raw_root = raw_dataset_root()
     pilot_seeds = active_config().scientific.randomness.pilot_seeds
     base_workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
     destination = experiment_workspace(layout, request.experiment) / "artifacts" / "fitted"
@@ -1619,7 +1690,7 @@ def _source_response_estimator_client_results(
         try:
             materialized = materialize_client(dataset, raw_root)
         except MaterializationError as error:
-            _persist_client_invalid(layout, request.experiment, dataset, str(error))
+            _persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             client_results.append(
                 cast(
                     StableJsonPayload,
@@ -1634,7 +1705,7 @@ def _source_response_estimator_client_results(
                 layout,
                 request.experiment,
                 dataset,
-                "fewer than two eligible source transfer concepts",
+                InvalidReason("fewer than two eligible source transfer concepts"),
             )
             client_results.append(
                 cast(
@@ -1737,6 +1808,2038 @@ def execute_final_source_response_band_validation(
     _execute_final_source_response_band_validation(layout, request)
 
 
+_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS = frozenset(
+    {ConfigurationSection.MODELS, ConfigurationSection.METRICS}
+)
+
+
+def _target_confirmatory_checkpoint_path(
+    layout: WorkspaceLayout,
+    target: DatasetId,
+    seed: RandomSeed,
+) -> Path:
+    return (
+        experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
+        / "checkpoints"
+        / CheckpointDirectorySegment.TRAINING
+        / target.value
+        / f"seed-{seed}"
+        / "checkpoint.pt"
+    )
+
+
+def _checkpoint_artifact_id(
+    store: ArtifactStore, checkpoint_path: Path
+) -> ArtifactIdentifier | None:
+    target_path = str(checkpoint_path)
+    for manifest in store.all_manifests():
+        if manifest.payload_paths == (target_path,):
+            return manifest.artifact_id
+    return None
+
+
+def _score_local_only_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    target: DatasetId,
+    materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, ArtifactIdentifier] | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    if not checkpoint_path.is_file():
+        return None
+    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    if checkpoint_artifact_id is None:
+        return None
+    checkpoint = load_base_checkpoint(checkpoint_path)
+    test = materialized.splits[Split.TEST]
+    n_classes = materialized.class_manifest.class_count
+    model = create_classifier(
+        target,
+        test.features.shape[1],
+        n_classes,
+        checkpoint.selected_hyperparameters.dropout_probability,
+        seed,
+        device,
+    )
+    checkpoint.state_dict.load_into(model)
+    score = score_model(
+        ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
+    )
+    return score, n_classes, checkpoint_artifact_id
+
+
+def class_metric_sets(
+    score: ScoreArtifact, n_classes: ClassCount
+) -> tuple[ClassF1Set, ClassRecallSet]:
+    predicted = tuple(ClassIndex(row.predicted_class.value) for row in score.rows)
+    actual = tuple(ClassIndex(row.target.value) for row in score.rows)
+    f1_values: list[ClassF1] = []
+    recall_values: list[ClassRecall] = []
+    for class_index in range(n_classes):
+        counts = confusion_counts(predicted, actual, ClassIndex(class_index))
+        recall_values.append(
+            ClassRecall(recall_from_counts(counts.true_positives, counts.false_negatives))
+        )
+        f1_values.append(
+            ClassF1(
+                f1_from_counts(
+                    counts.true_positives, counts.false_positives, counts.false_negatives
+                )
+            )
+        )
+    return ClassF1Set(tuple(f1_values)), ClassRecallSet(tuple(recall_values))
+
+
+def persist_primary_transfer_metric(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    pair_direction: str,
+    directed_pair_source: DatasetId,
+    directed_pair_target: DatasetId,
+    method: TransferMethod,
+    seed: RandomSeed,
+    metric_name: MetricId,
+    metric_value: float,
+    metric_unit: MetricUnit,
+    direction: MetricDirection,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        directed_pair=DirectedPair(source=directed_pair_source, target=directed_pair_target),
+        method=method,
+        seed=ExperimentSeed(seed),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.EVALUATION,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_artifact_ids),
+            _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    metric = MetricRecord(
+        experiment=experiment,
+        pair=DirectedPairName(pair_direction),
+        method=method,
+        condition=EvaluationConditionName("principal"),
+        seed=seed,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        metric_unit=metric_unit,
+        direction=direction,
+        evaluation_class_set_sha256=Sha256Digest(
+            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
+        ),
+        input_artifact_ids=tuple(input_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        valid=True,
+        invalid_reason=None,
+    )
+    validate_metric_records(MetricRecordCollection((metric,)))
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / (
+            f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
+            f".{method.value}.{seed}.{metric_name.value}.json"
+        )
+    )
+    payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.EVALUATION,
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.PREDICTION,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.EVALUATION,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=(),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
+def execute_primary_strict_cross_telemetry_transfer(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_target: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+    for directed_pair in primary_pairs:
+        target = directed_pair.target
+        if target not in materialized_by_target:
+            try:
+                materialized_by_target[target] = materialize_client(target, raw_root)
+            except MaterializationError:
+                continue
+        materialized = materialized_by_target[target]
+        source = directed_pair.source
+        if source not in materialized_by_target:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_target[source] = materialize_client(source, raw_root)
+        source_materialized = materialized_by_target.get(source)
+        pair_direction = f"{directed_pair.source.value} -> {directed_pair.target.value}"
+        for seed in confirmatory_seeds:
+            local_only = _score_local_only_cell(store, layout, target, materialized, seed, device)
+            if local_only is not None:
+                score, n_classes, checkpoint_artifact_id = local_only
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    directed_pair.source,
+                    directed_pair.target,
+                    TransferMethod.LOCAL_ONLY,
+                    seed,
+                    score,
+                    n_classes,
+                    (checkpoint_artifact_id,),
+                )
+            local_sir = _score_local_sir_cell(store, layout, target, materialized, seed, device)
+            if local_sir is not None:
+                score, n_classes, input_artifact_ids = local_sir
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    directed_pair.source,
+                    directed_pair.target,
+                    TransferMethod.LOCAL_SIR,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                )
+            if source_materialized is not None:
+                matched_resource_rectangular = _score_matched_resource_rectangular_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                    device,
+                )
+                if matched_resource_rectangular is not None:
+                    score, n_classes, input_artifact_ids = matched_resource_rectangular
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                    )
+                point_correspondence = _score_point_correspondence_commitment_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                    device,
+                )
+                if point_correspondence is not None:
+                    score, n_classes, input_artifact_ids = point_correspondence
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                    )
+                fedorbit_exact_sparse = _score_fedorbit_exact_sparse_solver_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                    device,
+                )
+                if fedorbit_exact_sparse is not None:
+                    score, n_classes, input_artifact_ids = fedorbit_exact_sparse
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                    )
+                generic_exact_qap = _score_generic_exact_qap_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                    device,
+                )
+                if generic_exact_qap is not None:
+                    score, n_classes, input_artifact_ids = generic_exact_qap
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        TransferMethod.GENERIC_EXACT_QAP,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                    )
+                exact_map_oracle = _score_exact_map_oracle_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                    device,
+                )
+                if exact_map_oracle is not None:
+                    score, n_classes, input_artifact_ids = exact_map_oracle
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        TransferMethod.EXACT_MAP_ORACLE,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                    )
+
+
+def _persist_primary_transfer_cell_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: str,
+    source: DatasetId,
+    target: DatasetId,
+    method: TransferMethod,
+    seed: RandomSeed,
+    score: ScoreArtifact,
+    n_classes: ClassCount,
+    input_artifact_ids: tuple[ArtifactIdentifier, ...],
+) -> None:
+    f1_set, recall_set = class_metric_sets(score, n_classes)
+    for metric_name, metric_value, metric_unit, direction in (
+        (
+            MetricId.MACRO_CROSS_ENTROPY,
+            float(score.macro_cross_entropy.value),
+            MetricUnit("nats"),
+            MetricDirection.LOWER_IS_BETTER,
+        ),
+        (
+            MetricId.MACRO_F1,
+            float(macro_f1(f1_set).value),
+            MetricUnit("fraction"),
+            MetricDirection.HIGHER_IS_BETTER,
+        ),
+        (
+            MetricId.BALANCED_ACCURACY,
+            float(balanced_accuracy(recall_set).value),
+            MetricUnit("fraction"),
+            MetricDirection.HIGHER_IS_BETTER,
+        ),
+    ):
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            request.experiment,
+            pair_direction,
+            source,
+            target,
+            method,
+            seed,
+            metric_name,
+            metric_value,
+            metric_unit,
+            direction,
+            input_artifact_ids,
+            request.overwrite_policy,
+        )
+
+
+_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.METRICS})
+
+
+@dataclass(frozen=True, slots=True)
+class _SeedMetric:
+    value: float
+    artifact_id: ArtifactIdentifier
+
+
+def _iter_completed_json_payloads(
+    store: ArtifactStore, experiment: ExperimentName, payload_key: str
+) -> Iterator[tuple[ReusableArtifactManifest, Mapping[str, StableJsonPayload]]]:
+    experiment_value = experiment.value
+    for manifest in store.all_manifests():
+        if experiment_value not in manifest.semantic_producer_coordinates:
+            continue
+        try:
+            resolved = store.resolve(manifest.artifact_id)
+        except ValueError:
+            continue
+        if resolved.state != ArtifactState.COMPLETED:
+            continue
+        for payload_path in resolved.payload_paths:
+            path = Path(payload_path)
+            if not path.is_file():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            record_payload = payload.get(payload_key)
+            if record_payload is not None:
+                yield resolved, record_payload
+
+
+def completed_primary_transfer_metric_records(store: ArtifactStore) -> tuple[MetricRecord, ...]:
+    return tuple(
+        MetricRecord.model_validate(payload)
+        for _, payload in _iter_completed_json_payloads(
+            store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record"
+        )
+    )
+
+
+def completed_primary_transfer_comparison_records(
+    store: ArtifactStore,
+) -> tuple[PairedComparisonRecord, ...]:
+    return tuple(
+        PairedComparisonRecord.model_validate(payload)
+        for _, payload in _iter_completed_json_payloads(
+            store, ExperimentName.STATISTICAL_SYNTHESIS, "comparison_record"
+        )
+    )
+
+
+def _completed_primary_transfer_macro_ce(
+    store: ArtifactStore,
+) -> Mapping[tuple[str, TransferMethod, RandomSeed], _SeedMetric]:
+    result: OrderedDict[tuple[str, TransferMethod, RandomSeed], _SeedMetric] = OrderedDict()
+    for resolved, record_payload in _iter_completed_json_payloads(
+        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record"
+    ):
+        record = MetricRecord.model_validate(record_payload)
+        if (
+            record.metric_name != MetricId.MACRO_CROSS_ENTROPY
+            or not record.valid
+            or record.metric_value is None
+        ):
+            continue
+        result[(record.pair, record.method, record.seed)] = _SeedMetric(
+            float(record.metric_value), resolved.artifact_id
+        )
+    return result
+
+
+def persist_primary_transfer_comparison(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    pair: str,
+    method: TransferMethod,
+    paired_seed_count: Index,
+    mean_difference: float | None,
+    median_difference: float | None,
+    bca_ci_low: float | None,
+    bca_ci_high: float | None,
+    raw_p: float | None,
+    holm_p: float | None,
+    decision: ComparisonDecision,
+    input_metric_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        directed_pair=DirectedPair(
+            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
+        ),
+        method=method,
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.STATISTICS,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    comparison = PairedComparisonRecord(
+        contrast_name=ContrastName(f"{method.value} vs {TransferMethod.LOCAL_ONLY.value}: {pair}"),
+        family=MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+        pair=DirectedPairName(pair),
+        method_a=method,
+        method_b=TransferMethod.LOCAL_ONLY,
+        metric=MetricId.MACRO_CROSS_ENTROPY,
+        paired_seed_count=paired_seed_count,
+        mean_difference=mean_difference,
+        median_difference=median_difference,
+        bca_ci_low=bca_ci_low,
+        bca_ci_high=bca_ci_high,
+        raw_p=raw_p,
+        holm_p=holm_p,
+        materiality_threshold=active_config().scientific.materiality.realized_relative_macro_ce,
+        equivalence_margin_low=None,
+        equivalence_margin_high=None,
+        input_metric_artifact_ids=tuple(input_metric_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        decision=decision,
+    )
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"comparison.{pair.replace(' -> ', '-to-')}.{method.value}.json"
+    )
+    payload = cast(
+        StableJsonPayload, OrderedDict(comparison_record=comparison.model_dump(mode="json"))
+    )
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.STATISTICS,
+        upstream_artifact_ids=tuple(input_metric_artifact_ids),
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.OTHER,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.STATISTICS,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=tuple(input_metric_artifact_ids),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
+def execute_statistical_synthesis(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    metrics = _completed_primary_transfer_macro_ce(store)
+    pairs = sorted({pair for pair, _, _ in metrics})
+    methods = sorted(
+        {method for _, method, _ in metrics if method != TransferMethod.LOCAL_ONLY},
+        key=lambda method: method.value,
+    )
+    statistics_config = active_config().scientific.statistics
+    for method in methods:
+        raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
+        contrasts: OrderedDict[
+            str,
+            tuple[
+                Index,
+                float | None,
+                float | None,
+                float | None,
+                float | None,
+                tuple[ArtifactIdentifier, ...],
+            ],
+        ] = OrderedDict()
+        for pair in pairs:
+            local_only_seeds = OrderedDict(
+                (seed, entry)
+                for (candidate_pair, candidate_method, seed), entry in metrics.items()
+                if candidate_pair == pair and candidate_method == TransferMethod.LOCAL_ONLY
+            )
+            method_seeds = OrderedDict(
+                (seed, entry)
+                for (candidate_pair, candidate_method, seed), entry in metrics.items()
+                if candidate_pair == pair and candidate_method == method
+            )
+            shared_seeds = sorted(set(local_only_seeds) & set(method_seeds))
+            paired_seed_count: Index = len(shared_seeds)
+            input_ids = tuple(
+                identifier
+                for seed in shared_seeds
+                for identifier in (
+                    local_only_seeds[seed].artifact_id,
+                    method_seeds[seed].artifact_id,
+                )
+            )
+            if len(shared_seeds) < statistics_config.minimum_valid_paired_seeds:
+                contrasts[pair] = (paired_seed_count, None, None, None, None, input_ids)
+                continue
+            local_only_values = tuple(local_only_seeds[seed].value for seed in shared_seeds)
+            method_values = tuple(method_seeds[seed].value for seed in shared_seeds)
+            bca = paired_bca_interval(
+                local_only_values,
+                method_values,
+                statistical_bootstrap_seed(
+                    ContrastName(f"{method.value} vs Local-Only"),
+                    MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+                    DirectedPairName(pair),
+                    MetricId.MACRO_CROSS_ENTROPY,
+                    BootstrapPurpose("primary-transfer-gain"),
+                ),
+            )
+            sign_flip = exact_sign_flip_test(local_only_values, method_values)
+            raw_p_by_pair[pair] = sign_flip.p_value
+            contrasts[pair] = (
+                paired_seed_count,
+                float(sign_flip.mean_difference),
+                float(sign_flip.median_difference),
+                None if bca.lower is None else float(bca.lower),
+                None if bca.upper is None else float(bca.upper),
+                input_ids,
+            )
+        holm_adjusted = holm_step_down(
+            PValueSet(
+                tuple(
+                    NamedPValue(PValueName(pair), p_value)
+                    for pair, p_value in raw_p_by_pair.items()
+                )
+            )
+        )
+        criteria = active_config().scientific.evaluation_criteria.strict_cross_telemetry_utility
+        for pair in pairs:
+            paired_seed_count, mean_difference, median_difference, bca_low, bca_high, input_ids = (
+                contrasts[pair]
+            )
+            if mean_difference is None:
+                decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+                raw_p = None
+                holm_p = None
+            else:
+                raw_p = raw_p_by_pair[pair]
+                holm_p = holm_adjusted.value_of(PValueName(pair))
+                if bca_low is None:
+                    decision = ComparisonDecision.DEGENERATE
+                elif (
+                    holm_p is not None
+                    and holm_p <= criteria.holm_adjusted_p_maximum
+                    and bca_low > criteria.bca_lower_bound_strictly_greater_than
+                ):
+                    decision = ComparisonDecision.SUPERIOR
+                else:
+                    decision = ComparisonDecision.NOT_SUPPORTED
+            if not input_ids:
+                continue
+            persist_primary_transfer_comparison(
+                store,
+                layout,
+                request.experiment,
+                pair,
+                method,
+                paired_seed_count,
+                mean_difference,
+                median_difference,
+                bca_low,
+                bca_high,
+                raw_p,
+                float(holm_p) if holm_p is not None else None,
+                decision,
+                input_ids,
+                request.overwrite_policy,
+            )
+
+
+def _dataset_eligible_groups_by_coarse(
+    target: DatasetId, materialized: MaterializedClient
+) -> Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]:
+    eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
+    for group in transfer_concept_groups(target, materialized):
+        if group.source_eligible:
+            eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
+    return OrderedDict((coarse, tuple(groups)) for coarse, groups in eligible_by_group.items())
+
+
+def self_padded_blocks(
+    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+) -> PaddedBlockStructure:
+    coarse_groups = tuple(eligible_groups_by_coarse.keys())
+    counts = OrderedDict(
+        (coarse, len(groups)) for coarse, groups in eligible_groups_by_coarse.items()
+    )
+    return build_padded_block_structure(coarse_groups, counts, counts)
+
+
+def _load_dataset_source_packet(
+    layout: WorkspaceLayout,
+    target: DatasetId,
+    seed: RandomSeed,
+    coarse_group: CoarseGroup,
+) -> SourcePacket | None:
+    path = (
+        experiment_workspace(layout, ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
+        / "artifacts"
+        / "packets"
+        / target.value
+        / f"seed-{seed}"
+        / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
+    )
+    if not path.is_file():
+        return None
+    return SourcePacket.from_serialized(SerializedPacket(path.read_text(encoding="utf-8")))
+
+
+def assemble_self_response_matrix(
+    blocks: PaddedBlockStructure,
+    packets_by_coarse_group: Mapping[CoarseGroup, SourcePacket],
+) -> ResponseMatrix:
+    size = blocks.total_padded_nodes
+    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
+    for block_index, coarse_group in enumerate(blocks.coarse_groups):
+        packet = packets_by_coarse_group.get(coarse_group)
+        if packet is None:
+            continue
+        block_range = blocks.block_index_range(block_index)
+        block_size = block_range.stop - block_range.start
+        submatrix = packet.lower_matrix()
+        if submatrix.shape != (block_size, block_size):
+            raise ExecutionError(
+                f"source packet for {coarse_group.value} has shape {submatrix.shape}, "
+                f"expected {(block_size, block_size)}"
+            )
+        matrix[block_range.start : block_range.stop, block_range.start : block_range.stop] = (
+            submatrix
+        )
+    return matrix
+
+
+def target_node_risks(
+    blocks: PaddedBlockStructure,
+    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    class_conditional_cross_entropy: tuple[float, ...],
+) -> tuple[TransferNodeRisk, ...]:
+    risks: list[TransferNodeRisk] = []
+    for block_index, coarse_group in enumerate(blocks.coarse_groups):
+        groups = eligible_groups_by_coarse.get(coarse_group, ())
+        block_range = blocks.block_index_range(block_index)
+        for offset, node_index in enumerate(block_range):
+            if offset < len(groups):
+                relevant = [
+                    class_conditional_cross_entropy[class_index]
+                    for class_index in groups[offset].native_class_indices
+                    if math.isfinite(class_conditional_cross_entropy[class_index])
+                ]
+                risk = statistics.fmean(relevant) if relevant else 0.0
+                risks.append(TransferNodeRisk(node_index, True, risk))
+            else:
+                risks.append(TransferNodeRisk(node_index, False, 0.0))
+    return tuple(risks)
+
+
+def curriculum_multipliers_from_action(
+    action: CurriculumAction,
+    blocks: PaddedBlockStructure,
+    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    n_classes: ClassCount,
+) -> CurriculumMultipliers:
+    values = torch.ones(n_classes, dtype=torch.float64)
+    for block_index, coarse_group in enumerate(blocks.coarse_groups):
+        groups = eligible_groups_by_coarse.get(coarse_group, ())
+        block_range = blocks.block_index_range(block_index)
+        for offset, node_index in enumerate(block_range):
+            if offset >= len(groups):
+                continue
+            alpha = float(action.coordinates[node_index])
+            if alpha <= 0.0:
+                continue
+            for class_index in groups[offset].native_class_indices:
+                values[class_index] = 1.0 + alpha
+    return CurriculumMultipliers(values)
+
+
+def _confirm_assimilate_and_score(
+    model: torch.nn.Module,
+    optimizer: torch.optim.AdamW,
+    checkpoint: BaseCheckpoint,
+    train: SplitTensors,
+    confirm: SplitTensors,
+    test: SplitTensors,
+    multipliers: CurriculumMultipliers,
+    seed: RandomSeed,
+    contrast_coordinates: ContrastCoordinates,
+    assimilation_coordinates: AssimilationCoordinates,
+    n_classes: ClassCount,
+) -> ScoreArtifact:
+    pre_confirm = capture_pre_confirm_pair(model, optimizer)
+    verdict = run_proposal_confirmation(
+        ConfirmationRequest(
+            model,
+            pre_confirm.baseline,
+            pre_confirm.curriculum,
+            train.features,
+            train.targets,
+            confirm.features,
+            confirm.targets,
+            checkpoint.train_class_weights,
+            multipliers,
+            checkpoint.selected_hyperparameters,
+            seed,
+            contrast_coordinates,
+        )
+    )
+    lifecycle = PreTestLifecycle()
+    lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.CONFIRMATION_DECISION_FINALIZED)
+    if verdict.accepted:
+        apply_accepted_assimilation(
+            model,
+            optimizer,
+            pre_confirm.curriculum,
+            train.features,
+            train.targets,
+            checkpoint.train_class_weights,
+            multipliers,
+            seed,
+            assimilation_coordinates,
+        )
+    else:
+        settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
+    lifecycle.complete_phase(PreTestPhase.ASSIMILATION_SETTLED)
+    lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
+    lifecycle.open_test()
+    lifecycle.assert_opened()
+    return score_model(
+        ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
+    )
+
+
+def _action_sha256(action: CurriculumAction) -> Sha256Digest:
+    return Sha256Digest(
+        hashlib.sha256(
+            ",".join(f"{value:.17g}" for value in action.coordinates).encode()
+        ).hexdigest()
+    )
+
+
+def _score_local_sir_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    target: DatasetId,
+    materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    if not checkpoint_path.is_file():
+        return None
+    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    if checkpoint_artifact_id is None:
+        return None
+    eligible_groups_by_coarse = _dataset_eligible_groups_by_coarse(target, materialized)
+    if not eligible_groups_by_coarse:
+        return None
+    blocks = self_padded_blocks(eligible_groups_by_coarse)
+    packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    for coarse_group in eligible_groups_by_coarse:
+        packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        if packet is not None:
+            packets_by_coarse[coarse_group] = packet
+    if not packets_by_coarse:
+        return None
+    response_matrix = assemble_self_response_matrix(blocks, packets_by_coarse)
+    checkpoint = load_base_checkpoint(checkpoint_path)
+    n_classes = materialized.class_manifest.class_count
+    train = materialized.splits[Split.TRAIN]
+    meta = materialized.splits[Split.META]
+    confirm = materialized.splits[Split.CONFIRM]
+    test = materialized.splits[Split.TEST]
+    model = create_classifier(
+        target,
+        train.features.shape[1],
+        n_classes,
+        checkpoint.selected_hyperparameters.dropout_probability,
+        seed,
+        device,
+    )
+    checkpoint.state_dict.load_into(model)
+    meta_score = score_model(
+        ScoringRequest(model, meta.features, meta.targets, LocalClassCount(n_classes))
+    )
+    meta_class_ce = tuple(
+        entry.value for entry in meta_score.class_conditional_cross_entropy.values
+    )
+    node_risks = target_node_risks(blocks, eligible_groups_by_coarse, meta_class_ce)
+    try:
+        target_importance = build_target_importance(node_risks)
+    except TargetImportanceError:
+        return None
+    actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
+    problem = build_robust_action_problem(
+        blocks,
+        response_matrix,
+        response_matrix,
+        target_importance.as_vector(blocks.total_padded_nodes),
+        actionable_nodes,
+    )
+    solution = local_sir_action(problem, response_matrix)
+    action = solution.selected_action
+    multipliers = curriculum_multipliers_from_action(
+        action, blocks, eligible_groups_by_coarse, n_classes
+    )
+    optimizer = make_adamw(
+        model,
+        checkpoint.selected_hyperparameters.learning_rate,
+        checkpoint.selected_hyperparameters.weight_decay,
+    )
+    input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
+        checkpoint_artifact_id,
+        *(
+            ArtifactIdentifier(packet.packet_integrity_sha256)
+            for packet in packets_by_coarse.values()
+        ),
+    )
+    first_packet = next(iter(packets_by_coarse.values()))
+    score = _confirm_assimilate_and_score(
+        model,
+        optimizer,
+        checkpoint,
+        train,
+        confirm,
+        test,
+        multipliers,
+        seed,
+        ContrastCoordinates(f"local-sir:{target.value}:{seed}"),
+        AssimilationCoordinates(
+            target_client=SourceClientName(target.value),
+            directed_pair=DirectedPairName(f"{target.value} -> {target.value}"),
+            condition=EvaluationConditionName("principal"),
+            seed=seed,
+            clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
+            source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
+            action_artifact_sha256=_action_sha256(action),
+        ),
+        n_classes,
+    )
+    return score, n_classes, input_artifact_ids
+
+
+def _common_eligible_groups(
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+) -> (
+    tuple[
+        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    ]
+    | None
+):
+    target_eligible_all = _dataset_eligible_groups_by_coarse(target, target_materialized)
+    source_eligible_all = _dataset_eligible_groups_by_coarse(source, source_materialized)
+    common_coarse = tuple(group for group in target_eligible_all if group in source_eligible_all)
+    if not common_coarse:
+        return None
+    source_eligible = OrderedDict((group, source_eligible_all[group]) for group in common_coarse)
+    target_eligible = OrderedDict((group, target_eligible_all[group]) for group in common_coarse)
+    return source_eligible, target_eligible
+
+
+def cross_client_padded_blocks(
+    source_eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    target_eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+) -> PaddedBlockStructure:
+    coarse_groups = tuple(
+        group for group in target_eligible_by_coarse if group in source_eligible_by_coarse
+    )
+    source_counts = OrderedDict(
+        (group, len(source_eligible_by_coarse[group])) for group in coarse_groups
+    )
+    target_counts = OrderedDict(
+        (group, len(target_eligible_by_coarse[group])) for group in coarse_groups
+    )
+    return build_padded_block_structure(coarse_groups, source_counts, target_counts)
+
+
+def assemble_cross_client_response_matrix(
+    blocks: PaddedBlockStructure,
+    source_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
+    array_selector: Callable[[SourcePacket], ResponseMatrix],
+) -> ResponseMatrix:
+    size = blocks.total_padded_nodes
+    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
+    for block_index, coarse_group in enumerate(blocks.coarse_groups):
+        packet = source_packets_by_coarse.get(coarse_group)
+        if packet is None:
+            continue
+        block_range = blocks.block_index_range(block_index)
+        source_real = blocks.source_real_counts[block_index]
+        submatrix = array_selector(packet)
+        if submatrix.shape != (source_real, source_real):
+            raise ExecutionError(
+                f"source packet for {coarse_group.value} has shape {submatrix.shape}, "
+                f"expected {(source_real, source_real)}"
+            )
+        start = block_range.start
+        matrix[start : start + source_real, start : start + source_real] = submatrix
+    return matrix
+
+
+def assemble_target_response_matrix(
+    blocks: PaddedBlockStructure,
+    target_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
+    array_selector: Callable[[SourcePacket], ResponseMatrix],
+) -> ResponseMatrix:
+    size = blocks.total_padded_nodes
+    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
+    for block_index, coarse_group in enumerate(blocks.coarse_groups):
+        packet = target_packets_by_coarse.get(coarse_group)
+        if packet is None:
+            continue
+        block_range = blocks.block_index_range(block_index)
+        target_real = blocks.target_real_counts[block_index]
+        submatrix = array_selector(packet)
+        if submatrix.shape != (target_real, target_real):
+            raise ExecutionError(
+                f"target packet for {coarse_group.value} has shape {submatrix.shape}, "
+                f"expected {(target_real, target_real)}"
+            )
+        start = block_range.start
+        matrix[start : start + target_real, start : start + target_real] = submatrix
+    return matrix
+
+
+def _score_matched_resource_rectangular_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    if not checkpoint_path.is_file():
+        return None
+    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    if checkpoint_artifact_id is None:
+        return None
+    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    if common is None:
+        return None
+    source_eligible, target_eligible = common
+    common_coarse = tuple(target_eligible)
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    for coarse_group in common_coarse:
+        packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        if packet is not None:
+            packets_by_coarse[coarse_group] = packet
+    if not packets_by_coarse:
+        return None
+    lower_matrix = assemble_cross_client_response_matrix(
+        blocks, packets_by_coarse, SourcePacket.lower_matrix
+    )
+    upper_matrix = assemble_cross_client_response_matrix(
+        blocks, packets_by_coarse, SourcePacket.upper_matrix
+    )
+    checkpoint = load_base_checkpoint(checkpoint_path)
+    n_classes = target_materialized.class_manifest.class_count
+    train = target_materialized.splits[Split.TRAIN]
+    meta = target_materialized.splits[Split.META]
+    confirm = target_materialized.splits[Split.CONFIRM]
+    test = target_materialized.splits[Split.TEST]
+    model = create_classifier(
+        target,
+        train.features.shape[1],
+        n_classes,
+        checkpoint.selected_hyperparameters.dropout_probability,
+        seed,
+        device,
+    )
+    checkpoint.state_dict.load_into(model)
+    meta_score = score_model(
+        ScoringRequest(model, meta.features, meta.targets, LocalClassCount(n_classes))
+    )
+    meta_class_ce = tuple(
+        entry.value for entry in meta_score.class_conditional_cross_entropy.values
+    )
+    node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
+    try:
+        target_importance = build_target_importance(node_risks)
+    except TargetImportanceError:
+        return None
+    actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
+    problem = build_robust_action_problem(
+        blocks,
+        lower_matrix,
+        upper_matrix,
+        target_importance.as_vector(blocks.total_padded_nodes),
+        actionable_nodes,
+    )
+    hull = build_rectangular_hull(blocks, lower_matrix, upper_matrix)
+    solution = optimize_against_fixed_matrix(problem, hull.lower_bounds)
+    action = solution.selected_action
+    multipliers = curriculum_multipliers_from_action(action, blocks, target_eligible, n_classes)
+    optimizer = make_adamw(
+        model,
+        checkpoint.selected_hyperparameters.learning_rate,
+        checkpoint.selected_hyperparameters.weight_decay,
+    )
+    input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
+        checkpoint_artifact_id,
+        *(
+            ArtifactIdentifier(packet.packet_integrity_sha256)
+            for packet in packets_by_coarse.values()
+        ),
+    )
+    first_packet = next(iter(packets_by_coarse.values()))
+    score = _confirm_assimilate_and_score(
+        model,
+        optimizer,
+        checkpoint,
+        train,
+        confirm,
+        test,
+        multipliers,
+        seed,
+        ContrastCoordinates(
+            f"matched-resource-rectangular:{source.value}-to-{target.value}:{seed}"
+        ),
+        AssimilationCoordinates(
+            target_client=SourceClientName(target.value),
+            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+            condition=EvaluationConditionName("principal"),
+            seed=seed,
+            clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
+            source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
+            action_artifact_sha256=_action_sha256(action),
+        ),
+        n_classes,
+    )
+    return score, n_classes, input_artifact_ids
+
+
+def _score_point_correspondence_commitment_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    if not checkpoint_path.is_file():
+        return None
+    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    if checkpoint_artifact_id is None:
+        return None
+    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    if common is None:
+        return None
+    source_eligible, target_eligible = common
+    common_coarse = tuple(target_eligible)
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    source_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    target_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    for coarse_group in common_coarse:
+        source_packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        if source_packet is not None:
+            source_packets[coarse_group] = source_packet
+        target_packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        if target_packet is not None:
+            target_packets[coarse_group] = target_packet
+    if not source_packets or not target_packets:
+        return None
+    source_matrix = assemble_cross_client_response_matrix(
+        blocks, source_packets, SourcePacket.lower_matrix
+    )
+    target_matrix = assemble_target_response_matrix(
+        blocks, target_packets, SourcePacket.lower_matrix
+    )
+    qap_result = point_correspondence_commitment(source_matrix, target_matrix, blocks)
+    if not qap_result.certified or qap_result.correspondence is None:
+        return None
+    committed_matrix = qap_result.correspondence.permute_response_matrix(source_matrix)
+    checkpoint = load_base_checkpoint(checkpoint_path)
+    n_classes = target_materialized.class_manifest.class_count
+    train = target_materialized.splits[Split.TRAIN]
+    meta = target_materialized.splits[Split.META]
+    confirm = target_materialized.splits[Split.CONFIRM]
+    test = target_materialized.splits[Split.TEST]
+    model = create_classifier(
+        target,
+        train.features.shape[1],
+        n_classes,
+        checkpoint.selected_hyperparameters.dropout_probability,
+        seed,
+        device,
+    )
+    checkpoint.state_dict.load_into(model)
+    meta_score = score_model(
+        ScoringRequest(model, meta.features, meta.targets, LocalClassCount(n_classes))
+    )
+    meta_class_ce = tuple(
+        entry.value for entry in meta_score.class_conditional_cross_entropy.values
+    )
+    node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
+    try:
+        target_importance = build_target_importance(node_risks)
+    except TargetImportanceError:
+        return None
+    actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
+    problem = build_robust_action_problem(
+        blocks,
+        committed_matrix,
+        committed_matrix,
+        target_importance.as_vector(blocks.total_padded_nodes),
+        actionable_nodes,
+    )
+    solution = optimize_against_fixed_matrix(problem, committed_matrix)
+    action = solution.selected_action
+    multipliers = curriculum_multipliers_from_action(action, blocks, target_eligible, n_classes)
+    optimizer = make_adamw(
+        model,
+        checkpoint.selected_hyperparameters.learning_rate,
+        checkpoint.selected_hyperparameters.weight_decay,
+    )
+    input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
+        checkpoint_artifact_id,
+        *(
+            ArtifactIdentifier(packet.packet_integrity_sha256)
+            for packet in (*source_packets.values(), *target_packets.values())
+        ),
+    )
+    first_source_packet = next(iter(source_packets.values()))
+    score = _confirm_assimilate_and_score(
+        model,
+        optimizer,
+        checkpoint,
+        train,
+        confirm,
+        test,
+        multipliers,
+        seed,
+        ContrastCoordinates(
+            f"point-correspondence-commitment:{source.value}-to-{target.value}:{seed}"
+        ),
+        AssimilationCoordinates(
+            target_client=SourceClientName(target.value),
+            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+            condition=EvaluationConditionName("principal"),
+            seed=seed,
+            clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
+            source_packet_artifact_id=ArtifactIdentifier(
+                first_source_packet.packet_integrity_sha256
+            ),
+            action_artifact_sha256=_action_sha256(action),
+        ),
+        n_classes,
+    )
+    return score, n_classes, input_artifact_ids
+
+
+def _score_robust_action_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+    method_slug: str,
+    solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
+    settle_and_score: Callable[
+        [
+            torch.nn.Module,
+            torch.optim.AdamW,
+            BaseCheckpoint,
+            SplitTensors,
+            SplitTensors,
+            SplitTensors,
+            CurriculumMultipliers,
+            CurriculumAction,
+            RandomSeed,
+            ContrastCoordinates,
+            AssimilationCoordinates,
+            ClassCount,
+        ],
+        ScoreArtifact,
+    ]
+    | None = None,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    if not checkpoint_path.is_file():
+        return None
+    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    if checkpoint_artifact_id is None:
+        return None
+    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    if common is None:
+        return None
+    source_eligible, target_eligible = common
+    common_coarse = tuple(target_eligible)
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    for coarse_group in common_coarse:
+        packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        if packet is not None:
+            packets_by_coarse[coarse_group] = packet
+    if not packets_by_coarse:
+        return None
+    lower_matrix = assemble_cross_client_response_matrix(
+        blocks, packets_by_coarse, SourcePacket.lower_matrix
+    )
+    upper_matrix = assemble_cross_client_response_matrix(
+        blocks, packets_by_coarse, SourcePacket.upper_matrix
+    )
+    checkpoint = load_base_checkpoint(checkpoint_path)
+    n_classes = target_materialized.class_manifest.class_count
+    train = target_materialized.splits[Split.TRAIN]
+    meta = target_materialized.splits[Split.META]
+    confirm = target_materialized.splits[Split.CONFIRM]
+    test = target_materialized.splits[Split.TEST]
+    model = create_classifier(
+        target,
+        train.features.shape[1],
+        n_classes,
+        checkpoint.selected_hyperparameters.dropout_probability,
+        seed,
+        device,
+    )
+    checkpoint.state_dict.load_into(model)
+    meta_score = score_model(
+        ScoringRequest(model, meta.features, meta.targets, LocalClassCount(n_classes))
+    )
+    meta_class_ce = tuple(
+        entry.value for entry in meta_score.class_conditional_cross_entropy.values
+    )
+    node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
+    try:
+        target_importance = build_target_importance(node_risks)
+    except TargetImportanceError:
+        return None
+    actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
+    problem = build_robust_action_problem(
+        blocks,
+        lower_matrix,
+        upper_matrix,
+        target_importance.as_vector(blocks.total_padded_nodes),
+        actionable_nodes,
+    )
+    action = solve_action(problem, seed)
+    if action is None:
+        return None
+    multipliers = curriculum_multipliers_from_action(action, blocks, target_eligible, n_classes)
+    optimizer = make_adamw(
+        model,
+        checkpoint.selected_hyperparameters.learning_rate,
+        checkpoint.selected_hyperparameters.weight_decay,
+    )
+    input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
+        checkpoint_artifact_id,
+        *(
+            ArtifactIdentifier(packet.packet_integrity_sha256)
+            for packet in packets_by_coarse.values()
+        ),
+    )
+    first_packet = next(iter(packets_by_coarse.values()))
+    contrast_coordinates = ContrastCoordinates(
+        f"{method_slug}:{source.value}-to-{target.value}:{seed}"
+    )
+    assimilation_coordinates = AssimilationCoordinates(
+        target_client=SourceClientName(target.value),
+        directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+        condition=EvaluationConditionName("principal"),
+        seed=seed,
+        clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
+        source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
+        action_artifact_sha256=_action_sha256(action),
+    )
+    if settle_and_score is None:
+        score = _confirm_assimilate_and_score(
+            model,
+            optimizer,
+            checkpoint,
+            train,
+            confirm,
+            test,
+            multipliers,
+            seed,
+            contrast_coordinates,
+            assimilation_coordinates,
+            n_classes,
+        )
+    else:
+        score = settle_and_score(
+            model,
+            optimizer,
+            checkpoint,
+            train,
+            confirm,
+            test,
+            multipliers,
+            action,
+            seed,
+            contrast_coordinates,
+            assimilation_coordinates,
+            n_classes,
+        )
+    return score, n_classes, input_artifact_ids
+
+
+def _solve_fedorbit_exact_sparse_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    solution = solve_robust_action(problem)
+    return solution.selected_action
+
+
+def _solve_generic_exact_qap_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    outcome = solve_robust_action_qap(problem)
+    if outcome.certified_solution is None:
+        return None
+    return outcome.certified_solution.certified_action
+
+
+def _solve_exact_map_oracle_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
+    committed_matrix = identity.permute_response_matrix(problem.lower_response_matrix)
+    return optimize_against_fixed_matrix(problem, committed_matrix).selected_action
+
+
+def _score_fedorbit_exact_sparse_solver_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "fedorbit-exact-sparse-solver",
+        _solve_fedorbit_exact_sparse_action,
+    )
+
+
+def _settle_without_confirmation_and_score(
+    model: torch.nn.Module,
+    optimizer: torch.optim.AdamW,
+    checkpoint: BaseCheckpoint,
+    train: SplitTensors,
+    confirm: SplitTensors,
+    test: SplitTensors,
+    multipliers: CurriculumMultipliers,
+    action: CurriculumAction,
+    seed: RandomSeed,
+    contrast_coordinates: ContrastCoordinates,
+    assimilation_coordinates: AssimilationCoordinates,
+    n_classes: ClassCount,
+) -> ScoreArtifact:
+    del confirm, contrast_coordinates
+    pre_confirm = capture_pre_confirm_pair(model, optimizer)
+    if action.realized_support_size > 0:
+        apply_accepted_assimilation(
+            model,
+            optimizer,
+            pre_confirm.curriculum,
+            train.features,
+            train.targets,
+            checkpoint.train_class_weights,
+            multipliers,
+            seed,
+            assimilation_coordinates,
+        )
+    else:
+        settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
+    return score_model(
+        ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
+    )
+
+
+def _score_fedorbit_without_confirmation_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "fedorbit-without-confirmation",
+        _solve_fedorbit_exact_sparse_action,
+        _settle_without_confirmation_and_score,
+    )
+
+
+def _score_generic_exact_qap_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "generic-exact-qap",
+        _solve_generic_exact_qap_action,
+    )
+
+
+def _score_exact_map_oracle_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "exact-map-oracle",
+        _solve_exact_map_oracle_action,
+    )
+
+
+def solve_coarse_block_mean_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    summary = coarse_block_mean_matrix(problem.blocks, problem.lower_response_matrix)
+    return optimize_against_fixed_matrix(problem, summary.matrix).selected_action
+
+
+def solve_coarse_block_min_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    summary = coarse_block_min_matrix(problem.blocks, problem.lower_response_matrix)
+    return optimize_against_fixed_matrix(problem, summary.matrix).selected_action
+
+
+def solve_orbit_mean_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    summary = orbit_mean_matrix(problem.blocks, problem.lower_response_matrix)
+    return optimize_against_fixed_matrix(problem, summary.matrix).selected_action
+
+
+def solve_coupling_destroyed_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    destroyed = coupling_destroyed_matrices(
+        problem.blocks,
+        problem.lower_response_matrix,
+        problem.upper_response_matrix,
+        seed,
+        ContrastCoordinates(f"coupling-destroyed:{seed}"),
+    )
+    destroyed_problem = RobustActionProblem(
+        blocks=problem.blocks,
+        lower_response_matrix=destroyed.lower_response_matrix,
+        upper_response_matrix=destroyed.upper_response_matrix,
+        target_importance=problem.target_importance,
+        coordinate_caps=problem.coordinate_caps,
+        linear_costs=problem.linear_costs,
+        total_budget=problem.total_budget,
+        principal_support=problem.principal_support,
+    )
+    return solve_robust_action(destroyed_problem).selected_action
+
+
+def _score_coarse_block_mean_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "coarse-block-mean",
+        solve_coarse_block_mean_action,
+    )
+
+
+def _score_coarse_block_min_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "coarse-block-min",
+        solve_coarse_block_min_action,
+    )
+
+
+def _score_orbit_mean_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "orbit-mean",
+        solve_orbit_mean_action,
+    )
+
+
+def _score_coupling_destroyed_fedorbit_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "coupling-destroyed-fedorbit",
+        solve_coupling_destroyed_action,
+    )
+
+
+def _score_local_sir_cell_adapter(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    del source, source_materialized
+    return _score_local_sir_cell(store, layout, target, target_materialized, seed, device)
+
+
+def execute_mechanism_ablations(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    scorers: tuple[
+        tuple[
+            TransferMethod,
+            Callable[
+                [
+                    ArtifactStore,
+                    WorkspaceLayout,
+                    DatasetId,
+                    DatasetId,
+                    MaterializedClient,
+                    MaterializedClient,
+                    RandomSeed,
+                    torch.device,
+                ],
+                tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None,
+            ],
+        ],
+        ...,
+    ] = (
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _score_matched_resource_rectangular_cell),
+        (
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            _score_point_correspondence_commitment_cell,
+        ),
+        (TransferMethod.COUPLING_DESTROYED_FEDORBIT, _score_coupling_destroyed_fedorbit_cell),
+        (TransferMethod.COARSE_BLOCK_MEAN, _score_coarse_block_mean_cell),
+        (TransferMethod.COARSE_BLOCK_MIN, _score_coarse_block_min_cell),
+        (TransferMethod.ORBIT_MEAN, _score_orbit_mean_cell),
+        (TransferMethod.LOCAL_SIR, _score_local_sir_cell_adapter),
+    )
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = f"{source.value} -> {target.value}"
+        for seed in confirmatory_seeds:
+            for method, scorer in scorers:
+                scored = scorer(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    device,
+                )
+                if scored is None:
+                    continue
+                score, n_classes, input_artifact_ids = scored
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    method,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                )
+
+
+def execute_target_confirmation_and_portability(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    directed_pairs = (
+        *active_config().scientific.datasets.primary_directed_pairs,
+        *active_config().scientific.datasets.secondary_directed_pairs,
+    )
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    scorers = (
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
+        (TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION, _score_fedorbit_without_confirmation_cell),
+    )
+    for directed_pair in directed_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = f"{source.value} -> {target.value}"
+        for seed in confirmatory_seeds:
+            for method, scorer in scorers:
+                scored = scorer(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    device,
+                )
+                if scored is None:
+                    continue
+                score, n_classes, input_artifact_ids = scored
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    method,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                )
+
+
+def _score_local_only_cell_adapter(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    del source, source_materialized
+    scored = _score_local_only_cell(store, layout, target, target_materialized, seed, device)
+    if scored is None:
+        return None
+    score, n_classes, artifact_id = scored
+    return score, n_classes, (artifact_id,)
+
+
+def execute_secondary_cross_modality_generalization(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    secondary_pairs = active_config().scientific.datasets.secondary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    scorers = (
+        (TransferMethod.LOCAL_ONLY, _score_local_only_cell_adapter),
+        (TransferMethod.LOCAL_SIR, _score_local_sir_cell_adapter),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _score_matched_resource_rectangular_cell),
+        (
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            _score_point_correspondence_commitment_cell,
+        ),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
+    )
+    for directed_pair in secondary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = f"{source.value} -> {target.value}"
+        for seed in confirmatory_seeds:
+            for method, scorer in scorers:
+                scored = scorer(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    device,
+                )
+                if scored is None:
+                    continue
+                score, n_classes, input_artifact_ids = scored
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    method,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                )
+
+
 def _execute_client_base_model_pilot(
     store: ArtifactStore,
     layout: WorkspaceLayout,
@@ -1744,7 +3847,7 @@ def _execute_client_base_model_pilot(
     relevance: frozenset[SemanticCoordinate],
     dataset: DatasetId,
     materialized: MaterializedClient,
-    confirmatory_seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: confirmatory_seeds)
+    confirmatory_seeds: tuple[RandomSeed, ...],
     overwrite_policy: OverwritePolicy,
     device: torch.device,
     logger: ExecutionLogger,
@@ -1762,9 +3865,9 @@ def _execute_client_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
                 artifact_id=None,
                 state=ArtifactState.RUNNING,
-                stage=ArtifactStage.PILOT_SELECTION.value,
-                experiment=experiment.value,
-                dataset=dataset.value,
+                stage=ExecutionStageName(ArtifactStage.PILOT_SELECTION.value),
+                experiment=experiment,
+                dataset=dataset,
             )
         )
         pilot_results = run_base_model_pilot(pilot_data, dataset, device)
@@ -1775,9 +3878,9 @@ def _execute_client_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
                 artifact_id=None,
                 state=ArtifactState.COMPLETED,
-                stage=ArtifactStage.PILOT_SELECTION.value,
-                experiment=experiment.value,
-                dataset=dataset.value,
+                stage=ExecutionStageName(ArtifactStage.PILOT_SELECTION.value),
+                experiment=experiment,
+                dataset=dataset,
                 elapsed_seconds=time.monotonic() - pilot_started_at,
             )
         )
@@ -1793,7 +3896,7 @@ def _execute_client_base_model_pilot(
                 pilot_result.seed,
                 pilot_result.outcome.checkpoint,
                 ArtifactStage.PILOT_SELECTION,
-                "pilot",
+                CheckpointDirectorySegment.PILOT,
                 overwrite_policy,
             )
         for seed_index, seed in enumerate(confirmatory_seeds):
@@ -1812,7 +3915,7 @@ def _execute_client_base_model_pilot(
                 relevance,
                 (),
                 _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-                _BASE_MODEL_PILOT_PRODUCER_MODULE,
+                _MODULE_NAME,
             )
             if overwrite_policy == OverwritePolicy.REUSE:
                 existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -1821,13 +3924,13 @@ def _execute_client_base_model_pilot(
                         ExecutionLogEvent(
                             occurred_at=datetime.now(UTC),
                             cell_coordinates=checkpoint_coordinates,
-                            artifact_id=ArtifactIdentifier(existing.artifact_id),
+                            artifact_id=existing.artifact_id,
                             state=ArtifactState.COMPLETED,
-                            stage=ArtifactStage.TRAINING.value,
-                            experiment=experiment.value,
-                            dataset=dataset.value,
+                            stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                            experiment=experiment,
+                            dataset=dataset,
                             seed=seed,
-                            reuse_decision="reused",
+                            reuse_decision=ReuseDecision("reused"),
                         )
                     )
                     continue
@@ -1837,11 +3940,11 @@ def _execute_client_base_model_pilot(
                     cell_coordinates=checkpoint_coordinates,
                     artifact_id=None,
                     state=ArtifactState.RUNNING,
-                    stage=ArtifactStage.TRAINING.value,
-                    experiment=experiment.value,
-                    dataset=dataset.value,
+                    stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                    experiment=experiment,
+                    dataset=dataset,
                     seed=seed,
-                    reuse_decision=(
+                    reuse_decision=ReuseDecision(
                         f"{seed_index + 1}/{len(confirmatory_seeds)} confirmatory checkpoints"
                     ),
                 )
@@ -1876,7 +3979,7 @@ def _execute_client_base_model_pilot(
                 seed,
                 outcome.checkpoint,
                 ArtifactStage.TRAINING,
-                "training",
+                CheckpointDirectorySegment.TRAINING,
                 overwrite_policy,
             )
             logger.record(
@@ -1885,9 +3988,9 @@ def _execute_client_base_model_pilot(
                     cell_coordinates=checkpoint_coordinates,
                     artifact_id=None,
                     state=ArtifactState.COMPLETED,
-                    stage=ArtifactStage.TRAINING.value,
-                    experiment=experiment.value,
-                    dataset=dataset.value,
+                    stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                    experiment=experiment,
+                    dataset=dataset,
                     seed=seed,
                     elapsed_seconds=time.monotonic() - checkpoint_started_at,
                 )
@@ -1898,7 +4001,7 @@ def _persist_training_efficiency(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     dataset: DatasetId,
-    seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed)
+    seed: RandomSeed,
     measurement: EfficiencyMeasurement,
 ) -> Path:
     record = EfficiencyRecord(
@@ -1918,7 +4021,7 @@ def _persist_training_efficiency(
         / "derived"
         / f"training-efficiency.{dataset.value}.{seed}.json"
     )
-    atomic_write_json(destination, cast(StableJsonPayload, OrderedDict(asdict(record)))) #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
+    atomic_write_json(destination, OrderedDict[str, StableJsonPayload](asdict(record)))
     return destination
 
 
@@ -1928,10 +4031,10 @@ def _persist_base_checkpoint(
     experiment: ExperimentName,
     relevance: frozenset[SemanticCoordinate],
     dataset: DatasetId,
-    seed: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seed)
+    seed: RandomSeed,
     checkpoint: BaseCheckpoint,
     stage: ArtifactStage,
-    directory_segment: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: directory_segment)
+    directory_segment: CheckpointDirectorySegment,
     overwrite_policy: OverwritePolicy,
 ) -> None:
     checkpoint_cell = SemanticCell(
@@ -1940,14 +4043,16 @@ def _persist_base_checkpoint(
         source_client=dataset,
         seed=ExperimentSeed(seed),
     )
-    coordinates = checkpoint_cell.identity_json(relevance)
-    fingerprint = stage_dependency_fingerprint(
-        stage,
-        checkpoint_cell,
-        relevance,
-        (),
-        _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-        _BASE_MODEL_PILOT_PRODUCER_MODULE,
+    coordinates = SemanticCoordinateText(checkpoint_cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            stage,
+            checkpoint_cell,
+            relevance,
+            (),
+            _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
         existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -1963,13 +4068,15 @@ def _persist_base_checkpoint(
     )
     save_base_checkpoint(checkpoint, payload_path)
     payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = configuration_subset_digest(_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
-    code_sha256 = implementation_fingerprint(_BASE_MODEL_PILOT_PRODUCER_MODULE)
-    runtime_sha256 = runtime_fingerprint(stage).sha256
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(stage).sha256)
     completion = _completion(
         coordinates,
         fingerprint,
-        payload_path,
+        ArtifactPath(payload_path),
         payload_sha256,
         configuration_sha256,
         code_sha256,
@@ -1979,12 +4086,12 @@ def _persist_base_checkpoint(
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
             artifact_id=artifact_id(
-                "checkpoint",
+                ArtifactTypeName(ArtifactType.CHECKPOINT.value),
                 cast(
                     StableJsonPayload,
                     OrderedDict(coordinates=coordinates, payload_sha256=payload_sha256),
                 ),
-                fingerprint,
+                Sha256Digest(fingerprint),
             ),
             artifact_type=ArtifactType.CHECKPOINT,
             semantic_producer_coordinates=coordinates,
@@ -2013,8 +4120,9 @@ class PrimitiveValidationError(ValueError):
 
 _EXPERIMENT = ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION
 _STAGE = ArtifactStage.EVALUATION
-_CONFIGURATION_SECTIONS = frozenset({"action", "generators", "metrics"})
-_PRODUCER_MODULE = "fedorbit.infrastructure.execution" #TODO: identify all similar module calls in the code and delete them. This is horrible
+_CONFIGURATION_SECTIONS = frozenset(
+    {ConfigurationSection.ACTION, ConfigurationSection.GENERATORS, ConfigurationSection.METRICS}
+)
 
 
 def execute_primitive_validation(
@@ -2026,14 +4134,16 @@ def execute_primitive_validation(
     seed = ExperimentSeed(0)
     cell = SemanticCell(experiment=_EXPERIMENT, seed=seed)
     relevance = experiment_relevance(_EXPERIMENT)
-    coordinates = cell.identity_json(relevance)
-    fingerprint = stage_dependency_fingerprint(
-        _STAGE,
-        cell,
-        relevance,
-        (),
-        _CONFIGURATION_SECTIONS,
-        _PRODUCER_MODULE,
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            _STAGE,
+            cell,
+            relevance,
+            (),
+            _CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
         existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -2045,13 +4155,13 @@ def execute_primitive_validation(
     )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = configuration_subset_digest(_CONFIGURATION_SECTIONS)
-    code_sha256 = implementation_fingerprint(_PRODUCER_MODULE)
-    runtime_sha256 = runtime_fingerprint(_STAGE).sha256
+    configuration_sha256 = Sha256Digest(configuration_subset_digest(_CONFIGURATION_SECTIONS))
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(_STAGE).sha256)
     completion = _completion(
         coordinates,
         fingerprint,
-        payload_path,
+        ArtifactPath(payload_path),
         payload_sha256,
         configuration_sha256,
         code_sha256,
@@ -2059,7 +4169,9 @@ def execute_primitive_validation(
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
-            artifact_id=artifact_id("other", payload, fingerprint),
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
             artifact_type="other",
             semantic_producer_coordinates=coordinates,
             producer_stage=_STAGE,
@@ -2082,7 +4194,7 @@ def execute_primitive_validation(
     return manifest
 
 
-def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
+def _payload_path(layout: WorkspaceLayout, fingerprint: Sha256Digest) -> Path:
     return (
         experiment_workspace(layout, _EXPERIMENT)
         / "artifacts"
@@ -2091,7 +4203,7 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: str) -> Path: #TODO: do 
     )
 
 
-def _validation_payload(block_pattern: tuple[int, ...]) -> StableJsonPayload: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: block_pattern)
+def _validation_payload(block_pattern: tuple[ConceptCount, ...]) -> StableJsonPayload:
     source_seed = active_config().scientific.randomness.pilot_seeds[0]
     instance = generate_exact_separator_instance(
         ExactSeparatorInstanceRequest(block_pattern, source_seed)
@@ -2139,15 +4251,15 @@ def _score_deterministic_validation_batch() -> ScoreArtifact:
 
 
 def _completion(
-    coordinates: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: coordinates)
-    fingerprint: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: fingerprint)
-    payload_path: Path, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    payload_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: payload_sha256)
-    configuration_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: configuration_sha256)
-    code_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: code_sha256)
-    runtime_sha256: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: runtime_sha256)
+    coordinates: SemanticCoordinateText,
+    fingerprint: Sha256Digest,
+    payload_path: ArtifactPath,
+    payload_sha256: Sha256Digest,
+    configuration_sha256: Sha256Digest,
+    code_sha256: Sha256Digest,
+    runtime_sha256: Sha256Digest,
     stage: ArtifactStage = _STAGE,
-    upstream_artifact_ids: tuple[str, ...] = (), #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: upstream_artifact_ids)
+    upstream_artifact_ids: ArtifactIdentifiers = (),
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(
@@ -2162,7 +4274,7 @@ def _completion(
             scientific_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
             material_runtime_sha256=runtime_sha256,
-            upstream_lineage=stable_json(cast(StableJsonPayload, OrderedDict())), #TODO: build typed payload models instead of cast(StableJsonPayload, OrderedDict(...)) (pydantic/msgspec)
+            upstream_lineage=stable_json(OrderedDict[str, StableJsonPayload]()),
             completion_validation_state="validated",
             completion_written_last=True,
             completion_manifest_sha256="",

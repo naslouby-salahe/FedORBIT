@@ -5,48 +5,94 @@ import unicodedata
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 
 from fedorbit.config.loading import active_config
-from fedorbit.types import CoarseGroup, DatasetId, OracleTransferConcept, SampleCount
+from fedorbit.types import (
+    CoarseGroup,
+    DatasetId,
+    DatasetLabel,
+    FineLabel,
+    LabelText,
+    NativeLabels,
+    NativeLabelSet,
+    OracleTransferConcept,
+    SampleCount,
+)
 
-NORMAL_LABEL = "normal" #TODO: move to constants or enums
-TRANSFER_CONCEPTS = tuple(concept.value for concept in OracleTransferConcept) #TODO: remove this from code and move to tests
+class CanonicalLabel(StrEnum):
+    NORMAL = "normal"
+
+
+class EdgeNativeLabel(StrEnum):
+    DDOS_UDP = "ddos_udp"
+    DDOS_ICMP = "ddos_icmp"
+    DDOS_TCP = "ddos_tcp"
+    DDOS_HTTP = "ddos_http"
+    RANSOMWARE = "ransomware"
+    BACKDOOR = "backdoor"
+    SQL_INJECTION = "sql_injection"
+    XSS = "xss"
+    PASSWORD = "password"
+    PORT_SCANNING = "port_scanning"
+    FINGERPRINTING = "fingerprinting"
+    VULNERABILITY_SCANNER = "vulnerability_scanner"
+    MITM = "mitm"
+    UPLOADING = "uploading"
+
+
+class TonNativeLabel(StrEnum):
+    DDOS = "ddos"
+    RANSOMWARE = "ransomware"
+    BACKDOOR = "backdoor"
+    INJECTION = "injection"
+    XSS = "xss"
+    PASSWORD = "password"
+    SCANNING = "scanning"
+    MITM = "mitm"
+    DOS = "dos"
+
+
+NORMAL_LABEL = CanonicalLabel.NORMAL
 TRANSFER_ONTOLOGY: Mapping[
-    OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-                                 , tuple[str, ...]] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-] = OrderedDict[OracleTransferConcept, tuple[CoarseGroup, tuple[str, ...], tuple[str, ...]]](
+    OracleTransferConcept, tuple[CoarseGroup, NativeLabels, NativeLabels]
+] = OrderedDict[OracleTransferConcept, tuple[CoarseGroup, NativeLabels, NativeLabels]](
     (
         (
             OracleTransferConcept.DDOS,
-            (CoarseGroup.DISRUPTION, ("ddos_udp", "ddos_icmp", "ddos_tcp", "ddos_http"), ("ddos",)), #TODO: should be in enums
+            (
+                CoarseGroup.DISRUPTION,
+                tuple(FineLabel(label) for label in (EdgeNativeLabel.DDOS_UDP, EdgeNativeLabel.DDOS_ICMP, EdgeNativeLabel.DDOS_TCP, EdgeNativeLabel.DDOS_HTTP)),
+                (FineLabel(TonNativeLabel.DDOS),),
+            ),
         ),
         (
             OracleTransferConcept.RANSOMWARE,
-            (CoarseGroup.DISRUPTION, ("ransomware",), ("ransomware",)), #TODO: should be in enums
+            (CoarseGroup.DISRUPTION, (FineLabel(EdgeNativeLabel.RANSOMWARE),), (FineLabel(TonNativeLabel.RANSOMWARE),)),
         ),
-        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, ("backdoor",), ("backdoor",))), #TODO: should be in enums
+        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.BACKDOOR),), (FineLabel(TonNativeLabel.BACKDOOR),))),
         (
             OracleTransferConcept.INJECTION,
-            (CoarseGroup.EXPLOITATION, ("sql_injection",), ("injection",)), #TODO: should be in enums
+            (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.SQL_INJECTION),), (FineLabel(TonNativeLabel.INJECTION),)),
         ),
-        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, ("xss",), ("xss",))), #TODO: should be in enums
+        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.XSS),), (FineLabel(TonNativeLabel.XSS),))),
         (
             OracleTransferConcept.PASSWORD_ATTACK,
-            (CoarseGroup.ACCESS_AND_DISCOVERY, ("password",), ("password",)), #TODO: should be in enums
+            (CoarseGroup.ACCESS_AND_DISCOVERY, (FineLabel(EdgeNativeLabel.PASSWORD),), (FineLabel(TonNativeLabel.PASSWORD),)),
         ),
         (
             OracleTransferConcept.SCANNING,
             (
                 CoarseGroup.ACCESS_AND_DISCOVERY,
-                ("port_scanning", "fingerprinting", "vulnerability_scanner"), #TODO: should be in enums
-                ("scanning",), #TODO: should be in enums
+                tuple(FineLabel(label) for label in (EdgeNativeLabel.PORT_SCANNING, EdgeNativeLabel.FINGERPRINTING, EdgeNativeLabel.VULNERABILITY_SCANNER)),
+                (FineLabel(TonNativeLabel.SCANNING),),
             ),
         ),
-        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, ("mitm",), ("mitm",))), #TODO: should be in enums
+        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, (FineLabel(EdgeNativeLabel.MITM),), (FineLabel(TonNativeLabel.MITM),))),
     )
 )
-EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({"uploading"}) #TODO: should be more centralized and in enums
-TON_ELIGIBLE_LOCAL_CLASSES = frozenset({"dos"}) #TODO: should be more centralized and in enums
+EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({FineLabel(EdgeNativeLabel.UPLOADING)})
+TON_ELIGIBLE_LOCAL_CLASSES = frozenset({FineLabel(TonNativeLabel.DOS)})
 
 
 class OntologyError(ValueError):
@@ -72,19 +118,18 @@ class TransferEligibility:
         return self.target_eligible
 
 
-def normalize_label(raw: str #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: raw)
-                    ) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    normalized = unicodedata.normalize("NFC", raw).strip().casefold() #TODO: should be in enums
+def normalize_label(raw: LabelText) -> FineLabel:
+    normalized = unicodedata.normalize("NFC", raw).strip().casefold()
     underscored = re.sub(r"[^0-9a-z]+", "_", normalized)
-    return re.sub(r"_+", "_", underscored).strip("_")
+    return FineLabel(re.sub(r"_+", "_", underscored).strip("_"))
 
 
-def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> tuple[str, ...]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> NativeLabels:
     _, edge_labels, ton_labels = TRANSFER_ONTOLOGY[concept]
     return edge_labels if client == DatasetId.EDGE_IIOTSET_NETWORK else ton_labels
 
 
-def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
+def native_labels_for(client: DatasetId) -> NativeLabelSet:
     labels = {
         label for concept in OracleTransferConcept for label in _native_mapping(client, concept)
     }
@@ -97,7 +142,7 @@ def native_labels_for(client: DatasetId) -> frozenset[str]: #TODO: do not use pr
 
 def transfer_concept_for(
     client: DatasetId,
-    normalized_label: str, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
+    normalized_label: FineLabel,
 ) -> OracleTransferConcept | None:
     matches = tuple(
         concept
@@ -109,7 +154,7 @@ def transfer_concept_for(
     return matches[0] if matches else None
 
 
-def coarse_group_for(client: DatasetId, normalized_label: str) -> CoarseGroup | None: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: normalized_label)
+def coarse_group_for(client: DatasetId, normalized_label: FineLabel) -> CoarseGroup | None:
     concept = transfer_concept_for(client, normalized_label)
     return None if concept is None else TRANSFER_ONTOLOGY[concept][0]
 

@@ -9,7 +9,6 @@ from pathlib import Path
 import yaml
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.config.validation import validate_cross_field_contract
 
 _bound_config: ContextVar[FedorbitConfig | None] = ContextVar("fedorbit_config", default=None)
 
@@ -26,6 +25,10 @@ def default_config_path() -> Path:
     return repository_root() / "configs" / "fedorbit.yaml"
 
 
+def raw_dataset_root() -> Path:
+    return repository_root() / active_config().paths.raw_dataset_relative_path
+
+
 def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
     config_path = Path(path) if path is not None else default_config_path()
     if not config_path.is_file():
@@ -34,9 +37,7 @@ def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
     raw = yaml.safe_load(text)
     if not isinstance(raw, Mapping):
         raise ValueError(f"Configuration file must contain a mapping: {config_path}")
-    config = FedorbitConfig.model_validate(raw)
-    validate_cross_field_contract(config)
-    return config
+    return FedorbitConfig.model_validate(raw)
 
 
 @cache

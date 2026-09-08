@@ -12,9 +12,9 @@ def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path
     layout = build_layout(root=tmp_path)
     store = ArtifactStore(layout.execution_root)
     manifest = execute_primitive_validation(store, layout)
-    resolved = store.resolve(ArtifactIdentifier(manifest.artifact_id))
+    resolved = store.resolve(manifest.artifact_id)
     assert resolved.state == ArtifactState.COMPLETED
-    completion = store.read_completion(ArtifactIdentifier(manifest.artifact_id))
+    completion = store.read_completion(manifest.artifact_id)
     assert (
         completion.semantic_experiment_coordinates
         == '{"experiment":"Mathematical Primitive Validation","seed":0}'

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fedorbit.datasets.common import file_sha256
 from fedorbit.infrastructure.execution import ArtifactStore
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,
     dependency_fingerprint,
-    file_sha256,
 )
 from fedorbit.infrastructure.reuse import ExecutionAction, ExecutionReuse
 from fedorbit.types import (
@@ -102,7 +102,7 @@ def test_stale_descendant_is_overwritten(tmp_path: Path) -> None:
     decisions = reuse.decide(
         (_cell("derived-cell", fingerprint),),
         OverwritePolicy.REUSE,
-        stale_artifact_ids=frozenset({ArtifactIdentifier(manifest.artifact_id)}),
+        stale_artifact_ids=frozenset({manifest.artifact_id}),
     )
     assert decisions[0].action == ExecutionAction.OVERWRITE
 
@@ -126,12 +126,12 @@ def test_stale_descendants_detected_via_upstream_ids(tmp_path: Path) -> None:
     manifest = ReusableArtifactManifest.model_validate(
         {
             **_manifest(payload, fingerprint, artifact_type="checkpoint").model_dump(),
-            "upstream_artifact_ids": ("upstream-artifact-1",),
+            "upstream_artifact_ids": (ArtifactIdentifier("upstream-artifact-1"),),
         }
     )
     store.write_reusable(manifest)
     reuse = ExecutionReuse(store)
-    stale = reuse.stale_descendants("upstream-artifact-1")
+    stale = reuse.stale_descendants(ArtifactIdentifier("upstream-artifact-1"))
     assert manifest.artifact_id in stale
 
 
@@ -142,6 +142,4 @@ def test_promote_completed_manifests_validates_before_reuse(tmp_path: Path) -> N
     manifest = _manifest(payload, fingerprint, artifact_type="response_packet")
     reuse = ExecutionReuse(store)
     reuse.promote_completed((manifest,))
-    assert (
-        store.resolve(ArtifactIdentifier(manifest.artifact_id)).artifact_id == manifest.artifact_id
-    )
+    assert store.resolve(manifest.artifact_id).artifact_id == manifest.artifact_id

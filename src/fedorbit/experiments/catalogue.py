@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 
 from fedorbit.config.loading import active_config
 from fedorbit.experiments.cells import (
@@ -16,27 +17,56 @@ from fedorbit.types import (
     ExperimentClassification,
     ExperimentName,
     Index,
+    MethodName,
+    RandomSeed,
     TransferMethod,
 )
 
-_PRIMARY_PAIRS_LABEL = "six primary directed ToN-IoT pairs" #TODO: should be enum
-_SECONDARY_PAIRS_LABEL = "optional external directed pairs" #TODO: should be enum
+
+class CatalogueScope(StrEnum):
+    PRIMARY_PAIRS = "six primary directed ToN-IoT pairs"
+    SECONDARY_PAIRS = "optional external directed pairs"
+    ALL_PRIMARY_DIRECTED_PAIRS = "all primary directed ToN-IoT pairs"
+    PRIMARY_DIRECTED_PAIRS = "primary directed ToN-IoT pairs"
+    PRIMARY_PAIRS_SHORT = "primary pairs"
+    TARGET_CLIENTS = "target clients"
 
 
-def _experiment_name(name: ExperimentName) -> str: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-    return name.value
+class CatalogueMethodLabel(StrEnum):
+    EXHAUSTIVE_ORBIT = "exhaustive orbit"
+    EXACT_SPARSE_SUPPORT_ONE = "exact sparse s=1"
+    EXACT_SPARSE_SUPPORT_TWO = "exact sparse s=2"
+    EXACT_SPARSE_SUPPORT_THREE = "exact sparse s=3"
+
+
+class CataloguePrerequisite(StrEnum):
+    PRIMITIVE_IMPLEMENTATION = "primitive implementation"
+    RAW_MANIFESTS = "raw manifests"
+    COMPLETED_REGISTERED_ARTIFACTS = "completed registered artifacts"
+
+
+class CatalogueCondition(StrEnum):
+    HAND_FIXTURES = "hand fixtures"
+
+
+type CatalogueMethod = MethodName | CatalogueMethodLabel
+type CataloguePrerequisiteValue = ExperimentName | CataloguePrerequisite
+
+
+def _experiment_name(name: ExperimentName) -> ExperimentName:
+    return name
 
 
 @dataclass(frozen=True, slots=True)
 class ExperimentDefinition:
     name: ExperimentName
     classification: ExperimentClassification
-    methods: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
-    datasets_or_pairs: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    methods: tuple[CatalogueMethod, ...]
+    datasets_or_pairs: tuple[CatalogueScope, ...]
     conditions: RegisteredConditions
-    seeds: tuple[int, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    seeds: tuple[RandomSeed, ...]
     derived_planned_cells: Index
-    prerequisites: tuple[str, ...] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    prerequisites: tuple[CataloguePrerequisiteValue, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,15 +82,15 @@ class ExperimentCatalogue:
     def registered_names(self) -> tuple[ExperimentName, ...]:
         return tuple(self.definitions_by_name.keys())
 
-    def __len__(self) -> int: #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (output return)
-        return len(self.definitions_by_name)
+    def __len__(self) -> Index:
+        return Index(len(self.definitions_by_name))
 
 
 class CatalogueError(KeyError):
     pass
 
 
-def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems to be sticking together. Revamp it so it's cleaner and clearer. NO HARDCODED STRINGS....
+def build_catalogue() -> ExperimentCatalogue:
     config = active_config()
     confirmatory_seeds = config.scientific.randomness.confirmatory_seeds
     pilot_seeds = config.scientific.randomness.pilot_seeds
@@ -72,12 +102,12 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     def definition(
         name: ExperimentName,
         classification: ExperimentClassification,
-        method_names: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: method_names)
-        pairs: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: pairs)
-        conditions: tuple[str | tuple[str, ...], ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: conditions)
-        seeds: tuple[int, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: seeds)
-        derived_cells: int, #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: derived_cells)
-        prerequisites: tuple[str, ...], #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this (input param: prerequisites)
+        method_names: tuple[CatalogueMethod, ...],
+        pairs: tuple[CatalogueScope, ...],
+        conditions: tuple[ConditionLabel | tuple[ConditionLabel, ...], ...],
+        seeds: tuple[RandomSeed, ...],
+        derived_cells: Index,
+        prerequisites: tuple[CataloguePrerequisiteValue, ...],
     ) -> ExperimentDefinition:
         return ExperimentDefinition(
             name=name,
@@ -86,11 +116,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
             datasets_or_pairs=pairs,
             conditions=RegisteredConditions(
                 tuple(
-                    RegisteredCondition(
-                        tuple(ConditionLabel(label) for label in entry)
-                        if isinstance(entry, tuple)
-                        else (ConditionLabel(entry),)
-                    )
+                    RegisteredCondition(entry if isinstance(entry, tuple) else (entry,))
                     for entry in conditions
                 )
             ),
@@ -106,10 +132,10 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentClassification.VALIDATION,
         (),
         (),
-        ("hand fixtures",),
+        (ConditionLabel(CatalogueCondition.HAND_FIXTURES),),
         (0,),
         0,
-        ("primitive implementation",),
+        (CataloguePrerequisite.PRIMITIVE_IMPLEMENTATION,),
     )
 
     block_patterns = config.generators.exact_separator_theorem.block_patterns
@@ -120,7 +146,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION] = definition(
         ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
         ExperimentClassification.VALIDATION,
-        ("exhaustive orbit", TransferMethod.GENERIC_EXACT_QAP.value),
+        (CatalogueMethodLabel.EXHAUSTIVE_ORBIT, TransferMethod.GENERIC_EXACT_QAP),
         (),
         (),
         confirmatory_seeds,
@@ -162,11 +188,11 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION,
         ExperimentClassification.VALIDATION,
         (),
-        ("all primary directed ToN-IoT pairs",),
+        (CatalogueScope.ALL_PRIMARY_DIRECTED_PAIRS,),
         (),
         confirmatory_seeds,
         primary_client_count * primary_pair_count * len(confirmatory_seeds),
-        ("raw manifests",),
+        (CataloguePrerequisite.RAW_MANIFESTS,),
     )
 
     registered_client_count = len(config.scientific.datasets.clients)
@@ -222,12 +248,12 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION,
         ExperimentClassification.VALIDATION,
         (
-            TransferMethod.LOCAL_ONLY.value,
-            TransferMethod.LOCAL_SIR.value,
-            TransferMethod.MATCHED_RESOURCE_RECTANGULAR.value,
-            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT.value,
-            TransferMethod.GENERIC_EXACT_QAP.value,
-            TransferMethod.EXACT_MAP_ORACLE.value,
+            TransferMethod.LOCAL_ONLY,
+            TransferMethod.LOCAL_SIR,
+            TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            TransferMethod.GENERIC_EXACT_QAP,
+            TransferMethod.EXACT_MAP_ORACLE,
         ),
         (),
         (),
@@ -272,8 +298,8 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION] = definition(
         ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
         ExperimentClassification.CONFIRMATORY_MECHANISM,
-        ("exact orbit", TransferMethod.MATCHED_RESOURCE_RECTANGULAR.value),
-        ("primary pairs",),
+        (CatalogueMethodLabel.EXHAUSTIVE_ORBIT, TransferMethod.MATCHED_RESOURCE_RECTANGULAR),
+        (CatalogueScope.PRIMARY_PAIRS_SHORT,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds),
@@ -289,7 +315,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP] = definition(
         ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP,
         ExperimentClassification.DIAGNOSTIC,
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
         (),
         (),
         confirmatory_seeds,
@@ -300,7 +326,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP] = definition(
         ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP,
         ExperimentClassification.DIAGNOSTIC,
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
         (),
         (),
         confirmatory_seeds,
@@ -311,7 +337,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY] = definition(
         ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY,
         ExperimentClassification.FAILURE_BOUNDARY,
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
         (),
         (),
         confirmatory_seeds,
@@ -326,7 +352,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION] = definition(
         ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION,
         ExperimentClassification.VALIDATION,
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
         (),
         (),
         confirmatory_seeds,
@@ -338,7 +364,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         ExperimentClassification.CONFIRMATORY,
         methods,
-        (_PRIMARY_PAIRS_LABEL,),
+        (CatalogueScope.PRIMARY_PAIRS,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * len(methods),
@@ -352,8 +378,8 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     catalogue[ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION] = definition(
         ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION,
         ExperimentClassification.DIAGNOSTIC,
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,),
-        ("target clients",),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
+        (CatalogueScope.TARGET_CLIENTS,),
         (),
         confirmatory_seeds,
         multi_source_targets * len(confirmatory_seeds),
@@ -365,7 +391,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.MECHANISM_ABLATIONS,
         ExperimentClassification.ABLATION,
         ablation_methods,
-        (_PRIMARY_PAIRS_LABEL,),
+        (CatalogueScope.PRIMARY_PAIRS,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * len(ablation_methods),
@@ -377,12 +403,12 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.SPARSITY_AND_DENSE_FALLBACK,
         ExperimentClassification.ROBUSTNESS,
         (
-            "exact sparse s=1",
-            "exact sparse s=2",
-            "exact sparse s=3",
-            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK.value,
+            CatalogueMethodLabel.EXACT_SPARSE_SUPPORT_ONE,
+            CatalogueMethodLabel.EXACT_SPARSE_SUPPORT_TWO,
+            CatalogueMethodLabel.EXACT_SPARSE_SUPPORT_THREE,
+            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
         ),
-        (_PRIMARY_PAIRS_LABEL,),
+        (CatalogueScope.PRIMARY_PAIRS,),
         (),
         confirmatory_seeds,
         primary_pair_count * len(confirmatory_seeds) * sparse_conditions,
@@ -394,7 +420,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY,
         ExperimentClassification.CONFIRMATORY_SAFETY,
         confirmation_methods,
-        ("primary directed ToN-IoT pairs",),
+        (CatalogueScope.PRIMARY_DIRECTED_PAIRS,),
         (),
         confirmatory_seeds,
         (primary_pair_count + secondary_pair_count)
@@ -408,7 +434,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION,
         ExperimentClassification.GENERALIZATION,
         secondary_methods,
-        (_SECONDARY_PAIRS_LABEL,),
+        (CatalogueScope.SECONDARY_PAIRS,),
         (),
         confirmatory_seeds,
         secondary_pair_count * len(confirmatory_seeds) * len(secondary_methods),
@@ -421,8 +447,13 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER,
         ExperimentClassification.FAILURE_BOUNDARY,
         frontier_methods,
-        (_PRIMARY_PAIRS_LABEL,),
-        experiments.semantic_sufficiency_frontier.partitions,
+        (CatalogueScope.PRIMARY_PAIRS,),
+        tuple(
+            tuple(ConditionLabel(label) for label in partition)
+            if isinstance(partition, tuple)
+            else ConditionLabel(partition)
+            for partition in experiments.semantic_sufficiency_frontier.partitions
+        ),
         confirmatory_seeds,
         primary_pair_count * frontier_partitions * len(frontier_methods) * len(confirmatory_seeds),
         (_experiment_name(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),),
@@ -441,7 +472,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES,
         ExperimentClassification.FAILURE_BOUNDARY,
         weak_signal.methods,
-        (_PRIMARY_PAIRS_LABEL,),
+        (CatalogueScope.PRIMARY_PAIRS,),
         (),
         confirmatory_seeds,
         weak_conditions * len(weak_signal.methods) * primary_pair_count * len(confirmatory_seeds),
@@ -454,7 +485,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT,
         ExperimentClassification.DIAGNOSTIC,
         recovery_methods,
-        (_PRIMARY_PAIRS_LABEL,),
+        (CatalogueScope.PRIMARY_PAIRS,),
         (),
         confirmatory_seeds,
         recovery_attempts,
@@ -475,11 +506,11 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
     real_timing_cells = planned_packets * 3
     catalogue[ExperimentName.SCALABILITY_AND_EFFICIENCY] = definition(
         ExperimentName.SCALABILITY_AND_EFFICIENCY,
-        ExperimentClassification.ROBUSTNESS,
+        ExperimentClassification.ROBUSTNESS_EFFICIENCY,
         (
-            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value,
-            TransferMethod.GENERIC_EXACT_QAP.value,
-            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK.value,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            TransferMethod.GENERIC_EXACT_QAP,
+            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
         ),
         (),
         (),
@@ -496,7 +527,7 @@ def build_catalogue() -> ExperimentCatalogue: #TODO: this whol catalogue seems t
         (),
         (),
         0,
-        ("completed registered artifacts",),
+        (CataloguePrerequisite.COMPLETED_REGISTERED_ARTIFACTS,),
     )
 
     completed = ExperimentCatalogue(catalogue)

@@ -14,6 +14,7 @@ from fedorbit.analysis.metrics import (
     macro_cross_entropy,
 )
 from fedorbit.config.loading import active_config
+from fedorbit.types import ConceptCount, Index
 
 
 class ScoringError(ValueError):
@@ -22,7 +23,7 @@ class ScoringError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class LocalClassCount:
-    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: ConceptCount
 
     def __post_init__(self) -> None:
         if self.value <= 1:
@@ -31,12 +32,12 @@ class LocalClassCount:
 
 @dataclass(frozen=True, slots=True)
 class ScoreRowIndex:
-    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: Index
 
 
 @dataclass(frozen=True, slots=True)
 class LocalClassIndex:
-    value: int #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    value: Index
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,11 +85,13 @@ def score_model(request: ScoringRequest) -> ScoreArtifact:
     log_floor = active_config().scientific.metrics.probability_log_floor
     losses = -torch.log(torch.clamp(selected, min=log_floor))
     predictions = probabilities.argmax(dim=1)
-    class_risks: list[float] = [] #TODO: do not use primitivies. Use an appropriate alias in Types. And diagnose my tests to identify why the architecture tests didn't catch this
+    class_risks: list[CrossEntropy] = []
     for class_index in range(n_classes):
         mask = target_values == class_index
-        class_risks.append(float(losses[mask].mean()) if bool(mask.any()) else math.nan)
-    present_risks = tuple(value for value in class_risks if math.isfinite(value))
+        class_risks.append(
+            CrossEntropy(float(losses[mask].mean())) if bool(mask.any()) else CrossEntropy(math.nan)
+        )
+    present_risks = tuple(value for value in class_risks if math.isfinite(value.value))
     if not present_risks:
         raise ScoringError("no evaluation classes are present")
     rows = tuple(
@@ -106,9 +109,9 @@ def score_model(request: ScoringRequest) -> ScoreArtifact:
     return ScoreArtifact(
         rows=rows,
         class_conditional_cross_entropy=ClassEntropySet(
-            tuple(CrossEntropy(value) for value in class_risks)
+            tuple(class_risks)
         ),
         macro_cross_entropy=macro_cross_entropy(
-            ClassEntropySet(tuple(CrossEntropy(value) for value in present_risks))
+            ClassEntropySet(tuple(present_risks))
         ),
     )

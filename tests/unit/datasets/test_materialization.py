@@ -24,7 +24,7 @@ def test_memory_guard_refuses_when_estimated_peak_exceeds_budget(
 ) -> None:
     big_file = _write_file_of_size(tmp_path / "big.csv", 10_000_000)
     monkeypatch.setattr(
-        "fedorbit.datasets.materialization.psutil.virtual_memory",
+        "fedorbit.infrastructure.runtime.psutil.virtual_memory",
         lambda: _FakeVirtualMemory(available=1_000_000),
     )
     with pytest.raises(MaterializationError):
@@ -37,7 +37,7 @@ def test_memory_guard_passes_when_estimated_peak_fits_the_budget(
 ) -> None:
     small_file = _write_file_of_size(tmp_path / "small.csv", 1_000)
     monkeypatch.setattr(
-        "fedorbit.datasets.materialization.psutil.virtual_memory",
+        "fedorbit.infrastructure.runtime.psutil.virtual_memory",
         lambda: _FakeVirtualMemory(available=10_000_000_000),
     )
     require_safe_memory_budget(DatasetId.TON_IOT_WINDOWS10_HOST, (small_file,))

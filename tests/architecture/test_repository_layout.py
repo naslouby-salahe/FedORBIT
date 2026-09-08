@@ -57,7 +57,6 @@ REQUIRED_SOURCE_FILES = {
     "src/fedorbit/cli.py",
     "src/fedorbit/config/loading.py",
     "src/fedorbit/config/models.py",
-    "src/fedorbit/config/validation.py",
     "src/fedorbit/datasets/common.py",
     "src/fedorbit/datasets/preprocessing.py",
     "src/fedorbit/datasets/splitting.py",
@@ -98,7 +97,6 @@ REQUIRED_SOURCE_FILES = {
     "src/fedorbit/infrastructure/workspace.py",
     "src/fedorbit/infrastructure/manifests.py",
     "src/fedorbit/infrastructure/provenance.py",
-    "src/fedorbit/infrastructure/planner.py",
     "src/fedorbit/infrastructure/reuse.py",
     "src/fedorbit/infrastructure/execution.py",
     "src/fedorbit/infrastructure/runtime.py",
@@ -127,6 +125,7 @@ def test_repository_root_entries_are_allowed() -> None:
         "__pycache__",
         ".scannerwork",
         ".import_linter_cache",
+        ".claude",
         "outputs",
         "results",
     }

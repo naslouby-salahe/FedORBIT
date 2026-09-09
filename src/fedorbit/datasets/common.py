@@ -24,7 +24,6 @@ from fedorbit.types import (
     DatasetLabel,
     Fraction,
     Index,
-    NonNegativeInt,
     RawCellSamples,
     RawCellText,
     RawCellValue,
@@ -137,12 +136,12 @@ def _digest_cache_path() -> Path:
 
 def _load_digest_cache(cache_path: Path) -> dict[str, dict[str, int | str]]:
     if not cache_path.is_file():
-        return {}
+        return OrderedDict()
     try:
         loaded = json.loads(cache_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
+        return OrderedDict()
+    return loaded if isinstance(loaded, dict) else OrderedDict()
 
 
 def _hash_file_contents(path: Path) -> Sha256Digest:
@@ -167,11 +166,11 @@ def file_sha256(path: Path) -> Sha256Digest:
         ):
             return Sha256Digest(cast(str, entry["sha256"]))
         digest = _hash_file_contents(path)
-        cache[resolved] = {
-            "size": stat.st_size,
-            "mtime_ns": stat.st_mtime_ns,
-            "sha256": digest,
-        }
+        cache[resolved] = OrderedDict(
+            size=stat.st_size,
+            mtime_ns=stat.st_mtime_ns,
+            sha256=digest,
+        )
         atomic_write_json(cache_path, cast(StableJsonPayload, cache))
         return digest
 
@@ -442,15 +441,15 @@ class DatasetInspectionRequest:
 @dataclass(frozen=True, slots=True)
 class LabelCount:
     label: DatasetLabel
-    row_count: NonNegativeInt
+    row_count: Index
 
 
 @dataclass(frozen=True, slots=True)
 class EventTimeInspection:
     field: TabularColumnName
-    observed_row_count: NonNegativeInt
-    timestamp_pattern_row_count: NonNegativeInt
-    unusable_row_count: NonNegativeInt
+    observed_row_count: Index
+    timestamp_pattern_row_count: Index
+    unusable_row_count: Index
     state: ChronologyValidationState
     reason: ValidationReason
 
@@ -458,11 +457,11 @@ class EventTimeInspection:
 @dataclass(frozen=True, slots=True)
 class DatasetObservation:
     dataset: DatasetId
-    row_count: NonNegativeInt
+    row_count: Index
     observed_columns: TabularColumns
     local_class_counts: tuple[LabelCount, ...]
     binary_label_counts: tuple[LabelCount, ...]
-    inconsistent_binary_label_rows: NonNegativeInt
+    inconsistent_binary_label_rows: Index
     event_time: EventTimeInspection
 
     @property
@@ -579,9 +578,9 @@ class LabelFields:
 
 @dataclass(slots=True)
 class EventTimeTally:
-    observed_row_count: NonNegativeInt = 0
-    timestamp_pattern_row_count: NonNegativeInt = 0
-    resolvable_row_count: NonNegativeInt = 0
+    observed_row_count: Index = 0
+    timestamp_pattern_row_count: Index = 0
+    resolvable_row_count: Index = 0
 
     def observe(self, value: RawCellText) -> None:
         self.observed_row_count += 1

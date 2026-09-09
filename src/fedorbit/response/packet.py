@@ -40,7 +40,6 @@ from fedorbit.types import (
     ExposedCoarseGroupId,
     FeatureCount,
     Index,
-    NonNegativeInt,
     RandomSeed,
     ReplicateCount,
     Rfc3339UtcTimestamp,
@@ -51,7 +50,7 @@ from fedorbit.types import (
 
 type NodeDisplayIds = tuple[AnonymousNodeDisplayId, ...]
 type ResponseBounds = tuple[Estimate, ...]
-type PerNodeSupport = tuple[NonNegativeInt, ...]
+type PerNodeSupport = tuple[Index, ...]
 type PerNodeReplicateCounts = tuple[ReplicateCount, ...]
 type ArrayShape = tuple[Index, ...]
 type Float64ArrayData = tuple[Estimate, ...]
@@ -531,7 +530,7 @@ def _validate_context(context: PacketConstructionContext) -> None:
         raise PacketConstructionError("META support count differs from source fine-node count")
 
 
-def _float64_array(values: tuple[NonNegativeInt | Estimate, ...]) -> Float64ArrayPayload:
+def _float64_array(values: tuple[Index | Estimate, ...]) -> Float64ArrayPayload:
     array = np.asarray(values, dtype=np.float64, order="C")
     return Float64ArrayPayload(
         dtype=PacketArrayDtype.FLOAT64,

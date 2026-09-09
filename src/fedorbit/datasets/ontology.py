@@ -20,7 +20,7 @@ from fedorbit.types import (
 )
 
 
-class CanonicalLabel(StrEnum):
+class NormalTrafficLabel(StrEnum):
     NORMAL = "normal"
 
 
@@ -53,7 +53,7 @@ class TonNativeLabel(StrEnum):
     DOS = "dos"
 
 
-NORMAL_LABEL = CanonicalLabel.NORMAL
+NORMAL_LABEL = NormalTrafficLabel.NORMAL
 TRANSFER_ONTOLOGY: Mapping[
     OracleTransferConcept, tuple[CoarseGroup, NativeLabels, NativeLabels]
 ] = OrderedDict[OracleTransferConcept, tuple[CoarseGroup, NativeLabels, NativeLabels]](

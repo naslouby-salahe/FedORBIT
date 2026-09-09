@@ -215,6 +215,7 @@ InterventionMagnitude = PositiveFloat
 Tolerance = PositiveFloat
 Floor = PositiveFloat
 Budget = PositiveFloat
+ConsumedBudget = NonNegativeFloat
 ScaleFactor = NonNegativeFloat
 Threshold = NonNegativeFloat
 AbsoluteMetric = NonNegativeFloat
@@ -227,6 +228,7 @@ Coefficient = FiniteFloat
 RelativeGain = FiniteFloat
 Estimate = FiniteFloat
 Score = FiniteFloat
+Timestamp = FiniteFloat
 ConfidenceLevel = FiniteFloat
 SignificanceLevel = FiniteFloat
 Fraction = FiniteFloat
@@ -680,8 +682,8 @@ class DirectedPair:
     target: DatasetId
 
     @property
-    def direction(self) -> str:
-        return f"{self.source.value} -> {self.target.value}"
+    def direction(self) -> DirectedPairName:
+        return DirectedPairName(f"{self.source.value} -> {self.target.value}")
 
 
 @dataclass(frozen=True, slots=True)

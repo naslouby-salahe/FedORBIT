@@ -595,6 +595,7 @@ def _confirmation_results_rows(
             continue
         proposals = len(verdicts)
         accepted = sum(1 for value in verdicts if value == 1.0)
+        risk_reduction_columns = OrderedDict((column.value, None) for column in RiskReductionColumn)
         rows.append(
             OrderedDict(
                 pair=pair,
@@ -605,10 +606,7 @@ def _confirmation_results_rows(
                 beneficial_rejected_rate=None,
                 coverage=accepted / proposals,
                 no_confirm_harmful_rate=None,
-                **{
-                    RiskReductionColumn.ABSOLUTE_RISK_REDUCTION.value: None,
-                    RiskReductionColumn.RELATIVE_RISK_REDUCTION.value: None,
-                },
+                **risk_reduction_columns,
                 ci=None,
                 p=None,
             )
@@ -667,12 +665,12 @@ def _coupling_mechanism_results_rows(
             continue
         rows.append(_coupling_gap_row(condition, gap_values, fixed_action_values, None, None))
     pairs = sorted({record.pair for record in real_packet_records})
-    comparisons_by_pair = {
-        comparison.pair: comparison
+    comparisons_by_pair = OrderedDict(
+        (comparison.pair, comparison)
         for comparison in comparison_records
         if comparison.family == MultiplicityFamily.COUPLING_MECHANISM
         and comparison.method_a == ExperimentLocalMethod.EXACT_ORBIT
-    }
+    )
     for pair in pairs:
         gap_values = [
             float(record.metric_value)

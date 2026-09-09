@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
     DuplicateGroupIdentifier,
-    FiniteFloat,
     Fraction,
-    NonNegativeInt,
+    Index,
     Split,
+    Timestamp,
 )
 
 
@@ -36,12 +36,12 @@ class ChronologicalFraction:
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalTimestamp:
-    value: FiniteFloat
+    value: Timestamp
 
 
 @dataclass(frozen=True, slots=True)
 class ChronologicalRowCount:
-    value: NonNegativeInt
+    value: Index
 
     def __post_init__(self) -> None:
         if self.value < 0:

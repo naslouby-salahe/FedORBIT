@@ -36,7 +36,6 @@ from fedorbit.types import (
     Fraction,
     Index,
     LocalClassNames,
-    NonNegativeInt,
     NormalizedGroupIdentifier,
     NumericFeatureValue,
     RawCellText,
@@ -377,7 +376,7 @@ class DuplicateGroups:
             seen.add(group_sha256)
 
     @property
-    def group_count(self) -> NonNegativeInt:
+    def group_count(self) -> Index:
         return len(self.groups)
 
     def members_of(self, group_sha256: Sha256Digest) -> tuple[NormalizedRow, ...] | None:

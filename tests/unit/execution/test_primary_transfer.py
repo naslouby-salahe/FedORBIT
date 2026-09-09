@@ -14,7 +14,11 @@ from fedorbit.analysis.metrics import (
     balanced_accuracy,
     macro_f1,
 )
-from fedorbit.analysis.records import ComparisonDecision, MetricDirection
+from fedorbit.analysis.records import (
+    ComparisonDecision,
+    MetricDirection,
+    StatisticalMetadataRecord,
+)
 from fedorbit.config.loading import active_config
 from fedorbit.datasets.materialization import TransferConceptGroup
 from fedorbit.experiments.catalogue import build_catalogue
@@ -55,6 +59,7 @@ from fedorbit.types import (
     ClassCount,
     ClassIndex,
     CoarseGroup,
+    ComparisonStatistic,
     DatasetId,
     DirectedPairName,
     ExperimentLocalMethod,
@@ -199,6 +204,7 @@ def test_statistical_synthesis_detects_a_material_improvement(tmp_path: Path) ->
         manifest
         for manifest in store.all_manifests()
         if ExperimentName.STATISTICAL_SYNTHESIS.value in manifest.semantic_producer_coordinates
+        and "comparison" in Path(store.resolve(manifest.artifact_id).payload_paths[0]).name
     ]
     assert len(comparisons) == 1
     resolved = store.resolve(comparisons[0].artifact_id)
@@ -220,6 +226,25 @@ def test_statistical_synthesis_detects_a_material_improvement(tmp_path: Path) ->
     assert len(comparison_records) == 1
     assert comparison_records[0].method_a == TransferMethod.LOCAL_SIR
     assert comparison_records[0].method_b == TransferMethod.LOCAL_ONLY
+    metadata_manifests = [
+        manifest
+        for manifest in store.all_manifests()
+        if ExperimentName.STATISTICAL_SYNTHESIS.value in manifest.semantic_producer_coordinates
+        and "statistical-metadata"
+        in Path(store.resolve(manifest.artifact_id).payload_paths[0]).name
+    ]
+    assert len(metadata_manifests) == 1
+    metadata_payload = json.loads(
+        Path(store.resolve(metadata_manifests[0].artifact_id).payload_paths[0]).read_text(
+            encoding="utf-8"
+        )
+    )
+    metadata = StatisticalMetadataRecord.model_validate(
+        metadata_payload["statistical_metadata_record"]
+    )
+    assert metadata.test_name == ComparisonStatistic.SIGN_FLIP_SUPERIORITY.value
+    assert metadata.holm_rank == 1
+    assert metadata.family_size == 1
 
 
 def test_statistical_synthesis_detects_a_material_coupling_gap(tmp_path: Path) -> None:
@@ -264,6 +289,25 @@ def test_statistical_synthesis_detects_a_material_coupling_gap(tmp_path: Path) -
     assert comparison.mean_difference is not None and comparison.mean_difference > 0.0
     assert comparison.holm_p is not None and comparison.holm_p <= 0.05
     assert comparison.bca_ci_low is not None and comparison.bca_ci_low > 0.0
+    metadata_manifests = [
+        manifest
+        for manifest in store.all_manifests()
+        if ExperimentName.STATISTICAL_SYNTHESIS.value in manifest.semantic_producer_coordinates
+        and "statistical-metadata"
+        in Path(store.resolve(manifest.artifact_id).payload_paths[0]).name
+    ]
+    assert len(metadata_manifests) == 1
+    metadata_payload = json.loads(
+        Path(store.resolve(metadata_manifests[0].artifact_id).payload_paths[0]).read_text(
+            encoding="utf-8"
+        )
+    )
+    metadata = StatisticalMetadataRecord.model_validate(
+        metadata_payload["statistical_metadata_record"]
+    )
+    assert metadata.test_name == ComparisonStatistic.SIGN_FLIP_AGAINST_ZERO.value
+    assert metadata.holm_rank == 1
+    assert metadata.family_size == 1
 
 
 def _synthetic_packet(node_count: int, base_value: float) -> SourcePacket:

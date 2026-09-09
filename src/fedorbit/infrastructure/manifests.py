@@ -33,7 +33,6 @@ from fedorbit.types import (
     GitRevision,
     Index,
     ManifestValidationState,
-    NonNegativeInt,
     OracleTransferConcept,
     RandomSeed,
     RawDatasetPath,
@@ -105,7 +104,7 @@ class DatasetManifest(FrozenModel):
     component: ClientComponentName
     raw_files: tuple[RawDatasetPath, ...]
     raw_sha256: Sha256Digest
-    raw_counts: Mapping[RawDatasetPath, NonNegativeInt]
+    raw_counts: Mapping[RawDatasetPath, Index]
     schema_version: ArtifactSchemaVersion = Field(
         serialization_alias="schema", validation_alias="schema"
     )
@@ -115,9 +114,9 @@ class DatasetManifest(FrozenModel):
     adapter_adaptations: tuple[FieldDescription, ...]
     timestamp_field: TabularColumnName
     timestamp_range: TimestampRange
-    duplicate_counts: Mapping[str, NonNegativeInt]
-    conflicting_duplicate_counts: Mapping[str, NonNegativeInt]
-    local_class_counts: Mapping[str, NonNegativeInt]
+    duplicate_counts: Mapping[str, Index]
+    conflicting_duplicate_counts: Mapping[str, Index]
+    local_class_counts: Mapping[str, Index]
     transfer_candidate_counts: Mapping[str, SampleCount]
     feature_quality: FeatureQualityManifest
     preprocessing_state: DatasetPreprocessingState

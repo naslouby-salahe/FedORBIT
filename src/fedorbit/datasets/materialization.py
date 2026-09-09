@@ -61,7 +61,6 @@ from fedorbit.types import (
     Fraction,
     Index,
     LocalClassNames,
-    NonNegativeInt,
     NormalizedGroupIdentifier,
     NumericFeatureValue,
     OracleTransferConcept,
@@ -151,20 +150,20 @@ _SUBSAMPLED_SPLITS = (Split.TRAIN, Split.META, Split.CONFIRM)
 
 
 def _recompute_class_row_counts(
-    original: Mapping[FineLabel, Mapping[Split, NonNegativeInt]],
+    original: Mapping[FineLabel, Mapping[Split, Index]],
     class_names: LocalClassNames,
     subsampled_splits: Mapping[Split, SplitTensors],
-) -> Mapping[FineLabel, Mapping[Split, NonNegativeInt]]:
-    updated: OrderedDict[FineLabel, OrderedDict[Split, NonNegativeInt]] = OrderedDict(
+) -> Mapping[FineLabel, Mapping[Split, Index]]:
+    updated: OrderedDict[FineLabel, OrderedDict[Split, Index]] = OrderedDict(
         (fine_label, OrderedDict(per_split)) for fine_label, per_split in original.items()
     )
     for split_name in _SUBSAMPLED_SPLITS:
-        counts: dict[int, int] = {}
+        counts: dict[int, int] = OrderedDict()
         split_target_values: list[int] = subsampled_splits[split_name].targets.tolist()
         for value in split_target_values:
             counts[value] = counts.get(value, 0) + 1
         for class_index, fine_label in enumerate(class_names):
-            count: NonNegativeInt = counts.get(class_index, 0)
+            count: Index = counts.get(class_index, 0)
             updated[fine_label][split_name] = count
     return updated
 
@@ -202,7 +201,7 @@ def subsampled_materialized_client(
 class RawFileProvenance:
     path: RawDatasetPath
     sha256: Sha256Digest
-    row_count: NonNegativeInt
+    row_count: Index
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,8 +210,8 @@ class DatasetProvenance:
     raw_files: tuple[RawFileProvenance, ...]
     accepted_timestamp_column: TabularColumnName
     timestamp_range: TimestampRange
-    duplicate_group_count: NonNegativeInt
-    conflicting_duplicate_group_count: NonNegativeInt
+    duplicate_group_count: Index
+    conflicting_duplicate_group_count: Index
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,7 +222,7 @@ class MaterializedClient:
     feature_names: FeatureNames
     splits: Mapping[Split, SplitTensors]
     feature_quality: FeatureQualityReport
-    class_row_counts: Mapping[FineLabel, Mapping[Split, NonNegativeInt]]
+    class_row_counts: Mapping[FineLabel, Mapping[Split, Index]]
     provenance: DatasetProvenance
 
 
@@ -279,7 +278,7 @@ class _LazyColumnSamples(Mapping[TabularColumnName, tuple[RawCellText, ...]]):
     def __iter__(self):
         return iter(self._columns)
 
-    def __len__(self) -> NonNegativeInt:
+    def __len__(self) -> Index:
         return len(self._columns)
 
 
@@ -360,8 +359,8 @@ def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManife
 @dataclass(frozen=True, slots=True)
 class SplitAssignmentResult:
     buckets: Mapping[Split, tuple[NormalizedRow, ...]]
-    duplicate_group_count: NonNegativeInt
-    conflicting_duplicate_group_count: NonNegativeInt
+    duplicate_group_count: Index
+    conflicting_duplicate_group_count: Index
 
 
 def _assign_splits(
@@ -460,7 +459,9 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         duplicate_group_count=split_result.duplicate_group_count,
         conflicting_duplicate_group_count=split_result.conflicting_duplicate_group_count,
     )
-    class_counts_by_split = {split: Counter(row.label for row in buckets[split]) for split in Split}
+    class_counts_by_split = OrderedDict(
+        (split, Counter(row.label for row in buckets[split])) for split in Split
+    )
     class_row_counts = OrderedDict(
         (
             label,
@@ -573,8 +574,8 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
 class TransferConceptGroup:
     concept: OracleTransferConcept
     native_class_indices: tuple[ClassIndex, ...]
-    train_support: NonNegativeInt
-    meta_support: NonNegativeInt
+    train_support: Index
+    meta_support: Index
     source_eligible: bool
 
 

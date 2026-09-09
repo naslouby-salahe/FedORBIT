@@ -65,7 +65,7 @@ def blank_audit_template(
     )
 
 
-def canonical_submission_payload(submission: MapAvailabilityAuditSubmission) -> str:
+def stable_submission_payload(submission: MapAvailabilityAuditSubmission) -> str:
     ordered_mapping = sorted(
         submission.proposed_mapping,
         key=lambda entry: (
@@ -114,7 +114,7 @@ def canonical_submission_payload(submission: MapAvailabilityAuditSubmission) -> 
 
 def submission_sha256(submission: MapAvailabilityAuditSubmission) -> Sha256Digest:
     return Sha256Digest(
-        hashlib.sha256(canonical_submission_payload(submission).encode("utf-8")).hexdigest()
+        hashlib.sha256(stable_submission_payload(submission).encode("utf-8")).hexdigest()
     )
 
 

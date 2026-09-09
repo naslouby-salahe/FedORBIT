@@ -14,6 +14,7 @@ from fedorbit.types import (
     ArtifactStage,
     SemanticCell,
     SemanticCoordinate,
+    Sha256Digest,
     StableJsonPayload,
     stable_json,
 )
@@ -124,10 +125,10 @@ def _module_source_digest(module_name: str, visited: set[str]) -> str:
     return digest.hexdigest()
 
 
-def implementation_fingerprint(producer_module: str) -> str:
+def implementation_fingerprint(producer_module: str) -> Sha256Digest:
     if not producer_module.startswith("fedorbit"):
         raise ProvenanceError(f"producer must be a fedorbit module: {producer_module}")
-    return _module_source_digest(producer_module, set())
+    return Sha256Digest(_module_source_digest(producer_module, set()))
 
 
 def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
@@ -200,7 +201,7 @@ def stage_dependency_fingerprint(
     upstream_artifact_ids: tuple[str, ...],
     config_sections: frozenset[str],
     producer_module: str,
-) -> str:
+) -> Sha256Digest:
     payload = stable_json(
         cast(
             StableJsonPayload,
@@ -214,4 +215,4 @@ def stage_dependency_fingerprint(
             ),
         )
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())

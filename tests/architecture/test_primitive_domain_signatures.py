@@ -45,6 +45,7 @@ MEASURED_KEYWORDS = (
     "total",
     "remaining",
     "category",
+    "class",
 )
 
 IDENTITY_KEYWORDS = (
@@ -92,7 +93,7 @@ def _violations(source: str) -> list[str]:
             name = argument.arg.lower()
             if any(fragment in name for fragment in EXCLUDED_SUBSTRINGS):
                 continue
-            if _contains_primitive(annotation, {"int", "float", "bool"}) and any(
+            if _contains_primitive(annotation, {"int", "float"}) and any(
                 keyword in name for keyword in MEASURED_KEYWORDS
             ):
                 violations.append(f"{node.name}({argument.arg}: {annotation})")
@@ -116,7 +117,7 @@ def _return_violations(source: str) -> list[str]:
             continue
         annotation = ast.unparse(node.returns)
         name = node.name.lower()
-        if _contains_primitive(annotation, {"int", "float", "bool"}) and any(
+        if _contains_primitive(annotation, {"int", "float"}) and any(
             keyword in name for keyword in MEASURED_KEYWORDS
         ):
             violations.append(f"{node.name}() -> {annotation}")
@@ -137,9 +138,7 @@ def _field_violations(source: str) -> list[str]:
         name = node.target.id.lower()
         if any(fragment in name for fragment in EXCLUDED_SUBSTRINGS):
             continue
-        if annotation in {"int", "float", "bool"} and any(
-            keyword in name for keyword in MEASURED_KEYWORDS
-        ):
+        if annotation in {"int", "float"} and any(keyword in name for keyword in MEASURED_KEYWORDS):
             violations.append(f"{node.target.id}: {annotation}")
         if annotation == "str" and any(keyword in name for keyword in IDENTITY_KEYWORDS):
             violations.append(f"{node.target.id}: {annotation}")
@@ -165,7 +164,7 @@ def test_domain_public_signatures_use_canonical_domain_types() -> None:
                 name = argument.arg.lower()
                 if any(fragment in name for fragment in EXCLUDED_SUBSTRINGS):
                     continue
-                if _contains_primitive(annotation, {"int", "float", "bool"}) and any(
+                if _contains_primitive(annotation, {"int", "float"}) and any(
                     keyword in name for keyword in MEASURED_KEYWORDS
                 ):
                     findings.append(

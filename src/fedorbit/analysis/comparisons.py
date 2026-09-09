@@ -8,9 +8,9 @@ from fedorbit.config.loading import active_config
 from fedorbit.types import (
     ArtifactIdentifier,
     Coefficient,
+    ConsumedBudget,
     DirectedPairName,
     Index,
-    NonNegativeFloat,
     RandomSeed,
     RelativeGain,
     SampleCount,
@@ -42,7 +42,7 @@ class PairingLineage:
     target_pre_transfer_checkpoint_artifact_id: ArtifactIdentifier
     target_importance_artifact_id: ArtifactIdentifier
     source_packet_artifact_id: ArtifactIdentifier | None
-    action_budget: NonNegativeFloat
+    action_budget: ConsumedBudget
     support_budget: Index
     confirmation_budget: Index
     environment_lineage_sha256: Sha256Digest

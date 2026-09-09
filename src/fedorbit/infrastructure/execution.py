@@ -39,6 +39,10 @@ from fedorbit.analysis.records import (
     MetricRecord,
     MetricRecordCollection,
     PairedComparisonRecord,
+    StatisticalAlternative,
+    StatisticalExactness,
+    StatisticalMetadataRecord,
+    validate_comparison_metadata,
     validate_metric_records,
 )
 from fedorbit.analysis.statistics import (
@@ -262,6 +266,7 @@ from fedorbit.types import (
     ClientRole,
     CoarseGroup,
     Coefficient,
+    ComparisonStatistic,
     ConceptCount,
     ConfigurationSection,
     ContrastCoordinates,
@@ -271,6 +276,7 @@ from fedorbit.types import (
     DatasetPreprocessingState,
     DirectedPair,
     DirectedPairName,
+    Estimate,
     EvaluationConditionName,
     ExecutionCell,
     ExecutionStageName,
@@ -290,6 +296,7 @@ from fedorbit.types import (
     ProducerModuleName,
     PValueName,
     ReplicateCount,
+    ResampleCount,
     ResourceLimitReason,
     ReuseDecision,
     Rfc3339UtcTimestamp,
@@ -306,6 +313,7 @@ from fedorbit.types import (
     SourceClientName,
     Split,
     StableJsonPayload,
+    StatisticalTestName,
     StepCount,
     StorageLayoutSegment,
     SupportCount,
@@ -2439,6 +2447,7 @@ def execute_statistical_synthesis(
     statistics_config = active_config().scientific.statistics
     for method in methods:
         raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
+        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict()
         contrasts: OrderedDict[
             str,
             tuple[
@@ -2476,19 +2485,17 @@ def execute_statistical_synthesis(
                 continue
             local_only_values = tuple(local_only_seeds[seed].value for seed in shared_seeds)
             method_values = tuple(method_seeds[seed].value for seed in shared_seeds)
-            bca = paired_bca_interval(
-                local_only_values,
-                method_values,
-                statistical_bootstrap_seed(
-                    ContrastName(f"{method.value} vs Local-Only"),
-                    MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
-                    DirectedPairName(pair),
-                    MetricId.MACRO_CROSS_ENTROPY,
-                    BootstrapPurpose("primary-transfer-gain"),
-                ),
+            bootstrap_seed = statistical_bootstrap_seed(
+                ContrastName(f"{method.value} vs Local-Only"),
+                MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+                DirectedPairName(pair),
+                MetricId.MACRO_CROSS_ENTROPY,
+                BootstrapPurpose("primary-transfer-gain"),
             )
+            bca = paired_bca_interval(local_only_values, method_values, bootstrap_seed)
             sign_flip = exact_sign_flip_test(local_only_values, method_values)
             raw_p_by_pair[pair] = sign_flip.p_value
+            metadata_inputs[pair] = (sign_flip.nonzero_difference_count, bootstrap_seed)
             contrasts[pair] = (
                 paired_seed_count,
                 float(sign_flip.mean_difference),
@@ -2529,7 +2536,7 @@ def execute_statistical_synthesis(
                     decision = ComparisonDecision.NOT_SUPPORTED
             if not input_ids:
                 continue
-            persist_primary_transfer_comparison(
+            comparison_manifest = persist_primary_transfer_comparison(
                 store,
                 layout,
                 request.experiment,
@@ -2546,9 +2553,33 @@ def execute_statistical_synthesis(
                 input_ids,
                 request.overwrite_policy,
             )
+            if comparison_manifest is not None and pair in metadata_inputs:
+                resolved_comparison = store.resolve(comparison_manifest.artifact_id)
+                comparison_record = PairedComparisonRecord.model_validate(
+                    json.loads(Path(resolved_comparison.payload_paths[0]).read_text())[
+                        "comparison_record"
+                    ]
+                )
+                nonzero_count, bootstrap_seed = metadata_inputs[pair]
+                family_size: SampleCount = len(raw_p_by_pair)
+                persist_statistical_metadata(
+                    store,
+                    layout,
+                    request.experiment,
+                    DirectedPairName(pair),
+                    method,
+                    comparison_record,
+                    ComparisonStatistic.SIGN_FLIP_SUPERIORITY,
+                    nonzero_count,
+                    bootstrap_seed,
+                    _holm_rank(raw_p_by_pair, pair),
+                    family_size,
+                    request.overwrite_policy,
+                )
     gap_metrics = _completed_real_packet_coupling_gap(store)
     coupling_pairs = sorted({pair for pair, _ in gap_metrics})
     coupling_raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
+    coupling_metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict()
     coupling_contrasts: OrderedDict[
         str,
         tuple[
@@ -2574,19 +2605,20 @@ def execute_statistical_synthesis(
             continue
         gap_values = tuple(pair_seeds[seed].value for seed in seeds)
         zero_reference = tuple(0.0 for _ in gap_values)
-        bca = paired_bca_interval(
-            gap_values,
-            zero_reference,
-            statistical_bootstrap_seed(
-                ContrastName(f"Exact correspondence orbit vs Matched-Resource Rectangular: {pair}"),
-                MultiplicityFamily.COUPLING_MECHANISM,
-                DirectedPairName(pair),
-                MetricId.ROBUST_COUPLING_VALUE_GAP,
-                BootstrapPurpose("coupling-mechanism-gap"),
-            ),
+        coupling_bootstrap_seed = statistical_bootstrap_seed(
+            ContrastName(f"Exact correspondence orbit vs Matched-Resource Rectangular: {pair}"),
+            MultiplicityFamily.COUPLING_MECHANISM,
+            DirectedPairName(pair),
+            MetricId.ROBUST_COUPLING_VALUE_GAP,
+            BootstrapPurpose("coupling-mechanism-gap"),
         )
+        bca = paired_bca_interval(gap_values, zero_reference, coupling_bootstrap_seed)
         sign_flip = exact_sign_flip_test(gap_values, zero_reference)
         coupling_raw_p_by_pair[pair] = sign_flip.p_value
+        coupling_metadata_inputs[pair] = (
+            sign_flip.nonzero_difference_count,
+            coupling_bootstrap_seed,
+        )
         coupling_contrasts[pair] = (
             paired_seed_count,
             float(sign_flip.mean_difference),
@@ -2632,7 +2664,7 @@ def execute_statistical_synthesis(
                 decision = ComparisonDecision.NOT_SUPPORTED
         if not input_ids:
             continue
-        persist_coupling_mechanism_comparison(
+        coupling_comparison_manifest = persist_coupling_mechanism_comparison(
             store,
             layout,
             request.experiment,
@@ -2648,6 +2680,29 @@ def execute_statistical_synthesis(
             input_ids,
             request.overwrite_policy,
         )
+        if coupling_comparison_manifest is not None and pair in coupling_metadata_inputs:
+            resolved_coupling_comparison = store.resolve(coupling_comparison_manifest.artifact_id)
+            coupling_comparison_record = PairedComparisonRecord.model_validate(
+                json.loads(Path(resolved_coupling_comparison.payload_paths[0]).read_text())[
+                    "comparison_record"
+                ]
+            )
+            coupling_nonzero_count, coupling_metadata_seed = coupling_metadata_inputs[pair]
+            coupling_family_size: SampleCount = len(coupling_raw_p_by_pair)
+            persist_statistical_metadata(
+                store,
+                layout,
+                request.experiment,
+                DirectedPairName(pair),
+                TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                coupling_comparison_record,
+                ComparisonStatistic.SIGN_FLIP_AGAINST_ZERO,
+                coupling_nonzero_count,
+                coupling_metadata_seed,
+                _holm_rank(coupling_raw_p_by_pair, pair),
+                coupling_family_size,
+                request.overwrite_policy,
+            )
 
 
 def _completed_real_packet_coupling_gap(
@@ -2787,6 +2842,120 @@ def persist_coupling_mechanism_comparison(
     return manifest
 
 
+def _holm_rank(raw_p_by_pair: Mapping[str, float], pair: str) -> Index:
+    ordered = sorted(raw_p_by_pair.items(), key=lambda item: (item[1], item[0]))
+    rank: Index = next(index for index, (name, _) in enumerate(ordered, start=1) if name == pair)
+    return rank
+
+
+def persist_statistical_metadata(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    pair: DirectedPairName,
+    method: TransferMethod,
+    comparison: PairedComparisonRecord,
+    comparison_statistic: ComparisonStatistic,
+    nonzero_difference_count: Index,
+    bootstrap_seed: RandomSeed,
+    holm_rank: Index,
+    family_size: SampleCount,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        directed_pair=DirectedPair(
+            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
+        ),
+        method=method,
+        condition=ExperimentCondition(comparison_statistic.value),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    input_artifact_ids = comparison.input_metric_artifact_ids
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.STATISTICS,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_artifact_ids),
+            _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    statistics_config = active_config().scientific.statistics
+    zero_difference_count: Index = comparison.paired_seed_count - nonzero_difference_count
+    resamples: ResampleCount = statistics_config.ci_bootstrap_repetitions
+    metadata = StatisticalMetadataRecord(
+        test_name=StatisticalTestName(comparison_statistic.value),
+        exact_or_asymptotic=StatisticalExactness.EXACT,
+        alternative=StatisticalAlternative.TWO_SIDED,
+        zero_difference_count=zero_difference_count,
+        bootstrap_resamples=resamples,
+        bootstrap_seed=bootstrap_seed,
+        holm_rank=holm_rank,
+        family_size=family_size,
+        statistical_code_sha256=implementation_fingerprint(_MODULE_NAME),
+    )
+    validate_comparison_metadata(comparison, metadata)
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"statistical-metadata.{pair.replace(' -> ', '-to-')}.{method.value}.json"
+    )
+    payload = cast(
+        StableJsonPayload, OrderedDict(statistical_metadata_record=metadata.model_dump(mode="json"))
+    )
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.STATISTICS,
+        upstream_artifact_ids=tuple(input_artifact_ids),
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.OTHER,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.STATISTICS,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=tuple(input_artifact_ids),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
 def _dataset_eligible_groups_by_coarse(
     target: DatasetId, materialized: MaterializedClient
 ) -> Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]:
@@ -2853,7 +3022,7 @@ def assemble_self_response_matrix(
 def target_node_risks(
     blocks: PaddedBlockStructure,
     eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    class_conditional_cross_entropy: tuple[float, ...],
+    class_conditional_cross_entropy: tuple[Estimate, ...],
 ) -> tuple[TransferNodeRisk, ...]:
     risks: list[TransferNodeRisk] = []
     for block_index, coarse_group in enumerate(blocks.coarse_groups):

@@ -33,13 +33,13 @@ from fedorbit.types import (
     IneligibilityReason,
     InterventionMagnitude,
     LearningRate,
+    ReplicateCount,
     Score,
     StableJsonPayload,
     StandardError,
     StepCount,
     WeightDecay,
 )
-
 
 type NativeClassSet = tuple[ClassIndex, ...]
 type NativeClassSets = tuple[NativeClassSet, ...]
@@ -144,12 +144,8 @@ def _evaluate_candidate(
 ) -> CandidateResult:
     outcome_count = len(data.outcome_native_class_sets)
     intervention_count = len(intervention_classes)
-    full_values: list[list[Estimate]] = [
-        [] for _ in range(outcome_count * intervention_count)
-    ]
-    half_values: list[list[Estimate]] = [
-        [] for _ in range(outcome_count * intervention_count)
-    ]
+    full_values: list[list[Estimate]] = [[] for _ in range(outcome_count * intervention_count)]
+    half_values: list[list[Estimate]] = [[] for _ in range(outcome_count * intervention_count)]
     all_finite = True
     full_settings = ShadowSettings(
         candidate.intervention_magnitude,

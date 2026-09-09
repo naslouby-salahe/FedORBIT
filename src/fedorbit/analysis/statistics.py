@@ -101,13 +101,15 @@ _CHI_SQUARE_CDF = cast(Callable[..., Estimate], scipy_stats.chi2.cdf)
 
 
 def nominal_alpha() -> SignificanceLevel:
-    return SignificanceLevel(1.0 - active_config().scientific.statistics.confidence_level)
+    alpha: SignificanceLevel = 1.0 - active_config().scientific.statistics.confidence_level
+    return alpha
 
 
 def _mean(values: DifferenceSeries) -> RelativeGain:
     if not values:
         raise StatisticsError("statistical mean requires at least one value")
-    return RelativeGain(math.fsum(values) / len(values))
+    mean: RelativeGain = math.fsum(values) / len(values)
+    return mean
 
 
 def sign_flip_p_value(
@@ -116,7 +118,8 @@ def sign_flip_p_value(
 ) -> SignificanceLevel:
     nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
-        return SignificanceLevel(1.0)
+        certain: SignificanceLevel = 1.0
+        return certain
     observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
@@ -127,7 +130,8 @@ def sign_flip_p_value(
         if abs(permuted_mean) >= abs(observed_mean) - comparison_tolerance:
             extremes += 1
         total += 1
-    return SignificanceLevel(extremes / total)
+    p_value: SignificanceLevel = extremes / total
+    return p_value
 
 
 def one_sided_sign_flip_p_value(
@@ -139,7 +143,8 @@ def one_sided_sign_flip_p_value(
         raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
     nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
-        return SignificanceLevel(1.0)
+        certain: SignificanceLevel = 1.0
+        return certain
     observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
@@ -153,7 +158,8 @@ def one_sided_sign_flip_p_value(
             extreme = permuted_mean <= observed_mean + comparison_tolerance
         extremes += int(extreme)
         total += 1
-    return SignificanceLevel(extremes / total)
+    p_value: SignificanceLevel = extremes / total
+    return p_value
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,7 +179,7 @@ def exact_sign_flip_test(
     if not method_values:
         raise StatisticsError("paired sign-flip test requires at least one pair")
     differences: DifferenceSeries = tuple(
-        RelativeGain(method - reference)
+        method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
     nonzero_count = sum(value != 0.0 for value in differences)
@@ -185,11 +191,13 @@ def exact_sign_flip_test(
             f"maximum is {maximum}"
         )
     tolerance = statistics_config.exact_sign_flip_comparison_tolerance
+    median_difference: RelativeGain = statistics.median(differences)
+    nonzero_difference_count: Index = nonzero_count
     return SignFlipResult(
         p_value=sign_flip_p_value(differences, tolerance),
         mean_difference=_mean(differences),
-        median_difference=RelativeGain(statistics.median(differences)),
-        nonzero_difference_count=Index(nonzero_count),
+        median_difference=median_difference,
+        nonzero_difference_count=nonzero_difference_count,
     )
 
 
@@ -200,12 +208,15 @@ def statistical_bootstrap_seed(
     metric: MetricId,
     purpose: BootstrapPurpose,
 ) -> DerivedSeed:
-    coordinates: StableJsonPayload = OrderedDict(
-        contrast=contrast_name,
-        family=family.value,
-        metric=metric.value,
-        pair=directed_pair,
-        purpose=purpose,
+    coordinates = cast(
+        StableJsonPayload,
+        OrderedDict(
+            contrast=contrast_name,
+            family=family.value,
+            metric=metric.value,
+            pair=directed_pair,
+            purpose=purpose,
+        ),
     )
     return derive_seed32(
         SeedDerivationRequest(
@@ -224,6 +235,9 @@ class BcaInterval:
     degenerate: BootstrapDegeneracy
 
 
+_LAST_AXIS = ArrayAxis(-1)
+
+
 def paired_bca_interval(
     method_values: ScoreSeries,
     reference_values: ScoreSeries,
@@ -234,11 +248,12 @@ def paired_bca_interval(
     if not method_values:
         raise StatisticsError("paired BCa interval requires at least one pair")
     differences: DifferenceSeries = tuple(
-        RelativeGain(method - reference)
+        method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
     if any(not math.isfinite(value) for value in differences):
-        return BcaInterval(None, None, RelativeGain(math.nan), BootstrapDegeneracy(True))
+        nan_point_estimate: RelativeGain = math.nan
+        return BcaInterval(None, None, nan_point_estimate, BootstrapDegeneracy(True))
     point_estimate = _mean(differences)
     statistics_config = active_config().scientific.statistics
     identical_tolerance = statistics_config.identical_difference_tolerance
@@ -255,7 +270,7 @@ def paired_bca_interval(
     def statistic(
         x: FloatArray,
         y: FloatArray,
-        axis: ArrayAxis = ArrayAxis(-1),
+        axis: ArrayAxis = _LAST_AXIS,
     ) -> FloatArray:
         return np.asarray(np.mean(x - y, axis=axis), dtype=np.float64)
 
@@ -277,9 +292,11 @@ def paired_bca_interval(
     upper = float(result.confidence_interval.high)
     if not math.isfinite(lower) or not math.isfinite(upper):
         return BcaInterval(None, None, point_estimate, BootstrapDegeneracy(True))
+    bca_lower: RelativeGain = lower
+    bca_upper: RelativeGain = upper
     return BcaInterval(
-        RelativeGain(lower),
-        RelativeGain(upper),
+        bca_lower,
+        bca_upper,
         point_estimate,
         BootstrapDegeneracy(False),
     )
@@ -302,14 +319,14 @@ def tost_equivalence(
     margins = config.scientific.materiality.equivalence_relative_macro_ce
     tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
     differences: DifferenceSeries = tuple(
-        RelativeGain(method - reference)
+        method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
     shifted_lower: DifferenceSeries = tuple(
-        RelativeGain(difference - margins.lower) for difference in differences
+        difference - margins.lower for difference in differences
     )
     shifted_upper: DifferenceSeries = tuple(
-        RelativeGain(difference - margins.upper) for difference in differences
+        difference - margins.upper for difference in differences
     )
     p_lower = one_sided_sign_flip_p_value(
         shifted_lower,
@@ -321,7 +338,8 @@ def tost_equivalence(
         StatisticalAlternative.LESS,
         tolerance,
     )
-    return TostResult(p_lower, p_upper, SignificanceLevel(max(p_lower, p_upper)))
+    p_equiv: SignificanceLevel = max(p_lower, p_upper)
+    return TostResult(p_lower, p_upper, p_equiv)
 
 
 def holm_step_down(raw_p_values: PValueSet) -> PValueSet:
@@ -341,10 +359,12 @@ def mcnemar_exact_p(b01: Index, b10: Index) -> SignificanceLevel:
         raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
     if discordant == 0:
-        return SignificanceLevel(1.0)
+        certain: SignificanceLevel = 1.0
+        return certain
     count = min(b01, b10)
     tail = sum(math.comb(discordant, k) for k in range(count + 1))
-    return SignificanceLevel(min(1.0, 2.0 * tail / 2**discordant))
+    p_value: SignificanceLevel = min(1.0, 2.0 * tail / 2**discordant)
+    return p_value
 
 
 def mcnemar_asymptotic_continuity_corrected_p(
@@ -355,10 +375,12 @@ def mcnemar_asymptotic_continuity_corrected_p(
         raise StatisticsError("McNemar discordant counts must be nonnegative")
     discordant = b01 + b10
     if discordant == 0:
-        return SignificanceLevel(1.0)
+        certain: SignificanceLevel = 1.0
+        return certain
     chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
     survival = 1.0 - _CHI_SQUARE_CDF(chi_square, df=1)
-    return SignificanceLevel(max(0.0, min(1.0, survival)))
+    p_value: SignificanceLevel = max(0.0, min(1.0, survival))
+    return p_value
 
 
 def mcnemar_test(

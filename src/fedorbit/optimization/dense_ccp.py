@@ -46,7 +46,6 @@ from fedorbit.types import (
     TerminalState,
 )
 
-
 type ProductKey = tuple[Index, Index, Index, Index]
 type ProductCoefficients = Mapping[ProductKey, Coefficient]
 type MutableProductCoefficients = MutableMapping[ProductKey, Coefficient]

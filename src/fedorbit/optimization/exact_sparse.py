@@ -46,7 +46,6 @@ from fedorbit.types import (
     Tolerance,
 )
 
-
 type ScoredAction = tuple[Score, CurriculumAction]
 
 
@@ -160,9 +159,7 @@ def fixed_action_worst_correspondence(
     )
 
 
-def _support_block_counts(
-    blocks: PaddedBlockStructure, active_nodes: NodeIndices
-) -> BlockCounts:
+def _support_block_counts(blocks: PaddedBlockStructure, active_nodes: NodeIndices) -> BlockCounts:
     counts = [0] * len(blocks.padded_size_tuple)
     for node in active_nodes:
         counts[blocks.block_of_node(node)] += 1

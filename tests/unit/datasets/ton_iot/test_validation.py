@@ -10,14 +10,20 @@ from fedorbit.datasets.ton_iot.validation import (
     validate_ton_iot_label_consistency,
     validate_ton_iot_schema,
 )
-from fedorbit.types import DatasetId, FineLabel
+from fedorbit.types import DatasetId, FineLabel, TabularColumnName
 
 
 def test_ton_schema_validation_matches_selected_component() -> None:
     config = load_fedorbit_config()
     component = component_for(DatasetId.TON_IOT_NETWORK)
     schema = ton_iot_adapter(component.dataset_id).resolve_schema(
-        ("ts", "src_ip", "label", "type", "duration"),
+        (
+            TabularColumnName("ts"),
+            TabularColumnName("src_ip"),
+            TabularColumnName("label"),
+            TabularColumnName("type"),
+            TabularColumnName("duration"),
+        ),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
     )
@@ -29,7 +35,7 @@ def test_ton_schema_validation_rejects_component_identity_mismatch() -> None:
     network = component_for(DatasetId.TON_IOT_NETWORK)
     windows = component_for(DatasetId.TON_IOT_WINDOWS10_HOST)
     schema = ton_iot_adapter(network.dataset_id).resolve_schema(
-        ("ts", "label", "type"),
+        (TabularColumnName("ts"), TabularColumnName("label"), TabularColumnName("type")),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
     )

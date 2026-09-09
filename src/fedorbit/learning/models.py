@@ -5,17 +5,15 @@ from torch import nn
 
 from fedorbit.types import ConceptCount, FeatureCount, Fraction
 
-
 HOST_BLOCK_WIDTHS = (192, 96, 48)
 HOST_BATCH_NORM_EPSILON = 1e-5
 HOST_BATCH_NORM_MOMENTUM = 0.1
 
 
 class NetworkFlowClassifier(nn.Module):
-    def __init__(self, input_dim: FeatureCount,
-                 n_classes: ConceptCount,
-                 dropout_probability: Fraction
-                 ) -> None:
+    def __init__(
+        self, input_dim: FeatureCount, n_classes: ConceptCount, dropout_probability: Fraction
+    ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
             raise ValueError("network classifier dimensions must be positive")
@@ -52,10 +50,9 @@ class NetworkFlowClassifier(nn.Module):
 
 
 class HostClassifier(nn.Module):
-    def __init__(self, input_dim: FeatureCount,
-                 n_classes: ConceptCount,
-                 dropout_probability: Fraction
-                 ) -> None:
+    def __init__(
+        self, input_dim: FeatureCount, n_classes: ConceptCount, dropout_probability: Fraction
+    ) -> None:
         super().__init__()
         if input_dim <= 0 or n_classes <= 1:
             raise ValueError("host classifier dimensions must be positive")

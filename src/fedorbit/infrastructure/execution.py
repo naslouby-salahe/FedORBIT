@@ -5238,7 +5238,7 @@ def execute_synthetic_coupling_mechanism_validation(
                                     instance.lower_response_matrix,
                                     instance.lower_response_matrix,
                                     seed,
-                                    condition,
+                                    ContrastCoordinates(condition),
                                 )
                                 destroyed_problem = build_robust_action_problem(
                                     problem.blocks,

@@ -17,24 +17,33 @@ from fedorbit.datasets.preprocessing import (
     transform_categorical,
     transform_numeric,
 )
+from fedorbit.types import (
+    CategoryName,
+    NumericFeatureValue,
+    RawCellText,
+    TabularColumnName,
+)
 
 
 def test_missing_token_contract_is_type_scoped() -> None:
     assert frozenset({"", "0", "0.0", "nan", "none", "null"}) == MISSING_TOKEN_VOCABULARY
-    assert is_missing_token("0", True)
-    assert not is_missing_token("0", False)
-    assert numeric_zero_is_not_missing(0.0)
+    assert is_missing_token(RawCellText("0"), True)
+    assert not is_missing_token(RawCellText("0"), False)
+    assert numeric_zero_is_not_missing(NumericFeatureValue(0.0))
 
 
 def test_feature_quality_uses_raw_semantic_features_once() -> None:
+    good = TabularColumnName("good")
+    bad = TabularColumnName("bad")
+    category = TabularColumnName("category")
     report = evaluate_feature_quality(
-        ("good", "bad", "category"),
-        frozenset({"category"}),
+        (good, bad, category),
+        frozenset({category}),
         TrainingFeatureValues(
             {
-                "good": np.array([0.0, 1.0, 2.0]),
-                "bad": np.array([np.nan, np.nan, 1.0]),
-                "category": np.array(["a", "b", "c"], dtype=object),
+                good: np.array([0.0, 1.0, 2.0]),
+                bad: np.array([np.nan, np.nan, 1.0]),
+                category: np.array(["a", "b", "c"], dtype=object),
             }
         ),
     )
@@ -67,7 +76,7 @@ def test_zero_iqr_constant_feature_is_identified() -> None:
 
 
 def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
-    vocabulary = categorical_vocabulary(("z", "a", "z"))
+    vocabulary = categorical_vocabulary((CategoryName("z"), CategoryName("a"), CategoryName("z")))
     assert vocabulary == (
         PreprocessingToken.ABSENT,
         PreprocessingToken.RARE,
@@ -75,9 +84,11 @@ def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
         "a",
         "z",
     )
-    fitted = fit_categorical_preprocessor(("a", "a", "b", ""))
-    assert transform_categorical("", fitted) == PreprocessingToken.ABSENT
-    assert transform_categorical("never-seen", fitted) == PreprocessingToken.UNKNOWN
-    encoded = one_hot("a", fitted)
+    fitted = fit_categorical_preprocessor(
+        (RawCellText("a"), RawCellText("a"), RawCellText("b"), RawCellText(""))
+    )
+    assert transform_categorical(RawCellText(""), fitted) == PreprocessingToken.ABSENT
+    assert transform_categorical(RawCellText("never-seen"), fitted) == PreprocessingToken.UNKNOWN
+    encoded = one_hot(RawCellText("a"), fitted)
     assert len(encoded) == len(fitted.vocabulary)
     assert sum(encoded) == 1.0

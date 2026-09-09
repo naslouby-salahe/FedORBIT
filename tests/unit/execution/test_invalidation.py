@@ -15,8 +15,10 @@ from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
     ArtifactState,
+    ArtifactTypeName,
     ExecutionCell,
     SemanticCoordinates,
+    Sha256Digest,
 )
 
 COORDINATES = {"experiment": "Primary Strict Cross-Telemetry Transfer"}
@@ -37,7 +39,9 @@ def _manifest(
 ) -> ReusableArtifactManifest:
     return ReusableArtifactManifest.model_validate(
         {
-            "artifact_id": artifact_id(artifact_type, COORDINATES, fingerprint),
+            "artifact_id": artifact_id(
+                ArtifactTypeName(artifact_type), COORDINATES, Sha256Digest(fingerprint)
+            ),
             "artifact_type": artifact_type,
             "semantic_producer_coordinates": "{}",
             "producer_stage": stage,
@@ -79,12 +83,24 @@ def test_invalidation_propagates_only_to_descendants(tmp_path: Path) -> None:
     train_payload = _payload(tmp_path, "train.pt")
     report_payload = _payload(tmp_path, "report.json")
     store.write_reusable(
-        _manifest(raw_payload, "prepared_split", "preprocessing", "fp-pre", (ArtifactIdentifier("raw-up"),))
+        _manifest(
+            raw_payload,
+            "prepared_split",
+            "preprocessing",
+            "fp-pre",
+            (ArtifactIdentifier("raw-up"),),
+        )
     )
     store.write_reusable(
-        _manifest(train_payload, "checkpoint", "training", "fp-train", (ArtifactIdentifier("pre-up"),))
+        _manifest(
+            train_payload, "checkpoint", "training", "fp-train", (ArtifactIdentifier("pre-up"),)
+        )
     )
-    store.write_reusable(_manifest(report_payload, "other", "reporting", "fp-report", (ArtifactIdentifier("stat-up"),)))
+    store.write_reusable(
+        _manifest(
+            report_payload, "other", "reporting", "fp-report", (ArtifactIdentifier("stat-up"),)
+        )
+    )
     invalidated = SelectiveInvalidation(store).invalidate_stage(ArtifactStage.TRAINING)
     assert len(invalidated) == 2
     remaining = {path.stem for path in store.manifest_dir().glob("*.json")}
@@ -101,16 +117,16 @@ def test_invalidation_keeps_siblings_and_unrelated(tmp_path: Path) -> None:
     store.write_reusable(second)
     invalidated = SelectiveInvalidation(store).invalidate_descendants(ArtifactIdentifier("pre-a"))
     assert invalidated == (first.artifact_id,)
-    assert {path.stem for path in store.manifest_dir().glob("*.json")} == {
-        second.artifact_id.value
-    }
+    assert {path.stem for path in store.manifest_dir().glob("*.json")} == {second.artifact_id.value}
 
 
 def test_invalidation_propagates_transitively(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     mid = _payload(tmp_path, "mid.bin")
     leaf = _payload(tmp_path, "leaf.bin")
-    mid_manifest = _manifest(mid, "response_packet", "response", "fp-mid", (ArtifactIdentifier("target-up"),))
+    mid_manifest = _manifest(
+        mid, "response_packet", "response", "fp-mid", (ArtifactIdentifier("target-up"),)
+    )
     leaf_manifest = _manifest(
         leaf, "confirmation_input", "confirmation", "fp-leaf", (mid_manifest.artifact_id,)
     )

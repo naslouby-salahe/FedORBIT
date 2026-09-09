@@ -31,8 +31,8 @@ from fedorbit.optimization.objective import (
     zero_action,
 )
 from fedorbit.types import (
-    MonotonicDeadline,
     Index,
+    MonotonicDeadline,
     Score,
     SolverStatus,
     SolverVariablePrefix,
@@ -40,7 +40,6 @@ from fedorbit.types import (
     TerminalState,
     Tolerance,
 )
-
 
 type AssignmentKey = tuple[int, int]
 type ProductKey = tuple[int, int, int, int]
@@ -124,7 +123,9 @@ def _configure_model(model: Model, deadline: MonotonicDeadline | None) -> None:
     model.setIntParam(ScipIntegerParameter.MAX_THREADS.value, int(settings.threads))
     model.setIntParam(ScipIntegerParameter.RANDOM_SEED_SHIFT.value, int(settings.random_seed))
     model.setIntParam(ScipIntegerParameter.PERMUTATION_SEED.value, int(settings.random_seed))
-    model.setRealParam(ScipRealParameter.FEASIBILITY_TOLERANCE.value, float(settings.feasibility_tolerance))
+    model.setRealParam(
+        ScipRealParameter.FEASIBILITY_TOLERANCE.value, float(settings.feasibility_tolerance)
+    )
     model.setRealParam(ScipRealParameter.RELATIVE_GAP.value, float(settings.relative_mip_gap))
 
 

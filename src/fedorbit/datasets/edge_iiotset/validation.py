@@ -9,7 +9,7 @@ from fedorbit.datasets.edge_iiotset.schema import (
     EDGE_MULTICLASS_LABEL,
 )
 from fedorbit.datasets.ontology import normalize_label
-from fedorbit.types import FineLabel, Index
+from fedorbit.types import FineLabel, Index, TabularColumnName
 
 
 class EdgeValidationError(ValueError):
@@ -30,7 +30,7 @@ def validate_edge_schema(schema: AdapterSchema) -> None:
     if schema.binary_label_column != EDGE_BINARY_LABEL:
         raise EdgeValidationError("Edge-IIoTset binary label semantics are unresolved")
     for field in EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS:
-        if field in schema.observed_columns and schema.role_of(field) in (
+        if field in schema.observed_columns and schema.role_of(TabularColumnName(field)) in (
             FieldRole.BEHAVIORAL_NUMERIC,
             FieldRole.BEHAVIORAL_CATEGORICAL,
         ):

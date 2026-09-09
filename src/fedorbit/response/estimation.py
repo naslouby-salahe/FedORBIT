@@ -73,13 +73,15 @@ def native_class_cross_entropy(
 ) -> Score:
     class_examples = targets == class_index
     if not bool(class_examples.any()):
-        return Score(math.nan)
+        nan_score: Score = math.nan
+        return nan_score
     probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
     selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
     per_example = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(
         dtype=torch.float64
     )
-    return Score(float(per_example[class_examples].mean()))
+    mean_score: Score = float(per_example[class_examples].mean())
+    return mean_score
 
 
 def equal_native_class_risk(
@@ -93,8 +95,10 @@ def equal_native_class_risk(
         for class_index in native_classes
     )
     if not risks or any(math.isnan(risk) for risk in risks):
-        return Score(math.nan)
-    return Score(sum(risks) / len(risks))
+        nan_score: Score = math.nan
+        return nan_score
+    mean_score: Score = sum(risks) / len(risks)
+    return mean_score
 
 
 def shadow_batch_schedule(
@@ -128,10 +132,10 @@ def paired_shadow_derivative(
         raise ResponseEstimationError("intervention magnitude must be positive")
     if denominator_floor <= 0.0:
         raise ResponseEstimationError("risk denominator floor must be positive")
-    return Coefficient(
-        (negative_risk - positive_risk)
-        / (2.0 * epsilon * max(baseline_risk, denominator_floor))
+    derivative: Coefficient = (negative_risk - positive_risk) / (
+        2.0 * epsilon * max(baseline_risk, denominator_floor)
     )
+    return derivative
 
 
 def run_shadow_pair(
@@ -147,6 +151,8 @@ def run_shadow_pair(
     batch_size = config.scientific.training.batch_size
     positive_rng = torch.Generator().manual_seed(schedule_seed)
     negative_rng = torch.Generator().manual_seed(schedule_seed)
+    positive_multiplier: Coefficient = 1.0 + settings.epsilon
+    negative_multiplier: Coefficient = 1.0 - settings.epsilon
     positive = _run_shadow(
         model,
         base_state,
@@ -154,7 +160,7 @@ def run_shadow_pair(
         base_rng_state,
         data,
         settings,
-        Coefficient(1.0 + settings.epsilon),
+        positive_multiplier,
         batch_size,
         positive_rng,
     )
@@ -165,7 +171,7 @@ def run_shadow_pair(
         base_rng_state,
         data,
         settings,
-        Coefficient(1.0 - settings.epsilon),
+        negative_multiplier,
         batch_size,
         negative_rng,
     )
@@ -201,8 +207,9 @@ def _run_shadow(
     optimizer = make_adamw(model, settings.learning_rate, settings.weight_decay)
     base_optimizer_state.load_into(optimizer)
     model.train()
+    train_size: SampleCount = data.train_features.shape[0]
     schedule = shadow_batch_schedule(
-        SampleCount(data.train_features.shape[0]),
+        train_size,
         batch_size,
         schedule_rng,
     )
@@ -289,5 +296,7 @@ def _evaluate_risks(
 
 def standard_error(values: RiskSeries) -> StandardError:
     if len(values) < 2:
-        return StandardError(math.nan)
-    return StandardError(statistics.stdev(values) / math.sqrt(len(values)))
+        nan_error: StandardError = math.nan
+        return nan_error
+    error: StandardError = statistics.stdev(values) / math.sqrt(len(values))
+    return error

@@ -24,8 +24,9 @@ from fedorbit.infrastructure.workspace import (
 )
 from fedorbit.types import DatasetId, OverwritePolicy, Split, stable_json
 
-
-EDGE_NETWORK_RELATIVE_PATH = load_fedorbit_config().scientific.datasets.edge_iiotset_network_relative_path
+EDGE_NETWORK_RELATIVE_PATH = (
+    load_fedorbit_config().scientific.datasets.edge_iiotset_network_relative_path
+)
 
 
 def test_edge_raw_inventory_records_file_identity(tmp_path: Path) -> None:

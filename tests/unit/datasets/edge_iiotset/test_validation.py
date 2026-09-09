@@ -11,23 +11,26 @@ from fedorbit.datasets.edge_iiotset.validation import (
     validate_binary_multiclass_consistency,
     validate_edge_schema,
 )
-from fedorbit.types import FineLabel
+from fedorbit.types import FineLabel, TabularColumnName
 
 
 def _schema():
     config = load_fedorbit_config()
-    columns = (
-        "frame.time",
-        "http.request.method",
-        "tcp.ack",
-        "Attack_label",
-        "Attack_type",
+    columns = tuple(
+        TabularColumnName(name)
+        for name in (
+            "frame.time",
+            "http.request.method",
+            "tcp.ack",
+            "Attack_label",
+            "Attack_type",
+        )
     )
     return edge_iiotset_adapter().resolve_schema(
         columns,
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
-        ObservedColumnSamples({"tcp.ack": ("1", "2")}),
+        ObservedColumnSamples({TabularColumnName("tcp.ack"): ("1", "2")}),
     )
 
 

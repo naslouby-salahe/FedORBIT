@@ -411,7 +411,8 @@ def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> b
 
 
 def _experiment_metric_summary_directory() -> str:
-    return active_config().runtime.artifact_layout.reporting_output_directories.manuscript_metric_summary
+    directories = active_config().runtime.artifact_layout.reporting_output_directories
+    return directories.manuscript_metric_summary
 
 
 def _project_metric_summary_directory() -> str:
@@ -421,7 +422,8 @@ def _project_metric_summary_directory() -> str:
 
 
 def _experiment_supplementary_table_directory() -> str:
-    return active_config().runtime.artifact_layout.reporting_output_directories.manuscript_supplementary_table
+    directories = active_config().runtime.artifact_layout.reporting_output_directories
+    return directories.manuscript_supplementary_table
 
 
 def _experiment_main_figure_directory() -> str:
@@ -439,11 +441,13 @@ def _project_main_figure_directory() -> str:
 
 
 def _project_configuration_reproducibility_directory() -> str:
-    return active_config().runtime.artifact_layout.reporting_output_directories.project_configuration_reproducibility
+    directories = active_config().runtime.artifact_layout.reporting_output_directories
+    return directories.project_configuration_reproducibility
 
 
 def _project_execution_reproducibility_directory() -> str:
-    return active_config().runtime.artifact_layout.reporting_output_directories.project_execution_reproducibility
+    directories = active_config().runtime.artifact_layout.reporting_output_directories
+    return directories.project_execution_reproducibility
 
 
 def _metric_svg_bytes(label: str, value: float) -> bytes:

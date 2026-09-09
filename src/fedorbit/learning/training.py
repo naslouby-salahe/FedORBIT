@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader, TensorDataset
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.types import (
-    EpochCount,
     ConceptCount,
+    EpochCount,
     Floor,
     Fraction,
     Index,
@@ -39,9 +39,7 @@ class ClassWeights:
     values: torch.Tensor
 
     @classmethod
-    def from_targets(cls, targets: torch.Tensor,
-                     n_classes: ConceptCount
-                     ) -> ClassWeights:
+    def from_targets(cls, targets: torch.Tensor, n_classes: ConceptCount) -> ClassWeights:
         if targets.ndim != 1 or targets.numel() == 0:
             raise LossContractError("TRAIN targets must be a non-empty one-dimensional tensor")
         if n_classes <= 0:
@@ -146,7 +144,7 @@ class ModelParameterState:
     def capture(cls, model: nn.Module) -> ModelParameterState:
         return cls(
             tuple(
-                NamedTensor(name, value.detach().cpu().clone())
+                NamedTensor(ModelParameterName(name), value.detach().cpu().clone())
                 for name, value in model.state_dict().items()
             )
         )

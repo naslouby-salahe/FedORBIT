@@ -199,9 +199,7 @@ def test_checker_catches_primitive_class_collection_param() -> None:
 
 
 def test_checker_catches_primitive_weight_return() -> None:
-    assert _return_violations("def weight_of() -> float: ...\n") == [
-        "weight_of() -> float"
-    ]
+    assert _return_violations("def weight_of() -> float: ...\n") == ["weight_of() -> float"]
 
 
 def test_checker_allows_typed_domain_param() -> None:
@@ -218,5 +216,7 @@ def test_checker_allows_implementation_scalar() -> None:
 
 
 def test_evaluation_record_fields_use_domain_types() -> None:
-    records_path = Path(__file__).resolve().parents[2] / "src" / "fedorbit" / "analysis" / "records.py"
+    records_path = (
+        Path(__file__).resolve().parents[2] / "src" / "fedorbit" / "analysis" / "records.py"
+    )
     assert _field_violations(records_path.read_text(encoding="utf-8")) == []

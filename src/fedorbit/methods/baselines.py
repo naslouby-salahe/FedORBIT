@@ -34,7 +34,6 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-
 type ResponseMatrix = NDArray[np.float64]
 type ScoredAction = tuple[Score, CurriculumAction]
 
@@ -77,7 +76,7 @@ def coupling_destroyed_matrices(
     lower_response_matrix: ResponseMatrix,
     upper_response_matrix: ResponseMatrix,
     seed: RandomSeed,
-    contrast_coordinates: str,
+    contrast_coordinates: ContrastCoordinates,
 ) -> CouplingDestroyedMatrices:
     size = blocks.total_padded_nodes
     if lower_response_matrix.shape != (size, size):
@@ -276,12 +275,11 @@ def optimize_against_fixed_matrix(
     supports = enumerate_support_coordinate_sets(problem, support_limit)
 
     def objective_of(action: CurriculumAction) -> Score:
-        return Score(float(objective_row @ action.coordinates))
+        objective: Score = float(objective_row @ action.coordinates)
+        return objective
 
     zero_candidate = zero_action(problem)
-    candidates: list[ScoredAction] = [
-        (objective_of(zero_candidate), zero_candidate)
-    ]
+    candidates: list[ScoredAction] = [(objective_of(zero_candidate), zero_candidate)]
     candidates.extend(
         (objective_of(action), action)
         for action in (_solve_support_lp(problem, support, objective_row) for support in supports)

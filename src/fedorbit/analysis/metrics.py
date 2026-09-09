@@ -8,8 +8,8 @@ from fedorbit.config.loading import active_config
 from fedorbit.types import (
     ByteCount,
     ClassIndex,
-    ElapsedSeconds,
     EfficiencyMetricName,
+    ElapsedSeconds,
     Estimate,
     Fraction,
     Index,
@@ -133,15 +133,19 @@ def relative_macro_ce_gain(
 def precision_from_counts(true_positives: Index, false_positives: Index) -> Fraction:
     denominator = true_positives + false_positives
     if denominator == 0:
-        return Fraction(0.0)
-    return Fraction(true_positives / denominator)
+        zero: Fraction = 0.0
+        return zero
+    precision: Fraction = true_positives / denominator
+    return precision
 
 
 def recall_from_counts(true_positives: Index, false_negatives: Index) -> Fraction:
     denominator = true_positives + false_negatives
     if denominator == 0:
-        return Fraction(0.0)
-    return Fraction(true_positives / denominator)
+        zero: Fraction = 0.0
+        return zero
+    recall: Fraction = true_positives / denominator
+    return recall
 
 
 def f1_from_counts(
@@ -153,8 +157,10 @@ def f1_from_counts(
     recall_value = recall_from_counts(true_positives, false_negatives)
     denominator = precision_value + recall_value
     if denominator == 0:
-        return Fraction(0.0)
-    return Fraction(2 * precision_value * recall_value / denominator)
+        zero: Fraction = 0.0
+        return zero
+    f1: Fraction = 2 * precision_value * recall_value / denominator
+    return f1
 
 
 def macro_f1(per_class_f1: ClassF1Set) -> ClassF1:
@@ -194,10 +200,13 @@ def confusion_counts(
         for predicted, actual in zip(predicted_labels, true_labels, strict=True)
         if actual == positive_class and predicted != positive_class
     )
+    true_positive_count: Index = true_positives
+    false_positive_count: Index = false_positives
+    false_negative_count: Index = false_negatives
     return ConfusionCounts(
-        Index(true_positives),
-        Index(false_positives),
-        Index(false_negatives),
+        true_positive_count,
+        false_positive_count,
+        false_negative_count,
     )
 
 
@@ -230,7 +239,8 @@ def relative_objective_error(
     truth_value: Score,
 ) -> RelativeGain:
     floor = active_config().scientific.metrics.relative_solver_error_denominator_floor
-    return RelativeGain(abs(objective_value - truth_value) / max(abs(truth_value), floor))
+    error: RelativeGain = abs(objective_value - truth_value) / max(abs(truth_value), floor)
+    return error
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,13 +294,15 @@ def confirmation_coverage(
 ) -> Fraction | None:
     if eligible_decisions == 0:
         return None
-    return Fraction(live_transfer_decisions / eligible_decisions)
+    coverage: Fraction = live_transfer_decisions / eligible_decisions
+    return coverage
 
 
 def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None:
     if eligible_decisions == 0:
         return None
-    return Fraction(1.0)
+    full_coverage: Fraction = 1.0
+    return full_coverage
 
 
 def coverage_loss(
@@ -299,7 +311,8 @@ def coverage_loss(
 ) -> RelativeGain | None:
     if coverage_no_confirm is None or coverage_confirm is None:
         return None
-    return RelativeGain(coverage_no_confirm - coverage_confirm)
+    loss: RelativeGain = coverage_no_confirm - coverage_confirm
+    return loss
 
 
 def harm_indicator(test_gain: RelativeGain, harmful_threshold: Threshold) -> bool:
@@ -312,7 +325,8 @@ def seed_harm_rate(
     if not decision_gains:
         return None
     indicators = [harm_indicator(gain, harmful_threshold) for gain in decision_gains]
-    return Fraction(sum(1 for indicator in indicators if indicator) / len(indicators))
+    rate: Fraction = sum(1 for indicator in indicators if indicator) / len(indicators)
+    return rate
 
 
 def absolute_risk_reduction(
@@ -321,7 +335,8 @@ def absolute_risk_reduction(
 ) -> RelativeGain | None:
     if harm_rate_no_confirm is None or harm_rate_confirm is None:
         return None
-    return RelativeGain(harm_rate_no_confirm - harm_rate_confirm)
+    reduction: RelativeGain = harm_rate_no_confirm - harm_rate_confirm
+    return reduction
 
 
 def relative_risk_reduction(
@@ -330,7 +345,8 @@ def relative_risk_reduction(
 ) -> RelativeGain | None:
     if harm_rate_no_confirm is None or risk_reduction is None or harm_rate_no_confirm <= 0.0:
         return None
-    return RelativeGain(risk_reduction / harm_rate_no_confirm)
+    reduction: RelativeGain = risk_reduction / harm_rate_no_confirm
+    return reduction
 
 
 def beneficial_rejected_rate(
@@ -339,13 +355,15 @@ def beneficial_rejected_rate(
 ) -> Fraction | None:
     if proposed == 0:
         return None
-    return Fraction(rejected_with_counterfactual_gain / proposed)
+    rate: Fraction = rejected_with_counterfactual_gain / proposed
+    return rate
 
 
 def pair_mean(values: tuple[RelativeGain, ...]) -> RelativeGain | None:
     if not values:
         return None
-    return RelativeGain(statistics.fmean(values))
+    mean: RelativeGain = statistics.fmean(values)
+    return mean
 
 
 def equal_pair_mean(
@@ -354,7 +372,8 @@ def equal_pair_mean(
     present = [value for value in pair_means_values if value is not None]
     if not present:
         return None
-    return RelativeGain(statistics.fmean(present))
+    mean: RelativeGain = statistics.fmean(present)
+    return mean
 
 
 def equal_pair_absolute_risk_reduction(

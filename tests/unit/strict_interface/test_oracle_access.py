@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fedorbit.experiments.catalogue import build_catalogue
+from fedorbit.experiments.catalogue import CatalogueMethodLabel, build_catalogue
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     build_padded_block_structure,
@@ -20,7 +20,10 @@ from fedorbit.types import CoarseGroup, DatasetId, ExperimentName
 
 def _authorize(experiment: ExperimentName):
     methods = build_catalogue().definition(experiment).methods
-    return authorize_oracle_access(experiment, methods)
+    registered_methods = tuple(
+        method for method in methods if not isinstance(method, CatalogueMethodLabel)
+    )
+    return authorize_oracle_access(experiment, registered_methods)
 
 
 def _problem():

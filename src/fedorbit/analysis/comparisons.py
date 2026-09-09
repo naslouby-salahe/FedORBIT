@@ -185,16 +185,18 @@ def descriptive_spearman(
     ranked_predicted = _ranks(predicted_values)
     ranked_realized = _ranks(realized_values)
     rho = _pearson(ranked_predicted, ranked_realized)
+    point_count: SampleCount = len(predicted_values)
     return SpearmanReport(
-        rho=Coefficient(rho),
-        point_count=SampleCount(len(predicted_values)),
+        rho=rho,
+        point_count=point_count,
         pair=directed_pair,
     )
 
 
 def _ranks(values: ScoreSeries) -> RankSeries:
     order = sorted(range(len(values)), key=lambda index: values[index])
-    ranks: list[Score] = [Score(0.0)] * len(values)
+    zero_rank: Score = 0.0
+    ranks: list[Score] = [zero_rank] * len(values)
     position = 0
     while position < len(order):
         block_end = position
@@ -217,5 +219,7 @@ def _pearson(left: RankSeries, right: RankSeries) -> Coefficient:
     variance_right = sum((b - mean_right) ** 2 for b in right)
     denominator = math.sqrt(variance_left * variance_right)
     if denominator == 0.0:
-        return Coefficient(0.0)
-    return Coefficient(covariance / denominator)
+        zero: Coefficient = 0.0
+        return zero
+    correlation: Coefficient = covariance / denominator
+    return correlation

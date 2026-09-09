@@ -6,6 +6,12 @@ from fedorbit.learning.models import NetworkFlowClassifier
 from fedorbit.learning.training import ClassWeights, SelectedHyperparameters, train_base_model
 from fedorbit.response.packet import build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
+from fedorbit.types import (
+    AnonymousNodeDisplayId,
+    ExposedCoarseGroupId,
+    Rfc3339UtcTimestamp,
+    Sha256Digest,
+)
 
 
 def test_response_pipeline_builds_valid_strict_packet() -> None:
@@ -18,14 +24,14 @@ def test_response_pipeline_builds_valid_strict_packet() -> None:
     )
     packet = build_source_packet(
         estimate,
-        anonymous_fine_node_ids=("node-0001",),
-        exposed_coarse_group_id="Disruption",
+        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),),
+        exposed_coarse_group_id=ExposedCoarseGroupId("Disruption"),
         per_node_train_support=(200,),
         per_node_meta_support=(40,),
         per_node_effective_replicate_count=(24,),
-        source_checkpoint_sha256="a" * 64,
-        response_configuration_sha256="b" * 64,
-        creation_timestamp="2026-08-23T22:00:00Z",
+        source_checkpoint_sha256=Sha256Digest("a" * 64),
+        response_configuration_sha256=Sha256Digest("b" * 64),
+        creation_timestamp=Rfc3339UtcTimestamp("2026-08-23T22:00:00Z"),
     )
     packet.validate()
     assert packet.packet_integrity_sha256 == packet.compute_integrity_sha256()

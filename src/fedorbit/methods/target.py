@@ -20,8 +20,8 @@ from fedorbit.types import (
     Coefficient,
     Index,
     RandomSeed,
-    Score,
     ResponseSeedStage,
+    Score,
     SourceClientName,
     StepCount,
 )

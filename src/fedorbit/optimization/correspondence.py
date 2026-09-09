@@ -12,7 +12,6 @@ from numpy.typing import NDArray
 
 from fedorbit.types import CoarseGroup, Index, SampleCount
 
-
 type BlockCounts = tuple[Index, ...]
 type NodePermutation = tuple[Index, ...]
 type NodeImagePair = tuple[Index, Index]
@@ -35,6 +34,7 @@ class BlockNodeCounts:
             raise CorrespondenceError("block-count length mismatch")
         if any(count < 0 for count in self.per_block):
             raise CorrespondenceError("block counts must be nonnegative")
+
 
 @dataclass(frozen=True, slots=True)
 class PaddedBlockStructure:
@@ -206,7 +206,11 @@ def compare_correspondences_lexicographically(
 ) -> CorrespondenceOrdering:
     for left_value, right_value in zip(left.images, right.images, strict=True):
         if left_value != right_value:
-            return CorrespondenceOrdering.LESS if left_value < right_value else CorrespondenceOrdering.GREATER
+            return (
+                CorrespondenceOrdering.LESS
+                if left_value < right_value
+                else CorrespondenceOrdering.GREATER
+            )
     return CorrespondenceOrdering.EQUAL
 
 
@@ -244,7 +248,9 @@ def active_support_of_action(alpha: ActionVector) -> tuple[Index, ...]:
     return tuple(int(node) for node in np.flatnonzero(alpha > 0.0))
 
 
-def support_per_block(blocks: PaddedBlockStructure, active_nodes: Sequence[Index]) -> BlockNodeCounts:
+def support_per_block(
+    blocks: PaddedBlockStructure, active_nodes: Sequence[Index]
+) -> BlockNodeCounts:
     counts = [0] * len(blocks.padded_size_tuple)
     for node in active_nodes:
         if node < 0 or node >= blocks.total_padded_nodes:

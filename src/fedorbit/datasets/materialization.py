@@ -242,7 +242,7 @@ def _read_component_rows(
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed = tuple(TabularColumnName(column) for column in frame.columns)
+        observed = tuple(TabularColumnName(cast(str, column)) for column in frame.columns)
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)

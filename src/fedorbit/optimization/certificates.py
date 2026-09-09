@@ -73,7 +73,8 @@ def build_rectangular_hull(
 
 
 def h_rect_from_hull(alpha: CurriculumAction, hull: RectangularHull) -> Score:
-    return Score(float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates))
+    value: Score = float(alpha.problem.target_importance @ hull.lower_bounds @ alpha.coordinates)
+    return value
 
 
 def orbit_value_over_candidates(
@@ -92,7 +93,8 @@ def orbit_value_over_candidates(
         best = max(best, objective)
     if math.isinf(best):
         raise ActionSpaceError("orbit value requires at least one candidate action")
-    return Score(best)
+    orbit_value: Score = best
+    return orbit_value
 
 
 def rectangular_value_over_candidates(
@@ -108,7 +110,8 @@ def rectangular_value_over_candidates(
         best = max(best, objective)
     if math.isinf(best):
         raise ActionSpaceError("rectangular value requires at least one candidate action")
-    return Score(best)
+    rectangular_value: Score = best
+    return rectangular_value
 
 
 def robust_coupling_gap(
@@ -117,7 +120,7 @@ def robust_coupling_gap(
     orbit: Sequence[BlockCorrespondence],
     hull: RectangularHull,
 ) -> Score:
-    return Score(
-        orbit_value_over_candidates(action_candidates, problem, orbit)
-        - rectangular_value_over_candidates(action_candidates, problem, hull)
-    )
+    gap: Score = orbit_value_over_candidates(
+        action_candidates, problem, orbit
+    ) - rectangular_value_over_candidates(action_candidates, problem, hull)
+    return gap

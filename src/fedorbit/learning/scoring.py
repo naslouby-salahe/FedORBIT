@@ -108,10 +108,6 @@ def score_model(request: ScoringRequest) -> ScoreArtifact:
     )
     return ScoreArtifact(
         rows=rows,
-        class_conditional_cross_entropy=ClassEntropySet(
-            tuple(class_risks)
-        ),
-        macro_cross_entropy=macro_cross_entropy(
-            ClassEntropySet(tuple(present_risks))
-        ),
+        class_conditional_cross_entropy=ClassEntropySet(tuple(class_risks)),
+        macro_cross_entropy=macro_cross_entropy(ClassEntropySet(tuple(present_risks))),
     )

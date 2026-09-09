@@ -36,7 +36,6 @@ from fedorbit.types import (
     DirectedPairName,
     EvaluationConditionName,
     Floor,
-    RandomSeed,
     RelativeGain,
     ReplicateCount,
     RngNamespace,
@@ -87,9 +86,7 @@ class AssimilationCoordinates:
     def __post_init__(self) -> None:
         for key in ASSIMILATION_COORDINATE_KEYS:
             if key is not AssimilationCoordinateKey.SEED and not getattr(self, key.value):
-                raise AssimilationError(
-                    f"assimilation coordinate {key.value} must be non-empty"
-                )
+                raise AssimilationError(f"assimilation coordinate {key.value} must be non-empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,10 +317,12 @@ def run_proposal_confirmation(
         request.contrast_coordinates,
     )
     threshold = confirmation.lower_bound_acceptance_threshold_relative_macro_ce
+    verdict_lower_bound: RelativeGain = lower_bound
+    verdict_threshold: RelativeGain = threshold
     return ConfirmationVerdict(
         lower_bound >= threshold,
-        RelativeGain(lower_bound),
-        RelativeGain(threshold),
+        verdict_lower_bound,
+        verdict_threshold,
     )
 
 
@@ -384,7 +383,7 @@ def apply_accepted_assimilation(
     pre_confirm.restore_into(model, optimizer)
     model.train()
     device = next(model.parameters()).device
-    steps_executed = StepCount(0)
+    steps_executed: StepCount = 0
     for batch in _assimilation_batches(
         train_features,
         train_targets,
@@ -411,7 +410,7 @@ def apply_accepted_assimilation(
             norm_type=2.0,
         )
         optimizer_step(optimizer)
-        steps_executed = StepCount(steps_executed + 1)
+        steps_executed = steps_executed + 1
     if steps_executed != total_steps:
         raise AssimilationError(
             f"live assimilation executed {steps_executed} of {total_steps} steps"

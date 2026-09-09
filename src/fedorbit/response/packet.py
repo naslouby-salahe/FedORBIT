@@ -28,6 +28,7 @@ from fedorbit.response.pilot import PilotData, ResponseCandidate
 from fedorbit.response.uncertainty import (
     FinalResponseEntry,
     FinalResponseEstimate,
+    NativeClassSets,
     estimate_final_response,
 )
 from fedorbit.types import (
@@ -48,13 +49,13 @@ from fedorbit.types import (
     stable_json,
 )
 
-
 type NodeDisplayIds = tuple[AnonymousNodeDisplayId, ...]
 type ResponseBounds = tuple[Estimate, ...]
 type PerNodeSupport = tuple[NonNegativeInt, ...]
 type PerNodeReplicateCounts = tuple[ReplicateCount, ...]
 type ArrayShape = tuple[Index, ...]
 type Float64ArrayData = tuple[Estimate, ...]
+
 
 class ResponsePacketSchema(StrEnum):
     V1 = "source-response-packet/v1"
@@ -357,7 +358,7 @@ class PacketConstructionError(ValueError):
 def load_source_packet(source: Path) -> SourcePacket:
     if not source.is_file():
         raise PacketError(f"source-response packet does not exist: {source}")
-    return SourcePacket.from_serialized(source.read_text(encoding="utf-8"))
+    return SourcePacket.from_serialized(SerializedPacket(source.read_text(encoding="utf-8")))
 
 
 def construct_source_packet(
@@ -368,8 +369,8 @@ def construct_source_packet(
     train_targets: torch.Tensor,
     meta_features: torch.Tensor,
     meta_targets: torch.Tensor,
-    intervention_classes: tuple[tuple[Index, ...], ...],
-    outcome_native_class_sets: tuple[tuple[Index, ...], ...],
+    intervention_classes: NativeClassSets,
+    outcome_native_class_sets: NativeClassSets,
     base_class_weights: ClassWeights,
     selected_configuration: ResponseCandidate,
     creation_timestamp: Rfc3339UtcTimestamp,

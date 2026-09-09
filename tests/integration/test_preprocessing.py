@@ -18,7 +18,7 @@ from fedorbit.datasets.splitting import (
     DuplicateGroupId,
     assign_duplicate_groups_chronologically,
 )
-from fedorbit.types import DatasetId, Split
+from fedorbit.types import DatasetId, DuplicateGroupIdentifier, Split
 
 RAW_ROOT = Path(__file__).resolve().parents[2] / "data" / "raw"
 
@@ -37,24 +37,34 @@ def test_dataset_support_and_chronology_contracts_share_authoritative_config() -
     assignment = assign_duplicate_groups_chronologically(
         (
             DuplicateGroupChronology(
-                DuplicateGroupId("a"), ChronologicalTimestamp(1.0), ChronologicalRowCount(55)
+                DuplicateGroupId(DuplicateGroupIdentifier("a")),
+                ChronologicalTimestamp(1.0),
+                ChronologicalRowCount(55),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("b"), ChronologicalTimestamp(2.0), ChronologicalRowCount(15)
+                DuplicateGroupId(DuplicateGroupIdentifier("b")),
+                ChronologicalTimestamp(2.0),
+                ChronologicalRowCount(15),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("c"), ChronologicalTimestamp(3.0), ChronologicalRowCount(10)
+                DuplicateGroupId(DuplicateGroupIdentifier("c")),
+                ChronologicalTimestamp(3.0),
+                ChronologicalRowCount(10),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("d"), ChronologicalTimestamp(4.0), ChronologicalRowCount(10)
+                DuplicateGroupId(DuplicateGroupIdentifier("d")),
+                ChronologicalTimestamp(4.0),
+                ChronologicalRowCount(10),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("e"), ChronologicalTimestamp(5.0), ChronologicalRowCount(10)
+                DuplicateGroupId(DuplicateGroupIdentifier("e")),
+                ChronologicalTimestamp(5.0),
+                ChronologicalRowCount(10),
             ),
         ),
     )
-    assert assignment.split_of(DuplicateGroupId("a")) == Split.TRAIN
-    assert assignment.split_of(DuplicateGroupId("e")) == Split.TEST
+    assert assignment.split_of(DuplicateGroupId(DuplicateGroupIdentifier("a"))) == Split.TRAIN
+    assert assignment.split_of(DuplicateGroupId(DuplicateGroupIdentifier("e"))) == Split.TEST
 
 
 @pytest.mark.skipif(not RAW_ROOT.is_dir(), reason="real raw datasets are unavailable")

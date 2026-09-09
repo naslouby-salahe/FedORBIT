@@ -26,8 +26,9 @@ from fedorbit.types import (
     EvaluationConditionName,
     ExperimentName,
     FineLabel,
-    MetricUnit,
+    InvalidReason,
     MetricId,
+    MetricUnit,
     MultiplicityFamily,
     Sha256Digest,
     Split,
@@ -99,7 +100,9 @@ def test_prediction_semantic_identity_is_unique_per_condition_split_and_row() ->
         validate_prediction_records(PredictionRecordCollection((first, first)))
 
 
-def _metric(metric_value: float | None, valid: bool, invalid_reason: str | None) -> MetricRecord:
+def _metric(
+    metric_value: float | None, valid: bool, invalid_reason: InvalidReason | None
+) -> MetricRecord:
     return MetricRecord(
         experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
         pair=DirectedPairName("source -> target"),
@@ -238,5 +241,3 @@ def test_comparison_rejects_partial_bca_interval() -> None:
         PairedComparisonRecord.model_validate(
             _comparison().model_copy(update={"bca_ci_high": None}).model_dump()
         )
-    Sha256Digest,
-    StatisticalTestName,

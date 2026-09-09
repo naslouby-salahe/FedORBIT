@@ -19,15 +19,19 @@ from fedorbit.datasets.preprocessing import (
     normalized_row_bytes,
     validate_duplicate_groups,
 )
+from fedorbit.types import DuplicateGroupIdentifier, FineLabel, TabularColumnName
 
-EDGE_COLUMNS = (
-    "frame.time",
-    "ip.src_host",
-    "service_state",
-    "tcp.ack",
-    "http.file_data",
-    "Attack_label",
-    "Attack_type",
+EDGE_COLUMNS = tuple(
+    TabularColumnName(name)
+    for name in (
+        "frame.time",
+        "ip.src_host",
+        "service_state",
+        "tcp.ack",
+        "http.file_data",
+        "Attack_label",
+        "Attack_type",
+    )
 )
 
 
@@ -39,8 +43,8 @@ def _schema():
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
         ObservedColumnSamples(
             {
-                "tcp.ack": ("1", "2", "3.5"),
-                "service_state": ("OPEN", "CLOSED"),
+                TabularColumnName("tcp.ack"): ("1", "2", "3.5"),
+                TabularColumnName("service_state"): ("OPEN", "CLOSED"),
             }
         ),
     )
@@ -53,13 +57,13 @@ def _features(
 ) -> NormalizedFeatureVector:
     return NormalizedFeatureVector(
         {
-            "frame.time": "2024-01-01T00:00:00Z",
-            "ip.src_host": identity,
-            "service_state": service_state,
-            "tcp.ack": tcp_ack,
-            "http.file_data": "payload",
-            "Attack_label": 1,
-            "Attack_type": "ddos",
+            TabularColumnName("frame.time"): "2024-01-01T00:00:00Z",
+            TabularColumnName("ip.src_host"): identity,
+            TabularColumnName("service_state"): service_state,
+            TabularColumnName("tcp.ack"): tcp_ack,
+            TabularColumnName("http.file_data"): "payload",
+            TabularColumnName("Attack_label"): 1,
+            TabularColumnName("Attack_type"): "ddos",
         }
     )
 
@@ -94,8 +98,8 @@ def test_duplicate_hash_ignores_forbidden_identity_fields() -> None:
 def test_exact_duplicate_grouping_rejects_conflicting_labels() -> None:
     schema = _schema()
     rows = (
-        NormalizedRow(_features(), "ddos", 0.1, ""),
-        NormalizedRow(_features(), "normal", 0.2, ""),
+        NormalizedRow(_features(), FineLabel("ddos"), 0.1, DuplicateGroupIdentifier("")),
+        NormalizedRow(_features(), FineLabel("normal"), 0.2, DuplicateGroupIdentifier("")),
     )
     groups = deduplicate_rows(schema, rows)
     assert groups.group_count == 1

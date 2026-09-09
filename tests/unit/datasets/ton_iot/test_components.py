@@ -9,7 +9,7 @@ from fedorbit.datasets.ton_iot.components import (
     ton_iot_adapter,
     ton_iot_components,
 )
-from fedorbit.types import DatasetId
+from fedorbit.types import DatasetId, TabularColumnName
 
 
 def test_ton_iot_component_registry_is_exact() -> None:
@@ -28,14 +28,20 @@ def test_ton_iot_component_registry_is_exact() -> None:
 def test_ton_windows_adapter_resolves_timestamp_labels_and_identity_exclusion() -> None:
     config = load_fedorbit_config()
     schema = ton_iot_adapter(DatasetId.TON_IOT_WINDOWS10_HOST).resolve_schema(
-        ("ts", "src_ip", "label", "type", "Processor_pct_User_Time"),
+        (
+            TabularColumnName("ts"),
+            TabularColumnName("src_ip"),
+            TabularColumnName("label"),
+            TabularColumnName("type"),
+            TabularColumnName("Processor_pct_User_Time"),
+        ),
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
     )
     assert schema.timestamp_column == "ts"
     assert schema.multiclass_label_column == "type"
     assert schema.binary_label_column == "label"
-    assert schema.role_of("src_ip") == FieldRole.FORBIDDEN_IDENTITY
+    assert schema.role_of(TabularColumnName("src_ip")) == FieldRole.FORBIDDEN_IDENTITY
 
 
 def test_ton_adapter_requires_exact_label_semantics() -> None:
@@ -45,7 +51,13 @@ def test_ton_adapter_requires_exact_label_semantics() -> None:
     )
     with pytest.raises(DatasetSchemaError):
         ton_iot_adapter(DatasetId.TON_IOT_NETWORK).resolve_schema(
-            ("ts", "label", "attack_type"), 1.0, threshold
+            (
+                TabularColumnName("ts"),
+                TabularColumnName("label"),
+                TabularColumnName("attack_type"),
+            ),
+            1.0,
+            threshold,
         )
 
 

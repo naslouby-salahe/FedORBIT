@@ -11,7 +11,6 @@ from fedorbit.config.loading import active_config
 from fedorbit.types import (
     CoarseGroup,
     DatasetId,
-    DatasetLabel,
     FineLabel,
     LabelText,
     NativeLabels,
@@ -19,6 +18,7 @@ from fedorbit.types import (
     OracleTransferConcept,
     SampleCount,
 )
+
 
 class CanonicalLabel(StrEnum):
     NORMAL = "normal"
@@ -62,33 +62,81 @@ TRANSFER_ONTOLOGY: Mapping[
             OracleTransferConcept.DDOS,
             (
                 CoarseGroup.DISRUPTION,
-                tuple(FineLabel(label) for label in (EdgeNativeLabel.DDOS_UDP, EdgeNativeLabel.DDOS_ICMP, EdgeNativeLabel.DDOS_TCP, EdgeNativeLabel.DDOS_HTTP)),
+                tuple(
+                    FineLabel(label)
+                    for label in (
+                        EdgeNativeLabel.DDOS_UDP,
+                        EdgeNativeLabel.DDOS_ICMP,
+                        EdgeNativeLabel.DDOS_TCP,
+                        EdgeNativeLabel.DDOS_HTTP,
+                    )
+                ),
                 (FineLabel(TonNativeLabel.DDOS),),
             ),
         ),
         (
             OracleTransferConcept.RANSOMWARE,
-            (CoarseGroup.DISRUPTION, (FineLabel(EdgeNativeLabel.RANSOMWARE),), (FineLabel(TonNativeLabel.RANSOMWARE),)),
+            (
+                CoarseGroup.DISRUPTION,
+                (FineLabel(EdgeNativeLabel.RANSOMWARE),),
+                (FineLabel(TonNativeLabel.RANSOMWARE),),
+            ),
         ),
-        (OracleTransferConcept.BACKDOOR, (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.BACKDOOR),), (FineLabel(TonNativeLabel.BACKDOOR),))),
+        (
+            OracleTransferConcept.BACKDOOR,
+            (
+                CoarseGroup.EXPLOITATION,
+                (FineLabel(EdgeNativeLabel.BACKDOOR),),
+                (FineLabel(TonNativeLabel.BACKDOOR),),
+            ),
+        ),
         (
             OracleTransferConcept.INJECTION,
-            (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.SQL_INJECTION),), (FineLabel(TonNativeLabel.INJECTION),)),
+            (
+                CoarseGroup.EXPLOITATION,
+                (FineLabel(EdgeNativeLabel.SQL_INJECTION),),
+                (FineLabel(TonNativeLabel.INJECTION),),
+            ),
         ),
-        (OracleTransferConcept.XSS, (CoarseGroup.EXPLOITATION, (FineLabel(EdgeNativeLabel.XSS),), (FineLabel(TonNativeLabel.XSS),))),
+        (
+            OracleTransferConcept.XSS,
+            (
+                CoarseGroup.EXPLOITATION,
+                (FineLabel(EdgeNativeLabel.XSS),),
+                (FineLabel(TonNativeLabel.XSS),),
+            ),
+        ),
         (
             OracleTransferConcept.PASSWORD_ATTACK,
-            (CoarseGroup.ACCESS_AND_DISCOVERY, (FineLabel(EdgeNativeLabel.PASSWORD),), (FineLabel(TonNativeLabel.PASSWORD),)),
+            (
+                CoarseGroup.ACCESS_AND_DISCOVERY,
+                (FineLabel(EdgeNativeLabel.PASSWORD),),
+                (FineLabel(TonNativeLabel.PASSWORD),),
+            ),
         ),
         (
             OracleTransferConcept.SCANNING,
             (
                 CoarseGroup.ACCESS_AND_DISCOVERY,
-                tuple(FineLabel(label) for label in (EdgeNativeLabel.PORT_SCANNING, EdgeNativeLabel.FINGERPRINTING, EdgeNativeLabel.VULNERABILITY_SCANNER)),
+                tuple(
+                    FineLabel(label)
+                    for label in (
+                        EdgeNativeLabel.PORT_SCANNING,
+                        EdgeNativeLabel.FINGERPRINTING,
+                        EdgeNativeLabel.VULNERABILITY_SCANNER,
+                    )
+                ),
                 (FineLabel(TonNativeLabel.SCANNING),),
             ),
         ),
-        (OracleTransferConcept.MITM, (CoarseGroup.ACCESS_AND_DISCOVERY, (FineLabel(EdgeNativeLabel.MITM),), (FineLabel(TonNativeLabel.MITM),))),
+        (
+            OracleTransferConcept.MITM,
+            (
+                CoarseGroup.ACCESS_AND_DISCOVERY,
+                (FineLabel(EdgeNativeLabel.MITM),),
+                (FineLabel(TonNativeLabel.MITM),),
+            ),
+        ),
     )
 )
 EDGE_ELIGIBLE_LOCAL_CLASSES = frozenset({FineLabel(EdgeNativeLabel.UPLOADING)})

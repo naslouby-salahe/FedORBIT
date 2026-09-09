@@ -83,7 +83,8 @@ class ExperimentCatalogue:
         return tuple(self.definitions_by_name.keys())
 
     def __len__(self) -> Index:
-        return Index(len(self.definitions_by_name))
+        count: Index = len(self.definitions_by_name)
+        return count
 
 
 class CatalogueError(KeyError):

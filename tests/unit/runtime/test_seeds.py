@@ -21,7 +21,7 @@ from fedorbit.infrastructure.runtime import (
     statistical_bootstrap_stream,
     torch_generator,
 )
-from fedorbit.types import RngNamespace, StableSerializationError, stable_json
+from fedorbit.types import RngNamespace, SerializedPacket, StableSerializationError, stable_json
 
 FIXED_COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",
@@ -109,7 +109,7 @@ def test_seed_plan_covers_every_namespace() -> None:
 def test_seed_plan_rejects_unknown_namespace() -> None:
     partial = SeedPlan(
         base_seed=1103,
-        coordinates_json="{}",
+        coordinates_json=SerializedPacket("{}"),
         streams=(SeedStream(RngNamespace.SPLIT, 1),),
     )
     with pytest.raises(SeedDerivationError):

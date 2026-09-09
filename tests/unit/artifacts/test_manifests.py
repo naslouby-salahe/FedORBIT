@@ -20,7 +20,17 @@ from fedorbit.infrastructure.manifests import (
     eligibility_copy,
 )
 from fedorbit.infrastructure.reuse import ArtifactValidationError
-from fedorbit.types import ArtifactIdentifier, ArtifactStage, ArtifactState, TerminalState
+from fedorbit.types import (
+    ArtifactIdentifier,
+    ArtifactStage,
+    ArtifactState,
+    ArtifactTypeName,
+    Sha256Digest,
+    TerminalState,
+)
+
+_PREPARED_SPLIT = ArtifactTypeName("prepared_split")
+_CHECKPOINT = ArtifactTypeName("checkpoint")
 
 COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",
@@ -138,11 +148,21 @@ def test_completion_manifest_rejects_unknown_fields() -> None:
 
 
 def test_dependency_fingerprint_and_artifact_identity_are_stable_and_sensitive() -> None:
-    first = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    assert first == dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
-    assert first != dependency_fingerprint(COORDINATES, ("upstream",), "c" * 64, "d" * 64, "e" * 64)
-    assert artifact_id("prepared_split", COORDINATES, first) != artifact_id(
-        "checkpoint", COORDINATES, first
+    first = dependency_fingerprint(
+        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
+    )
+    assert first == dependency_fingerprint(
+        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
+    )
+    assert first != dependency_fingerprint(
+        COORDINATES,
+        (ArtifactIdentifier("upstream"),),
+        Sha256Digest("c" * 64),
+        Sha256Digest("d" * 64),
+        Sha256Digest("e" * 64),
+    )
+    assert artifact_id(_PREPARED_SPLIT, COORDINATES, first) != artifact_id(
+        _CHECKPOINT, COORDINATES, first
     )
 
 
@@ -157,11 +177,13 @@ def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -
     store = ArtifactStore(tmp_path)
     payload = tmp_path / "split.parquet"
     payload.write_bytes(b"payload-v1")
-    fingerprint = dependency_fingerprint(COORDINATES, (), "c" * 64, "d" * 64, "e" * 64)
+    fingerprint = dependency_fingerprint(
+        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
+    )
     manifest = ReusableArtifactManifest.model_validate(
         {
             **_reusable_payload(),
-            "artifact_id": artifact_id("prepared_split", COORDINATES, fingerprint),
+            "artifact_id": artifact_id(_PREPARED_SPLIT, COORDINATES, fingerprint),
             "dependency_fingerprint_sha256": fingerprint,
             "payload_paths": (str(payload),),
             "payload_sha256": file_sha256(payload),
@@ -309,7 +331,7 @@ def test_completed_storage_records_matching_completion_last(tmp_path: Path) -> N
         {
             **_reusable_payload(),
             "artifact_id": artifact_id(
-                "prepared_split", COORDINATES, completion.dependency_fingerprint_sha256
+                _PREPARED_SPLIT, COORDINATES, completion.dependency_fingerprint_sha256
             ),
             "producer_stage": completion.producer_stage,
             "dependency_fingerprint_sha256": completion.dependency_fingerprint_sha256,
@@ -340,7 +362,7 @@ def test_completed_storage_rejects_incompatible_completion(tmp_path: Path) -> No
     manifest = ReusableArtifactManifest.model_validate(
         {
             **_reusable_payload(),
-            "artifact_id": artifact_id("prepared_split", COORDINATES, "b" * 64),
+            "artifact_id": artifact_id(_PREPARED_SPLIT, COORDINATES, Sha256Digest("b" * 64)),
             "producer_stage": completion.producer_stage,
             "dependency_fingerprint_sha256": "b" * 64,
             "payload_paths": (str(payload),),

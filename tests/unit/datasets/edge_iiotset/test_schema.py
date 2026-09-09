@@ -9,16 +9,20 @@ from fedorbit.datasets.edge_iiotset.schema import (
     EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
     edge_iiotset_adapter,
 )
+from fedorbit.types import TabularColumnName
 
-EDGE_COLUMNS = (
-    "frame.time",
-    "ip.src_host",
-    "ip.dst_host",
-    "http.request.method",
-    "tcp.ack",
-    "mqtt.msg",
-    "Attack_label",
-    "Attack_type",
+EDGE_COLUMNS = tuple(
+    TabularColumnName(name)
+    for name in (
+        "frame.time",
+        "ip.src_host",
+        "ip.dst_host",
+        "http.request.method",
+        "tcp.ack",
+        "mqtt.msg",
+        "Attack_label",
+        "Attack_type",
+    )
 )
 
 
@@ -28,16 +32,18 @@ def test_edge_schema_resolves_timestamp_labels_and_feature_roles() -> None:
         EDGE_COLUMNS,
         1.0,
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum,
-        ObservedColumnSamples({"tcp.ack": ("1", "2", "3.5")}),
+        ObservedColumnSamples({TabularColumnName("tcp.ack"): ("1", "2", "3.5")}),
     )
     assert schema.timestamp_column == "frame.time"
     assert schema.multiclass_label_column == "Attack_type"
     assert schema.binary_label_column == "Attack_label"
-    assert schema.role_of("frame.time") == FieldRole.TIMESTAMP
-    assert schema.role_of("tcp.ack") == FieldRole.BEHAVIORAL_NUMERIC
-    assert schema.role_of("ip.src_host") == FieldRole.FORBIDDEN_IDENTITY
-    assert schema.role_of("mqtt.msg") == FieldRole.FORBIDDEN_PAYLOAD
-    assert schema.role_of("http.request.method") == FieldRole.FORBIDDEN_PROVENANCE
+    assert schema.role_of(TabularColumnName("frame.time")) == FieldRole.TIMESTAMP
+    assert schema.role_of(TabularColumnName("tcp.ack")) == FieldRole.BEHAVIORAL_NUMERIC
+    assert schema.role_of(TabularColumnName("ip.src_host")) == FieldRole.FORBIDDEN_IDENTITY
+    assert schema.role_of(TabularColumnName("mqtt.msg")) == FieldRole.FORBIDDEN_PAYLOAD
+    assert (
+        schema.role_of(TabularColumnName("http.request.method")) == FieldRole.FORBIDDEN_PROVENANCE
+    )
 
 
 def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:
@@ -83,7 +89,7 @@ def test_duplicate_or_missing_semantic_columns_fail_closed() -> None:
         config.scientific.datasets.timestamp_alias_acceptance.retained_row_parse_success_minimum
     )
     with pytest.raises(DatasetSchemaError):
-        adapter.resolve_schema((*EDGE_COLUMNS, "frame.time"), 1.0, threshold)
+        adapter.resolve_schema((*EDGE_COLUMNS, TabularColumnName("frame.time")), 1.0, threshold)
     missing_multiclass = tuple(column for column in EDGE_COLUMNS if column != "Attack_type")
     with pytest.raises(DatasetSchemaError):
         adapter.resolve_schema(missing_multiclass, 1.0, threshold)

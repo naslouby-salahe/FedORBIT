@@ -19,22 +19,22 @@ from fedorbit.config.loading import active_config, repository_root
 from fedorbit.datasets.ontology import normalize_label
 from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.types import (
+    ComponentColumns,
     DatasetId,
     DatasetLabel,
     Fraction,
     Index,
     NonNegativeInt,
-    RawDatasetDirectory,
     RawCellSamples,
     RawCellText,
     RawCellValue,
+    RawDatasetDirectory,
     RawNumericCellValue,
     Sha256Digest,
     StableJsonPayload,
     TabularColumnName,
     TabularColumns,
     TabularColumnSet,
-    ComponentColumns,
     ValidationReason,
     stable_json,
 )

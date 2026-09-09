@@ -145,7 +145,8 @@ class _EfficiencyMeasurementHandle:
 
 
 def _peak_host_rss_mib() -> MemoryMib:
-    return MemoryMib(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0)
+    rss: MemoryMib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    return rss
 
 
 @contextmanager

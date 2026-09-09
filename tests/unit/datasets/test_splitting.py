@@ -15,7 +15,7 @@ from fedorbit.datasets.splitting import (
     interval_edges,
     split_for_duplicate_group,
 )
-from fedorbit.types import Split
+from fedorbit.types import DuplicateGroupIdentifier, Split
 
 
 def test_split_intervals_exact_from_config() -> None:
@@ -51,22 +51,28 @@ def test_chronological_assignment_uses_timestamp_then_hash_and_indivisible_group
     assignment = assign_duplicate_groups_chronologically(
         (
             DuplicateGroupChronology(
-                DuplicateGroupId("b"), ChronologicalTimestamp(1.0), ChronologicalRowCount(10)
+                DuplicateGroupId(DuplicateGroupIdentifier("b")),
+                ChronologicalTimestamp(1.0),
+                ChronologicalRowCount(10),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("a"), ChronologicalTimestamp(1.0), ChronologicalRowCount(50)
+                DuplicateGroupId(DuplicateGroupIdentifier("a")),
+                ChronologicalTimestamp(1.0),
+                ChronologicalRowCount(50),
             ),
             DuplicateGroupChronology(
-                DuplicateGroupId("c"), ChronologicalTimestamp(2.0), ChronologicalRowCount(40)
+                DuplicateGroupId(DuplicateGroupIdentifier("c")),
+                ChronologicalTimestamp(2.0),
+                ChronologicalRowCount(40),
             ),
         ),
     )
-    assert assignment.assignments[0].group_id == DuplicateGroupId("a")
-    assert assignment.assignments[1].group_id == DuplicateGroupId("b")
-    assert assignment.assignments[2].group_id == DuplicateGroupId("c")
-    assert assignment.split_of(DuplicateGroupId("a")) == Split.TRAIN
-    assert assignment.split_of(DuplicateGroupId("b")) == Split.META
-    assert assignment.split_of(DuplicateGroupId("c")) == Split.CONFIRM
+    assert assignment.assignments[0].group_id == DuplicateGroupId(DuplicateGroupIdentifier("a"))
+    assert assignment.assignments[1].group_id == DuplicateGroupId(DuplicateGroupIdentifier("b"))
+    assert assignment.assignments[2].group_id == DuplicateGroupId(DuplicateGroupIdentifier("c"))
+    assert assignment.split_of(DuplicateGroupId(DuplicateGroupIdentifier("a"))) == Split.TRAIN
+    assert assignment.split_of(DuplicateGroupId(DuplicateGroupIdentifier("b"))) == Split.META
+    assert assignment.split_of(DuplicateGroupId(DuplicateGroupIdentifier("c"))) == Split.CONFIRM
 
 
 def test_invalid_midpoint_inputs_fail_closed() -> None:

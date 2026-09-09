@@ -30,12 +30,14 @@ def _completion_cost(
     free_rows = [row for row in range(costs.shape[0]) if row not in fixed_rows]
     free_columns = [column for column in range(costs.shape[1]) if column not in fixed_columns]
     if not free_rows:
-        return Score(0.0)
+        zero: Score = 0.0
+        return zero
     reduced = costs[np.ix_(free_rows, free_columns)]
     row_indices, column_indices = linear_sum_assignment(reduced)
     selected_rows = np.asarray(row_indices, dtype=np.intp)
     selected_columns = np.asarray(column_indices, dtype=np.intp)
-    return Score(float(reduced[selected_rows, selected_columns].sum()))
+    cost: Score = float(reduced[selected_rows, selected_columns].sum())
+    return cost
 
 
 def solve_minimum_cost_assignment(
@@ -58,8 +60,8 @@ def solve_minimum_cost_assignment(
     assigned_cost = 0.0
     for row in range(costs.shape[0]):
         for column in sorted(set(range(costs.shape[1])) - set(fixed_columns)):
-            candidate_fixed_rows = (*fixed_rows, Index(row))
-            candidate_fixed_columns = (*fixed_columns, Index(column))
+            candidate_fixed_rows: AssignmentIndexes = (*fixed_rows, row)
+            candidate_fixed_columns: AssignmentIndexes = (*fixed_columns, column)
             completion = _completion_cost(costs, candidate_fixed_rows, candidate_fixed_columns)
             partial = assigned_cost + float(costs[row, column])
             if partial + completion <= optimum + tie_tolerance:
@@ -69,7 +71,8 @@ def solve_minimum_cost_assignment(
                 break
         else:
             raise AssignmentError(f"no feasible completion found for assignment row {row}")
+    objective_value: Score = assigned_cost
     return BlockwiseAssignmentResult(
         column_for_row=tuple(fixed_columns),
-        objective_value=Score(assigned_cost),
+        objective_value=objective_value,
     )

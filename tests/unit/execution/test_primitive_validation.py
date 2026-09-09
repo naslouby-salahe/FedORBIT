@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fedorbit.infrastructure.execution import ArtifactStore, execute_primitive_validation
 from fedorbit.infrastructure.workspace import build_layout
-from fedorbit.types import ArtifactIdentifier, ArtifactState
+from fedorbit.types import ArtifactState
 
 
 def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path) -> None:

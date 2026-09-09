@@ -247,6 +247,168 @@ def test_statistical_synthesis_detects_a_material_improvement(tmp_path: Path) ->
     assert metadata.family_size == 1
 
 
+def test_statistical_synthesis_detects_external_source_superiority(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    for seed_index, seed in enumerate(confirmatory_seeds):
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            pair,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            TransferMethod.LOCAL_SIR,
+            seed,
+            MetricId.MACRO_CROSS_ENTROPY,
+            1.0 + 0.001 * seed_index,
+            MetricUnit("nats"),
+            MetricDirection.LOWER_IS_BETTER,
+            (ArtifactIdentifier(f"local-sir-checkpoint-{seed}"),),
+            OverwritePolicy.REPLACE,
+        )
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            pair,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.MACRO_CROSS_ENTROPY,
+            0.5 + 0.001 * seed_index,
+            MetricUnit("nats"),
+            MetricDirection.LOWER_IS_BETTER,
+            (ArtifactIdentifier(f"fedorbit-checkpoint-{seed}"),),
+            OverwritePolicy.REPLACE,
+        )
+    request = ExperimentExecutionRequest(
+        ExperimentName.STATISTICAL_SYNTHESIS,
+        build_catalogue().definition(ExperimentName.STATISTICAL_SYNTHESIS),
+        OverwritePolicy.REPLACE,
+    )
+    execute_statistical_synthesis(store, layout, request)
+    comparison_records = [
+        record
+        for record in completed_primary_transfer_comparison_records(store)
+        if record.family == MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR
+    ]
+    assert len(comparison_records) == 2
+    superiority = next(
+        record for record in comparison_records if "superiority" in record.contrast_name
+    )
+    equivalence = next(
+        record for record in comparison_records if "TOST equivalence" in record.contrast_name
+    )
+    assert superiority.method_a == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+    assert superiority.method_b == TransferMethod.LOCAL_SIR
+    assert superiority.decision == ComparisonDecision.SUPERIOR
+    assert superiority.mean_difference is not None and superiority.mean_difference > 0.0
+    assert superiority.holm_p is not None and superiority.holm_p <= 0.05
+    assert equivalence.decision == ComparisonDecision.NOT_SUPPORTED
+    assert equivalence.equivalence_margin_low is not None
+    assert equivalence.equivalence_margin_high is not None
+    metadata_manifests = [
+        manifest
+        for manifest in store.all_manifests()
+        if ExperimentName.STATISTICAL_SYNTHESIS.value in manifest.semantic_producer_coordinates
+        and "statistical-metadata"
+        in Path(store.resolve(manifest.artifact_id).payload_paths[0]).name
+    ]
+    metadata_records = [
+        StatisticalMetadataRecord.model_validate(
+            json.loads(
+                Path(store.resolve(manifest.artifact_id).payload_paths[0]).read_text(
+                    encoding="utf-8"
+                )
+            )["statistical_metadata_record"]
+        )
+        for manifest in metadata_manifests
+    ]
+    external_source_test_names = {
+        ComparisonStatistic.SIGN_FLIP_SUPERIORITY.value,
+        ComparisonStatistic.TOST_EQUIVALENCE.value,
+    }
+    matching_metadata = [
+        record for record in metadata_records if record.test_name in external_source_test_names
+    ]
+    assert len(matching_metadata) == 2
+    assert {record.family_size for record in matching_metadata} == {2}
+
+
+def test_statistical_synthesis_builds_point_correspondence_safety_contrasts(
+    tmp_path: Path,
+) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    for seed_index, seed in enumerate(confirmatory_seeds):
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            pair,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            seed,
+            MetricId.MACRO_CROSS_ENTROPY,
+            0.5 + 0.001 * seed_index,
+            MetricUnit("nats"),
+            MetricDirection.LOWER_IS_BETTER,
+            (ArtifactIdentifier(f"commitment-checkpoint-{seed}"),),
+            OverwritePolicy.REPLACE,
+        )
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            pair,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.MACRO_CROSS_ENTROPY,
+            0.5001 + 0.001 * seed_index,
+            MetricUnit("nats"),
+            MetricDirection.LOWER_IS_BETTER,
+            (ArtifactIdentifier(f"fedorbit-checkpoint-{seed}"),),
+            OverwritePolicy.REPLACE,
+        )
+    request = ExperimentExecutionRequest(
+        ExperimentName.STATISTICAL_SYNTHESIS,
+        build_catalogue().definition(ExperimentName.STATISTICAL_SYNTHESIS),
+        OverwritePolicy.REPLACE,
+    )
+    execute_statistical_synthesis(store, layout, request)
+    comparison_records = [
+        record
+        for record in completed_primary_transfer_comparison_records(store)
+        if record.family == MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY
+    ]
+    assert len(comparison_records) == 2
+    difference = next(
+        record for record in comparison_records if "difference" in record.contrast_name
+    )
+    equivalence = next(
+        record for record in comparison_records if "TOST equivalence" in record.contrast_name
+    )
+    assert difference.method_a == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+    assert difference.method_b == TransferMethod.POINT_CORRESPONDENCE_COMMITMENT
+    assert difference.decision in (ComparisonDecision.NOT_SUPPORTED, ComparisonDecision.DEGENERATE)
+    assert difference.materiality_threshold is None
+    assert equivalence.decision in (
+        ComparisonDecision.EQUIVALENT,
+        ComparisonDecision.NOT_SUPPORTED,
+    )
+    assert equivalence.equivalence_margin_low is not None
+    assert equivalence.equivalence_margin_high is not None
+
+
 def test_statistical_synthesis_detects_a_material_coupling_gap(tmp_path: Path) -> None:
     layout = build_layout(root=tmp_path)
     store = ArtifactStore(layout.execution_root)

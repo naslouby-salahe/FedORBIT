@@ -52,6 +52,7 @@ from fedorbit.analysis.statistics import (
     holm_step_down,
     paired_bca_interval,
     statistical_bootstrap_seed,
+    tost_equivalence,
 )
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.datasets.common import (
@@ -141,6 +142,7 @@ from fedorbit.infrastructure.workspace import (
     inspect_raw_inventory,
     persist_raw_duplicate_report,
     persist_raw_inventory,
+    safe_slug,
 )
 from fedorbit.interface import (
     StrictResourceViolationError,
@@ -266,6 +268,7 @@ from fedorbit.types import (
     ClientRole,
     CoarseGroup,
     Coefficient,
+    ComparisonContrastSuffix,
     ComparisonStatistic,
     ConceptCount,
     ConfigurationSection,
@@ -295,6 +298,7 @@ from fedorbit.types import (
     OverwritePolicy,
     ProducerModuleName,
     PValueName,
+    RelativeGain,
     ReplicateCount,
     ResampleCount,
     ResourceLimitReason,
@@ -2703,6 +2707,441 @@ def execute_statistical_synthesis(
                 coupling_family_size,
                 request.overwrite_policy,
             )
+    external_source_criteria = (
+        active_config().scientific.evaluation_criteria.external_source_value_vs_local_sir
+    )
+    equivalence_margins = active_config().scientific.materiality.equivalence_relative_macro_ce
+    external_source_pairs = sorted(
+        {
+            pair
+            for pair, method, _ in metrics
+            if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        }
+    )
+    external_source_raw_p: OrderedDict[str, float] = OrderedDict()
+    external_source_contrasts: OrderedDict[
+        str,
+        tuple[
+            Index,
+            float | None,
+            float | None,
+            float | None,
+            float | None,
+            float | None,
+            tuple[ArtifactIdentifier, ...],
+            Index,
+            RandomSeed,
+        ],
+    ] = OrderedDict()
+    for pair in external_source_pairs:
+        local_sir_seeds = OrderedDict(
+            (seed, entry)
+            for (candidate_pair, candidate_method, seed), entry in metrics.items()
+            if candidate_pair == pair and candidate_method == TransferMethod.LOCAL_SIR
+        )
+        fedorbit_seeds = OrderedDict(
+            (seed, entry)
+            for (candidate_pair, candidate_method, seed), entry in metrics.items()
+            if candidate_pair == pair
+            and candidate_method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        )
+        shared_seeds = sorted(set(local_sir_seeds) & set(fedorbit_seeds))
+        paired_seed_count: Index = len(shared_seeds)
+        input_ids = tuple(
+            identifier
+            for seed in shared_seeds
+            for identifier in (
+                local_sir_seeds[seed].artifact_id,
+                fedorbit_seeds[seed].artifact_id,
+            )
+        )
+        if len(shared_seeds) < statistics_config.minimum_valid_paired_seeds:
+            placeholder_count: Index = 0
+            placeholder_seed: RandomSeed = 0
+            external_source_contrasts[pair] = (
+                paired_seed_count,
+                None,
+                None,
+                None,
+                None,
+                None,
+                input_ids,
+                placeholder_count,
+                placeholder_seed,
+            )
+            continue
+        local_sir_values = tuple(local_sir_seeds[seed].value for seed in shared_seeds)
+        fedorbit_values = tuple(fedorbit_seeds[seed].value for seed in shared_seeds)
+        bootstrap_seed = statistical_bootstrap_seed(
+            ContrastName("FedORBIT Exact-Sparse Solver vs Local-SIR"),
+            MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+            DirectedPairName(pair),
+            MetricId.MACRO_CROSS_ENTROPY,
+            BootstrapPurpose("external-source-vs-local-sir-gain"),
+        )
+        bca = paired_bca_interval(local_sir_values, fedorbit_values, bootstrap_seed)
+        sign_flip = exact_sign_flip_test(local_sir_values, fedorbit_values)
+        tost = tost_equivalence(fedorbit_values, local_sir_values)
+        external_source_raw_p[f"{pair}|superiority"] = sign_flip.p_value
+        external_source_raw_p[f"{pair}|equivalence"] = tost.p_equiv
+        external_source_contrasts[pair] = (
+            paired_seed_count,
+            float(sign_flip.mean_difference),
+            float(sign_flip.median_difference),
+            None if bca.lower is None else float(bca.lower),
+            None if bca.upper is None else float(bca.upper),
+            float(tost.p_equiv),
+            input_ids,
+            sign_flip.nonzero_difference_count,
+            bootstrap_seed,
+        )
+    external_source_holm = holm_step_down(
+        PValueSet(
+            tuple(
+                NamedPValue(PValueName(name), p_value)
+                for name, p_value in external_source_raw_p.items()
+            )
+        )
+    )
+    for pair in external_source_pairs:
+        (
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            p_equiv,
+            input_ids,
+            nonzero_count,
+            bootstrap_seed,
+        ) = external_source_contrasts[pair]
+        if not input_ids:
+            continue
+        if mean_difference is None:
+            superiority_decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+            equivalence_decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+            raw_p = None
+            holm_p = None
+            equivalence_holm_p = None
+        else:
+            raw_p = external_source_raw_p[f"{pair}|superiority"]
+            holm_p = external_source_holm.value_of(PValueName(f"{pair}|superiority"))
+            equivalence_holm_p = external_source_holm.value_of(PValueName(f"{pair}|equivalence"))
+            if bca_low is None:
+                superiority_decision = ComparisonDecision.DEGENERATE
+            elif (
+                holm_p is not None
+                and holm_p <= external_source_criteria.holm_adjusted_p_maximum
+                and bca_low > external_source_criteria.bca_lower_bound_strictly_greater_than
+            ):
+                superiority_decision = ComparisonDecision.SUPERIOR
+            else:
+                superiority_decision = ComparisonDecision.NOT_SUPPORTED
+            if (
+                equivalence_holm_p is not None
+                and equivalence_holm_p <= statistics_config.tost_alpha_per_one_sided_test
+            ):
+                equivalence_decision = ComparisonDecision.EQUIVALENT
+            else:
+                equivalence_decision = ComparisonDecision.NOT_SUPPORTED
+        realized_relative_macro_ce = (
+            active_config().scientific.materiality.realized_relative_macro_ce
+        )
+        superiority_manifest = persist_baseline_comparison(
+            store,
+            layout,
+            request.experiment,
+            DirectedPairName(pair),
+            MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+            TransferMethod.LOCAL_SIR,
+            ContrastName(
+                "FedORBIT Exact-Sparse Solver vs Local-SIR"
+                " — TEST relative macro-CE gain superiority"
+            ),
+            realized_relative_macro_ce,
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            raw_p,
+            float(holm_p) if holm_p is not None else None,
+            superiority_decision,
+            None,
+            None,
+            input_ids,
+            request.overwrite_policy,
+        )
+        equivalence_manifest = persist_baseline_comparison(
+            store,
+            layout,
+            request.experiment,
+            DirectedPairName(pair),
+            MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR,
+            TransferMethod.LOCAL_SIR,
+            ContrastName(
+                "FedORBIT Exact-Sparse Solver vs Local-SIR"
+                f" — TEST relative macro-CE gain {ComparisonContrastSuffix.TOST_EQUIVALENCE.value}"
+            ),
+            realized_relative_macro_ce,
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            float(p_equiv) if p_equiv is not None else None,
+            float(equivalence_holm_p) if equivalence_holm_p is not None else None,
+            equivalence_decision,
+            equivalence_margins.lower,
+            equivalence_margins.upper,
+            input_ids,
+            request.overwrite_policy,
+        )
+        family_size: SampleCount = len(external_source_raw_p)
+        for manifest, statistic, seed_value in (
+            (superiority_manifest, ComparisonStatistic.SIGN_FLIP_SUPERIORITY, bootstrap_seed),
+            (equivalence_manifest, ComparisonStatistic.TOST_EQUIVALENCE, bootstrap_seed),
+        ):
+            if manifest is None or mean_difference is None:
+                continue
+            resolved = store.resolve(manifest.artifact_id)
+            comparison_record = PairedComparisonRecord.model_validate(
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+            )
+            key = (
+                "superiority"
+                if statistic == ComparisonStatistic.SIGN_FLIP_SUPERIORITY
+                else "equivalence"
+            )
+            persist_statistical_metadata(
+                store,
+                layout,
+                request.experiment,
+                DirectedPairName(pair),
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                comparison_record,
+                statistic,
+                nonzero_count,
+                seed_value,
+                _holm_rank(external_source_raw_p, f"{pair}|{key}"),
+                family_size,
+                request.overwrite_policy,
+            )
+    point_correspondence_pairs = sorted(
+        {
+            pair
+            for pair, method, _ in metrics
+            if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        }
+    )
+    point_correspondence_raw_p: OrderedDict[str, float] = OrderedDict()
+    point_correspondence_contrasts: OrderedDict[
+        str,
+        tuple[
+            Index,
+            float | None,
+            float | None,
+            float | None,
+            float | None,
+            float | None,
+            tuple[ArtifactIdentifier, ...],
+            Index,
+            RandomSeed,
+        ],
+    ] = OrderedDict()
+    for pair in point_correspondence_pairs:
+        commitment_seeds = OrderedDict(
+            (seed, entry)
+            for (candidate_pair, candidate_method, seed), entry in metrics.items()
+            if candidate_pair == pair
+            and candidate_method == TransferMethod.POINT_CORRESPONDENCE_COMMITMENT
+        )
+        fedorbit_seeds = OrderedDict(
+            (seed, entry)
+            for (candidate_pair, candidate_method, seed), entry in metrics.items()
+            if candidate_pair == pair
+            and candidate_method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        )
+        shared_seeds = sorted(set(commitment_seeds) & set(fedorbit_seeds))
+        paired_seed_count: Index = len(shared_seeds)
+        input_ids = tuple(
+            identifier
+            for seed in shared_seeds
+            for identifier in (
+                commitment_seeds[seed].artifact_id,
+                fedorbit_seeds[seed].artifact_id,
+            )
+        )
+        if len(shared_seeds) < statistics_config.minimum_valid_paired_seeds:
+            placeholder_count: Index = 0
+            placeholder_seed: RandomSeed = 0
+            point_correspondence_contrasts[pair] = (
+                paired_seed_count,
+                None,
+                None,
+                None,
+                None,
+                None,
+                input_ids,
+                placeholder_count,
+                placeholder_seed,
+            )
+            continue
+        commitment_values = tuple(commitment_seeds[seed].value for seed in shared_seeds)
+        fedorbit_values = tuple(fedorbit_seeds[seed].value for seed in shared_seeds)
+        bootstrap_seed = statistical_bootstrap_seed(
+            ContrastName("FedORBIT Exact-Sparse Solver vs Point-Correspondence Commitment"),
+            MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
+            DirectedPairName(pair),
+            MetricId.MACRO_CROSS_ENTROPY,
+            BootstrapPurpose("point-correspondence-safety-difference"),
+        )
+        bca = paired_bca_interval(commitment_values, fedorbit_values, bootstrap_seed)
+        sign_flip = exact_sign_flip_test(commitment_values, fedorbit_values)
+        tost = tost_equivalence(fedorbit_values, commitment_values)
+        point_correspondence_raw_p[f"{pair}|difference"] = sign_flip.p_value
+        point_correspondence_raw_p[f"{pair}|equivalence"] = tost.p_equiv
+        point_correspondence_contrasts[pair] = (
+            paired_seed_count,
+            float(sign_flip.mean_difference),
+            float(sign_flip.median_difference),
+            None if bca.lower is None else float(bca.lower),
+            None if bca.upper is None else float(bca.upper),
+            float(tost.p_equiv),
+            input_ids,
+            sign_flip.nonzero_difference_count,
+            bootstrap_seed,
+        )
+    point_correspondence_holm = holm_step_down(
+        PValueSet(
+            tuple(
+                NamedPValue(PValueName(name), p_value)
+                for name, p_value in point_correspondence_raw_p.items()
+            )
+        )
+    )
+    for pair in point_correspondence_pairs:
+        (
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            p_equiv,
+            input_ids,
+            nonzero_count,
+            bootstrap_seed,
+        ) = point_correspondence_contrasts[pair]
+        if not input_ids:
+            continue
+        if mean_difference is None:
+            difference_decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+            equivalence_decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+            raw_p = None
+            holm_p = None
+            equivalence_holm_p = None
+        else:
+            raw_p = point_correspondence_raw_p[f"{pair}|difference"]
+            holm_p = point_correspondence_holm.value_of(PValueName(f"{pair}|difference"))
+            equivalence_holm_p = point_correspondence_holm.value_of(
+                PValueName(f"{pair}|equivalence")
+            )
+            difference_decision = (
+                ComparisonDecision.DEGENERATE
+                if bca_low is None
+                else ComparisonDecision.NOT_SUPPORTED
+            )
+            if (
+                equivalence_holm_p is not None
+                and equivalence_holm_p <= statistics_config.tost_alpha_per_one_sided_test
+            ):
+                equivalence_decision = ComparisonDecision.EQUIVALENT
+            else:
+                equivalence_decision = ComparisonDecision.NOT_SUPPORTED
+        difference_manifest = persist_baseline_comparison(
+            store,
+            layout,
+            request.experiment,
+            DirectedPairName(pair),
+            MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            ContrastName(
+                "FedORBIT Exact-Sparse Solver vs Point-Correspondence Commitment"
+                f" — TEST relative macro-CE {ComparisonContrastSuffix.DIFFERENCE.value}"
+            ),
+            None,
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            raw_p,
+            float(holm_p) if holm_p is not None else None,
+            difference_decision,
+            None,
+            None,
+            input_ids,
+            request.overwrite_policy,
+        )
+        point_equivalence_manifest = persist_baseline_comparison(
+            store,
+            layout,
+            request.experiment,
+            DirectedPairName(pair),
+            MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY,
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            ContrastName(
+                "FedORBIT Exact-Sparse Solver vs Point-Correspondence Commitment"
+                f" — TEST relative macro-CE {ComparisonContrastSuffix.TOST_EQUIVALENCE.value}"
+            ),
+            None,
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            float(p_equiv) if p_equiv is not None else None,
+            float(equivalence_holm_p) if equivalence_holm_p is not None else None,
+            equivalence_decision,
+            equivalence_margins.lower,
+            equivalence_margins.upper,
+            input_ids,
+            request.overwrite_policy,
+        )
+        point_correspondence_family_size: SampleCount = len(point_correspondence_raw_p)
+        for manifest, statistic, seed_value in (
+            (
+                difference_manifest,
+                ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE,
+                bootstrap_seed,
+            ),
+            (point_equivalence_manifest, ComparisonStatistic.TOST_EQUIVALENCE, bootstrap_seed),
+        ):
+            if manifest is None or mean_difference is None:
+                continue
+            resolved = store.resolve(manifest.artifact_id)
+            comparison_record = PairedComparisonRecord.model_validate(
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+            )
+            key = (
+                "difference"
+                if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
+                else "equivalence"
+            )
+            persist_statistical_metadata(
+                store,
+                layout,
+                request.experiment,
+                DirectedPairName(pair),
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                comparison_record,
+                statistic,
+                nonzero_count,
+                seed_value,
+                _holm_rank(point_correspondence_raw_p, f"{pair}|{key}"),
+                point_correspondence_family_size,
+                request.overwrite_policy,
+            )
 
 
 def _completed_real_packet_coupling_gap(
@@ -2842,6 +3281,127 @@ def persist_coupling_mechanism_comparison(
     return manifest
 
 
+def persist_baseline_comparison(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    pair: DirectedPairName,
+    family: MultiplicityFamily,
+    method_b: TransferMethod,
+    contrast_name: ContrastName,
+    materiality_threshold: RelativeGain | None,
+    paired_seed_count: Index,
+    mean_difference: float | None,
+    median_difference: float | None,
+    bca_ci_low: float | None,
+    bca_ci_high: float | None,
+    raw_p: float | None,
+    holm_p: float | None,
+    decision: ComparisonDecision,
+    equivalence_margin_low: float | None,
+    equivalence_margin_high: float | None,
+    input_metric_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        directed_pair=DirectedPair(
+            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
+        ),
+        method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        condition=ExperimentCondition(contrast_name),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.STATISTICS,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    comparison = PairedComparisonRecord(
+        contrast_name=contrast_name,
+        family=family,
+        pair=pair,
+        method_a=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        method_b=method_b,
+        metric=MetricId.MACRO_CROSS_ENTROPY,
+        paired_seed_count=paired_seed_count,
+        mean_difference=mean_difference,
+        median_difference=median_difference,
+        bca_ci_low=bca_ci_low,
+        bca_ci_high=bca_ci_high,
+        raw_p=raw_p,
+        holm_p=holm_p,
+        materiality_threshold=materiality_threshold,
+        equivalence_margin_low=equivalence_margin_low,
+        equivalence_margin_high=equivalence_margin_high,
+        input_metric_artifact_ids=tuple(input_metric_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        decision=decision,
+    )
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / (f"baseline-comparison.{pair.replace(' -> ', '-to-')}.{safe_slug(contrast_name)}.json")
+    )
+    payload = cast(
+        StableJsonPayload, OrderedDict(comparison_record=comparison.model_dump(mode="json"))
+    )
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.STATISTICS,
+        upstream_artifact_ids=tuple(input_metric_artifact_ids),
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.OTHER,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.STATISTICS,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=tuple(input_metric_artifact_ids),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
 def _holm_rank(raw_p_by_pair: Mapping[str, float], pair: str) -> Index:
     ordered = sorted(raw_p_by_pair.items(), key=lambda item: (item[1], item[0]))
     rank: Index = next(index for index, (name, _) in enumerate(ordered, start=1) if name == pair)
@@ -2906,7 +3466,10 @@ def persist_statistical_metadata(
         experiment_workspace(layout, experiment)
         / "artifacts"
         / "derived"
-        / f"statistical-metadata.{pair.replace(' -> ', '-to-')}.{method.value}.json"
+        / (
+            f"statistical-metadata.{pair.replace(' -> ', '-to-')}.{method.value}"
+            f".{safe_slug(comparison_statistic.value)}.json"
+        )
     )
     payload = cast(
         StableJsonPayload, OrderedDict(statistical_metadata_record=metadata.model_dump(mode="json"))

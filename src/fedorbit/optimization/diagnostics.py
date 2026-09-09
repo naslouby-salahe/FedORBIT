@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -32,22 +31,24 @@ def fixed_action_rectangularization_gap(
     orbit: Sequence[BlockCorrespondence],
     lower_hull: ResponseMatrix,
 ) -> Score:
-    gap = h_orb(alpha, orbit) - h_rect(alpha, lower_hull)
+    gap: Score = h_orb(alpha, orbit) - h_rect(alpha, lower_hull)
     if gap < 0.0:
         raise ActionSpaceError(
             f"fixed-action rectangularization gap must be nonnegative, got {gap}"
         )
-    return Score(gap)
+    return gap
 
 
 def _same_group_block_means(
     block_entries: NDArray[np.float64],
 ) -> BlockMeans:
-    diagonal_mean = float(np.mean(np.diag(block_entries)))
+    diagonal_mean: Score = float(np.mean(np.diag(block_entries)))
     off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
     off_diagonal_values = block_entries[off_diagonal_mask]
-    off_diagonal_mean = float(np.mean(off_diagonal_values)) if off_diagonal_values.size else 0.0
-    return Score(diagonal_mean), Score(off_diagonal_mean)
+    off_diagonal_mean: Score = (
+        float(np.mean(off_diagonal_values)) if off_diagonal_values.size else 0.0
+    )
+    return diagonal_mean, off_diagonal_mean
 
 
 def _fill_target_block(
@@ -81,9 +82,56 @@ def analytic_orbit_mean(
                 diagonal_mean, off_diagonal_mean = _same_group_block_means(block_entries)
                 _fill_target_block(mean, rows, columns, diagonal_mean, off_diagonal_mean)
             else:
-                block_mean = Score(float(np.mean(block_entries)))
+                block_mean: Score = float(np.mean(block_entries))
                 _fill_target_block(mean, rows, columns, block_mean, block_mean)
     return mean
+
+
+def _same_group_block_extrema(
+    block_entries: NDArray[np.float64],
+    extremum: Callable[[NDArray[np.float64]], float],
+) -> BlockMeans:
+    diagonal_extremum: Score = extremum(np.diag(block_entries))
+    off_diagonal_mask = ~np.eye(block_entries.shape[0], dtype=bool)
+    off_diagonal_values = block_entries[off_diagonal_mask]
+    off_diagonal_extremum: Score = (
+        extremum(off_diagonal_values) if off_diagonal_values.size else diagonal_extremum
+    )
+    return diagonal_extremum, off_diagonal_extremum
+
+
+def analytic_rectangular_hull_bounds(
+    blocks: PaddedBlockStructure,
+    lower_response_matrix: ResponseMatrix,
+    upper_response_matrix: ResponseMatrix,
+) -> tuple[ResponseMatrix, ResponseMatrix]:
+    size = blocks.total_padded_nodes
+    if lower_response_matrix.shape != (size, size) or upper_response_matrix.shape != (size, size):
+        raise ActionSpaceError("response matrix shape mismatch for analytic rectangular hull")
+    lower_hull = np.zeros((size, size), dtype=np.float64)
+    upper_hull = np.zeros((size, size), dtype=np.float64)
+    block_count = len(blocks.padded_size_tuple)
+    for group_source in range(block_count):
+        rows = blocks.block_index_range(group_source)
+        for group_target in range(block_count):
+            columns = blocks.block_index_range(group_target)
+            lower_entries = lower_response_matrix[np.ix_(rows, columns)]
+            upper_entries = upper_response_matrix[np.ix_(rows, columns)]
+            if group_source == group_target:
+                lower_diagonal, lower_off_diagonal = _same_group_block_extrema(
+                    lower_entries, lambda values: float(np.min(values))
+                )
+                upper_diagonal, upper_off_diagonal = _same_group_block_extrema(
+                    upper_entries, lambda values: float(np.max(values))
+                )
+                _fill_target_block(lower_hull, rows, columns, lower_diagonal, lower_off_diagonal)
+                _fill_target_block(upper_hull, rows, columns, upper_diagonal, upper_off_diagonal)
+            else:
+                block_lower: Score = float(np.min(lower_entries))
+                block_upper: Score = float(np.max(upper_entries))
+                _fill_target_block(lower_hull, rows, columns, block_lower, block_lower)
+                _fill_target_block(upper_hull, rows, columns, block_upper, block_upper)
+    return lower_hull, upper_hull
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,12 +144,12 @@ def orbit_radius_2_norm(
     response_matrix: ResponseMatrix,
 ) -> OrbitRadius:
     mean = analytic_orbit_mean(blocks, response_matrix)
-    radius = 0.0
+    radius: Score = 0.0
     for correspondence in enumerate_block_permutations(blocks):
         permuted = correspondence.permute_response_matrix(response_matrix)
         spectral = float(np.linalg.norm(permuted - mean, ord=2))
         radius = max(radius, spectral)
-    return OrbitRadius(radius=Score(radius))
+    return OrbitRadius(radius=radius)
 
 
 @dataclass(frozen=True, slots=True)

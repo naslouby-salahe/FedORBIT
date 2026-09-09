@@ -193,6 +193,10 @@ ROADMAP_LOCKED_STRING_VALUES = frozenset(
         "statistics",
         "reporting",
         "frame.time",
+        "principal_three_coarse_groups",
+        "one_attack_supergroup",
+        "Disruption or Exploitation",
+        "Access and Discovery",
     }
 )
 

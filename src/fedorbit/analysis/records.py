@@ -7,16 +7,18 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from fedorbit.types import (
-    Estimate,
     ArtifactIdentifier,
     ContrastName,
     DirectedPairName,
+    Estimate,
     EvaluationConditionName,
+    ExperimentName,
     FieldDescription,
     FineLabel,
-    ExperimentName,
+    Fraction,
     Index,
     InvalidReason,
+    MethodName,
     MetricId,
     MetricUnit,
     MultiplicityFamily,
@@ -24,7 +26,6 @@ from fedorbit.types import (
     RelativeGain,
     ResampleCount,
     SampleCount,
-    Fraction,
     Sha256Digest,
     SignificanceLevel,
     Split,
@@ -174,8 +175,8 @@ class PairedComparisonRecord(FrozenRecord):
     contrast_name: ContrastName
     family: MultiplicityFamily
     pair: DirectedPairName
-    method_a: TransferMethod
-    method_b: TransferMethod
+    method_a: MethodName
+    method_b: MethodName
     metric: MetricId
     paired_seed_count: Index
     mean_difference: RelativeGain | None

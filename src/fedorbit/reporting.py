@@ -730,7 +730,7 @@ def information_resource_matrix_table(  # TODO: roadmap §23 report table/figure
     )
 
 
-def coupling_mechanism_results_table(  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+def coupling_mechanism_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
@@ -750,7 +750,7 @@ def coupling_mechanism_results_table(  # TODO: roadmap §23 report table/figure 
 
 def exact_solver_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "k",
@@ -774,7 +774,7 @@ def exact_solver_results_table(
 
 def ablation_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "ablation",
@@ -791,7 +791,7 @@ def ablation_results_table(
 
 def sparsity_and_dense_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "support_or_dense_condition",
@@ -809,7 +809,7 @@ def sparsity_and_dense_results_table(
 
 def confirmation_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "pair",
@@ -831,7 +831,7 @@ def confirmation_results_table(
 
 def generalization_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "pair",
@@ -875,7 +875,7 @@ def failure_boundary_results_table(
 
 def scalability_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
-) -> EvidenceTable:  # TODO: roadmap §23 report table/figure surface (evidence-onboarding): wire into the report flow; do not delete
+) -> EvidenceTable:
     return _rows_table(
         (
             "k",

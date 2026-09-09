@@ -56,10 +56,13 @@ from fedorbit.types import (
     ClassIndex,
     CoarseGroup,
     DatasetId,
+    DirectedPairName,
+    ExperimentLocalMethod,
     ExperimentName,
     ExposedCoarseGroupId,
     MetricId,
     MetricUnit,
+    MultiplicityFamily,
     OracleTransferConcept,
     OverwritePolicy,
     RandomSeed,
@@ -111,7 +114,7 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
         store,
         layout,
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-        "ton_iot_linux_process_host -> ton_iot_windows10_host",
+        DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host"),
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
         DatasetId.TON_IOT_WINDOWS10_HOST,
         TransferMethod.LOCAL_ONLY,
@@ -132,7 +135,7 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
         store,
         layout,
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-        "ton_iot_linux_process_host -> ton_iot_windows10_host",
+        DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host"),
         DatasetId.TON_IOT_LINUX_PROCESS_HOST,
         DatasetId.TON_IOT_WINDOWS10_HOST,
         TransferMethod.LOCAL_ONLY,
@@ -151,7 +154,7 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
 def test_statistical_synthesis_detects_a_material_improvement(tmp_path: Path) -> None:
     layout = build_layout(root=tmp_path)
     store = ArtifactStore(layout.execution_root)
-    pair = "ton_iot_linux_process_host -> ton_iot_windows10_host"
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     for seed_index, seed in enumerate(confirmatory_seeds):
         persist_primary_transfer_metric(
@@ -217,6 +220,50 @@ def test_statistical_synthesis_detects_a_material_improvement(tmp_path: Path) ->
     assert len(comparison_records) == 1
     assert comparison_records[0].method_a == TransferMethod.LOCAL_SIR
     assert comparison_records[0].method_b == TransferMethod.LOCAL_ONLY
+
+
+def test_statistical_synthesis_detects_a_material_coupling_gap(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    for seed_index, seed in enumerate(confirmatory_seeds):
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
+            pair,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+            seed,
+            MetricId.ROBUST_COUPLING_VALUE_GAP,
+            0.02 + 0.0001 * seed_index,
+            MetricUnit("score"),
+            MetricDirection.DESCRIPTIVE,
+            (ArtifactIdentifier(f"coupling-checkpoint-{seed}"),),
+            OverwritePolicy.REPLACE,
+        )
+    request = ExperimentExecutionRequest(
+        ExperimentName.STATISTICAL_SYNTHESIS,
+        build_catalogue().definition(ExperimentName.STATISTICAL_SYNTHESIS),
+        OverwritePolicy.REPLACE,
+    )
+    execute_statistical_synthesis(store, layout, request)
+    comparison_records = [
+        record
+        for record in completed_primary_transfer_comparison_records(store)
+        if record.family == MultiplicityFamily.COUPLING_MECHANISM
+    ]
+    assert len(comparison_records) == 1
+    comparison = comparison_records[0]
+    assert comparison.method_a == ExperimentLocalMethod.EXACT_ORBIT
+    assert comparison.method_b == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+    assert comparison.metric == MetricId.ROBUST_COUPLING_VALUE_GAP
+    assert comparison.decision == ComparisonDecision.SUPERIOR
+    assert comparison.mean_difference is not None and comparison.mean_difference > 0.0
+    assert comparison.holm_p is not None and comparison.holm_p <= 0.05
+    assert comparison.bca_ci_low is not None and comparison.bca_ci_low > 0.0
 
 
 def _synthetic_packet(node_count: int, base_value: float) -> SourcePacket:

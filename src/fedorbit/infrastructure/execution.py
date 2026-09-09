@@ -65,6 +65,7 @@ from fedorbit.datasets.materialization import (
     SplitTensors,
     TransferConceptGroup,
     materialize_client,
+    subsampled_materialized_client,
     transfer_concept_groups,
 )
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
@@ -72,10 +73,13 @@ from fedorbit.experiments.catalogue import ExperimentDefinition
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.synthetic import (
     CouplingGenerationError,
+    CouplingInstance,
     CouplingInstanceRequest,
     ExactSeparatorInstanceRequest,
     MechanismGenerationError,
+    ScalabilityGenerationError,
     ScalabilityInstanceRequest,
+    UnresolvedMapWorld,
     UnresolvedMapWorldKind,
     UnresolvedMapWorldRequest,
     eligible_coupling_support_sizes,
@@ -115,7 +119,9 @@ from fedorbit.infrastructure.runtime import (
     ExecutionLogEvent,
     ExecutionLogger,
     RandomSeed,
+    SeedDerivationRequest,
     current_code_revision,
+    derive_seed32,
     execution_logger,
     measure_efficiency,
     principal_determinism,
@@ -131,6 +137,11 @@ from fedorbit.infrastructure.workspace import (
     inspect_raw_inventory,
     persist_raw_duplicate_report,
     persist_raw_inventory,
+)
+from fedorbit.interface import (
+    StrictResourceViolationError,
+    validate_disjoint_feature_namespaces,
+    validate_oracle_acl_isolation,
 )
 from fedorbit.learning.checkpoints import load_base_checkpoint, save_base_checkpoint
 from fedorbit.learning.pilot import (
@@ -149,6 +160,7 @@ from fedorbit.learning.training import (
 from fedorbit.methods.assimilation import (
     AssimilationCoordinates,
     ConfirmationRequest,
+    ConfirmationVerdict,
     PreTestLifecycle,
     PreTestPhase,
     apply_accepted_assimilation,
@@ -164,15 +176,29 @@ from fedorbit.methods.baselines import (
     optimize_against_fixed_matrix,
     orbit_mean_matrix,
 )
+from fedorbit.methods.map_availability_audit import (
+    MapAvailabilityAuditSubmission,
+    blank_audit_template,
+    distinct_researcher_ids,
+    documented_public_labels,
+    submission_sha256,
+    validate_submission,
+)
 from fedorbit.methods.target import (
     CurriculumMultipliers,
+    SourceProposal,
     TargetImportanceError,
     TransferNodeRisk,
     build_target_importance,
+    rank_source_proposals,
+    select_source_sequentially,
 )
 from fedorbit.optimization.assignment import solve_minimum_cost_assignment
 from fedorbit.optimization.certificates import (
+    RectangularHull,
     build_rectangular_hull,
+    rectangular_value_over_candidates,
+    robust_coupling_gap,
     verify_correspondence_certificate,
     verify_exactness_certificate,
 )
@@ -184,8 +210,12 @@ from fedorbit.optimization.correspondence import (
     enumerate_block_permutations,
 )
 from fedorbit.optimization.dense_ccp import solve_dense_ccp
-from fedorbit.optimization.diagnostics import fixed_action_rectangularization_gap
+from fedorbit.optimization.diagnostics import (
+    analytic_rectangular_hull_bounds,
+    fixed_action_rectangularization_gap,
+)
 from fedorbit.optimization.exact_qap import (
+    fixed_action_worst_correspondence_qap,
     point_correspondence_commitment,
     solve_robust_action_qap,
 )
@@ -197,8 +227,8 @@ from fedorbit.optimization.objective import (
     CurriculumAction,
     RobustActionProblem,
     build_robust_action_problem,
-    curriculum_action_from_entries,
     evaluate_objective,
+    zero_action,
 )
 from fedorbit.response.packet import (
     PacketConstructionContext,
@@ -244,12 +274,15 @@ from fedorbit.types import (
     EvaluationConditionName,
     ExecutionCell,
     ExecutionStageName,
+    ExperimentCondition,
+    ExperimentLocalMethod,
     ExperimentName,
     ExperimentSeed,
     ExposedCoarseGroupId,
     Index,
     InfrastructureLogCoordinate,
     InvalidReason,
+    MethodName,
     MetricId,
     MetricUnit,
     MultiplicityFamily,
@@ -260,8 +293,10 @@ from fedorbit.types import (
     ResourceLimitReason,
     ReuseDecision,
     Rfc3339UtcTimestamp,
+    RngNamespace,
     SampleCount,
     ScalabilityBlockPattern,
+    Score,
     SemanticCell,
     SemanticCoordinate,
     SemanticCoordinates,
@@ -271,8 +306,10 @@ from fedorbit.types import (
     SourceClientName,
     Split,
     StableJsonPayload,
+    StepCount,
     StorageLayoutSegment,
     SupportCount,
+    SupportSize,
     TerminalState,
     Threshold,
     Tolerance,
@@ -282,6 +319,7 @@ from fedorbit.types import (
 )
 
 _MODULE_NAME = ProducerModuleName("fedorbit.infrastructure.execution")
+_PRINCIPAL_CONDITION = EvaluationConditionName("principal")
 
 
 class ArtifactStore:
@@ -629,10 +667,6 @@ def _registered_experiment_producers(
     producers[ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION] = lambda: (
         execute_dataset_client_and_resource_validation(store, layout, request)
     )
-    for synthetic_experiment in _SYNTHETIC_EXPERIMENTS:
-        producers[synthetic_experiment] = lambda: execute_synthetic_experiment(
-            store, layout, request
-        )
     producers[ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT] = lambda: execute_base_model_pilot(
         store, layout, request
     )
@@ -656,6 +690,48 @@ def _registered_experiment_producers(
     )
     producers[ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION] = lambda: (
         execute_secondary_cross_modality_generalization(store, layout, request)
+    )
+    producers[ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK] = lambda: (
+        execute_exact_sparse_solver_benchmark(store, layout, request)
+    )
+    producers[ExperimentName.SCALABILITY_AND_EFFICIENCY] = lambda: (
+        execute_scalability_and_efficiency(store, layout, request)
+    )
+    producers[ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP] = lambda: (
+        execute_common_action_under_unidentified_map(store, layout, request)
+    )
+    producers[ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP] = lambda: (
+        execute_robust_compromise_under_unidentified_map(store, layout, request)
+    )
+    producers[ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY] = lambda: (
+        execute_map_dependent_action_boundary(store, layout, request)
+    )
+    producers[ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION] = lambda: (
+        execute_exact_map_value_bound_validation(store, layout, request)
+    )
+    producers[ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION] = lambda: (
+        execute_synthetic_coupling_mechanism_validation(store, layout, request)
+    )
+    producers[ExperimentName.SPARSITY_AND_DENSE_FALLBACK] = lambda: (
+        execute_sparsity_and_dense_fallback(store, layout, request)
+    )
+    producers[ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION] = lambda: (
+        execute_real_packet_coupling_mechanism_validation(store, layout, request)
+    )
+    producers[ExperimentName.MULTI_SOURCE_SELECTION_VALIDATION] = lambda: (
+        execute_multi_source_selection_validation(store, layout, request)
+    )
+    producers[ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER] = lambda: (
+        execute_semantic_sufficiency_frontier(store, layout, request)
+    )
+    producers[ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES] = lambda: (
+        execute_weak_signal_support_and_heterogeneity_boundaries(store, layout, request)
+    )
+    producers[ExperimentName.MAP_AVAILABILITY_APPLICABILITY_AUDIT] = lambda: (
+        execute_map_availability_applicability_audit(store, layout, request)
+    )
+    producers[ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION] = lambda: (
+        execute_baseline_and_oracle_correctness_validation(store, layout, request)
     )
     return producers
 
@@ -688,21 +764,6 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         for decision in decisions
     ):
         raise ExecutionError("registered experiment has no scientific producer")
-
-
-_SYNTHETIC_EXPERIMENTS = frozenset(
-    {
-        ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION,
-        ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
-        ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION,
-        ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP,
-        ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP,
-        ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY,
-        ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION,
-        ExperimentName.SPARSITY_AND_DENSE_FALLBACK,
-        ExperimentName.SCALABILITY_AND_EFFICIENCY,
-    }
-)
 
 
 def execute_dataset_client_and_resource_validation(
@@ -903,27 +964,6 @@ def _persist_synthetic_experiment_payload(
     )
     store.write_completed(manifest, completion)
     return manifest
-
-
-def execute_synthetic_experiment(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    request: ExperimentExecutionRequest,
-) -> ReusableArtifactManifest:
-    pattern = active_config().generators.exact_separator_theorem.block_patterns[3]
-    seed = ExperimentSeed(request.definition.seeds[0])
-    return _persist_synthetic_experiment_payload(
-        store,
-        layout,
-        request,
-        seed,
-        lambda fingerprint: _synthetic_experiment_payload(
-            request.experiment, pattern, seed.value, fingerprint
-        ),
-        _CONFIGURATION_SECTIONS,
-        _MODULE_NAME,
-        "synthetic-validation",
-    )
 
 
 _THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset(
@@ -1247,81 +1287,6 @@ def _map_bound_fixture_results(seeds: tuple[RandomSeed, ...]) -> StableJsonPaylo
             zero_map_value_failures=zero_map_value_failures,
             high_map_value_fixtures=len(seeds),
             high_map_value_failures=high_map_value_failures,
-        ),
-    )
-
-
-def _synthetic_experiment_payload(
-    experiment: ExperimentName,
-    pattern: tuple[ConceptCount, ...],
-    seed: RandomSeed,
-    fingerprint: Sha256Digest,
-) -> StableJsonPayload:
-    instance = generate_exact_separator_instance(ExactSeparatorInstanceRequest(pattern, seed))
-    groups = tuple(CoarseGroup)[: len(pattern)]
-    counts = OrderedDict((group, size) for group, size in zip(groups, pattern, strict=True))
-    blocks = build_padded_block_structure(groups, counts, counts)
-    problem = build_robust_action_problem(
-        blocks,
-        instance.lower_response_matrix,
-        instance.upper_response_matrix,
-        instance.target_importance / instance.target_importance.sum(),
-        tuple(range(sum(pattern))),
-    )
-    action = curriculum_action_from_entries(
-        problem, ((0, min(problem.total_budget, problem.coordinate_caps[0])),)
-    )
-    outcome = fixed_action_worst_correspondence(
-        problem,
-        action,
-        active_config().solvers.exact_sparse.lap_objective_tie_tolerance,
-        active_config().solvers.exact_sparse.action_tie_tolerance,
-    )
-    metric = MetricRecord(
-        experiment=experiment,
-        pair=DirectedPairName("synthetic"),
-        method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-        condition=EvaluationConditionName("generated"),
-        seed=seed,
-        metric_name=MetricId.ACTIVE_IMAGE_CANDIDATES,
-        metric_value=float(outcome.active_image_candidates),
-        metric_unit=MetricUnit("count"),
-        direction=MetricDirection.DESCRIPTIVE,
-        evaluation_class_set_sha256=Sha256Digest(
-            hashlib.sha256(b"synthetic-correspondence").hexdigest()
-        ),
-        input_artifact_ids=(ArtifactIdentifier("synthetic-generator"),),
-        dependency_fingerprint_sha256=Sha256Digest(fingerprint),
-        valid=True,
-        invalid_reason=None,
-    )
-    validate_metric_records(MetricRecordCollection((metric,)))
-    dense = None
-    if experiment == ExperimentName.SPARSITY_AND_DENSE_FALLBACK:
-        dense = solve_dense_ccp(problem, seed, SemanticCoordinates(experiment.value))
-    return cast(
-        StableJsonPayload,
-        OrderedDict(
-            experiment=experiment.value,
-            seed=seed,
-            block_pattern=list(pattern),
-            response_shape=list(instance.lower_response_matrix.shape),
-            separator_objective=outcome.separator_objective,
-            active_image_candidates=outcome.active_image_candidates,
-            lap_calls=outcome.lap_calls,
-            worst_correspondence_images=list(outcome.worst_correspondence.images),
-            metric_record=metric.model_dump(mode="json"),
-            dense_ccp=(
-                None
-                if dense is None
-                else OrderedDict(
-                    master_objective=dense.master_objective,
-                    projected_objective=dense.best_projected_response_objective,
-                    bound_gap=dense.dense_bound_gap,
-                    integrality_residual=dense.integrality_residual,
-                    exact=dense.is_exact,
-                )
-            ),
         ),
     )
 
@@ -1817,9 +1782,10 @@ def _target_confirmatory_checkpoint_path(
     layout: WorkspaceLayout,
     target: DatasetId,
     seed: RandomSeed,
+    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
 ) -> Path:
     return (
-        experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
+        experiment_workspace(layout, checkpoint_source_experiment)
         / "checkpoints"
         / CheckpointDirectorySegment.TRAINING
         / target.value
@@ -1845,8 +1811,11 @@ def _score_local_only_cell(
     materialized: MaterializedClient,
     seed: RandomSeed,
     device: torch.device,
+    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
 ) -> tuple[ScoreArtifact, ClassCount, ArtifactIdentifier] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    checkpoint_path = _target_confirmatory_checkpoint_path(
+        layout, target, seed, checkpoint_source_experiment
+    )
     if not checkpoint_path.is_file():
         return None
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
@@ -1896,7 +1865,7 @@ def persist_primary_transfer_metric(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
-    pair_direction: str,
+    pair_direction: DirectedPairName,
     directed_pair_source: DatasetId,
     directed_pair_target: DatasetId,
     method: TransferMethod,
@@ -1907,12 +1876,14 @@ def persist_primary_transfer_metric(
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
+    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
 ) -> ReusableArtifactManifest | None:
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
         directed_pair=DirectedPair(source=directed_pair_source, target=directed_pair_target),
         method=method,
+        condition=ExperimentCondition(condition),
         seed=ExperimentSeed(seed),
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -1932,9 +1903,9 @@ def persist_primary_transfer_metric(
             return existing
     metric = MetricRecord(
         experiment=experiment,
-        pair=DirectedPairName(pair_direction),
+        pair=pair_direction,
         method=method,
-        condition=EvaluationConditionName("principal"),
+        condition=condition,
         seed=seed,
         metric_name=metric_name,
         metric_value=metric_value,
@@ -1955,7 +1926,7 @@ def persist_primary_transfer_metric(
         / "derived"
         / (
             f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
-            f".{method.value}.{seed}.{metric_name.value}.json"
+            f".{method.value}.{condition}.{seed}.{metric_name.value}.json"
         )
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
@@ -2026,7 +1997,9 @@ def execute_primary_strict_cross_telemetry_transfer(
             with contextlib.suppress(MaterializationError):
                 materialized_by_target[source] = materialize_client(source, raw_root)
         source_materialized = materialized_by_target.get(source)
-        pair_direction = f"{directed_pair.source.value} -> {directed_pair.target.value}"
+        pair_direction = DirectedPairName(
+            f"{directed_pair.source.value} -> {directed_pair.target.value}"
+        )
         for seed in confirmatory_seeds:
             local_only = _score_local_only_cell(store, layout, target, materialized, seed, device)
             if local_only is not None:
@@ -2192,7 +2165,7 @@ def _persist_primary_transfer_cell_metrics(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
-    pair_direction: str,
+    pair_direction: DirectedPairName,
     source: DatasetId,
     target: DatasetId,
     method: TransferMethod,
@@ -2200,6 +2173,7 @@ def _persist_primary_transfer_cell_metrics(
     score: ScoreArtifact,
     n_classes: ClassCount,
     input_artifact_ids: tuple[ArtifactIdentifier, ...],
+    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
 ) -> None:
     f1_set, recall_set = class_metric_sets(score, n_classes)
     for metric_name, metric_value, metric_unit, direction in (
@@ -2237,6 +2211,7 @@ def _persist_primary_transfer_cell_metrics(
             direction,
             input_artifact_ids,
             request.overwrite_policy,
+            condition,
         )
 
 
@@ -2272,6 +2247,27 @@ def _iter_completed_json_payloads(
                 yield resolved, record_payload
 
 
+def completed_experiment_metric_records(
+    store: ArtifactStore, experiment: ExperimentName
+) -> tuple[MetricRecord, ...]:
+    return tuple(
+        MetricRecord.model_validate(payload)
+        for _, payload in _iter_completed_json_payloads(store, experiment, "metric_record")
+    )
+
+
+def completed_experiment_metric_records_with_support(
+    store: ArtifactStore, experiment: ExperimentName
+) -> tuple[tuple[MetricRecord, SupportCount | None], ...]:
+    results: list[tuple[MetricRecord, SupportCount | None]] = []
+    for manifest, payload in _iter_completed_json_payloads(store, experiment, "metric_record"):
+        record = MetricRecord.model_validate(payload)
+        coordinates = json.loads(manifest.semantic_producer_coordinates)
+        support = coordinates.get("support")
+        results.append((record, support))
+    return tuple(results)
+
+
 def completed_primary_transfer_metric_records(store: ArtifactStore) -> tuple[MetricRecord, ...]:
     return tuple(
         MetricRecord.model_validate(payload)
@@ -2294,8 +2290,10 @@ def completed_primary_transfer_comparison_records(
 
 def _completed_primary_transfer_macro_ce(
     store: ArtifactStore,
-) -> Mapping[tuple[str, TransferMethod, RandomSeed], _SeedMetric]:
-    result: OrderedDict[tuple[str, TransferMethod, RandomSeed], _SeedMetric] = OrderedDict()
+) -> Mapping[tuple[DirectedPairName, TransferMethod, RandomSeed], _SeedMetric]:
+    result: OrderedDict[tuple[DirectedPairName, TransferMethod, RandomSeed], _SeedMetric] = (
+        OrderedDict()
+    )
     for resolved, record_payload in _iter_completed_json_payloads(
         store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record"
     ):
@@ -2316,7 +2314,7 @@ def persist_primary_transfer_comparison(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
-    pair: str,
+    pair: DirectedPairName,
     method: TransferMethod,
     paired_seed_count: Index,
     mean_difference: float | None,
@@ -2548,6 +2546,245 @@ def execute_statistical_synthesis(
                 input_ids,
                 request.overwrite_policy,
             )
+    gap_metrics = _completed_real_packet_coupling_gap(store)
+    coupling_pairs = sorted({pair for pair, _ in gap_metrics})
+    coupling_raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
+    coupling_contrasts: OrderedDict[
+        str,
+        tuple[
+            Index,
+            float | None,
+            float | None,
+            float | None,
+            float | None,
+            tuple[ArtifactIdentifier, ...],
+        ],
+    ] = OrderedDict()
+    for pair in coupling_pairs:
+        pair_seeds = OrderedDict(
+            (seed, entry)
+            for (candidate_pair, seed), entry in gap_metrics.items()
+            if candidate_pair == pair
+        )
+        seeds = sorted(pair_seeds)
+        paired_seed_count: Index = len(seeds)
+        input_ids = tuple(pair_seeds[seed].artifact_id for seed in seeds)
+        if len(seeds) < statistics_config.minimum_valid_paired_seeds:
+            coupling_contrasts[pair] = (paired_seed_count, None, None, None, None, input_ids)
+            continue
+        gap_values = tuple(pair_seeds[seed].value for seed in seeds)
+        zero_reference = tuple(0.0 for _ in gap_values)
+        bca = paired_bca_interval(
+            gap_values,
+            zero_reference,
+            statistical_bootstrap_seed(
+                ContrastName(f"Exact correspondence orbit vs Matched-Resource Rectangular: {pair}"),
+                MultiplicityFamily.COUPLING_MECHANISM,
+                DirectedPairName(pair),
+                MetricId.ROBUST_COUPLING_VALUE_GAP,
+                BootstrapPurpose("coupling-mechanism-gap"),
+            ),
+        )
+        sign_flip = exact_sign_flip_test(gap_values, zero_reference)
+        coupling_raw_p_by_pair[pair] = sign_flip.p_value
+        coupling_contrasts[pair] = (
+            paired_seed_count,
+            float(sign_flip.mean_difference),
+            float(sign_flip.median_difference),
+            None if bca.lower is None else float(bca.lower),
+            None if bca.upper is None else float(bca.upper),
+            input_ids,
+        )
+    coupling_holm_adjusted = holm_step_down(
+        PValueSet(
+            tuple(
+                NamedPValue(PValueName(pair), p_value)
+                for pair, p_value in coupling_raw_p_by_pair.items()
+            )
+        )
+    )
+    coupling_criteria = active_config().scientific.evaluation_criteria.coupling_mechanism
+    for pair in coupling_pairs:
+        (
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            input_ids,
+        ) = coupling_contrasts[pair]
+        if mean_difference is None:
+            decision = ComparisonDecision.INSUFFICIENT_EVIDENCE
+            raw_p = None
+            holm_p = None
+        else:
+            raw_p = coupling_raw_p_by_pair[pair]
+            holm_p = coupling_holm_adjusted.value_of(PValueName(pair))
+            if bca_low is None:
+                decision = ComparisonDecision.DEGENERATE
+            elif (
+                holm_p is not None
+                and holm_p <= coupling_criteria.holm_adjusted_p_maximum
+                and bca_low > 0.0
+            ):
+                decision = ComparisonDecision.SUPERIOR
+            else:
+                decision = ComparisonDecision.NOT_SUPPORTED
+        if not input_ids:
+            continue
+        persist_coupling_mechanism_comparison(
+            store,
+            layout,
+            request.experiment,
+            DirectedPairName(pair),
+            paired_seed_count,
+            mean_difference,
+            median_difference,
+            bca_low,
+            bca_high,
+            raw_p,
+            float(holm_p) if holm_p is not None else None,
+            decision,
+            input_ids,
+            request.overwrite_policy,
+        )
+
+
+def _completed_real_packet_coupling_gap(
+    store: ArtifactStore,
+) -> Mapping[tuple[DirectedPairName, RandomSeed], _SeedMetric]:
+    result: OrderedDict[tuple[DirectedPairName, RandomSeed], _SeedMetric] = OrderedDict()
+    for resolved, record_payload in _iter_completed_json_payloads(
+        store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION, "metric_record"
+    ):
+        record = MetricRecord.model_validate(record_payload)
+        if (
+            record.metric_name != MetricId.ROBUST_COUPLING_VALUE_GAP
+            or record.method != TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            or not record.valid
+            or record.metric_value is None
+        ):
+            continue
+        result[(record.pair, record.seed)] = _SeedMetric(
+            float(record.metric_value), resolved.artifact_id
+        )
+    return result
+
+
+def persist_coupling_mechanism_comparison(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    pair: DirectedPairName,
+    paired_seed_count: Index,
+    mean_difference: float | None,
+    median_difference: float | None,
+    bca_ci_low: float | None,
+    bca_ci_high: float | None,
+    raw_p: float | None,
+    holm_p: float | None,
+    decision: ComparisonDecision,
+    input_metric_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        directed_pair=DirectedPair(
+            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
+        ),
+        method=TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.STATISTICS,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    comparison = PairedComparisonRecord(
+        contrast_name=ContrastName(
+            f"Exact correspondence orbit vs Matched-Resource Rectangular: {pair}"
+        ),
+        family=MultiplicityFamily.COUPLING_MECHANISM,
+        pair=DirectedPairName(pair),
+        method_a=ExperimentLocalMethod.EXACT_ORBIT,
+        method_b=TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+        metric=MetricId.ROBUST_COUPLING_VALUE_GAP,
+        paired_seed_count=paired_seed_count,
+        mean_difference=mean_difference,
+        median_difference=median_difference,
+        bca_ci_low=bca_ci_low,
+        bca_ci_high=bca_ci_high,
+        raw_p=raw_p,
+        holm_p=holm_p,
+        materiality_threshold=active_config().scientific.materiality.coupling_objective_units,
+        equivalence_margin_low=None,
+        equivalence_margin_high=None,
+        input_metric_artifact_ids=tuple(input_metric_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        decision=decision,
+    )
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"coupling-comparison.{pair.replace(' -> ', '-to-')}.json"
+    )
+    payload = cast(
+        StableJsonPayload, OrderedDict(comparison_record=comparison.model_dump(mode="json"))
+    )
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.STATISTICS,
+        upstream_artifact_ids=tuple(input_metric_artifact_ids),
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.OTHER,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.STATISTICS,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=tuple(input_metric_artifact_ids),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
 
 
 def _dataset_eligible_groups_by_coarse(
@@ -2886,6 +3123,60 @@ def assemble_cross_client_response_matrix(
     return matrix
 
 
+def _original_groups_for_bucket(
+    common_coarse: tuple[CoarseGroup, ...],
+    group_bucket_of: Mapping[CoarseGroup, CoarseGroup],
+) -> OrderedDict[CoarseGroup, tuple[CoarseGroup, ...]]:
+    by_bucket: OrderedDict[CoarseGroup, list[CoarseGroup]] = OrderedDict()
+    for group in common_coarse:
+        bucket = group_bucket_of.get(group, group)
+        by_bucket.setdefault(bucket, []).append(group)
+    return OrderedDict((bucket, tuple(groups)) for bucket, groups in by_bucket.items())
+
+
+def _regroup_eligible_groups(
+    eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]],
+) -> OrderedDict[CoarseGroup, tuple[TransferConceptGroup, ...]]:
+    merged: OrderedDict[CoarseGroup, tuple[TransferConceptGroup, ...]] = OrderedDict()
+    for bucket, originals in groups_by_bucket.items():
+        combined: list[TransferConceptGroup] = []
+        for original in originals:
+            combined.extend(eligible_by_coarse[original])
+        merged[bucket] = tuple(combined)
+    return merged
+
+
+def assemble_merged_cross_client_response_matrix(
+    blocks: PaddedBlockStructure,
+    groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]],
+    source_eligible_original: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    packets_by_original_group: Mapping[CoarseGroup, SourcePacket],
+    array_selector: Callable[[SourcePacket], ResponseMatrix],
+) -> ResponseMatrix:
+    size = blocks.total_padded_nodes
+    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
+    for block_index, bucket in enumerate(blocks.coarse_groups):
+        block_range = blocks.block_index_range(block_index)
+        offset = 0
+        for original in groups_by_bucket[bucket]:
+            original_source_real = len(source_eligible_original[original])
+            packet = packets_by_original_group.get(original)
+            if packet is not None:
+                submatrix = array_selector(packet)
+                if submatrix.shape != (original_source_real, original_source_real):
+                    raise ExecutionError(
+                        f"source packet for {original.value} has shape {submatrix.shape}, "
+                        f"expected {(original_source_real, original_source_real)}"
+                    )
+                start = block_range.start + offset
+                matrix[
+                    start : start + original_source_real, start : start + original_source_real
+                ] = submatrix
+            offset += original_source_real
+    return matrix
+
+
 def assemble_target_response_matrix(
     blocks: PaddedBlockStructure,
     target_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
@@ -3143,7 +3434,24 @@ def _score_point_correspondence_commitment_cell(
     return score, n_classes, input_artifact_ids
 
 
-def _score_robust_action_cell(
+@dataclass(frozen=True, slots=True)
+class PrincipalActionAssembly:
+    problem: RobustActionProblem
+    blocks: PaddedBlockStructure
+    action: CurriculumAction
+    checkpoint: BaseCheckpoint
+    checkpoint_artifact_id: ArtifactIdentifier
+    model: torch.nn.Module
+    train: SplitTensors
+    confirm: SplitTensors
+    test: SplitTensors
+    n_classes: ClassCount
+    target_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
+    input_artifact_ids: tuple[ArtifactIdentifier, ...]
+    first_packet_artifact_id: ArtifactIdentifier
+
+
+def _assemble_principal_action(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -3152,28 +3460,18 @@ def _score_robust_action_cell(
     target_materialized: MaterializedClient,
     seed: RandomSeed,
     device: torch.device,
-    method_slug: str,
     solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
-    settle_and_score: Callable[
-        [
-            torch.nn.Module,
-            torch.optim.AdamW,
-            BaseCheckpoint,
-            SplitTensors,
-            SplitTensors,
-            SplitTensors,
-            CurriculumMultipliers,
-            CurriculumAction,
-            RandomSeed,
-            ContrastCoordinates,
-            AssimilationCoordinates,
-            ClassCount,
-        ],
-        ScoreArtifact,
+    group_bucket_of: Mapping[CoarseGroup, CoarseGroup] | None = None,
+    perturb: Callable[
+        [PaddedBlockStructure, ResponseMatrix, ResponseMatrix],
+        tuple[ResponseMatrix, ResponseMatrix],
     ]
     | None = None,
-) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
+) -> PrincipalActionAssembly | None:
+    checkpoint_path = _target_confirmatory_checkpoint_path(
+        layout, target, seed, checkpoint_source_experiment
+    )
     if not checkpoint_path.is_file():
         return None
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
@@ -3182,9 +3480,8 @@ def _score_robust_action_cell(
     common = _common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
         return None
-    source_eligible, target_eligible = common
-    common_coarse = tuple(target_eligible)
-    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    source_eligible_original, target_eligible_original = common
+    common_coarse = tuple(target_eligible_original)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
         packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
@@ -3192,12 +3489,33 @@ def _score_robust_action_cell(
             packets_by_coarse[coarse_group] = packet
     if not packets_by_coarse:
         return None
-    lower_matrix = assemble_cross_client_response_matrix(
-        blocks, packets_by_coarse, SourcePacket.lower_matrix
+    if group_bucket_of is None:
+        source_eligible = source_eligible_original
+        target_eligible = target_eligible_original
+        groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]] = OrderedDict(
+            (group, (group,)) for group in common_coarse
+        )
+    else:
+        groups_by_bucket = _original_groups_for_bucket(common_coarse, group_bucket_of)
+        source_eligible = _regroup_eligible_groups(source_eligible_original, groups_by_bucket)
+        target_eligible = _regroup_eligible_groups(target_eligible_original, groups_by_bucket)
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    lower_matrix = assemble_merged_cross_client_response_matrix(
+        blocks,
+        groups_by_bucket,
+        source_eligible_original,
+        packets_by_coarse,
+        SourcePacket.lower_matrix,
     )
-    upper_matrix = assemble_cross_client_response_matrix(
-        blocks, packets_by_coarse, SourcePacket.upper_matrix
+    upper_matrix = assemble_merged_cross_client_response_matrix(
+        blocks,
+        groups_by_bucket,
+        source_eligible_original,
+        packets_by_coarse,
+        SourcePacket.upper_matrix,
     )
+    if perturb is not None:
+        lower_matrix, upper_matrix = perturb(blocks, lower_matrix, upper_matrix)
     checkpoint = load_base_checkpoint(checkpoint_path)
     n_classes = target_materialized.class_manifest.class_count
     train = target_materialized.splits[Split.TRAIN]
@@ -3235,12 +3553,6 @@ def _score_robust_action_cell(
     action = solve_action(problem, seed)
     if action is None:
         return None
-    multipliers = curriculum_multipliers_from_action(action, blocks, target_eligible, n_classes)
-    optimizer = make_adamw(
-        model,
-        checkpoint.selected_hyperparameters.learning_rate,
-        checkpoint.selected_hyperparameters.weight_decay,
-    )
     input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
         checkpoint_artifact_id,
         *(
@@ -3249,6 +3561,84 @@ def _score_robust_action_cell(
         ),
     )
     first_packet = next(iter(packets_by_coarse.values()))
+    return PrincipalActionAssembly(
+        problem=problem,
+        blocks=blocks,
+        action=action,
+        checkpoint=checkpoint,
+        checkpoint_artifact_id=checkpoint_artifact_id,
+        model=model,
+        train=train,
+        confirm=confirm,
+        test=test,
+        n_classes=n_classes,
+        target_eligible=target_eligible,
+        input_artifact_ids=input_artifact_ids,
+        first_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
+    )
+
+
+def _score_robust_action_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+    method_slug: str,
+    solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
+    settle_and_score: Callable[
+        [
+            torch.nn.Module,
+            torch.optim.AdamW,
+            BaseCheckpoint,
+            SplitTensors,
+            SplitTensors,
+            SplitTensors,
+            CurriculumMultipliers,
+            CurriculumAction,
+            RandomSeed,
+            ContrastCoordinates,
+            AssimilationCoordinates,
+            ClassCount,
+        ],
+        ScoreArtifact,
+    ]
+    | None = None,
+    group_bucket_of: Mapping[CoarseGroup, CoarseGroup] | None = None,
+    perturb: Callable[
+        [PaddedBlockStructure, ResponseMatrix, ResponseMatrix],
+        tuple[ResponseMatrix, ResponseMatrix],
+    ]
+    | None = None,
+    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    assembly = _assemble_principal_action(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        solve_action,
+        group_bucket_of,
+        perturb,
+        checkpoint_source_experiment,
+    )
+    if assembly is None:
+        return None
+    multipliers = curriculum_multipliers_from_action(
+        assembly.action, assembly.blocks, assembly.target_eligible, assembly.n_classes
+    )
+    optimizer = make_adamw(
+        assembly.model,
+        assembly.checkpoint.selected_hyperparameters.learning_rate,
+        assembly.checkpoint.selected_hyperparameters.weight_decay,
+    )
     contrast_coordinates = ContrastCoordinates(
         f"{method_slug}:{source.value}-to-{target.value}:{seed}"
     )
@@ -3257,40 +3647,40 @@ def _score_robust_action_cell(
         directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
         condition=EvaluationConditionName("principal"),
         seed=seed,
-        clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
-        source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
-        action_artifact_sha256=_action_sha256(action),
+        clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
+        source_packet_artifact_id=assembly.first_packet_artifact_id,
+        action_artifact_sha256=_action_sha256(assembly.action),
     )
     if settle_and_score is None:
         score = _confirm_assimilate_and_score(
-            model,
+            assembly.model,
             optimizer,
-            checkpoint,
-            train,
-            confirm,
-            test,
+            assembly.checkpoint,
+            assembly.train,
+            assembly.confirm,
+            assembly.test,
             multipliers,
             seed,
             contrast_coordinates,
             assimilation_coordinates,
-            n_classes,
+            assembly.n_classes,
         )
     else:
         score = settle_and_score(
-            model,
+            assembly.model,
             optimizer,
-            checkpoint,
-            train,
-            confirm,
-            test,
+            assembly.checkpoint,
+            assembly.train,
+            assembly.confirm,
+            assembly.test,
             multipliers,
-            action,
+            assembly.action,
             seed,
             contrast_coordinates,
             assimilation_coordinates,
-            n_classes,
+            assembly.n_classes,
         )
-    return score, n_classes, input_artifact_ids
+    return score, assembly.n_classes, assembly.input_artifact_ids
 
 
 def _solve_fedorbit_exact_sparse_action(
@@ -3664,7 +4054,7 @@ def execute_mechanism_ablations(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
-        pair_direction = f"{source.value} -> {target.value}"
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
             for method, scorer in scorers:
                 scored = scorer(
@@ -3695,6 +4085,113 @@ def execute_mechanism_ablations(
                 )
 
 
+def _confirm_assimilate_score_capturing_verdict(
+    verdicts: list[ConfirmationVerdict],
+) -> Callable[
+    [
+        torch.nn.Module,
+        torch.optim.AdamW,
+        BaseCheckpoint,
+        SplitTensors,
+        SplitTensors,
+        SplitTensors,
+        CurriculumMultipliers,
+        CurriculumAction,
+        RandomSeed,
+        ContrastCoordinates,
+        AssimilationCoordinates,
+        ClassCount,
+    ],
+    ScoreArtifact,
+]:
+    def settle_and_score(
+        model: torch.nn.Module,
+        optimizer: torch.optim.AdamW,
+        checkpoint: BaseCheckpoint,
+        train: SplitTensors,
+        confirm: SplitTensors,
+        test: SplitTensors,
+        multipliers: CurriculumMultipliers,
+        action: CurriculumAction,
+        seed: RandomSeed,
+        contrast_coordinates: ContrastCoordinates,
+        assimilation_coordinates: AssimilationCoordinates,
+        n_classes: ClassCount,
+    ) -> ScoreArtifact:
+        del action
+        pre_confirm = capture_pre_confirm_pair(model, optimizer)
+        verdict = run_proposal_confirmation(
+            ConfirmationRequest(
+                model,
+                pre_confirm.baseline,
+                pre_confirm.curriculum,
+                train.features,
+                train.targets,
+                confirm.features,
+                confirm.targets,
+                checkpoint.train_class_weights,
+                multipliers,
+                checkpoint.selected_hyperparameters,
+                seed,
+                contrast_coordinates,
+            )
+        )
+        verdicts.append(verdict)
+        lifecycle = PreTestLifecycle()
+        lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
+        lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
+        lifecycle.complete_phase(PreTestPhase.CONFIRMATION_DECISION_FINALIZED)
+        if verdict.accepted:
+            apply_accepted_assimilation(
+                model,
+                optimizer,
+                pre_confirm.curriculum,
+                train.features,
+                train.targets,
+                checkpoint.train_class_weights,
+                multipliers,
+                seed,
+                assimilation_coordinates,
+            )
+        else:
+            settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
+        lifecycle.complete_phase(PreTestPhase.ASSIMILATION_SETTLED)
+        lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
+        lifecycle.open_test()
+        lifecycle.assert_opened()
+        return score_model(
+            ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
+        )
+
+    return settle_and_score
+
+
+def _score_fedorbit_with_confirmation_verdict_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    device: torch.device,
+    verdicts: list[ConfirmationVerdict],
+) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
+    return _score_robust_action_cell(
+        store,
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+        device,
+        "fedorbit-exact-sparse-solver",
+        _solve_fedorbit_exact_sparse_action,
+        _confirm_assimilate_score_capturing_verdict(verdicts),
+    )
+
+
 def execute_target_confirmation_and_portability(
     store: ArtifactStore,
     layout: WorkspaceLayout,
@@ -3715,10 +4212,6 @@ def execute_target_confirmation_and_portability(
                 materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
         return materialized_by_dataset.get(dataset)
 
-    scorers = (
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
-        (TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION, _score_fedorbit_without_confirmation_cell),
-    )
     for directed_pair in directed_pairs:
         source = directed_pair.source
         target = directed_pair.target
@@ -3726,22 +4219,22 @@ def execute_target_confirmation_and_portability(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
-        pair_direction = f"{source.value} -> {target.value}"
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
-            for method, scorer in scorers:
-                scored = scorer(
-                    store,
-                    layout,
-                    source,
-                    target,
-                    source_materialized,
-                    target_materialized,
-                    seed,
-                    device,
-                )
-                if scored is None:
-                    continue
-                score, n_classes, input_artifact_ids = scored
+            verdicts: list[ConfirmationVerdict] = []
+            with_confirmation = _score_fedorbit_with_confirmation_verdict_cell(
+                store,
+                layout,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                device,
+                verdicts,
+            )
+            if with_confirmation is not None:
+                score, n_classes, input_artifact_ids = with_confirmation
                 _persist_primary_transfer_cell_metrics(
                     store,
                     layout,
@@ -3749,7 +4242,49 @@ def execute_target_confirmation_and_portability(
                     pair_direction,
                     source,
                     target,
-                    method,
+                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                )
+                for verdict in verdicts:
+                    persist_primary_transfer_metric(
+                        store,
+                        layout,
+                        request.experiment,
+                        pair_direction,
+                        source,
+                        target,
+                        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        seed,
+                        MetricId.PROPOSAL_ACCEPTANCE_RATE,
+                        1.0 if verdict.accepted else 0.0,
+                        MetricUnit("fraction"),
+                        MetricDirection.DESCRIPTIVE,
+                        input_artifact_ids,
+                        request.overwrite_policy,
+                    )
+            without_confirmation = _score_fedorbit_without_confirmation_cell(
+                store,
+                layout,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                device,
+            )
+            if without_confirmation is not None:
+                score, n_classes, input_artifact_ids = without_confirmation
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
                     seed,
                     score,
                     n_classes,
@@ -3809,7 +4344,7 @@ def execute_secondary_cross_modality_generalization(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
-        pair_direction = f"{source.value} -> {target.value}"
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
             for method, scorer in scorers:
                 scored = scorer(
@@ -3838,6 +4373,1952 @@ def execute_secondary_cross_modality_generalization(
                     n_classes,
                     input_artifact_ids,
                 )
+
+
+def persist_synthetic_benchmark_metric(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    method: TransferMethod,
+    seed: RandomSeed,
+    metric_name: MetricId,
+    metric_value: float,
+    metric_unit: MetricUnit,
+    direction: MetricDirection,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        method=method,
+        condition=ExperimentCondition(condition),
+        support=SupportSize(support),
+        seed=ExperimentSeed(seed),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.EVALUATION,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_artifact_ids),
+            _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    metric = MetricRecord(
+        experiment=experiment,
+        pair=DirectedPairName("synthetic"),
+        method=method,
+        condition=condition,
+        seed=seed,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        metric_unit=metric_unit,
+        direction=direction,
+        evaluation_class_set_sha256=Sha256Digest(
+            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
+        ),
+        input_artifact_ids=tuple(input_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        valid=True,
+        invalid_reason=None,
+    )
+    validate_metric_records(MetricRecordCollection((metric,)))
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"metric.{condition}.support-{support}.{method.value}.{seed}.{metric_name.value}.json"
+    )
+    payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.EVALUATION,
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.PREDICTION,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.EVALUATION,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=(),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
+def _synthetic_solver_instance(
+    node_count: ConceptCount,
+    block_pattern: ScalabilityBlockPattern,
+    support: SupportCount,
+    seed: RandomSeed,
+) -> tuple[RobustActionProblem, CurriculumAction, PaddedBlockStructure]:
+    instance = generate_scalability_instance(
+        ScalabilityInstanceRequest(node_count, block_pattern, support, seed)
+    )
+    groups = tuple(CoarseGroup)[:2]
+    counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
+    blocks = build_padded_block_structure(groups, counts, counts)
+    problem = build_robust_action_problem(
+        blocks,
+        instance.lower_response_matrix,
+        instance.lower_response_matrix,
+        instance.target_importance,
+        tuple(range(support)),
+    )
+    action = CurriculumAction(problem=problem, coordinates=instance.fixed_action)
+    return problem, action, blocks
+
+
+def _solver_benchmark_reference_truth(
+    blocks: PaddedBlockStructure,
+    action: CurriculumAction,
+    exhaustive_truth_correspondence_count_maximum: StepCount,
+) -> Score | None:
+    if blocks.orbit_size > exhaustive_truth_correspondence_count_maximum:
+        return None
+    return min(
+        evaluate_objective(action, correspondence)
+        for correspondence in enumerate_block_permutations(blocks)
+    )
+
+
+def _persist_solver_benchmark_error_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    method: TransferMethod,
+    seed: RandomSeed,
+    reference_truth: Score | None,
+    reported_objective: Score,
+    exact_validation_absolute_tolerance: Tolerance,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    if reference_truth is None:
+        return
+    absolute_error = abs(reported_objective - reference_truth)
+    persist_synthetic_benchmark_metric(
+        store,
+        layout,
+        experiment,
+        condition,
+        support,
+        method,
+        seed,
+        MetricId.ABSOLUTE_OBJECTIVE_ERROR,
+        float(absolute_error),
+        MetricUnit("score"),
+        MetricDirection.LOWER_IS_BETTER,
+        input_artifact_ids,
+        overwrite_policy,
+    )
+    relative_error = absolute_error / abs(reference_truth) if reference_truth != 0.0 else 0.0
+    persist_synthetic_benchmark_metric(
+        store,
+        layout,
+        experiment,
+        condition,
+        support,
+        method,
+        seed,
+        MetricId.RELATIVE_OBJECTIVE_ERROR,
+        float(relative_error),
+        MetricUnit("fraction"),
+        MetricDirection.LOWER_IS_BETTER,
+        input_artifact_ids,
+        overwrite_policy,
+    )
+    persist_synthetic_benchmark_metric(
+        store,
+        layout,
+        experiment,
+        condition,
+        support,
+        method,
+        seed,
+        MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY,
+        1.0
+        if verify_exactness_certificate(
+            reported_objective, reference_truth, exact_validation_absolute_tolerance
+        )
+        else 0.0,
+        MetricUnit("boolean"),
+        MetricDirection.HIGHER_IS_BETTER,
+        input_artifact_ids,
+        overwrite_policy,
+    )
+
+
+def _persist_solver_benchmark_efficiency_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    method: TransferMethod,
+    seed: RandomSeed,
+    measurement: EfficiencyMeasurement,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    for metric_name, metric_value, metric_unit in (
+        (MetricId.WALL_TIME, measurement.wall_time_seconds, MetricUnit("seconds")),
+        (MetricId.PEAK_HOST_RSS, measurement.peak_host_rss_mib, MetricUnit("mib")),
+        (
+            MetricId.PEAK_CUDA_ALLOCATED_BYTES,
+            float(measurement.peak_cuda_allocated_bytes),
+            MetricUnit("bytes"),
+        ),
+    ):
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            method,
+            seed,
+            metric_name,
+            float(metric_value),
+            metric_unit,
+            MetricDirection.LOWER_IS_BETTER,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+
+
+def _score_exact_sparse_solver_benchmark_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    seed: RandomSeed,
+    problem: RobustActionProblem,
+    action: CurriculumAction,
+    reference_truth: Score | None,
+    methods: tuple[MethodName, ...],
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
+    solver_config = active_config().solvers.exact_sparse
+    if TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER in methods:
+        with measure_efficiency() as efficiency:
+            outcome = fixed_action_worst_correspondence(
+                problem,
+                action,
+                solver_config.lap_objective_tie_tolerance,
+                solver_config.action_tie_tolerance,
+            )
+        _persist_solver_benchmark_efficiency_metrics(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            efficiency.result,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        _persist_solver_benchmark_error_metrics(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            reference_truth,
+            outcome.separator_objective,
+            solver_config.exact_validation_absolute_tolerance,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.ACTIVE_IMAGE_CANDIDATES,
+            float(outcome.active_image_candidates),
+            MetricUnit("count"),
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.LAP_CALLS,
+            float(outcome.lap_calls),
+            MetricUnit("count"),
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+    if TransferMethod.GENERIC_EXACT_QAP in methods:
+        with measure_efficiency() as efficiency:
+            qap_result = fixed_action_worst_correspondence_qap(problem, action)
+        _persist_solver_benchmark_efficiency_metrics(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.GENERIC_EXACT_QAP,
+            seed,
+            efficiency.result,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.GENERIC_EXACT_QAP,
+            seed,
+            MetricId.TIMEOUT_INDICATOR,
+            1.0 if qap_result.terminal_state == TerminalState.TIME_LIMIT else 0.0,
+            MetricUnit("boolean"),
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        if qap_result.certified and qap_result.objective_value is not None:
+            _persist_solver_benchmark_error_metrics(
+                store,
+                layout,
+                experiment,
+                condition,
+                support,
+                TransferMethod.GENERIC_EXACT_QAP,
+                seed,
+                reference_truth,
+                qap_result.objective_value,
+                solver_config.exact_validation_absolute_tolerance,
+                input_artifact_ids,
+                overwrite_policy,
+            )
+    if TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK in methods:
+        with measure_efficiency() as efficiency:
+            dense_outcome = solve_dense_ccp(
+                problem,
+                seed,
+                SemanticCoordinates(f"{experiment.value}:{condition}:{support}:{seed}"),
+            )
+        _persist_solver_benchmark_efficiency_metrics(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
+            seed,
+            efficiency.result,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        for metric_name, metric_value in (
+            (MetricId.DENSE_RELAXATION_BOUND, dense_outcome.relaxation_lower_bound),
+            (MetricId.DENSE_PROJECTED_OBJECTIVE, dense_outcome.best_projected_response_objective),
+            (MetricId.DENSE_BOUND_GAP, dense_outcome.dense_bound_gap),
+            (MetricId.DENSE_INTEGRALITY_RESIDUAL, dense_outcome.integrality_residual),
+        ):
+            persist_synthetic_benchmark_metric(
+                store,
+                layout,
+                experiment,
+                condition,
+                support,
+                TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
+                seed,
+                metric_name,
+                float(metric_value),
+                MetricUnit("score"),
+                MetricDirection.DESCRIPTIVE,
+                input_artifact_ids,
+                overwrite_policy,
+            )
+        _persist_solver_benchmark_error_metrics(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
+            seed,
+            reference_truth,
+            dense_outcome.best_projected_response_objective,
+            solver_config.exact_validation_absolute_tolerance,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+
+
+def execute_exact_sparse_solver_benchmark(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.exact_sparse_solver_benchmark
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    k_values: tuple[ConceptCount, ...] = tuple(
+        range(config.synthetic_k.minimum, config.synthetic_k.maximum + 1)
+    )
+    for node_count in k_values:
+        for pattern in config.block_patterns:
+            for support in config.supports:
+                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
+                for seed in confirmatory_seeds:
+                    try:
+                        problem, action, blocks = _synthetic_solver_instance(
+                            node_count, pattern, support, seed
+                        )
+                    except ScalabilityGenerationError:
+                        continue
+                    reference_truth = _solver_benchmark_reference_truth(
+                        blocks, action, config.exhaustive_truth_correspondence_count_maximum
+                    )
+                    _score_exact_sparse_solver_benchmark_cell(
+                        store,
+                        layout,
+                        request.experiment,
+                        condition,
+                        support,
+                        seed,
+                        problem,
+                        action,
+                        reference_truth,
+                        config.methods,
+                        request.overwrite_policy,
+                    )
+
+
+def execute_scalability_and_efficiency(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.scalability_and_efficiency
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    methods = (
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        TransferMethod.GENERIC_EXACT_QAP,
+    )
+    for node_count in config.k_values:
+        for pattern in config.block_patterns:
+            for support in config.exact_qap_supports:
+                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
+                for seed in confirmatory_seeds:
+                    try:
+                        problem, action, _ = _synthetic_solver_instance(
+                            node_count, pattern, support, seed
+                        )
+                    except ScalabilityGenerationError:
+                        continue
+                    _score_exact_sparse_solver_benchmark_cell(
+                        store,
+                        layout,
+                        request.experiment,
+                        condition,
+                        support,
+                        seed,
+                        problem,
+                        action,
+                        None,
+                        methods,
+                        request.overwrite_policy,
+                    )
+
+
+def persist_synthetic_diagnostic_metric(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    seed: RandomSeed,
+    metric_name: MetricId,
+    metric_value: float,
+    metric_unit: MetricUnit,
+    direction: MetricDirection,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        condition=ExperimentCondition(condition),
+        seed=ExperimentSeed(seed),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.EVALUATION,
+            cell,
+            relevance,
+            tuple(identifier.value for identifier in input_artifact_ids),
+            _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+            _MODULE_NAME,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    metric = MetricRecord(
+        experiment=experiment,
+        pair=DirectedPairName("synthetic"),
+        method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        condition=condition,
+        seed=seed,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        metric_unit=metric_unit,
+        direction=direction,
+        evaluation_class_set_sha256=Sha256Digest(
+            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
+        ),
+        input_artifact_ids=tuple(input_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        valid=True,
+        invalid_reason=None,
+    )
+    validate_metric_records(MetricRecordCollection((metric,)))
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "derived"
+        / f"metric.{condition}.{seed}.{metric_name.value}.json"
+    )
+    payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    completion = _completion(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        runtime_sha256,
+        stage=ArtifactStage.EVALUATION,
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(
+                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
+            ),
+            artifact_type=ArtifactType.PREDICTION,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.EVALUATION,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=(),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            material_runtime_sha256=runtime_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version="1.0",
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
+def _fixture_seed(
+    base_seed: RandomSeed, world_kind: UnresolvedMapWorldKind, fixture_index: Index
+) -> RandomSeed:
+    derived: RandomSeed = derive_seed32(
+        SeedDerivationRequest(
+            base_seed,
+            RngNamespace.SYNTHETIC_INSTANCE,
+            cast(
+                StableJsonPayload,
+                OrderedDict(world_kind=world_kind.value, fixture_index=fixture_index),
+            ),
+        )
+    )
+    return derived
+
+
+def _persist_map_world_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    world_kind: UnresolvedMapWorldKind,
+    fixture_index: Index,
+    seed: RandomSeed,
+    world: UnresolvedMapWorld,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    condition = EvaluationConditionName(f"{world_kind.value}-{fixture_index}")
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
+    for metric_name, metric_value in (
+        (MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, world.certified_robust_value),
+        (MetricId.EXACT_MAP_ACTION_VALUE, world.diagnostics.exact_map_action_value),
+        (MetricId.ORBIT_RADIUS_MAP_BOUND, world.diagnostics.bound),
+    ):
+        persist_synthetic_diagnostic_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            seed,
+            metric_name,
+            float(metric_value),
+            MetricUnit("score"),
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+
+
+def _run_unresolved_map_fixtures(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    world_kind: UnresolvedMapWorldKind,
+    fixtures_per_seed: ReplicateCount,
+) -> None:
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    for seed in confirmatory_seeds:
+        for fixture_index in range(fixtures_per_seed):
+            index: Index = fixture_index
+            fixture_seed = _fixture_seed(seed, world_kind, index)
+            world = generate_unresolved_map_world(
+                UnresolvedMapWorldRequest(world_kind, fixture_seed)
+            )
+            _persist_map_world_metrics(
+                store,
+                layout,
+                request.experiment,
+                world_kind,
+                index,
+                seed,
+                world,
+                request.overwrite_policy,
+            )
+
+
+def execute_common_action_under_unidentified_map(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.common_action_under_unidentified_map
+    _run_unresolved_map_fixtures(
+        store, layout, request, UnresolvedMapWorldKind.COMMON_ACTION, config.fixtures_per_seed
+    )
+
+
+def execute_robust_compromise_under_unidentified_map(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.robust_compromise_under_unidentified_map
+    _run_unresolved_map_fixtures(
+        store, layout, request, UnresolvedMapWorldKind.ROBUST_COMPROMISE, config.fixtures_per_seed
+    )
+
+
+def execute_map_dependent_action_boundary(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.map_dependent_action_boundary
+    _run_unresolved_map_fixtures(
+        store, layout, request, UnresolvedMapWorldKind.MAP_DEPENDENT, config.fixtures_per_seed
+    )
+
+
+def execute_exact_map_value_bound_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    config = active_config().experiments.exact_map_value_bound_validation
+    _run_unresolved_map_fixtures(
+        store,
+        layout,
+        request,
+        UnresolvedMapWorldKind.COMMON_ACTION,
+        config.zero_map_value_fixtures_per_seed,
+    )
+    _run_unresolved_map_fixtures(
+        store,
+        layout,
+        request,
+        UnresolvedMapWorldKind.MAP_DEPENDENT,
+        config.high_map_value_fixtures_per_seed,
+    )
+
+
+def _synthetic_coupling_problem(
+    instance: CouplingInstance,
+) -> tuple[RobustActionProblem, tuple[BlockCorrespondence, ...], CurriculumAction, RectangularHull]:
+    groups = tuple(CoarseGroup)[: len(instance.block_pattern)]
+    counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
+    blocks = build_padded_block_structure(groups, counts, counts)
+    orbit = tuple(enumerate_block_permutations(blocks))
+    problem = build_robust_action_problem(
+        blocks,
+        instance.lower_response_matrix,
+        instance.lower_response_matrix,
+        instance.target_importance,
+        tuple(range(sum(instance.block_pattern))),
+    )
+    alpha = CurriculumAction(problem=problem, coordinates=instance.active_action)
+    hull = build_rectangular_hull(
+        blocks, instance.lower_response_matrix, instance.lower_response_matrix
+    )
+    return problem, orbit, alpha, hull
+
+
+def _persist_coupling_mechanism_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    method: TransferMethod,
+    seed: RandomSeed,
+    problem: RobustActionProblem,
+    orbit: tuple[BlockCorrespondence, ...],
+    alpha: CurriculumAction,
+    hull: RectangularHull,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
+    candidates = (alpha, zero_action(problem))
+    for metric_name, metric_value in (
+        (
+            MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
+            fixed_action_rectangularization_gap(alpha, orbit, hull.lower_bounds),
+        ),
+        (
+            MetricId.ROBUST_COUPLING_VALUE_GAP,
+            robust_coupling_gap(candidates, problem, orbit, hull),
+        ),
+        (
+            MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
+            rectangular_value_over_candidates(candidates, problem, hull),
+        ),
+    ):
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            method,
+            seed,
+            metric_name,
+            float(metric_value),
+            MetricUnit("score"),
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+
+
+def execute_synthetic_coupling_mechanism_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    coupling_config = active_config().generators.coupling_structure
+    seeds = active_config().scientific.randomness.confirmatory_seeds
+    for compatibility in coupling_config.compatibility:
+        eligible_supports = eligible_coupling_support_sizes(compatibility, coupling_config.supports)
+        for support in eligible_supports:
+            for heterogeneity in coupling_config.response_heterogeneity:
+                for asymmetry in coupling_config.directed_asymmetry:
+                    for sparsity in coupling_config.response_sparsity:
+                        for block_pattern in coupling_config.block_patterns:
+                            condition = EvaluationConditionName(
+                                f"{compatibility.value}-{heterogeneity}-{asymmetry}-"
+                                f"{sparsity}-{'x'.join(str(size) for size in block_pattern)}"
+                            )
+                            for seed in seeds:
+                                coupling_request = CouplingInstanceRequest(
+                                    compatibility=compatibility,
+                                    response_heterogeneity=heterogeneity,
+                                    directed_asymmetry=asymmetry,
+                                    response_sparsity=sparsity,
+                                    block_pattern=tuple(block_pattern),
+                                    support_size=support,
+                                    seed=seed,
+                                    instance_index=0,
+                                )
+                                try:
+                                    instance = generate_coupling_instance(coupling_request)
+                                except CouplingGenerationError:
+                                    continue
+                                problem, orbit, alpha, hull = _synthetic_coupling_problem(instance)
+                                _persist_coupling_mechanism_metrics(
+                                    store,
+                                    layout,
+                                    request.experiment,
+                                    condition,
+                                    support,
+                                    TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                                    seed,
+                                    problem,
+                                    orbit,
+                                    alpha,
+                                    hull,
+                                    request.overwrite_policy,
+                                )
+                                destroyed = coupling_destroyed_matrices(
+                                    problem.blocks,
+                                    instance.lower_response_matrix,
+                                    instance.lower_response_matrix,
+                                    seed,
+                                    condition,
+                                )
+                                destroyed_problem = build_robust_action_problem(
+                                    problem.blocks,
+                                    destroyed.lower_response_matrix,
+                                    destroyed.lower_response_matrix,
+                                    instance.target_importance,
+                                    tuple(range(sum(instance.block_pattern))),
+                                )
+                                destroyed_alpha = CurriculumAction(
+                                    problem=destroyed_problem, coordinates=instance.active_action
+                                )
+                                destroyed_hull = build_rectangular_hull(
+                                    problem.blocks,
+                                    destroyed.lower_response_matrix,
+                                    destroyed.lower_response_matrix,
+                                )
+                                _persist_coupling_mechanism_metrics(
+                                    store,
+                                    layout,
+                                    request.experiment,
+                                    condition,
+                                    support,
+                                    TransferMethod.COUPLING_DESTROYED_FEDORBIT,
+                                    seed,
+                                    destroyed_problem,
+                                    orbit,
+                                    destroyed_alpha,
+                                    destroyed_hull,
+                                    request.overwrite_policy,
+                                )
+
+
+def _solve_fedorbit_exact_sparse_action_at_support(
+    support_limit: SupportCount,
+) -> Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None]:
+    def solve(problem: RobustActionProblem, seed: RandomSeed) -> CurriculumAction | None:
+        del seed
+        return solve_robust_action(problem, support_limit).selected_action
+
+    return solve
+
+
+def _solve_dense_ccp_fallback_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    outcome = solve_dense_ccp(
+        problem, seed, SemanticCoordinates(f"sparsity-and-dense-fallback:{seed}")
+    )
+    return outcome.selected_action
+
+
+def execute_sparsity_and_dense_fallback(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    conditions: tuple[
+        tuple[
+            str,
+            TransferMethod,
+            Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
+        ],
+        ...,
+    ] = (
+        (
+            "exact sparse s=1",
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            _solve_fedorbit_exact_sparse_action_at_support(1),
+        ),
+        (
+            "exact sparse s=2",
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            _solve_fedorbit_exact_sparse_action_at_support(2),
+        ),
+        (
+            "exact sparse s=3",
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            _solve_fedorbit_exact_sparse_action_at_support(3),
+        ),
+        ("dense CCP", TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, _solve_dense_ccp_fallback_action),
+    )
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        for seed in confirmatory_seeds:
+            for condition_label, method, solve_action in conditions:
+                scored = _score_robust_action_cell(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    device,
+                    "sparsity-and-dense-fallback",
+                    solve_action,
+                )
+                if scored is None:
+                    continue
+                score, n_classes, input_artifact_ids = scored
+                _persist_primary_transfer_cell_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    method,
+                    seed,
+                    score,
+                    n_classes,
+                    input_artifact_ids,
+                    EvaluationConditionName(condition_label),
+                )
+
+
+def execute_real_packet_coupling_mechanism_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        for seed in confirmatory_seeds:
+            assembly = _assemble_principal_action(
+                store,
+                layout,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                device,
+                _solve_fedorbit_exact_sparse_action,
+            )
+            if assembly is None:
+                continue
+            orbit = tuple(enumerate_block_permutations(assembly.blocks))
+            hull = build_rectangular_hull(
+                assembly.blocks,
+                assembly.problem.lower_response_matrix,
+                assembly.problem.upper_response_matrix,
+            )
+            candidates = (assembly.action, zero_action(assembly.problem))
+            for metric_name, metric_value in (
+                (
+                    MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
+                    fixed_action_rectangularization_gap(assembly.action, orbit, hull.lower_bounds),
+                ),
+                (
+                    MetricId.ROBUST_COUPLING_VALUE_GAP,
+                    robust_coupling_gap(candidates, assembly.problem, orbit, hull),
+                ),
+                (
+                    MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
+                    rectangular_value_over_candidates(candidates, assembly.problem, hull),
+                ),
+            ):
+                persist_primary_transfer_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    pair_direction,
+                    source,
+                    target,
+                    TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                    seed,
+                    metric_name,
+                    float(metric_value),
+                    MetricUnit("score"),
+                    MetricDirection.DESCRIPTIVE,
+                    assembly.input_artifact_ids,
+                    request.overwrite_policy,
+                )
+
+
+def execute_multi_source_selection_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    config = active_config().experiments.multi_source_selection_validation
+    all_clients = active_config().scientific.datasets.clients
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    for target in config.targets:
+        target_materialized = materialized(target)
+        if target_materialized is None:
+            continue
+        candidate_sources = tuple(client for client in all_clients if client != target)
+        for seed in confirmatory_seeds:
+            assemblies_by_source: OrderedDict[DatasetId, PrincipalActionAssembly] = OrderedDict()
+            proposals: list[SourceProposal] = []
+            for source in candidate_sources:
+                source_materialized = materialized(source)
+                if source_materialized is None:
+                    continue
+                assembly = _assemble_principal_action(
+                    store,
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    device,
+                    _solve_fedorbit_exact_sparse_action,
+                )
+                if assembly is None:
+                    continue
+                solution = solve_robust_action(assembly.problem)
+                assemblies_by_source[source] = assembly
+                proposals.append(
+                    SourceProposal(SourceClientName(source.value), solution.certified_robust_value)
+                )
+            if not proposals:
+                continue
+            ranked = rank_source_proposals(proposals)
+
+            def confirmation_decision(
+                proposal: SourceProposal,
+                *,
+                target: DatasetId = target,
+                seed: RandomSeed = seed,
+                assemblies_by_source: Mapping[
+                    DatasetId, PrincipalActionAssembly
+                ] = assemblies_by_source,
+            ) -> bool:
+                source = DatasetId(proposal.source_client_name)
+                assembly = assemblies_by_source[source]
+                multipliers = curriculum_multipliers_from_action(
+                    assembly.action, assembly.blocks, assembly.target_eligible, assembly.n_classes
+                )
+                optimizer = make_adamw(
+                    assembly.model,
+                    assembly.checkpoint.selected_hyperparameters.learning_rate,
+                    assembly.checkpoint.selected_hyperparameters.weight_decay,
+                )
+                pre_confirm = capture_pre_confirm_pair(assembly.model, optimizer)
+                contrast_coordinates = ContrastCoordinates(
+                    f"multi-source-selection:{source.value}-to-{target.value}:{seed}"
+                )
+                verdict = run_proposal_confirmation(
+                    ConfirmationRequest(
+                        assembly.model,
+                        pre_confirm.baseline,
+                        pre_confirm.curriculum,
+                        assembly.train.features,
+                        assembly.train.targets,
+                        assembly.confirm.features,
+                        assembly.confirm.targets,
+                        assembly.checkpoint.train_class_weights,
+                        multipliers,
+                        assembly.checkpoint.selected_hyperparameters,
+                        seed,
+                        contrast_coordinates,
+                    )
+                )
+                if verdict.accepted:
+                    apply_accepted_assimilation(
+                        assembly.model,
+                        optimizer,
+                        pre_confirm.curriculum,
+                        assembly.train.features,
+                        assembly.train.targets,
+                        assembly.checkpoint.train_class_weights,
+                        multipliers,
+                        seed,
+                        AssimilationCoordinates(
+                            target_client=SourceClientName(target.value),
+                            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+                            condition=EvaluationConditionName("principal"),
+                            seed=seed,
+                            clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
+                            source_packet_artifact_id=assembly.first_packet_artifact_id,
+                            action_artifact_sha256=_action_sha256(assembly.action),
+                        ),
+                    )
+                else:
+                    settle_rejected_proposal(assembly.model, optimizer, pre_confirm.baseline)
+                return verdict.accepted
+
+            decision = select_source_sequentially(ranked, confirmation_decision)
+            accepted_source = (
+                assemblies_by_source[DatasetId(decision.accepted_proposal.source_client_name)]
+                if decision.accepted_proposal is not None
+                else None
+            )
+            input_artifact_ids = (
+                accepted_source.input_artifact_ids
+                if accepted_source is not None
+                else next(iter(assemblies_by_source.values())).input_artifact_ids
+            )
+            persist_synthetic_diagnostic_metric(
+                store,
+                layout,
+                request.experiment,
+                EvaluationConditionName(target.value),
+                seed,
+                MetricId.PROPOSAL_ACCEPTANCE_RATE,
+                1.0 if decision.accepted_proposal is not None else 0.0,
+                MetricUnit("fraction"),
+                MetricDirection.DESCRIPTIVE,
+                input_artifact_ids,
+                request.overwrite_policy,
+            )
+
+
+def _solve_matched_resource_rectangular_action(
+    problem: RobustActionProblem, seed: RandomSeed
+) -> CurriculumAction | None:
+    del seed
+    hull = build_rectangular_hull(
+        problem.blocks, problem.lower_response_matrix, problem.upper_response_matrix
+    )
+    return optimize_against_fixed_matrix(problem, hull.lower_bounds).selected_action
+
+
+_SEMANTIC_PARTITION_MERGE: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
+    (
+        (CoarseGroup.DISRUPTION, CoarseGroup.DISRUPTION),
+        (CoarseGroup.EXPLOITATION, CoarseGroup.DISRUPTION),
+        (CoarseGroup.ACCESS_AND_DISCOVERY, CoarseGroup.ACCESS_AND_DISCOVERY),
+    )
+)
+_SEMANTIC_PARTITION_SUPERGROUP: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
+    (group, CoarseGroup.DISRUPTION) for group in CoarseGroup
+)
+_SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
+    (group, group) for group in CoarseGroup
+)
+
+
+def _semantic_partition_bucket_of(
+    partition: str | tuple[str, ...],
+) -> Mapping[CoarseGroup, CoarseGroup] | None:
+    if partition == "principal_three_coarse_groups":
+        return _SEMANTIC_PARTITION_PRINCIPAL
+    if partition == "one_attack_supergroup":
+        return _SEMANTIC_PARTITION_SUPERGROUP
+    if isinstance(partition, tuple) and set(partition) == {
+        "Disruption or Exploitation",
+        "Access and Discovery",
+    }:
+        return _SEMANTIC_PARTITION_MERGE
+    return None
+
+
+def _semantic_partition_label(partition: str | tuple[str, ...]) -> str:
+    return partition if isinstance(partition, str) else "|".join(partition)
+
+
+def execute_semantic_sufficiency_frontier(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    config = active_config().experiments.semantic_sufficiency_frontier
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    scorers = (
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _solve_fedorbit_exact_sparse_action),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _solve_matched_resource_rectangular_action),
+        (TransferMethod.EXACT_MAP_ORACLE, _solve_exact_map_oracle_action),
+    )
+    for partition in config.partitions:
+        bucket_of = _semantic_partition_bucket_of(partition)
+        if bucket_of is None:
+            continue
+        condition = EvaluationConditionName(_semantic_partition_label(partition))
+        for directed_pair in primary_pairs:
+            source = directed_pair.source
+            target = directed_pair.target
+            source_materialized = materialized(source)
+            target_materialized = materialized(target)
+            if source_materialized is None or target_materialized is None:
+                continue
+            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+            for seed in confirmatory_seeds:
+                for method, solve_action in scorers:
+                    scored = _score_robust_action_cell(
+                        store,
+                        layout,
+                        source,
+                        target,
+                        source_materialized,
+                        target_materialized,
+                        seed,
+                        device,
+                        "semantic-sufficiency-frontier",
+                        solve_action,
+                        None,
+                        bucket_of,
+                    )
+                    if scored is None:
+                        continue
+                    score, n_classes, input_artifact_ids = scored
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                        condition,
+                    )
+
+
+def _response_scale_perturbation(
+    scale: float,
+) -> Callable[
+    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
+]:
+    def perturb(
+        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
+    ) -> tuple[ResponseMatrix, ResponseMatrix]:
+        del blocks
+        midpoint = (lower + upper) / 2.0
+        half_width = (upper - lower) / 2.0
+        return scale * midpoint - half_width, scale * midpoint + half_width
+
+    return perturb
+
+
+def _ci_half_width_perturbation(
+    multiplier: float,
+) -> Callable[
+    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
+]:
+    def perturb(
+        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
+    ) -> tuple[ResponseMatrix, ResponseMatrix]:
+        del blocks
+        midpoint = (lower + upper) / 2.0
+        half_width = (upper - lower) / 2.0
+        return midpoint - multiplier * half_width, midpoint + multiplier * half_width
+
+    return perturb
+
+
+def _response_heterogeneity_perturbation(
+    multiplier: float,
+) -> Callable[
+    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
+]:
+    def perturb(
+        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
+    ) -> tuple[ResponseMatrix, ResponseMatrix]:
+        midpoint = (lower + upper) / 2.0
+        half_width = (upper - lower) / 2.0
+        new_midpoint = midpoint.copy()
+        block_count = len(blocks.padded_size_tuple)
+        for row_block in range(block_count):
+            row_range = blocks.block_index_range(row_block)
+            for col_block in range(block_count):
+                col_range = blocks.block_index_range(col_block)
+                segment = midpoint[
+                    row_range.start : row_range.stop, col_range.start : col_range.stop
+                ]
+                block_mean = segment.mean()
+                new_midpoint[row_range.start : row_range.stop, col_range.start : col_range.stop] = (
+                    block_mean + multiplier * (segment - block_mean)
+                )
+        return new_midpoint - half_width, new_midpoint + half_width
+
+    return perturb
+
+
+_WeakSignalPerturbation = Callable[
+    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
+]
+
+
+def execute_weak_signal_support_and_heterogeneity_boundaries(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    config = active_config().experiments.weak_signal_support_and_heterogeneity_boundaries
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    conditions: list[tuple[str, _WeakSignalPerturbation | None, SupportCount | None]] = []
+    for scale in config.response_scales:
+        conditions.append((f"response-scale-{scale}", _response_scale_perturbation(scale), None))
+    for multiplier in config.ci_half_width_multipliers:
+        conditions.append(
+            (f"ci-half-width-{multiplier}", _ci_half_width_perturbation(multiplier), None)
+        )
+    for multiplier in config.response_heterogeneity_multipliers:
+        conditions.append(
+            (
+                f"response-heterogeneity-{multiplier}",
+                _response_heterogeneity_perturbation(multiplier),
+                None,
+            )
+        )
+    for support in config.support_budgets:
+        conditions.append((f"support-budget-{support}", None, support))
+
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        for seed in confirmatory_seeds:
+            local_only = _score_local_only_cell_adapter(
+                store,
+                layout,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                device,
+            )
+            for condition_label, perturb, support_limit in conditions:
+                exact_sparse_solve = (
+                    _solve_fedorbit_exact_sparse_action_at_support(support_limit)
+                    if support_limit is not None
+                    else _solve_fedorbit_exact_sparse_action
+                )
+                condition = EvaluationConditionName(condition_label)
+                for method, solve_action in (
+                    (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, exact_sparse_solve),
+                    (
+                        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                        _solve_matched_resource_rectangular_action,
+                    ),
+                ):
+                    scored = _score_robust_action_cell(
+                        store,
+                        layout,
+                        source,
+                        target,
+                        source_materialized,
+                        target_materialized,
+                        seed,
+                        device,
+                        "weak-signal-boundaries",
+                        solve_action,
+                        None,
+                        None,
+                        perturb,
+                    )
+                    if scored is None:
+                        continue
+                    score, n_classes, input_artifact_ids = scored
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                        condition,
+                    )
+                if local_only is not None:
+                    score, n_classes, input_artifact_ids = local_only
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        TransferMethod.LOCAL_ONLY,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                        condition,
+                    )
+
+    for fraction in config.target_usable_support_fractions:
+        condition = EvaluationConditionName(f"target-usable-support-fraction-{fraction}")
+        for directed_pair in primary_pairs:
+            source = directed_pair.source
+            target = directed_pair.target
+            source_materialized = materialized(source)
+            target_materialized = materialized(target)
+            if source_materialized is None or target_materialized is None:
+                continue
+            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+            subsample_seed: RandomSeed = derive_seed32(
+                SeedDerivationRequest(
+                    confirmatory_seeds[0],
+                    RngNamespace.SYNTHETIC_INSTANCE,
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(target=target.value, fraction=fraction),
+                    ),
+                )
+            )
+            subsampled_target = subsampled_materialized_client(
+                target_materialized, fraction, subsample_seed
+            )
+            _execute_client_base_model_pilot(
+                store,
+                layout,
+                request.experiment,
+                experiment_relevance(request.experiment),
+                target,
+                subsampled_target,
+                confirmatory_seeds,
+                request.overwrite_policy,
+                device,
+                execution_logger(),
+            )
+            for seed in confirmatory_seeds:
+                local_only = _score_local_only_cell(
+                    store, layout, target, subsampled_target, seed, device, request.experiment
+                )
+                for method, solve_action in (
+                    (
+                        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        _solve_fedorbit_exact_sparse_action,
+                    ),
+                    (
+                        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                        _solve_matched_resource_rectangular_action,
+                    ),
+                ):
+                    scored = _score_robust_action_cell(
+                        store,
+                        layout,
+                        source,
+                        target,
+                        source_materialized,
+                        subsampled_target,
+                        seed,
+                        device,
+                        "weak-signal-boundaries",
+                        solve_action,
+                        None,
+                        None,
+                        None,
+                        request.experiment,
+                    )
+                    if scored is None:
+                        continue
+                    score, n_classes, input_artifact_ids = scored
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        score,
+                        n_classes,
+                        input_artifact_ids,
+                        condition,
+                    )
+                if local_only is not None:
+                    score, n_classes, artifact_id = local_only
+                    _persist_primary_transfer_cell_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        TransferMethod.LOCAL_ONLY,
+                        seed,
+                        score,
+                        n_classes,
+                        (artifact_id,),
+                        condition,
+                    )
+
+
+def _human_audit_researcher_id(index: Index) -> str:
+    return f"researcher-{index + 1}"
+
+
+def _human_audit_directory(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    source: DatasetId,
+    target: DatasetId,
+    researcher_id: str,
+) -> Path:
+    return (
+        experiment_workspace(layout, experiment)
+        / "artifacts"
+        / "fitted"
+        / "human_audit"
+        / f"{source.value}-to-{target.value}"
+        / researcher_id
+    )
+
+
+def _score_packet_only_recovery_attempt(
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+) -> tuple[bool, tuple[ArtifactIdentifier, ...]] | None:
+    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    if common is None:
+        return None
+    source_eligible, target_eligible = common
+    common_coarse = tuple(target_eligible)
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    source_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    target_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
+    for coarse_group in common_coarse:
+        source_packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        if source_packet is not None:
+            source_packets[coarse_group] = source_packet
+        target_packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        if target_packet is not None:
+            target_packets[coarse_group] = target_packet
+    if not source_packets or not target_packets:
+        return None
+    source_matrix = assemble_cross_client_response_matrix(
+        blocks, source_packets, SourcePacket.lower_matrix
+    )
+    target_matrix = assemble_target_response_matrix(
+        blocks, target_packets, SourcePacket.lower_matrix
+    )
+    qap_result = point_correspondence_commitment(source_matrix, target_matrix, blocks)
+    if not qap_result.certified or qap_result.correspondence is None:
+        return None
+    oracle_correspondence = BlockCorrespondence.lexicographically_smallest(blocks)
+    recovered = qap_result.correspondence.images == oracle_correspondence.images
+    input_artifact_ids = tuple(
+        ArtifactIdentifier(packet.packet_integrity_sha256)
+        for packet in (*source_packets.values(), *target_packets.values())
+    )
+    return recovered, input_artifact_ids
+
+
+def execute_map_availability_applicability_audit(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    config = active_config().experiments.map_availability_applicability_audit
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    public_labels = documented_public_labels()
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        domain_pair = DirectedPair(source=source, target=target)
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is not None and target_materialized is not None:
+            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+            for seed in confirmatory_seeds:
+                attempt = _score_packet_only_recovery_attempt(
+                    layout, source, target, source_materialized, target_materialized, seed
+                )
+                if attempt is None:
+                    continue
+                recovered, input_artifact_ids = attempt
+                persist_primary_transfer_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    pair_direction,
+                    source,
+                    target,
+                    TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+                    seed,
+                    MetricId.PACKET_ONLY_RECOVERY_ACCURACY,
+                    1.0 if recovered else 0.0,
+                    MetricUnit("boolean"),
+                    MetricDirection.HIGHER_IS_BETTER,
+                    input_artifact_ids,
+                    request.overwrite_policy,
+                )
+        submissions: list[MapAvailabilityAuditSubmission] = []
+        for researcher_index in range(config.independent_researchers):
+            index: Index = researcher_index
+            researcher_id = _human_audit_researcher_id(index)
+            directory = _human_audit_directory(
+                layout, request.experiment, source, target, researcher_id
+            )
+            submission_path = directory / "submission.json"
+            if not submission_path.is_file():
+                template = blank_audit_template(researcher_id, domain_pair)
+                atomic_write_json(
+                    directory / "template.json",
+                    cast(StableJsonPayload, template.model_dump(mode="json")),
+                )
+                continue
+            submission = MapAvailabilityAuditSubmission.model_validate_json(
+                submission_path.read_text(encoding="utf-8")
+            )
+            failures = validate_submission(
+                submission, config.minutes_per_researcher_per_pair, public_labels
+            )
+            if failures:
+                continue
+            submissions.append(submission)
+        if len(submissions) != config.independent_researchers or not distinct_researcher_ids(
+            tuple(submissions)
+        ):
+            continue
+        for submission in submissions:
+            atomic_write_json(
+                _human_audit_directory(
+                    layout, request.experiment, source, target, submission.researcher_id
+                )
+                / "validated.sha256.json",
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(sha256=submission_sha256(submission)),
+                ),
+            )
+
+
+def _deterministic_replay_consistent(
+    node_count: ConceptCount,
+    pattern: ScalabilityBlockPattern,
+    support: SupportCount,
+    seed: RandomSeed,
+) -> bool:
+    problem_a, action_a, _ = _synthetic_solver_instance(node_count, pattern, support, seed)
+    problem_b, action_b, _ = _synthetic_solver_instance(node_count, pattern, support, seed)
+    solver_config = active_config().solvers.exact_sparse
+    outcome_a = fixed_action_worst_correspondence(
+        problem_a,
+        action_a,
+        solver_config.lap_objective_tie_tolerance,
+        solver_config.action_tie_tolerance,
+    )
+    outcome_b = fixed_action_worst_correspondence(
+        problem_b,
+        action_b,
+        solver_config.lap_objective_tie_tolerance,
+        solver_config.action_tie_tolerance,
+    )
+    return (
+        outcome_a.separator_objective == outcome_b.separator_objective
+        and outcome_a.worst_correspondence.images == outcome_b.worst_correspondence.images
+    )
+
+
+def execute_baseline_and_oracle_correctness_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    raw_root = raw_dataset_root()
+    confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
+    validation_seeds = (confirmatory_seeds[0], confirmatory_seeds[4])
+    tractable_config = active_config().experiments.exact_sparse_solver_benchmark
+    tractable_k: ConceptCount = tractable_config.synthetic_k.minimum
+    tractable_pattern = tractable_config.block_patterns[0]
+    tractable_support = tractable_config.supports[0]
+    for seed in validation_seeds:
+        replay_consistent = _deterministic_replay_consistent(
+            tractable_k, tractable_pattern, tractable_support, seed
+        )
+        persist_synthetic_diagnostic_metric(
+            store,
+            layout,
+            request.experiment,
+            EvaluationConditionName(f"deterministic-replay-k{tractable_k}"),
+            seed,
+            MetricId.DETERMINISTIC_REPLAY_CONSISTENCY,
+            1.0 if replay_consistent else 0.0,
+            MetricUnit("boolean"),
+            MetricDirection.HIGHER_IS_BETTER,
+            (ArtifactIdentifier("synthetic-generator"),),
+            request.overwrite_policy,
+        )
+        problem, action, blocks = _synthetic_solver_instance(
+            tractable_k, tractable_pattern, tractable_support, seed
+        )
+        exhaustive_truth = _solver_benchmark_reference_truth(
+            blocks, action, tractable_config.exhaustive_truth_correspondence_count_maximum
+        )
+        if exhaustive_truth is not None:
+            qap_result = fixed_action_worst_correspondence_qap(problem, action)
+            if qap_result.certified and qap_result.objective_value is not None:
+                persist_synthetic_diagnostic_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    EvaluationConditionName(f"generic-qap-vs-exhaustive-truth-k{tractable_k}"),
+                    seed,
+                    MetricId.ABSOLUTE_OBJECTIVE_ERROR,
+                    float(abs(qap_result.objective_value - exhaustive_truth)),
+                    MetricUnit("score"),
+                    MetricDirection.LOWER_IS_BETTER,
+                    (ArtifactIdentifier("synthetic-generator"),),
+                    request.overwrite_policy,
+                )
+            source_matrix = problem.lower_response_matrix
+            pc_result = point_correspondence_commitment(source_matrix, source_matrix, blocks)
+            if (
+                pc_result.certified
+                and pc_result.correspondence is not None
+                and pc_result.objective_value is not None
+            ):
+                pc_truth = min(
+                    -float(
+                        np.sum(
+                            correspondence.permute_response_matrix(source_matrix) * source_matrix
+                        )
+                    )
+                    for correspondence in enumerate_block_permutations(blocks)
+                )
+                persist_synthetic_diagnostic_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    EvaluationConditionName(f"point-map-qap-correctness-k{tractable_k}"),
+                    seed,
+                    MetricId.ABSOLUTE_OBJECTIVE_ERROR,
+                    float(abs(pc_result.objective_value - pc_truth)),
+                    MetricUnit("score"),
+                    MetricDirection.LOWER_IS_BETTER,
+                    (ArtifactIdentifier("synthetic-generator"),),
+                    request.overwrite_policy,
+                )
+            exhaustive_hull = build_rectangular_hull(blocks, source_matrix, source_matrix)
+            analytic_lower, analytic_upper = analytic_rectangular_hull_bounds(
+                blocks, source_matrix, source_matrix
+            )
+            hull_max_error = float(
+                max(
+                    np.max(np.abs(exhaustive_hull.lower_bounds - analytic_lower)),
+                    np.max(np.abs(exhaustive_hull.upper_bounds - analytic_upper)),
+                )
+            )
+            persist_synthetic_diagnostic_metric(
+                store,
+                layout,
+                request.experiment,
+                EvaluationConditionName(f"rectangular-baseline-vs-analytical-k{tractable_k}"),
+                seed,
+                MetricId.ABSOLUTE_OBJECTIVE_ERROR,
+                hull_max_error,
+                MetricUnit("score"),
+                MetricDirection.LOWER_IS_BETTER,
+                (ArtifactIdentifier("synthetic-generator"),),
+                request.overwrite_policy,
+            )
+    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
+
+    def materialized(dataset: DatasetId) -> MaterializedClient | None:
+        if dataset not in materialized_by_dataset:
+            with contextlib.suppress(MaterializationError):
+                materialized_by_dataset[dataset] = materialize_client(dataset, raw_root)
+        return materialized_by_dataset.get(dataset)
+
+    for directed_pair in primary_pairs:
+        source = directed_pair.source
+        target = directed_pair.target
+        source_materialized = materialized(source)
+        target_materialized = materialized(target)
+        if source_materialized is None or target_materialized is None:
+            continue
+        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        try:
+            validate_disjoint_feature_namespaces(
+                frozenset(str(name) for name in source_materialized.feature_names),
+                frozenset(str(name) for name in target_materialized.feature_names),
+            )
+            validate_oracle_acl_isolation(
+                cell_is_oracle_validation_context=True, oracle_information_accessed=True
+            )
+            valid = True
+        except StrictResourceViolationError:
+            valid = False
+        input_artifact_ids = (ArtifactIdentifier("materialized-client-schema"),)
+        for seed in validation_seeds:
+            persist_primary_transfer_metric(
+                store,
+                layout,
+                request.experiment,
+                pair_direction,
+                source,
+                target,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                seed,
+                MetricId.STRICT_RESOURCE_VALIDITY,
+                1.0 if valid else 0.0,
+                MetricUnit("boolean"),
+                MetricDirection.HIGHER_IS_BETTER,
+                input_artifact_ids,
+                request.overwrite_policy,
+            )
 
 
 def _execute_client_base_model_pilot(

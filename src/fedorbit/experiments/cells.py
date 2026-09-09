@@ -23,6 +23,46 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                 ),
             ),
             (
+                ExperimentName.COMMON_ACTION_UNDER_UNIDENTIFIED_MAP,
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.CONDITION,
+                    }
+                ),
+            ),
+            (
+                ExperimentName.ROBUST_COMPROMISE_UNDER_UNIDENTIFIED_MAP,
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.CONDITION,
+                    }
+                ),
+            ),
+            (
+                ExperimentName.MAP_DEPENDENT_ACTION_BOUNDARY,
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.CONDITION,
+                    }
+                ),
+            ),
+            (
+                ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION,
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.SEED,
+                        SemanticCoordinate.CONDITION,
+                    }
+                ),
+            ),
+            (
                 ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
                 frozenset(
                     {
@@ -103,7 +143,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                         SemanticCoordinate.DATASET,
                         SemanticCoordinate.DIRECTED_PAIR,
                         SemanticCoordinate.METHOD,
-                        SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.CONDITION,
                         SemanticCoordinate.SEED,
                     }
                 ),
@@ -117,6 +157,18 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                         SemanticCoordinate.DIRECTED_PAIR,
                         SemanticCoordinate.METHOD,
                         SemanticCoordinate.SUPPORT,
+                        SemanticCoordinate.SEED,
+                    }
+                ),
+            ),
+            (
+                ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
+                frozenset(
+                    {
+                        SemanticCoordinate.EXPERIMENT,
+                        SemanticCoordinate.DATASET,
+                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.METHOD,
                         SemanticCoordinate.SEED,
                     }
                 ),
@@ -166,8 +218,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                 frozenset(
                     {
                         SemanticCoordinate.EXPERIMENT,
-                        SemanticCoordinate.DATASET,
-                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.CONDITION,
                         SemanticCoordinate.METHOD,
                         SemanticCoordinate.SUPPORT,
                         SemanticCoordinate.SEED,
@@ -179,8 +230,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                 frozenset(
                     {
                         SemanticCoordinate.EXPERIMENT,
-                        SemanticCoordinate.DATASET,
-                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.CONDITION,
                         SemanticCoordinate.METHOD,
                         SemanticCoordinate.SUPPORT,
                         SemanticCoordinate.SEED,
@@ -192,10 +242,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                 frozenset(
                     {
                         SemanticCoordinate.EXPERIMENT,
-                        SemanticCoordinate.DATASET,
-                        SemanticCoordinate.DIRECTED_PAIR,
                         SemanticCoordinate.METHOD,
-                        SemanticCoordinate.SUPPORT,
                         SemanticCoordinate.CONDITION,
                         SemanticCoordinate.SEED,
                     }
@@ -218,8 +265,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
                 frozenset(
                     {
                         SemanticCoordinate.EXPERIMENT,
-                        SemanticCoordinate.DATASET,
-                        SemanticCoordinate.DIRECTED_PAIR,
+                        SemanticCoordinate.CONDITION,
                         SemanticCoordinate.METHOD,
                         SemanticCoordinate.SUPPORT,
                         SemanticCoordinate.SEED,

@@ -1,5 +1,3 @@
-# TODO: should be handled better and more optimized. Maybe inlined elsewhere
-
 from __future__ import annotations
 
 from collections import OrderedDict

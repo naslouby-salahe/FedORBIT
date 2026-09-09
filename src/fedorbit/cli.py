@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import statistics
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NoReturn, cast
 
@@ -9,7 +10,7 @@ import structlog
 import typer
 from typer import Argument, Exit
 
-from fedorbit.analysis.records import MetricRecord
+from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
 from fedorbit.infrastructure.environment import (
@@ -21,6 +22,8 @@ from fedorbit.infrastructure.execution import (
     DatasetPreparationRequest,
     ExecutionError,
     ExperimentExecutionRequest,
+    completed_experiment_metric_records,
+    completed_experiment_metric_records_with_support,
     completed_primary_transfer_comparison_records,
     completed_primary_transfer_metric_records,
     execution_store,
@@ -41,11 +44,18 @@ from fedorbit.reporting import (
     FigureSeries,
     TableScalar,
     VerifiedEvidenceWriter,
+    ablation_results_table,
+    confirmation_results_table,
+    coupling_mechanism_results_table,
     dataset_and_client_protocol_table,
+    exact_solver_results_table,
     experiment_matrix_table,
+    generalization_results_table,
     numerical_constants_and_seeds_table,
     primary_strict_transfer_results_table,
     real_transfer_gain_forest_plot,
+    scalability_results_table,
+    sparsity_and_dense_results_table,
 )
 from fedorbit.types import (
     ArtifactState,
@@ -57,11 +67,15 @@ from fedorbit.types import (
     ExitStatus,
     ExperimentIdentifierText,
     ExperimentName,
+    ExperimentLocalMethod,
     FailureReason,
+    MetricId,
+    MultiplicityFamily,
     OverwritePolicy,
     RelativeGain,
     ReportArtifactName,
     ReportSeriesName,
+    RiskReductionColumn,
     StableJsonPayload,
     TransferMethod,
 )
@@ -272,6 +286,427 @@ def _real_transfer_gain_series(
     )
 
 
+def _median(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return statistics.median(values)
+
+
+def _percentile_95(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+    return statistics.quantiles(values, n=100, method="inclusive")[94]
+
+
+def _metric_values(
+    records: Sequence[MetricRecord], method: TransferMethod, metric_name: MetricId
+) -> list[float]:
+    return [
+        record.metric_value
+        for record in records
+        if record.method == method
+        and record.metric_name == metric_name
+        and record.valid
+        and record.metric_value is not None
+    ]
+
+
+def _parse_k_pattern_condition(condition: str) -> tuple[int, str] | None:
+    if not condition.startswith("k"):
+        return None
+    k_text, separator, pattern = condition[1:].partition("-")
+    if not separator or not k_text.isdigit() or not pattern:
+        return None
+    return int(k_text), pattern
+
+
+def _exact_solver_results_rows(
+    records_with_support: Sequence[tuple[MetricRecord, int | None]],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    groups: OrderedDict[tuple[int, str, int | None], list[MetricRecord]] = OrderedDict()
+    for record, support in records_with_support:
+        parsed = _parse_k_pattern_condition(record.condition)
+        if parsed is None:
+            continue
+        groups.setdefault((*parsed, support), []).append(record)
+    rows: list[Mapping[str, TableScalar]] = []
+    for (k, pattern, support), entries in groups.items():
+        errors = _metric_values(
+            entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.ABSOLUTE_OBJECTIVE_ERROR
+        )
+        validity = _metric_values(
+            entries,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY,
+        )
+        runtimes = _metric_values(
+            entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.WALL_TIME
+        )
+        memory = _metric_values(
+            entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.PEAK_HOST_RSS
+        )
+        active_images = _metric_values(
+            entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.ACTIVE_IMAGE_CANDIDATES
+        )
+        lap_calls = _metric_values(
+            entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.LAP_CALLS
+        )
+        qap_runtimes = _metric_values(entries, TransferMethod.GENERIC_EXACT_QAP, MetricId.WALL_TIME)
+        qap_timeouts = _metric_values(
+            entries, TransferMethod.GENERIC_EXACT_QAP, MetricId.TIMEOUT_INDICATOR
+        )
+        dense_runtimes = _metric_values(
+            entries, TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, MetricId.WALL_TIME
+        )
+        rows.append(
+            OrderedDict(
+                k=k,
+                block_pattern=pattern,
+                support=support,
+                truth_availability=bool(errors),
+                exact_mismatches=sum(1 for value in validity if value == 0.0),
+                maximum_absolute_error=max(errors) if errors else None,
+                runtime_median=_median(runtimes),
+                runtime_p95=_percentile_95(runtimes),
+                qap_runtime=_median(qap_runtimes),
+                dense_runtime=_median(dense_runtimes),
+                timeouts=sum(1 for value in qap_timeouts if value == 1.0),
+                memory=_median(memory),
+                active_images=_median(active_images),
+                lap_calls=_median(lap_calls),
+            )
+        )
+    return tuple(rows)
+
+
+def _scalability_results_rows(
+    records_with_support: Sequence[tuple[MetricRecord, int | None]],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    groups: OrderedDict[tuple[int, str, int | None, TransferMethod], list[MetricRecord]] = (
+        OrderedDict()
+    )
+    for record, support in records_with_support:
+        parsed = _parse_k_pattern_condition(record.condition)
+        if parsed is None:
+            continue
+        groups.setdefault((*parsed, support, record.method), []).append(record)
+    rows: list[Mapping[str, TableScalar]] = []
+    for (k, pattern, support, method), entries in groups.items():
+        runtimes = _metric_values(entries, method, MetricId.WALL_TIME)
+        rss = _metric_values(entries, method, MetricId.PEAK_HOST_RSS)
+        cuda_memory = _metric_values(entries, method, MetricId.PEAK_CUDA_ALLOCATED_BYTES)
+        active_images = _metric_values(entries, method, MetricId.ACTIVE_IMAGE_CANDIDATES)
+        lap_calls = _metric_values(entries, method, MetricId.LAP_CALLS)
+        timeouts = _metric_values(entries, method, MetricId.TIMEOUT_INDICATOR)
+        rows.append(
+            OrderedDict(
+                k=k,
+                block=pattern,
+                support=support,
+                method=method.value,
+                n_s=_median(active_images),
+                lap_calls=_median(lap_calls),
+                cuts=None,
+                runtime_median=_median(runtimes),
+                runtime_p95=_percentile_95(runtimes),
+                rss=_median(rss),
+                cuda_memory=_median(cuda_memory),
+                timeout=sum(1 for value in timeouts if value == 1.0),
+                exactness_status=None,
+            )
+        )
+    return tuple(rows)
+
+
+def _ablation_results_rows(
+    records: Sequence[MetricRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    pairs = sorted({record.pair for record in records})
+    ablation_methods = sorted(
+        {record.method for record in records if record.method != TransferMethod.LOCAL_ONLY},
+        key=lambda method: method.value,
+    )
+    rows: list[Mapping[str, TableScalar]] = []
+    for pair in pairs:
+        full_ce = _metric_value_by_condition(
+            records, pair, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, "principal"
+        )
+        for method in ablation_methods:
+            ablation_ce = _metric_value_by_condition(records, pair, method, "principal")
+            if ablation_ce is None:
+                continue
+            difference_vs_full = ablation_ce - full_ce if full_ce is not None else None
+            rows.append(
+                OrderedDict(
+                    ablation=method.value,
+                    pair=pair,
+                    realized_gain=None,
+                    difference_vs_full=difference_vs_full,
+                    equivalence=None,
+                    retained_gain=None,
+                    confirmation_safety=None,
+                )
+            )
+    return tuple(rows)
+
+
+def _metric_value_by_condition(
+    records: Sequence[MetricRecord],
+    pair: str,
+    method: TransferMethod,
+    condition: str,
+    metric_name: MetricId = MetricId.MACRO_CROSS_ENTROPY,
+) -> float | None:
+    matches = [
+        record
+        for record in records
+        if record.pair == pair
+        and record.method == method
+        and record.condition == condition
+        and record.metric_name == metric_name
+        and record.valid
+        and record.metric_value is not None
+    ]
+    if not matches:
+        return None
+    return statistics.fmean(
+        record.metric_value for record in matches if record.metric_value is not None
+    )
+
+
+def _sparsity_and_dense_results_rows(
+    sparsity_records: Sequence[MetricRecord],
+    local_only_records: Sequence[MetricRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    pairs = sorted({record.pair for record in sparsity_records})
+    conditions = sorted({record.condition for record in sparsity_records})
+    rows: list[Mapping[str, TableScalar]] = []
+    for pair in pairs:
+        local_only_ce = _metric_value_by_condition(
+            local_only_records, pair, TransferMethod.LOCAL_ONLY, "principal"
+        )
+        for condition in conditions:
+            method = next(
+                (
+                    record.method
+                    for record in sparsity_records
+                    if record.pair == pair and record.condition == condition
+                ),
+                None,
+            )
+            if method is None:
+                continue
+            condition_ce = _metric_value_by_condition(sparsity_records, pair, method, condition)
+            realized_gain = (
+                (local_only_ce - condition_ce) / local_only_ce
+                if local_only_ce is not None and condition_ce is not None and local_only_ce != 0.0
+                else None
+            )
+            rows.append(
+                OrderedDict(
+                    support_or_dense_condition=condition,
+                    pair=pair,
+                    realized_gain=realized_gain,
+                    certified_value=None,
+                    runtime=None,
+                    memory=None,
+                    confirmation_coverage=None,
+                    dense_minus_sparse_difference=None,
+                )
+            )
+    return tuple(rows)
+
+
+def _generalization_results_rows(
+    metric_records: Sequence[MetricRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    pairs = sorted({record.pair for record in metric_records})
+    method_order = (
+        TransferMethod.LOCAL_ONLY,
+        TransferMethod.LOCAL_SIR,
+        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+        TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+    )
+    rows: list[Mapping[str, TableScalar]] = []
+    for pair in pairs:
+        for method in method_order:
+            valid_seeds = len(
+                {
+                    record.seed
+                    for record in metric_records
+                    if record.pair == pair
+                    and record.method == method
+                    and record.metric_name == MetricId.MACRO_CROSS_ENTROPY
+                    and record.valid
+                }
+            )
+            if valid_seeds == 0:
+                continue
+            rows.append(
+                OrderedDict(
+                    pair=pair,
+                    method=method.value,
+                    valid_seeds=valid_seeds,
+                    test_macro_ce=_metric_value_by_condition(
+                        metric_records, pair, method, "principal"
+                    ),
+                    macro_f1=_metric_value_by_condition(
+                        metric_records, pair, method, "principal", metric_name=MetricId.MACRO_F1
+                    ),
+                    balanced_accuracy=_metric_value_by_condition(
+                        metric_records,
+                        pair,
+                        method,
+                        "principal",
+                        metric_name=MetricId.BALANCED_ACCURACY,
+                    ),
+                    gain_vs_local=None,
+                    bca_ci_low=None,
+                    bca_ci_high=None,
+                    raw_p=None,
+                    holm_p=None,
+                    strict_validity=None,
+                    confirmation_coverage=None,
+                    is_secondary_pair=True,
+                )
+            )
+    return tuple(rows)
+
+
+def _confirmation_results_rows(
+    records: Sequence[MetricRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    pairs = sorted({record.pair for record in records})
+    rows: list[Mapping[str, TableScalar]] = []
+    for pair in pairs:
+        verdicts = [
+            record.metric_value
+            for record in records
+            if record.pair == pair
+            and record.method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+            and record.metric_name == MetricId.PROPOSAL_ACCEPTANCE_RATE
+            and record.valid
+            and record.metric_value is not None
+        ]
+        if not verdicts:
+            continue
+        proposals = len(verdicts)
+        accepted = sum(1 for value in verdicts if value == 1.0)
+        rows.append(
+            OrderedDict(
+                pair=pair,
+                proposals=proposals,
+                accepted=accepted,
+                harmful_accepted_rate=None,
+                useful_accepted_rate=None,
+                beneficial_rejected_rate=None,
+                coverage=accepted / proposals,
+                no_confirm_harmful_rate=None,
+                **{
+                    RiskReductionColumn.ABSOLUTE_RISK_REDUCTION.value: None,
+                    RiskReductionColumn.RELATIVE_RISK_REDUCTION.value: None,
+                },
+                ci=None,
+                p=None,
+            )
+        )
+    return tuple(rows)
+
+
+def _coupling_gap_row(
+    condition_or_pair: str,
+    gap_values: Sequence[float],
+    fixed_action_values: Sequence[float],
+    ci: str | None,
+    holm_p: float | None,
+) -> Mapping[str, TableScalar]:
+    materiality = active_config().scientific.materiality.coupling_objective_units
+    above_materiality = sum(1 for value in gap_values if value > materiality)
+    return OrderedDict(
+        condition_or_pair=condition_or_pair,
+        valid_units=len(gap_values),
+        fixed_action_gap=statistics.fmean(fixed_action_values) if fixed_action_values else None,
+        robust_coupling_gap=statistics.fmean(gap_values) if gap_values else None,
+        fraction_above_materiality=above_materiality / len(gap_values) if gap_values else None,
+        ci=ci,
+        holm_p=holm_p,
+        coupling_destruction_retained_gain_fraction=None,
+    )
+
+
+def _coupling_mechanism_results_rows(
+    synthetic_records: Sequence[MetricRecord],
+    real_packet_records: Sequence[MetricRecord],
+    comparison_records: Sequence[PairedComparisonRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    rows: list[Mapping[str, TableScalar]] = []
+    conditions = sorted({record.condition for record in synthetic_records})
+    for condition in conditions:
+        gap_values = [
+            float(record.metric_value)
+            for record in synthetic_records
+            if record.condition == condition
+            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record.metric_name == MetricId.ROBUST_COUPLING_VALUE_GAP
+            and record.valid
+            and record.metric_value is not None
+        ]
+        fixed_action_values = [
+            float(record.metric_value)
+            for record in synthetic_records
+            if record.condition == condition
+            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record.metric_name == MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP
+            and record.valid
+            and record.metric_value is not None
+        ]
+        if not gap_values:
+            continue
+        rows.append(_coupling_gap_row(condition, gap_values, fixed_action_values, None, None))
+    pairs = sorted({record.pair for record in real_packet_records})
+    comparisons_by_pair = {
+        comparison.pair: comparison
+        for comparison in comparison_records
+        if comparison.family == MultiplicityFamily.COUPLING_MECHANISM
+        and comparison.method_a == ExperimentLocalMethod.EXACT_ORBIT
+    }
+    for pair in pairs:
+        gap_values = [
+            float(record.metric_value)
+            for record in real_packet_records
+            if record.pair == pair
+            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record.metric_name == MetricId.ROBUST_COUPLING_VALUE_GAP
+            and record.valid
+            and record.metric_value is not None
+        ]
+        fixed_action_values = [
+            float(record.metric_value)
+            for record in real_packet_records
+            if record.pair == pair
+            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record.metric_name == MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP
+            and record.valid
+            and record.metric_value is not None
+        ]
+        if not gap_values:
+            continue
+        comparison = comparisons_by_pair.get(DirectedPairName(pair))
+        ci = (
+            f"[{comparison.bca_ci_low:.4g}, {comparison.bca_ci_high:.4g}]"
+            if comparison is not None
+            and comparison.bca_ci_low is not None
+            and comparison.bca_ci_high is not None
+            else None
+        )
+        holm_p = comparison.holm_p if comparison is not None else None
+        rows.append(_coupling_gap_row(pair, gap_values, fixed_action_values, ci, holm_p))
+    return tuple(rows)
+
+
 def report(
     experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT,
     overwrite: bool = False,
@@ -368,6 +803,107 @@ def report(
                         writer.write_project_evidence_figure(
                             real_transfer_gain_forest_plot(gain_series),
                             ReportArtifactName("real-transfer-gain-forest-plot"),
+                        )
+                    )
+                )
+            solver_benchmark_rows = _exact_solver_results_rows(
+                completed_experiment_metric_records_with_support(
+                    store, ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK
+                )
+            )
+            if solver_benchmark_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            exact_solver_results_table(solver_benchmark_rows),
+                            ReportArtifactName("exact-solver-results"),
+                        )
+                    )
+                )
+            scalability_rows = _scalability_results_rows(
+                completed_experiment_metric_records_with_support(
+                    store, ExperimentName.SCALABILITY_AND_EFFICIENCY
+                )
+            )
+            if scalability_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            scalability_results_table(scalability_rows),
+                            ReportArtifactName("scalability-results"),
+                        )
+                    )
+                )
+            ablation_rows = _ablation_results_rows(
+                completed_experiment_metric_records(store, ExperimentName.MECHANISM_ABLATIONS)
+            )
+            if ablation_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            ablation_results_table(ablation_rows),
+                            ReportArtifactName("ablation-results"),
+                        )
+                    )
+                )
+            sparsity_and_dense_rows = _sparsity_and_dense_results_rows(
+                completed_experiment_metric_records(
+                    store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK
+                ),
+                primary_transfer_metrics,
+            )
+            if sparsity_and_dense_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            sparsity_and_dense_results_table(sparsity_and_dense_rows),
+                            ReportArtifactName("sparsity-and-dense-results"),
+                        )
+                    )
+                )
+            generalization_rows = _generalization_results_rows(
+                completed_experiment_metric_records(
+                    store, ExperimentName.SECONDARY_CROSS_MODALITY_GENERALIZATION
+                )
+            )
+            if generalization_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            generalization_results_table(generalization_rows),
+                            ReportArtifactName("generalization-results"),
+                        )
+                    )
+                )
+            confirmation_rows = _confirmation_results_rows(
+                completed_experiment_metric_records(
+                    store, ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY
+                )
+            )
+            if confirmation_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            confirmation_results_table(confirmation_rows),
+                            ReportArtifactName("confirmation-results"),
+                        )
+                    )
+                )
+            coupling_rows = _coupling_mechanism_results_rows(
+                completed_experiment_metric_records(
+                    store, ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION
+                ),
+                completed_experiment_metric_records(
+                    store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION
+                ),
+                primary_transfer_comparisons,
+            )
+            if coupling_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            coupling_mechanism_results_table(coupling_rows),
+                            ReportArtifactName("coupling-mechanism-results"),
                         )
                     )
                 )

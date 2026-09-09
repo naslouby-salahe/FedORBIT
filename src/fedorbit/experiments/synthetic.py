@@ -22,6 +22,7 @@ from fedorbit.optimization.correspondence import (
     enumerate_block_permutations,
 )
 from fedorbit.optimization.diagnostics import (
+    MapValueDiagnostics,
     fixed_action_rectangularization_gap,
     map_value_diagnostics,
 )
@@ -179,6 +180,8 @@ class UnresolvedMapWorld:
     target_importance: np.ndarray
     generation_seed: RandomSeed
     world_kind: UnresolvedMapWorldKind
+    certified_robust_value: Score
+    diagnostics: MapValueDiagnostics
 
 
 def generate_unresolved_map_world(request: UnresolvedMapWorldRequest) -> UnresolvedMapWorld:
@@ -197,13 +200,17 @@ def generate_unresolved_map_world(request: UnresolvedMapWorldRequest) -> Unresol
         ).generator
         pattern, response = _draw_world_response(request.world_kind, random)
         importance = _gamma_normalized_importance(random, sum(pattern))
-        if _world_is_accepted(request.world_kind, pattern, response, importance):
+        evidence = _world_is_accepted(request.world_kind, pattern, response, importance)
+        if evidence is not None:
+            certified_robust_value, diagnostics = evidence
             return UnresolvedMapWorld(
                 block_pattern=pattern,
                 lower_response_matrix=response,
                 target_importance=importance,
                 generation_seed=request.seed,
                 world_kind=request.world_kind,
+                certified_robust_value=certified_robust_value,
+                diagnostics=diagnostics,
             )
     raise MechanismGenerationError(
         f"unresolved-map generator exhausted attempts for {request.world_kind.value}"
@@ -280,34 +287,36 @@ def _world_is_accepted(
     pattern: tuple[ConceptCount, ConceptCount],
     response: np.ndarray,
     importance: np.ndarray,
-) -> bool:
+) -> tuple[Score, MapValueDiagnostics] | None:
     problem = _unresolved_map_problem(pattern, response, importance)
     orbit = list(enumerate_block_permutations(problem.blocks))
     tolerance = active_config().solvers.exact_sparse.exact_validation_absolute_tolerance
     if world_kind == UnresolvedMapWorldKind.COMMON_ACTION:
         solution = solve_robust_action(problem)
         candidates = (solution.selected_action, zero_action(problem))
-        map_value_diagnostics(candidates, problem, orbit, tolerance)
-        return solution.certified_robust_value > 0.0
+        diagnostics = map_value_diagnostics(candidates, problem, orbit, tolerance)
+        if solution.certified_robust_value > 0.0:
+            return solution.certified_robust_value, diagnostics
+        return None
+    solution = solve_robust_action(problem)
     per_map_winners = tuple(
         _map_conditioned_winner(problem, correspondence) for correspondence in orbit
     )
-    candidates = (
-        solve_robust_action(problem).selected_action,
-        *per_map_winners,
-        zero_action(problem),
-    )
-    map_value_diagnostics(candidates, problem, orbit, tolerance)
+    candidates = (solution.selected_action, *per_map_winners, zero_action(problem))
+    diagnostics = map_value_diagnostics(candidates, problem, orbit, tolerance)
     if world_kind == UnresolvedMapWorldKind.ROBUST_COMPROMISE:
         configuration = active_config().generators.robust_compromise_unresolved_map
         threshold = configuration.robust_pre_map_value_strictly_greater_than
-        return (
+        accepted = (
             len(orbit) > 1
             and _map_conditioned_winners_disjoint(problem, orbit)
             and robust_pre_map_value(candidates, orbit) > threshold
         )
+        return (solution.certified_robust_value, diagnostics) if accepted else None
     threshold = active_config().generators.map_dependent.map_value_minimum
-    return exact_map_action_value(candidates, orbit) >= threshold
+    if exact_map_action_value(candidates, orbit) >= threshold:
+        return solution.certified_robust_value, diagnostics
+    return None
 
 
 def _common_action_response(

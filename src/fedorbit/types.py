@@ -419,7 +419,7 @@ class ExperimentClassification(StrEnum):
     ABLATION = "Ablation"
     ROBUSTNESS = "Robustness"
     GENERALIZATION = "Generalization"
-    FINAL_EVIDENCE = "FINAL EVIDENCE"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    FINAL_EVIDENCE = "FINAL EVIDENCE"
     CONFIRMATORY_ANALYSIS = "Confirmatory ANALYSIS"
     ROBUSTNESS_EFFICIENCY = "Robustness / EFFICIENCY"
 
@@ -529,8 +529,8 @@ class FailureCategory(StrEnum):
     VALIDATION = "validation"
     SCIENTIFIC_NULL = "scientific_null"
     SCIENTIFIC_BOUNDARY = "scientific_boundary"
-    SOLVER_TIME_LIMIT = "solver_time_limit"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
-    RESOURCE_LIMIT = "resource_limit"  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+    SOLVER_TIME_LIMIT = "solver_time_limit"
+    RESOURCE_LIMIT = "resource_limit"
     SCIENTIFIC_ALGORITHMIC = "scientific_algorithmic"
 
 
@@ -591,6 +591,9 @@ class MetricId(StrEnum):
     LIVE_ASSIMILATION_OPTIMIZER_STEPS = "Live Assimilation Optimizer Steps"
     TIMEOUT_INDICATOR = "Timeout Indicator"
     RESOURCE_LIMIT_INDICATOR = "Resource-Limit Indicator"
+    PACKET_ONLY_RECOVERY_ACCURACY = "Packet-Only Recovery Accuracy"
+    STRICT_RESOURCE_VALIDITY = "Strict Resource Validity"
+    DETERMINISTIC_REPLAY_CONSISTENCY = "Deterministic Replay Consistency"
 
 
 class DomainModel(BaseModel):
@@ -647,7 +650,7 @@ class ExperimentCondition:
 
 
 @dataclass(frozen=True, slots=True)
-class SupportSize:  # TODO: unreferenced — likely serialized-schema or deferred-wiring value; verify before removal
+class SupportSize:
     value: int
 
     def __post_init__(self) -> None:

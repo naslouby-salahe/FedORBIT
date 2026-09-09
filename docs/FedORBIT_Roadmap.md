@@ -4146,6 +4146,8 @@ Checks:
 * generic QAP vs exhaustive truth;
 * deterministic replay.
 
+"Rectangular baseline against analytical computation" means: for each coarse block pair $(g,h)$ of a tractable fixture, an independently-derived closed form for the rectangular hull bounds computed at each target position $(i,j)$, cross-checked against `build_rectangular_hull`'s exhaustive-enumeration result. For $g=h$ (same block): the diagonal entries ($i=j$) range over every diagonal entry of that block (a bijection can place any single node at position $i$), and the off-diagonal entries ($i\neq j$) range over every off-diagonal entry of that block only (injectivity forbids $\phi(i)=\phi(j)$); the closed-form bound is the min/max of each of these two disjoint value sets. For $g\neq h$ (different blocks, which permute independently): the closed-form bound is simply the min/max over the full cross-block rectangle. This mirrors the diagonal/off-diagonal/cross-block decomposition already used for the analogous *mean* computation (§ analytic orbit mean, used by the Orbit-Mean baseline).
+
 ## Exact-Sparse Solver Benchmark
 
 **Classification:** Confirmatory for solver exactness/structure.

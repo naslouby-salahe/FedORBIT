@@ -28,19 +28,17 @@ from fedorbit.response.pilot import PilotData
 from fedorbit.types import (
     ClassIndex,
     Coefficient,
-    ConfidenceLevel,
     ConceptCount,
+    ConfidenceLevel,
     Estimate,
     Floor,
     Index,
-    InterventionMagnitude,
     ReplicateCount,
     ResampleCount,
     ResponseSeedStage,
     StableJsonPayload,
     StandardError,
 )
-
 
 type NativeClassSet = tuple[ClassIndex, ...]
 type NativeClassSets = tuple[NativeClassSet, ...]
@@ -72,7 +70,7 @@ class FinalResponseEstimate:
     stability_rule_passed: bool
 
 
-def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, resamples) - pure, deterministic (functools.lru_cache)
+def max_t_critical_value(
     entry_derivatives: EntryDerivatives,
     seed: RandomSeed,
     resamples: ResampleCount | None = None,
@@ -80,8 +78,10 @@ def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, 
     standard_error_floor: Floor | None = None,
 ) -> Estimate:
     final = active_config().scientific.source_response_final
-    resample_count = resamples if resamples is not None else final.max_t_bootstrap_resamples
-    level = (
+    resample_count: ResampleCount = (
+        resamples if resamples is not None else final.max_t_bootstrap_resamples
+    )
+    level: ConfidenceLevel = (
         confidence_level if confidence_level is not None else final.simultaneous_confidence_level
     )
     se_floor = (
@@ -134,13 +134,9 @@ def max_t_critical_value( #TODO: PERF: cache the critical value per (df, alpha, 
         se_floor,
     )
     maxima = np.max(studentized, axis=0)
-    return float(
-        np.quantile(
-            maxima,
-            level,
-            method="higher",
-        )
-    )
+    quantile_probability = float(level)
+    critical_value: Estimate = float(np.quantile(maxima, quantile_probability, method="higher"))
+    return critical_value
 
 
 def estimate_final_response(

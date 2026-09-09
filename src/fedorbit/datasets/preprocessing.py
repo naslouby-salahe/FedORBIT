@@ -8,7 +8,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import lru_cache
+from functools import cache
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -24,21 +24,21 @@ from fedorbit.datasets.splitting import (
     assign_duplicate_groups_chronologically,
 )
 from fedorbit.types import (
-    Coefficient,
     CategoryName,
     CategorySet,
     CategoryVocabulary,
+    Coefficient,
     DuplicateGroupIdentifier,
     FeatureCount,
     FeatureValue,
     FeatureValueMap,
-    Fraction,
     FineLabel,
+    Fraction,
     Index,
     LocalClassNames,
     NonNegativeInt,
-    NumericFeatureValue,
     NormalizedGroupIdentifier,
+    NumericFeatureValue,
     RawCellText,
     ScaleFactor,
     Sha256Digest,
@@ -51,6 +51,7 @@ from fedorbit.types import (
 
 if TYPE_CHECKING:
     from fedorbit.datasets.preprocessing import DuplicateGroups, NormalizedRow
+
 
 class PreprocessingToken(StrEnum):
     EMPTY = ""
@@ -110,7 +111,8 @@ class FeatureQualityReport:
 
     @property
     def candidate_count_before_filtering(self) -> FeatureCount:
-        return FeatureCount(len(self.candidate_features))
+        count: FeatureCount = len(self.candidate_features)
+        return count
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,21 +158,25 @@ def numeric_zero_is_not_missing(value: NumericFeatureValue) -> bool:
 
 def _missing_fraction(values: np.ndarray, categorical: bool) -> Fraction:
     if values.size == 0:
-        return Fraction(1.0)
+        missing: Fraction = 1.0
+        return missing
     if categorical:
-        return Fraction(
+        token_fraction: Fraction = (
             sum(is_missing_token(RawCellText(str(value)), True) for value in values) / values.size
         )
+        return token_fraction
     numeric = values.astype(np.float64)
-    return Fraction(float(np.isnan(numeric).mean()))
+    numeric_fraction: Fraction = float(np.isnan(numeric).mean())
+    return numeric_fraction
 
 
-def _nonfinite_fraction(values: np.ndarray, categorical: bool
-                        ) -> Fraction:
+def _nonfinite_fraction(values: np.ndarray, categorical: bool) -> Fraction:
     if categorical:
-        return Fraction(0.0)
+        none_nonfinite: Fraction = 0.0
+        return none_nonfinite
     numeric = values.astype(np.float64)
-    return Fraction(float(np.logical_and(~np.isfinite(numeric), ~np.isnan(numeric)).mean()))
+    nonfinite: Fraction = float(np.logical_and(~np.isfinite(numeric), ~np.isnan(numeric)).mean())
+    return nonfinite
 
 
 def evaluate_feature_quality(
@@ -306,9 +312,7 @@ def fit_categorical_preprocessor(values: tuple[RawCellText, ...]) -> Categorical
     return CategoricalPreprocessor(categorical_vocabulary(retained), rare)
 
 
-def transform_categorical(
-    value: RawCellText, fitted: CategoricalPreprocessor
-) -> CategoryName:
+def transform_categorical(value: RawCellText, fitted: CategoricalPreprocessor) -> CategoryName:
     if is_missing_token(value, True):
         return CategoryName(PreprocessingToken.ABSENT)
     category = CategoryName(value)
@@ -319,13 +323,12 @@ def transform_categorical(
     return category
 
 
-def one_hot(
-    value: RawCellText, fitted: CategoricalPreprocessor
-) -> tuple[Coefficient, ...]:
+def one_hot(value: RawCellText, fitted: CategoricalPreprocessor) -> tuple[Coefficient, ...]:
     transformed = transform_categorical(value, fitted)
-    return tuple(
-        Coefficient(1.0 if candidate == transformed else 0.0) for candidate in fitted.vocabulary
+    encoded: tuple[Coefficient, ...] = tuple(
+        1.0 if candidate == transformed else 0.0 for candidate in fitted.vocabulary
     )
+    return encoded
 
 
 class RowNormalizationError(ValueError):
@@ -397,38 +400,36 @@ def normalize_value(value: FeatureValue, is_categorical: bool) -> FeatureValue:
     if is_missing_token(RawCellText(str(value).strip()), categorical=is_categorical):
         return normalized_missing_value(is_categorical)
     if isinstance(value, str):
-        return RawCellText(unicodedata.normalize(UnicodeNormalizationForm.NFC, value))
+        return RawCellText(unicodedata.normalize(UnicodeNormalizationForm.NFC.value, value))
     if isinstance(value, float) and not math.isfinite(float(value)):
         return normalized_missing_value(False)
     return value
 
 
-@lru_cache(maxsize=None)
+@cache
 def _numeric_scalar_bytes(value: NumericFeatureValue) -> bytes:
     return struct.pack("<d", value)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _categorical_scalar_bytes(value: RawCellText) -> bytes:
     encoded = value.encode("utf-8")
     return struct.pack("<i", len(encoded)) + encoded
 
 
 def normalized_row_bytes(row_features: NormalizedFeatureVector, schema: AdapterSchema) -> bytes:
-    parts: list[bytes] = [] #TODO: PERF: duplicate-hash path serializes every feature of every row in Python - memoize per-value encodings and prefer column-wise row hashing
+    parts: list[bytes] = []
     for column in schema.feature_order:
         role = schema.role_of(column)
         if role not in (FieldRole.BEHAVIORAL_NUMERIC, FieldRole.BEHAVIORAL_CATEGORICAL):
             continue
         value = row_features.value_of(column)
         if role == FieldRole.BEHAVIORAL_NUMERIC:
-            numeric_value = NumericFeatureValue(
-                float("nan") if value is None else float(value)
-            )
+            numeric_value = NumericFeatureValue(float("nan") if value is None else float(value))
             parts.append(_numeric_scalar_bytes(numeric_value))
         else:
             categorical_value = RawCellText(
-                unicodedata.normalize(UnicodeNormalizationForm.NFC, str(value))
+                unicodedata.normalize(UnicodeNormalizationForm.NFC.value, str(value))
             )
             parts.append(_categorical_scalar_bytes(categorical_value))
     return b"".join(parts)
@@ -443,7 +444,7 @@ def exact_duplicate_hash(
 def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> DuplicateGroups:
     groups: defaultdict[Sha256Digest, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
-        row_hash = exact_duplicate_hash(row.features, schema) #TODO: PERF: group duplicate rows column-wise (sort/tabulate normalized column tuples) instead of one sha256 per row; encode each distinct row once
+        row_hash = exact_duplicate_hash(row.features, schema)
         groups.setdefault(row_hash, []).append(row)
     return DuplicateGroups(
         tuple((row_hash, tuple(members)) for row_hash, members in sorted(groups.items()))

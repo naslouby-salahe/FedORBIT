@@ -69,7 +69,8 @@ def _tensor_mean(values: torch.Tensor) -> Score:
     total = 0.0
     for position in range(values.shape[0]):
         total += float(values[int(position)])
-    return Score(total / values.shape[0])
+    mean: Score = total / values.shape[0]
+    return mean
 
 
 def _macro_ce_from_losses(
@@ -82,7 +83,8 @@ def _macro_ce_from_losses(
         _tensor_mean(losses[indices])
         for losses, indices in zip(losses_by_class, resample_indices, strict=True)
     ]
-    return Score(statistics.fmean(class_entropies))
+    macro_ce: Score = statistics.fmean(class_entropies)
+    return macro_ce
 
 
 def hierarchical_bootstrap_relative_gains(
@@ -108,17 +110,19 @@ def hierarchical_bootstrap_relative_gains(
         for position in range(replicate_count):
             outcomes = replicate_outcomes[int(selected[position])]
             resample_indices = tuple(
-                torch.randint(0, losses.shape[0], (losses.shape[0],), generator=bootstrap_rng) #TODO: PERF: draw all bootstrap resamples in one tensor call and vectorize the loss aggregation instead of per-resample python loops
+                torch.randint(0, losses.shape[0], (losses.shape[0],), generator=bootstrap_rng)
                 for losses in outcomes.baseline_losses_by_class
             )
             baseline = _macro_ce_from_losses(outcomes.baseline_losses_by_class, resample_indices)
             curriculum = _macro_ce_from_losses(
                 outcomes.curriculum_losses_by_class, resample_indices
             )
-            replicate_gains.append(
-                RelativeGain((baseline - curriculum) / max(baseline, denominator_floor))
+            replicate_gain: RelativeGain = (baseline - curriculum) / max(
+                baseline, denominator_floor
             )
-        collected_gains.append(RelativeGain(statistics.fmean(replicate_gains)))
+            replicate_gains.append(replicate_gain)
+        replicate_mean_gain: RelativeGain = statistics.fmean(replicate_gains)
+        collected_gains.append(replicate_mean_gain)
     return tuple(collected_gains)
 
 
@@ -128,7 +132,7 @@ def hierarchical_bootstrap_lower_bound(
     contrast_coordinates: ContrastCoordinates,
 ) -> RelativeGain:
     gains = hierarchical_bootstrap_relative_gains(replicate_outcomes, seed, contrast_coordinates)
-    lower_probability = Fraction(
+    lower_probability: Fraction = (
         1.0 - active_config().scientific.confirmation.one_sided_confidence_level
     )
     return _linear_quantile(sorted(gains), lower_probability)
@@ -147,10 +151,10 @@ def _linear_quantile(
     lower_index = int(position // 1)
     upper_index = min(lower_index + 1, count - 1)
     fraction = position - lower_index
-    return RelativeGain(
-        sorted_values[lower_index]
-        + fraction * (sorted_values[upper_index] - sorted_values[lower_index])
+    interpolated: RelativeGain = sorted_values[lower_index] + fraction * (
+        sorted_values[upper_index] - sorted_values[lower_index]
     )
+    return interpolated
 
 
 def confirmation_decision(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -57,11 +58,14 @@ from fedorbit.types import (
     FeatureName,
     FeatureNames,
     FineLabel,
+    Fraction,
+    Index,
     LocalClassNames,
     NonNegativeInt,
     NormalizedGroupIdentifier,
     NumericFeatureValue,
     OracleTransferConcept,
+    RandomSeed,
     RawCellText,
     RawDatasetDirectory,
     RawDatasetPath,
@@ -94,13 +98,104 @@ class LocalClassManifest:
 
     @property
     def class_count(self) -> ClassCount:
-        return ClassCount(len(self.class_names))
+        count: ClassCount = len(self.class_names)
+        return count
 
 
 @dataclass(frozen=True, slots=True)
 class SplitTensors:
     features: torch.Tensor
     targets: torch.Tensor
+
+
+def deterministic_smallest_hash_subsample_indices(
+    class_row_indices: tuple[Index, ...],
+    fraction: Fraction,
+    seed: RandomSeed,
+    coordinates_text: str,
+) -> tuple[Index, ...]:
+    keep = max(1, round(fraction * len(class_row_indices)))
+    ranked: list[tuple[int, Index]] = []
+    for row_index in class_row_indices:
+        payload = f"FedORBIT|weak-signal-support-subsample|{seed}|{coordinates_text}|{row_index}"
+        digest_int = int.from_bytes(
+            hashlib.sha256(payload.encode("utf-8")).digest(), byteorder="big"
+        )
+        ranked.append((digest_int, row_index))
+    ranked.sort()
+    return tuple(sorted(row_index for _, row_index in ranked[:keep]))
+
+
+def subsample_split_tensors(
+    split: SplitTensors,
+    fraction: Fraction,
+    seed: RandomSeed,
+    coordinates_text: str,
+) -> SplitTensors:
+    target_values: list[int] = split.targets.tolist()
+    keep_indices: list[int] = []
+    for class_value in sorted({int(value) for value in target_values}):
+        class_row_indices: tuple[Index, ...] = tuple(
+            row_index for row_index, value in enumerate(target_values) if int(value) == class_value
+        )
+        kept = deterministic_smallest_hash_subsample_indices(
+            class_row_indices, fraction, seed, f"{coordinates_text}|class-{class_value}"
+        )
+        keep_indices.extend(int(row_index) for row_index in kept)
+    keep_indices.sort()
+    index_tensor = torch.tensor(keep_indices, dtype=torch.long)
+    return SplitTensors(features=split.features[index_tensor], targets=split.targets[index_tensor])
+
+
+_SUBSAMPLED_SPLITS = (Split.TRAIN, Split.META, Split.CONFIRM)
+
+
+def _recompute_class_row_counts(
+    original: Mapping[FineLabel, Mapping[Split, NonNegativeInt]],
+    class_names: LocalClassNames,
+    subsampled_splits: Mapping[Split, SplitTensors],
+) -> Mapping[FineLabel, Mapping[Split, NonNegativeInt]]:
+    updated: OrderedDict[FineLabel, OrderedDict[Split, NonNegativeInt]] = OrderedDict(
+        (fine_label, OrderedDict(per_split)) for fine_label, per_split in original.items()
+    )
+    for split_name in _SUBSAMPLED_SPLITS:
+        counts: dict[int, int] = {}
+        split_target_values: list[int] = subsampled_splits[split_name].targets.tolist()
+        for value in split_target_values:
+            counts[value] = counts.get(value, 0) + 1
+        for class_index, fine_label in enumerate(class_names):
+            count: NonNegativeInt = counts.get(class_index, 0)
+            updated[fine_label][split_name] = count
+    return updated
+
+
+def subsampled_materialized_client(
+    materialized: MaterializedClient,
+    fraction: Fraction,
+    seed: RandomSeed,
+) -> MaterializedClient:
+    coordinates_text = f"{materialized.dataset.value}|support-fraction-{fraction}"
+    subsampled_splits: OrderedDict[Split, SplitTensors] = OrderedDict(materialized.splits)
+    for split_name in _SUBSAMPLED_SPLITS:
+        subsampled_splits[split_name] = subsample_split_tensors(
+            materialized.splits[split_name],
+            fraction,
+            seed,
+            f"{coordinates_text}|{split_name.value}",
+        )
+    class_row_counts = _recompute_class_row_counts(
+        materialized.class_row_counts, materialized.class_manifest.class_names, subsampled_splits
+    )
+    return MaterializedClient(
+        dataset=materialized.dataset,
+        schema=materialized.schema,
+        class_manifest=materialized.class_manifest,
+        feature_names=materialized.feature_names,
+        splits=subsampled_splits,
+        feature_quality=materialized.feature_quality,
+        class_row_counts=class_row_counts,
+        provenance=materialized.provenance,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,7 +234,7 @@ def _read_component_rows(
     per_file_columns: list[TabularColumns] = []
     raw_files: list[RawFileProvenance] = []
     for path in paths:
-        frame = pd.read_csv(  # TODO: evaluate polars streaming CSV read for the large raw lineage (lower peak memory, faster)
+        frame = pd.read_csv(
             path,
             dtype=object,
             keep_default_na=False,
@@ -166,7 +261,7 @@ def _read_component_rows(
     ]
     rows: RawTabularRows = [
         dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)
-    ]  # TODO: PERF: keep the raw lineage columnar - one dict per row for the whole dataset dominates runtime; use column arrays (pandas/polars) and build row objects only where mandatory
+    ]
     return columns, rows, tuple(raw_files)
 
 
@@ -205,7 +300,8 @@ def _resolve_schema(
 
 def _parse_epoch_seconds(value: RawCellText) -> TimestampSeconds:
     try:
-        return TimestampSeconds(float(value))
+        seconds: TimestampSeconds = float(value)
+        return seconds
     except ValueError as error:
         raise MaterializationError(f"unparseable event-time cell: {value!r}") from error
 
@@ -231,9 +327,7 @@ def _build_normalized_rows(
         values: OrderedDict[TabularColumnName, FeatureValue] = OrderedDict()
         for column in behavioral:
             is_categorical = column in categorical_columns
-            values[column] = normalize_value(
-                row.get(column, RawCellText("")), is_categorical
-            )  # TODO: PERF: normalize column-wise with numpy/pandas vector ops instead of per-row, per-value Python normalization
+            values[column] = normalize_value(row.get(column, RawCellText("")), is_categorical)
         normalized_rows.append(
             NormalizedRow(
                 features=NormalizedFeatureVector(values),
@@ -301,17 +395,13 @@ def _assign_splits(
 
 
 def _numeric_array(rows: Sequence[NormalizedRow], column: TabularColumnName) -> np.ndarray:
-    return np.array(
-        [row.features.value_of(column) for row in rows], dtype=object
-    )  # TODO: PERF: build numeric arrays column-wise once instead of per-row feature.value_of lookups
+    return np.array([row.features.value_of(column) for row in rows], dtype=object)
 
 
 def _categorical_array(
     rows: Sequence[NormalizedRow], column: TabularColumnName
 ) -> tuple[RawCellText, ...]:
-    return tuple(
-        RawCellText(str(row.features.value_of(column))) for row in rows
-    )  # TODO: PERF: build categorical arrays column-wise once instead of per-row feature.value_of lookups
+    return tuple(RawCellText(str(row.features.value_of(column))) for row in rows)
 
 
 def _missing_indicator(rows: Sequence[NormalizedRow], column: TabularColumnName) -> np.ndarray:

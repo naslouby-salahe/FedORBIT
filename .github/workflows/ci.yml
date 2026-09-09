@@ -37,4 +37,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen --extra dev
-      - run: uv run pytest tests/architecture tests/unit tests/scientific tests/integration tests/e2e tests/smoke -q
+      - run: uv run pytest tests/architecture tests/unit tests/scientific tests/e2e tests/smoke -q

@@ -141,7 +141,8 @@ def test_no_governed_config_values_literalized_in_production() -> None:
                 and node.value not in ROADMAP_LOCKED_ARCHITECTURE_VALUES
                 and node.value not in STRUCTURAL_IDENTITY_VALUES
                 and not (
-                    path.name == "reporting.py" and node.value in PRESENTATIONAL_RENDERING_VALUES
+                    path.name in ("reporting.py", "evidence.py")
+                    and node.value in PRESENTATIONAL_RENDERING_VALUES
                 )
             ):
                 raise AssertionError(

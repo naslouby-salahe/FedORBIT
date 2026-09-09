@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,6 +14,7 @@ from fedorbit.infrastructure.manifests import (
     completion_manifest_self_hash,
 )
 from fedorbit.infrastructure.provenance import STAGE_DEPENDENCIES
+from fedorbit.infrastructure.runtime import ExecutionLogEvent, ReuseDecision, execution_logger
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
@@ -109,6 +111,19 @@ class ExecutionReuse:
                 )
             else:
                 decisions.append(CellDecision(cell.coordinates, ExecutionAction.REUSE, manifest))
+        logger = execution_logger()
+        for decision in decisions:
+            logger.record(
+                ExecutionLogEvent(
+                    occurred_at=datetime.now(UTC),
+                    cell_coordinates=decision.cell_coordinates,
+                    artifact_id=decision.manifest.artifact_id
+                    if decision.manifest is not None
+                    else None,
+                    state=ArtifactState.RUNNING,
+                    reuse_decision=ReuseDecision(decision.action.value),
+                )
+            )
         return tuple(decisions)
 
     def validate_existing(self, decisions: tuple[CellDecision, ...]) -> None:

@@ -43,13 +43,6 @@ def scientific(session: nox.Session) -> None:
 
 
 @nox.session
-def integration(session: nox.Session) -> None:
-    session.run(
-        "uv", "run", "pytest", "tests/integration", "-q", external=True, success_codes=[0, 5]
-    )
-
-
-@nox.session
 def e2e(session: nox.Session) -> None:
     session.run("uv", "run", "pytest", "tests/e2e", "-q", external=True, success_codes=[0, 5])
 

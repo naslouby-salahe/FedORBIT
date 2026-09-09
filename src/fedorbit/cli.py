@@ -30,6 +30,8 @@ from fedorbit.infrastructure.execution import (
     preprocess_datasets,
     run_experiment,
     run_smoke_validation,
+    training_protocol_rows,
+    transfer_ontology_and_null_padding_rows,
 )
 from fedorbit.infrastructure.failures import validation_failure_outcome
 from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
@@ -45,17 +47,22 @@ from fedorbit.reporting import (
     TableScalar,
     VerifiedEvidenceWriter,
     ablation_results_table,
+    baseline_paired_difference_plot,
     confirmation_results_table,
     coupling_mechanism_results_table,
     dataset_and_client_protocol_table,
     exact_solver_results_table,
     experiment_matrix_table,
+    failure_boundary_results_table,
     generalization_results_table,
+    information_resource_matrix_table,
+    model_and_training_protocol_table,
     numerical_constants_and_seeds_table,
     primary_strict_transfer_results_table,
     real_transfer_gain_forest_plot,
     scalability_results_table,
     sparsity_and_dense_results_table,
+    transfer_ontology_and_null_padding_table,
 )
 from fedorbit.types import (
     ArtifactState,
@@ -72,6 +79,7 @@ from fedorbit.types import (
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
+    RandomSeed,
     RelativeGain,
     ReportArtifactName,
     ReportSeriesName,
@@ -284,6 +292,56 @@ def _real_transfer_gain_series(
             y=tuple(float(index) for index in range(len(pairs))),
         ),
     )
+
+
+def _baseline_paired_difference_series(
+    metric_records: Sequence[MetricRecord],
+) -> tuple[FigureSeries, ...]:
+    pairs = sorted({record.pair for record in metric_records})
+    pair_index: Mapping[DirectedPairName, float] = OrderedDict(
+        (pair, float(index)) for index, pair in enumerate(pairs)
+    )
+    local_only_by_pair_seed: Mapping[tuple[DirectedPairName, RandomSeed], float] = OrderedDict(
+        ((record.pair, record.seed), record.metric_value)
+        for record in metric_records
+        if record.method == TransferMethod.LOCAL_ONLY
+        and record.condition == "principal"
+        and record.metric_name == MetricId.MACRO_CROSS_ENTROPY
+        and record.valid
+        and record.metric_value is not None
+    )
+    baseline_methods = (
+        TransferMethod.LOCAL_SIR,
+        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+        TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+    )
+    series: list[FigureSeries] = []
+    for method in baseline_methods:
+        x_values: list[float] = []
+        y_values: list[float] = []
+        for record in metric_records:
+            if (
+                record.method != method
+                or record.condition != "principal"
+                or record.metric_name != MetricId.MACRO_CROSS_ENTROPY
+                or not record.valid
+                or record.metric_value is None
+            ):
+                continue
+            local_only_value = local_only_by_pair_seed.get((record.pair, record.seed))
+            if local_only_value is None:
+                continue
+            x_values.append(pair_index[record.pair])
+            y_values.append(record.metric_value - local_only_value)
+        if x_values:
+            series.append(
+                FigureSeries(
+                    name=ReportSeriesName(method.value),
+                    x=tuple(x_values),
+                    y=tuple(y_values),
+                )
+            )
+    return tuple(series)
 
 
 def _median(values: Sequence[float]) -> float | None:
@@ -705,6 +763,97 @@ def _coupling_mechanism_results_rows(
     return tuple(rows)
 
 
+_WEAK_SIGNAL_BOUNDARY_DIMENSIONS = (
+    "response-scale",
+    "ci-half-width",
+    "response-heterogeneity",
+    "support-budget",
+    "target-usable-support-fraction",
+)
+
+
+def _boundary_dimension_and_setting(condition: str) -> tuple[str, str]:
+    for dimension in _WEAK_SIGNAL_BOUNDARY_DIMENSIONS:
+        prefix = f"{dimension}-"
+        if condition.startswith(prefix):
+            return dimension, condition[len(prefix) :]
+    return "semantic-sufficiency-partition", condition
+
+
+def _failure_boundary_results_rows(
+    weak_signal_records: Sequence[MetricRecord],
+    semantic_records: Sequence[MetricRecord],
+    primary_transfer_records: Sequence[MetricRecord],
+) -> tuple[Mapping[str, TableScalar], ...]:
+    rows: list[Mapping[str, TableScalar]] = []
+    for experiment_records in (weak_signal_records, semantic_records):
+        cells: set[tuple[DirectedPairName, str, TransferMethod]] = {
+            (record.pair, record.condition, record.method)
+            for record in experiment_records
+            if record.method != TransferMethod.LOCAL_ONLY
+        }
+        for pair, condition, method in sorted(
+            cells, key=lambda cell: (cell[0], cell[1], cell[2].value)
+        ):
+            dimension, setting = _boundary_dimension_and_setting(condition)
+            local_only_ce = _metric_value_by_condition(
+                experiment_records, pair, TransferMethod.LOCAL_ONLY, condition
+            )
+            if local_only_ce is None:
+                local_only_ce = _metric_value_by_condition(
+                    primary_transfer_records, pair, TransferMethod.LOCAL_ONLY, "principal"
+                )
+            method_ce = _metric_value_by_condition(experiment_records, pair, method, condition)
+            realized_gain = (
+                (local_only_ce - method_ce) / local_only_ce
+                if local_only_ce is not None and method_ce is not None and local_only_ce != 0.0
+                else None
+            )
+            certified_value = _metric_value_by_condition(
+                experiment_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
+            )
+            abstention = _metric_value_by_condition(
+                experiment_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.ABSTENTION_INDICATOR,
+            )
+            null_node_count = _metric_value_by_condition(
+                experiment_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.NULL_NODE_COUNT,
+            )
+            confirmation_coverage = _metric_value_by_condition(
+                experiment_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.PROPOSAL_ACCEPTANCE_RATE,
+            )
+            rows.append(
+                OrderedDict(
+                    boundary_dimension=dimension,
+                    setting=setting,
+                    pair=pair,
+                    method=method.value,
+                    certified_value=certified_value,
+                    realized_gain=realized_gain,
+                    abstention=abstention,
+                    null_node_count=null_node_count,
+                    confirmation_coverage=confirmation_coverage,
+                    state="Completed",
+                )
+            )
+    return tuple(rows)
+
+
 def report(
     experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT,
     overwrite: bool = False,
@@ -773,8 +922,32 @@ def report(
                     ),
                     ReportArtifactName("dataset-and-client-protocol"),
                 ),
+                (
+                    information_resource_matrix_table(),
+                    ReportArtifactName("information-resource-matrix"),
+                ),
             ):
                 typer.echo(str(writer.write_project_evidence_table(table, name)))
+            transfer_ontology_rows = transfer_ontology_and_null_padding_rows(store)
+            if transfer_ontology_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            transfer_ontology_and_null_padding_table(transfer_ontology_rows),
+                            ReportArtifactName("transfer-ontology-and-null-padding"),
+                        )
+                    )
+                )
+            model_training_rows = training_protocol_rows(store)
+            if model_training_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            model_and_training_protocol_table(model_training_rows),
+                            ReportArtifactName("model-and-training-protocol"),
+                        )
+                    )
+                )
             primary_transfer_metrics = completed_primary_transfer_metric_records(store)
             primary_transfer_comparisons = completed_primary_transfer_comparison_records(store)
             typer.echo(
@@ -801,6 +974,18 @@ def report(
                         writer.write_project_evidence_figure(
                             real_transfer_gain_forest_plot(gain_series),
                             ReportArtifactName("real-transfer-gain-forest-plot"),
+                        )
+                    )
+                )
+            baseline_difference_series = _baseline_paired_difference_series(
+                primary_transfer_metrics
+            )
+            if baseline_difference_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            baseline_paired_difference_plot(baseline_difference_series),
+                            ReportArtifactName("baseline-paired-difference-plot"),
                         )
                     )
                 )
@@ -902,6 +1087,24 @@ def report(
                         writer.write_project_evidence_table(
                             coupling_mechanism_results_table(coupling_rows),
                             ReportArtifactName("coupling-mechanism-results"),
+                        )
+                    )
+                )
+            failure_boundary_rows = _failure_boundary_results_rows(
+                completed_experiment_metric_records(
+                    store, ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES
+                ),
+                completed_experiment_metric_records(
+                    store, ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER
+                ),
+                primary_transfer_metrics,
+            )
+            if failure_boundary_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            failure_boundary_results_table(failure_boundary_rows),
+                            ReportArtifactName("failure-boundary-results"),
                         )
                     )
                 )

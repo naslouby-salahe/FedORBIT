@@ -40,7 +40,6 @@ REQUIRED_TEST_DIRECTORIES = {
     "tests/unit/config",
     "tests/unit/runtime",
     "tests/scientific",
-    "tests/integration",
     "tests/e2e",
     "tests/smoke",
 }

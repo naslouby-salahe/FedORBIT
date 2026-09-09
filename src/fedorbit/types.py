@@ -145,7 +145,7 @@ class ReportingPathSegment(StrEnum):
     REPRODUCIBILITY = "reproducibility"
     EVIDENCE_SUFFIX = ".evidence.json"
     TABLE_SUFFIX = ".table.json"
-    FIGURE_SUFFIX = ".figure.json"
+    FIGURE_SUFFIX = ".figure.svg"
     SUMMARY_JSON = "summary.json"
     METRIC_RECORDS_CSV = "metric_records.csv"
     METRIC_RECORDS_TEX = "metric_records.tex"
@@ -351,6 +351,9 @@ class TransferMethod(StrEnum):
 
 class ExperimentLocalMethod(StrEnum):
     EXACT_ORBIT = "exact_orbit"
+    EXACT_SPARSE_SUPPORT_ONE = "exact_sparse_support_one"
+    EXACT_SPARSE_SUPPORT_TWO = "exact_sparse_support_two"
+    EXACT_SPARSE_SUPPORT_THREE = "exact_sparse_support_three"
 
 
 type MethodName = TransferMethod | ExperimentLocalMethod
@@ -596,6 +599,8 @@ class MetricId(StrEnum):
     PACKET_ONLY_RECOVERY_ACCURACY = "Packet-Only Recovery Accuracy"
     STRICT_RESOURCE_VALIDITY = "Strict Resource Validity"
     DETERMINISTIC_REPLAY_CONSISTENCY = "Deterministic Replay Consistency"
+    ABSTENTION_INDICATOR = "Abstention Indicator"
+    NULL_NODE_COUNT = "Null-Node Count"
 
 
 class DomainModel(BaseModel):

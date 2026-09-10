@@ -2603,6 +2603,19 @@ Every principal cell must pass:
 
 Any violation makes the scientific cell Invalid.
 
+## 5.7.1 Method resource catalogue
+
+Item 9 above requires the resource kinds a scored cell actually accesses to equal the resource kinds its transfer method is registered for. `ResourceKind` values are TRAIN, META, VALID, CONFIRM, TEST (client splits), ANONYMOUS_SOURCE_PACKET (a cross-client source-response packet), and the remaining local-only/oracle-only kinds defined in `interface.py`. The registered manifest, keyed by `TransferMethod`, is:
+
+| Method | Registered resource kinds |
+| --- | --- |
+| Local-Only | TEST |
+| Local-SIR | TRAIN, META, CONFIRM, TEST |
+| FedORBIT Without Confirmation | ANONYMOUS_SOURCE_PACKET, TRAIN, META, TEST |
+| Coarse Block-Mean, Coarse Block-Min, Orbit-Mean, Matched-Resource Rectangular, Point-Correspondence Commitment, Generic Exact QAP, FedORBIT Exact-Sparse Solver, FedORBIT Dense-CCP Fallback, Exact-Map Oracle, Coupling-Destroyed FedORBIT | ANONYMOUS_SOURCE_PACKET, TRAIN, META, CONFIRM, TEST |
+
+Local-Only never reads a source packet or TRAIN (it scores an already-trained checkpoint directly against TEST). Local-SIR reads no cross-client packet at all — its response estimate is self-referential to the target's own client. FedORBIT Without Confirmation never reads CONFIRM by design (the ablation skips the confirmation step entirely); every other listed method reads all five kinds because target-importance estimation (META), the confirmation decision (CONFIRM), and the received source packet are all inputs to the action before TEST is opened. This is a closed, exhaustive list over the registered `TransferMethod` enum — any newly registered method must add its own entry before item 9 can pass for it.
+
 # 6. Dataset, Client, Ontology, and Preprocessing Protocol
 
 Dataset/component identifiers, directed-pair lists, split boundaries, preprocessing thresholds, and transfer-support thresholds are configured in `scientific.datasets`, `scientific.split`, `scientific.preprocessing`, and `scientific.transfer_support` in `configs/fedorbit.yaml`. The transfer ontology, component-selection rules, split semantics, preprocessing procedure, and eligibility logic are fixed scientific definitions in this section.

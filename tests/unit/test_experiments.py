@@ -3,8 +3,13 @@ from __future__ import annotations
 import pytest
 
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
-from fedorbit.types import ExperimentName, TransferMethod
+from fedorbit.experiments.catalogue import (
+    ExperimentCatalogue,
+    build_catalogue,
+    method_resource_manifest,
+)
+from fedorbit.interface import ResourceKind, validate_resource_manifest_equality
+from fedorbit.types import ExperimentName, StrictResourceViolationError, TransferMethod
 
 
 @pytest.fixture(scope="module")
@@ -236,3 +241,35 @@ def test_classifications_match_roadmap(
         catalogue.definition(ExperimentName.STATISTICAL_SYNTHESIS).classification.value
         == "Confirmatory ANALYSIS"
     )
+
+
+def test_method_resource_manifest_covers_every_transfer_method() -> None:
+    for method in TransferMethod:
+        assert method_resource_manifest(method)
+
+
+def test_method_resource_manifest_local_only_is_test_only() -> None:
+    assert method_resource_manifest(TransferMethod.LOCAL_ONLY) == frozenset({ResourceKind.TEST})
+
+
+def test_method_resource_manifest_without_confirmation_excludes_confirm() -> None:
+    manifest = method_resource_manifest(TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION)
+    assert ResourceKind.CONFIRM not in manifest
+    assert ResourceKind.TEST in manifest
+
+
+def test_method_resource_manifest_local_sir_excludes_source_packet() -> None:
+    manifest = method_resource_manifest(TransferMethod.LOCAL_SIR)
+    assert ResourceKind.ANONYMOUS_SOURCE_PACKET not in manifest
+
+
+def test_validate_resource_manifest_equality_rejects_mismatch() -> None:
+    catalogue_resources = method_resource_manifest(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER)
+    incomplete = catalogue_resources - {ResourceKind.CONFIRM}
+    with pytest.raises(StrictResourceViolationError):
+        validate_resource_manifest_equality(incomplete, catalogue_resources)
+
+
+def test_validate_resource_manifest_equality_accepts_match() -> None:
+    catalogue_resources = method_resource_manifest(TransferMethod.LOCAL_ONLY)
+    validate_resource_manifest_equality(catalogue_resources, catalogue_resources)

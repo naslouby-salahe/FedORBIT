@@ -12,6 +12,7 @@ from fedorbit.experiments.cells import (
     RegisteredConditions,
 )
 from fedorbit.experiments.synthetic import eligible_coupling_support_sizes
+from fedorbit.interface import ResourceKind
 from fedorbit.types import (
     ClientRole,
     ExperimentClassification,
@@ -21,6 +22,53 @@ from fedorbit.types import (
     RandomSeed,
     TransferMethod,
 )
+
+_SOLVER_ACTION_RESOURCES = frozenset(
+    {
+        ResourceKind.ANONYMOUS_SOURCE_PACKET,
+        ResourceKind.TRAIN,
+        ResourceKind.META,
+        ResourceKind.CONFIRM,
+        ResourceKind.TEST,
+    }
+)
+
+METHOD_RESOURCE_MANIFEST: Mapping[TransferMethod, frozenset[ResourceKind]] = OrderedDict(
+    (
+        (TransferMethod.LOCAL_ONLY, frozenset({ResourceKind.TEST})),
+        (
+            TransferMethod.LOCAL_SIR,
+            frozenset(
+                {ResourceKind.TRAIN, ResourceKind.META, ResourceKind.CONFIRM, ResourceKind.TEST}
+            ),
+        ),
+        (TransferMethod.COARSE_BLOCK_MEAN, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.COARSE_BLOCK_MIN, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.ORBIT_MEAN, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.POINT_CORRESPONDENCE_COMMITMENT, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.GENERIC_EXACT_QAP, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, _SOLVER_ACTION_RESOURCES),
+        (TransferMethod.EXACT_MAP_ORACLE, _SOLVER_ACTION_RESOURCES),
+        (
+            TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
+            frozenset(
+                {
+                    ResourceKind.ANONYMOUS_SOURCE_PACKET,
+                    ResourceKind.TRAIN,
+                    ResourceKind.META,
+                    ResourceKind.TEST,
+                }
+            ),
+        ),
+        (TransferMethod.COUPLING_DESTROYED_FEDORBIT, _SOLVER_ACTION_RESOURCES),
+    )
+)
+
+
+def method_resource_manifest(method: TransferMethod) -> frozenset[ResourceKind]:
+    return METHOD_RESOURCE_MANIFEST[method]
 
 
 class CatalogueScope(StrEnum):
@@ -561,6 +609,10 @@ def validate_catalogue(catalogue: ExperimentCatalogue) -> None:
     registered = catalogue.registered_names()
     if set(registered) != set(ExperimentName):
         raise ExperimentValidationError("catalogue must define every registered experiment")
+    if set(METHOD_RESOURCE_MANIFEST) != set(TransferMethod):
+        raise ExperimentValidationError(
+            "method resource manifest must define every registered transfer method"
+        )
     if len(registered) != len(set(registered)):
         raise ExperimentValidationError("catalogue registers an experiment more than once")
     for definition in (catalogue.definition(name) for name in registered):

@@ -893,6 +893,7 @@ def execute_sparsity_and_dense_fallback(
                     seed,
                     device,
                     FilesystemSlug("sparsity-and-dense-fallback"),
+                    method,
                     solve_action,
                 )
                 if scored is None:
@@ -1202,6 +1203,7 @@ def execute_semantic_sufficiency_frontier(
                         seed,
                         device,
                         FilesystemSlug("semantic-sufficiency-frontier"),
+                        method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         bucket_of,
@@ -1327,6 +1329,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         seed,
                         device,
                         FilesystemSlug("weak-signal-boundaries"),
+                        method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         None,
@@ -1457,6 +1460,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         seed,
                         device,
                         FilesystemSlug("weak-signal-boundaries"),
+                        method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         None,

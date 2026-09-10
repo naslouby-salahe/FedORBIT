@@ -40,6 +40,7 @@ from fedorbit.datasets.materialization import (
     transfer_concept_groups,
 )
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
+from fedorbit.experiments.catalogue import method_resource_manifest
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.infrastructure.artifacts import (
@@ -72,6 +73,7 @@ from fedorbit.interface import (
     AccessLogger,
     ResourceKind,
     validate_dynamic_access_log_scan,
+    validate_resource_manifest_equality,
 )
 from fedorbit.learning.checkpoints import load_base_checkpoint
 from fedorbit.learning.pilot import (
@@ -761,10 +763,14 @@ def _confirm_assimilate_and_score(
     contrast_coordinates: ContrastCoordinates,
     assimilation_coordinates: AssimilationCoordinates,
     n_classes: ClassCount,
+    method: TransferMethod,
     confirmation_verdict_sink: MutableCell[bool] | None = None,
 ) -> ScoreArtifact:
     access = AccessLogger()
+    if method != TransferMethod.LOCAL_SIR:
+        access.record(ClientRole.TARGET, ResourceKind.ANONYMOUS_SOURCE_PACKET)
     access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+    access.record(ClientRole.TARGET, ResourceKind.META)
     access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
     pre_confirm = capture_pre_confirm_pair(model, optimizer)
     verdict = run_proposal_confirmation(
@@ -809,6 +815,9 @@ def _confirm_assimilate_and_score(
     lifecycle.assert_opened()
     access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
     validate_dynamic_access_log_scan(access.trace())
+    validate_resource_manifest_equality(
+        frozenset(access.trace().resources()), method_resource_manifest(method)
+    )
     return score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
@@ -920,6 +929,7 @@ def score_local_sir_cell(
             action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
+        TransferMethod.LOCAL_SIR,
     )
     return score, n_classes, input_artifact_ids
 
@@ -1180,6 +1190,7 @@ def score_matched_resource_rectangular_cell(
             action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
+        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
     )
     return score, n_classes, input_artifact_ids
 
@@ -1301,6 +1312,7 @@ def score_point_correspondence_commitment_cell(
             action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
+        TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
     )
     return score, n_classes, input_artifact_ids
 
@@ -1531,6 +1543,7 @@ def score_robust_action_cell(
     seed: RandomSeed,
     device: torch.device,
     method_slug: FilesystemSlug,
+    method: TransferMethod,
     solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
     settle_and_score: Callable[
         [
@@ -1613,6 +1626,7 @@ def score_robust_action_cell(
             contrast_coordinates,
             assimilation_coordinates,
             assembly.n_classes,
+            method,
             confirmation_verdict_sink=confirmation_verdict_sink,
         )
     else:
@@ -1689,6 +1703,7 @@ def score_fedorbit_exact_sparse_solver_cell(
         seed,
         device,
         FilesystemSlug("fedorbit-exact-sparse-solver"),
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
     )
 
@@ -1709,7 +1724,9 @@ def _settle_without_confirmation_and_score(
 ) -> ScoreArtifact:
     del confirm, contrast_coordinates
     access = AccessLogger()
+    access.record(ClientRole.TARGET, ResourceKind.ANONYMOUS_SOURCE_PACKET)
     access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+    access.record(ClientRole.TARGET, ResourceKind.META)
     lifecycle = PreTestLifecycle()
     lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
     lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
@@ -1735,6 +1752,10 @@ def _settle_without_confirmation_and_score(
     lifecycle.assert_opened()
     access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
     validate_dynamic_access_log_scan(access.trace())
+    validate_resource_manifest_equality(
+        frozenset(access.trace().resources()),
+        method_resource_manifest(TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION),
+    )
     return score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
@@ -1760,6 +1781,7 @@ def score_fedorbit_without_confirmation_cell(
         seed,
         device,
         FilesystemSlug("fedorbit-without-confirmation"),
+        TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
         solve_fedorbit_exact_sparse_action,
         _settle_without_confirmation_and_score,
     )
@@ -1785,6 +1807,7 @@ def score_generic_exact_qap_cell(
         seed,
         device,
         FilesystemSlug("generic-exact-qap"),
+        TransferMethod.GENERIC_EXACT_QAP,
         _solve_generic_exact_qap_action,
     )
 
@@ -1809,6 +1832,7 @@ def score_exact_map_oracle_cell(
         seed,
         device,
         FilesystemSlug("exact-map-oracle"),
+        TransferMethod.EXACT_MAP_ORACLE,
         solve_exact_map_oracle_action,
     )
 
@@ -1880,6 +1904,7 @@ def score_coarse_block_mean_cell(
         seed,
         device,
         FilesystemSlug("coarse-block-mean"),
+        TransferMethod.COARSE_BLOCK_MEAN,
         solve_coarse_block_mean_action,
     )
 
@@ -1904,6 +1929,7 @@ def score_coarse_block_min_cell(
         seed,
         device,
         FilesystemSlug("coarse-block-min"),
+        TransferMethod.COARSE_BLOCK_MIN,
         solve_coarse_block_min_action,
     )
 
@@ -1928,6 +1954,7 @@ def score_orbit_mean_cell(
         seed,
         device,
         FilesystemSlug("orbit-mean"),
+        TransferMethod.ORBIT_MEAN,
         solve_orbit_mean_action,
     )
 
@@ -1952,6 +1979,7 @@ def score_coupling_destroyed_fedorbit_cell(
         seed,
         device,
         FilesystemSlug("coupling-destroyed-fedorbit"),
+        TransferMethod.COUPLING_DESTROYED_FEDORBIT,
         solve_coupling_destroyed_action,
     )
 
@@ -2005,7 +2033,9 @@ def _confirm_assimilate_score_capturing_verdict(
     ) -> ScoreArtifact:
         del action
         access = AccessLogger()
+        access.record(ClientRole.TARGET, ResourceKind.ANONYMOUS_SOURCE_PACKET)
         access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+        access.record(ClientRole.TARGET, ResourceKind.META)
         access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
         pre_confirm = capture_pre_confirm_pair(model, optimizer)
         verdict = run_proposal_confirmation(
@@ -2049,6 +2079,10 @@ def _confirm_assimilate_score_capturing_verdict(
         lifecycle.assert_opened()
         access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
         validate_dynamic_access_log_scan(access.trace())
+        validate_resource_manifest_equality(
+            frozenset(access.trace().resources()),
+            method_resource_manifest(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER),
+        )
         return score_model(
             ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
         )
@@ -2077,6 +2111,7 @@ def score_fedorbit_with_confirmation_verdict_cell(
         seed,
         device,
         FilesystemSlug("fedorbit-exact-sparse-solver"),
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
         _confirm_assimilate_score_capturing_verdict(verdicts),
     )

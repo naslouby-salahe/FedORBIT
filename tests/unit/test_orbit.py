@@ -14,12 +14,13 @@ from fedorbit.optimization.correspondence import (
     active_image_assignment_count,
     build_padded_block_structure,
     compare_correspondences_lexicographically,
+    correspondence_block_id,
     enumerate_active_image_maps,
     enumerate_block_permutations,
     falling_factorial,
     support_per_block,
 )
-from fedorbit.types import CoarseGroup
+from fedorbit.types import CoarseGroup, CorrespondenceBlockId, OracleTransferConcept
 
 
 def _two_by_three_blocks() -> PaddedBlockStructure:
@@ -141,6 +142,27 @@ def test_permutation_matches_conjugation_definition() -> None:
         actual = correspondence.permute_response_matrix(matrix)
         assert np.allclose(actual, expected)
         assert images.size == 5
+
+
+def test_correspondence_block_id_preserves_coarse_group_value() -> None:
+    assert correspondence_block_id(CoarseGroup.DISRUPTION) == CorrespondenceBlockId(
+        CoarseGroup.DISRUPTION.value
+    )
+
+
+def test_fine_concept_singleton_blocks_have_trivial_orbit() -> None:
+    block_ids = (
+        CorrespondenceBlockId(OracleTransferConcept.DDOS.value),
+        CorrespondenceBlockId(OracleTransferConcept.SCANNING.value),
+    )
+    blocks = build_padded_block_structure(
+        block_ids,
+        {block_ids[0]: 1, block_ids[1]: 1},
+        {block_ids[0]: 1, block_ids[1]: 1},
+    )
+    assert blocks.total_padded_nodes == 2
+    assert blocks.orbit_size == 1
+    assert next(iter(enumerate_block_permutations(blocks))).images == (0, 1)
 
 
 def test_permute_rejects_shape_mismatch() -> None:

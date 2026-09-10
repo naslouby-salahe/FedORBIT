@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fedorbit.infrastructure.execution import ArtifactStore, execute_primitive_validation
+from fedorbit.experiments.validation import execute_primitive_validation
+from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.types import ArtifactState
 
@@ -22,6 +23,11 @@ def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path
     payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
     assert payload["assignment_is_bijective"]
     assert payload["lower_bound_not_above_upper_bound"]
+    assert payload["null_padding_present"]
+    assert payload["orbit_mean_finite"]
+    assert payload["rectangular_hull_ordered"]
+    assert payload["assignment_serialization_round_trip"]
+    assert payload["fixture_error_within_tolerance"]
     assert manifest.semantic_producer_coordinates == completion.semantic_experiment_coordinates
     assert "mathematical-primitive-validation" in Path(manifest.payload_paths[0]).parts
     reused = execute_primitive_validation(store, layout)

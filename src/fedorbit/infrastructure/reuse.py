@@ -26,7 +26,7 @@ from fedorbit.types import (
 )
 
 if TYPE_CHECKING:
-    from fedorbit.infrastructure.execution import ArtifactStore
+    from fedorbit.infrastructure.artifacts import ArtifactStore
 
 
 class ReuseError(ValueError):

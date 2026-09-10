@@ -9,10 +9,10 @@ import pandas as pd
 import pytest
 import torch
 
-import fedorbit.infrastructure.execution as execution
+import fedorbit.infrastructure.preparation as execution
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.materialization import MaterializedClient
-from fedorbit.infrastructure.execution import persist_materialized_client
+from fedorbit.infrastructure.preparation import persist_materialized_client
 from fedorbit.infrastructure.workspace import (
     RawDuplicateReportRequest,
     RawInventoryPersistenceRequest,

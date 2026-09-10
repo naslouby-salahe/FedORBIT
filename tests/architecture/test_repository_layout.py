@@ -97,7 +97,17 @@ REQUIRED_SOURCE_FILES = {
     "src/fedorbit/infrastructure/manifests.py",
     "src/fedorbit/infrastructure/provenance.py",
     "src/fedorbit/infrastructure/reuse.py",
-    "src/fedorbit/infrastructure/execution.py",
+    "src/fedorbit/infrastructure/artifacts.py",
+    "src/fedorbit/infrastructure/preparation.py",
+    "src/fedorbit/experiments/dispatch.py",
+    "src/fedorbit/experiments/scoring.py",
+    "src/fedorbit/experiments/validation.py",
+    "src/fedorbit/experiments/training.py",
+    "src/fedorbit/experiments/transfer.py",
+    "src/fedorbit/experiments/solvers.py",
+    "src/fedorbit/experiments/synthesis.py",
+    "src/fedorbit/experiments/audit.py",
+    "src/fedorbit/experiments/classification.py",
     "src/fedorbit/infrastructure/runtime.py",
     "src/fedorbit/infrastructure/environment.py",
     "src/fedorbit/infrastructure/failures.py",
@@ -127,6 +137,8 @@ def test_repository_root_entries_are_allowed() -> None:
         ".claude",
         "outputs",
         "results",
+        ".coverage",
+        "graphify-out",
     }
     actual = {
         entry.name

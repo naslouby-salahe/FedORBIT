@@ -3,10 +3,8 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import platform
-import subprocess
 from collections import OrderedDict
 from dataclasses import dataclass
-from enum import StrEnum
 
 import psutil
 import torch
@@ -95,13 +93,16 @@ def observed_hardware() -> HardwareIdentity:
     gpu_name = None
     gpu_memory = None
     if cuda_available:
+        properties = torch.cuda.get_device_properties(0)
         gpu_name = GpuName(torch.cuda.get_device_name(0))
-        gpu_memory = _gpu_memory_bytes()
+        memory = properties.total_memory
+        if isinstance(memory, int):
+            gpu_memory = memory
     return HardwareIdentity(
         gpu_name=gpu_name,
         gpu_memory_bytes=gpu_memory,
         cuda_available=cuda_available,
-        driver_cuda_version=_driver_version(),
+        driver_cuda_version=None,
         torch_cuda_version=(
             CudaVersion(torch.version.cuda) if torch.version.cuda is not None else None
         ),
@@ -109,53 +110,6 @@ def observed_hardware() -> HardwareIdentity:
         ram_bytes=psutil.virtual_memory().total,
         os_release=OperatingSystemRelease(platform.platform()),
     )
-
-
-class NvidiaSmiQuery(StrEnum):
-    GPU_MEMORY_TOTAL = "memory.total"
-    DRIVER_VERSION = "driver_version"
-
-
-class NvidiaSmiFormat(StrEnum):
-    CSV_NO_HEADER_NO_UNITS = "csv,noheader,nounits"
-    CSV_NO_HEADER = "csv,noheader"
-
-
-def _gpu_memory_bytes() -> ByteCount | None:
-    try:
-        result = subprocess.run(
-            [
-                "nvidia-smi",
-                f"--query-gpu={NvidiaSmiQuery.GPU_MEMORY_TOTAL.value}",
-                f"--format={NvidiaSmiFormat.CSV_NO_HEADER_NO_UNITS.value}",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        )
-        memory_bytes: ByteCount = int(result.stdout.strip()) * 1024 * 1024
-        return memory_bytes
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
-
-
-def _driver_version() -> CudaVersion | None:
-    try:
-        result = subprocess.run(
-            [
-                "nvidia-smi",
-                f"--query-gpu={NvidiaSmiQuery.DRIVER_VERSION.value}",
-                f"--format={NvidiaSmiFormat.CSV_NO_HEADER.value}",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        )
-        return CudaVersion(result.stdout.strip())
-    except (OSError, subprocess.SubprocessError):
-        return None
 
 
 def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
@@ -187,16 +141,17 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
 def environment_snapshot() -> EnvironmentSnapshot:
     dependencies = observed_dependencies()
     hardware = observed_hardware()
+    python_version = observed_python_version()
     snapshot = EnvironmentSnapshot(
-        python_version=observed_python_version(),
+        python_version=python_version,
         dependencies=dependencies,
         hardware=hardware,
-        fingerprint_sha256=Sha256Digest(""),
+        fingerprint_sha256=Sha256Digest("0" * 64),
     )
     return EnvironmentSnapshot(
-        python_version=snapshot.python_version,
-        dependencies=snapshot.dependencies,
-        hardware=snapshot.hardware,
+        python_version=python_version,
+        dependencies=dependencies,
+        hardware=hardware,
         fingerprint_sha256=_fingerprint(snapshot),
     )
 
@@ -207,10 +162,13 @@ def reference_gpu_matches() -> bool:
     if hardware.gpu_name is None or hardware.gpu_memory_bytes is None:
         return False
     reference_parts = reference.split()
+    configured_gib: int | None = None
     if len(reference_parts) >= 2 and reference_parts[-1] == "GB" and reference_parts[-2].isdigit():
+        configured_gib = int(reference_parts[-2])
         reference_parts = reference_parts[:-2]
     normalized_reference = " ".join(reference_parts)
     name_matches = hardware.gpu_name.strip() == normalized_reference
+    if configured_gib is None:
+        return name_matches
     memory_gib = hardware.gpu_memory_bytes / (1024**3)
-    memory_matches = 15.0 <= memory_gib <= 17.0
-    return name_matches and memory_matches
+    return name_matches and abs(memory_gib - configured_gib) <= 1.0

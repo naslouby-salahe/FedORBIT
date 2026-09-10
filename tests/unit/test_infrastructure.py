@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fedorbit.datasets.common import file_sha256
-from fedorbit.infrastructure.execution import ArtifactStore
+from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fedorbit.datasets.common import file_sha256
-from fedorbit.infrastructure.execution import ArtifactStore, RecoveryBoundary
+from fedorbit.infrastructure.artifacts import ArtifactStore, RecoveryBoundary
 from fedorbit.infrastructure.manifests import ReusableArtifactManifest, artifact_id
 from fedorbit.infrastructure.reuse import (
     SelectiveInvalidation,
@@ -194,3 +194,16 @@ def test_recovery_discards_interrupted_staging(tmp_path: Path) -> None:
     (staging / "partial.bin").write_bytes(b"partial")
     RecoveryBoundary(store).discard_interrupted_staging()
     assert not staging.exists()
+
+
+def test_fingerprint_index_reuses_completed_manifest(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    payload = _payload(tmp_path, "ok.pt")
+    manifest = _manifest(payload, "checkpoint", "training", "fp-indexed")
+    store.write_reusable(manifest)
+    found = store.find_by_fingerprint(ArtifactFingerprint("fp-indexed"))
+    assert found is not None
+    assert found.artifact_id == manifest.artifact_id
+    again = store.find_by_fingerprint(ArtifactFingerprint("fp-indexed"))
+    assert again is not None
+    assert again.artifact_id == manifest.artifact_id

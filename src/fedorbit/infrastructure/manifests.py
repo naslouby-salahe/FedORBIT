@@ -172,7 +172,6 @@ class SemanticCellManifest(FrozenModel):
     relevant_code_sha256: Sha256Digest
     material_runtime_sha256: Sha256Digest
     git_commit: GitRevision
-    git_dirty: bool
     environment_sha256: Sha256Digest
     state: ArtifactState
     state_reason: ValidationReason | None = None

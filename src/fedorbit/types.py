@@ -77,6 +77,7 @@ ReportAxisLabel = NewType("ReportAxisLabel", str)
 ReportColumnName = NewType("ReportColumnName", str)
 ReportArtifactName = NewType("ReportArtifactName", str)
 ProducerModuleName = NewType("ProducerModuleName", str)
+CorrespondenceBlockId = NewType("CorrespondenceBlockId", str)
 
 
 class StorageLayoutSegment(StrEnum):
@@ -322,6 +323,32 @@ class CoarseGroup(StrEnum):
     ACCESS_AND_DISCOVERY = "Access and Discovery"
 
 
+class SemanticPartitionId(StrEnum):
+    ORACLE_FINE_SINGLETON_GROUPS = "oracle_fine_singleton_groups"
+    PRINCIPAL_THREE_COARSE_GROUPS = "principal_three_coarse_groups"
+    ONE_ATTACK_SUPERGROUP = "one_attack_supergroup"
+
+
+class DatasetModality(StrEnum):
+    NETWORK = "network"
+    HOST = "host"
+
+
+class ResearchQuestion(StrEnum):
+    EXACT_SPARSE_SEPARATOR_EXACTNESS = "Exact Sparse Separator Exactness"
+    JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM = (
+        "Joint Correspondence Avoids Rectangular Pessimism"
+    )
+    ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION = (
+        "Action Certification Without Fine-Map Identification"
+    )
+    STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY = "Strict Cross-Telemetry Transfer Utility"
+    VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE = "Value of External Procedural Evidence"
+    OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT = "Operational Relevance of Sparse Support"
+    TARGET_CONFIRMATION_SAFETY = "Target Confirmation Safety"
+    SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT = "Sparse Solver Work-Structure Agreement"
+
+
 class OracleTransferConcept(StrEnum):
     DDOS = "DDoS"
     RANSOMWARE = "Ransomware"
@@ -411,6 +438,23 @@ class ExperimentName(StrEnum):
     MAP_AVAILABILITY_APPLICABILITY_AUDIT = "Map-Availability Applicability Audit"
     SCALABILITY_AND_EFFICIENCY = "Scalability and Efficiency"
     STATISTICAL_SYNTHESIS = "Statistical Synthesis"
+    EVIDENCE_CLASSIFICATION = "Evidence Classification"
+
+
+class EvidenceStatus(StrEnum):
+    SUPPORTED = "Supported"
+    PARTIALLY_SUPPORTED = "Partially Supported"
+    MECHANISM_ONLY = "Mechanism Only"
+    CONDITIONAL = "Conditional"
+    NULL_RESULT = "Null Result"
+    NOT_SUPPORTED = "Not Supported"
+    NOT_TESTED = "Not Tested"
+
+
+class SimplificationRuleState(StrEnum):
+    APPLIED = "Applied"
+    NOT_APPLIED = "Not Applied"
+    NOT_TESTED = "Not Tested"
 
 
 class ExperimentClassification(StrEnum):
@@ -595,12 +639,15 @@ class MetricId(StrEnum):
     TARGET_CONFIRMATION_OPTIMIZER_STEPS = "Target Confirmation Optimizer Steps"
     LIVE_ASSIMILATION_OPTIMIZER_STEPS = "Live Assimilation Optimizer Steps"
     TIMEOUT_INDICATOR = "Timeout Indicator"
+    WORK_STRUCTURE_SPEARMAN = "Work-Structure Spearman"
+    PREDICTED_WORK_COORDINATE = "Predicted Work Coordinate"
     RESOURCE_LIMIT_INDICATOR = "Resource-Limit Indicator"
     PACKET_ONLY_RECOVERY_ACCURACY = "Packet-Only Recovery Accuracy"
     STRICT_RESOURCE_VALIDITY = "Strict Resource Validity"
     DETERMINISTIC_REPLAY_CONSISTENCY = "Deterministic Replay Consistency"
     ABSTENTION_INDICATOR = "Abstention Indicator"
     NULL_NODE_COUNT = "Null-Node Count"
+    ORBIT_SIZE = "Orbit Size"
 
 
 class DomainModel(BaseModel):

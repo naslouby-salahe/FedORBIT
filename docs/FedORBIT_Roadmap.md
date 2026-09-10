@@ -5773,13 +5773,12 @@ resource_manifest_sha256
 relevant_code_sha256
 material_runtime_sha256
 git_commit
-git_dirty
 environment_sha256
 state
 state_reason
 ```
 
-Hashes validate compatibility and provenance; they are not scientific experiment identity.
+Hashes validate compatibility and provenance; they are not scientific experiment identity. `git_commit` is informational metadata only and must not participate in scientific cache identity or artifact reuse decisions. Repository cleanliness is not a scientific invalidation signal.
 
 ## 22.4 Prediction schema
 

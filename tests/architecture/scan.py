@@ -21,6 +21,7 @@ ALLOWED_ROOT_ENTRIES = {
     "configs",
     "data",
     "docs",
+    "graphify-out",
     "noxfile.py",
     "pyproject.toml",
     "src",
@@ -40,9 +41,9 @@ PACKAGE_LAYERS: dict[str, int] = {
     "response": 4,
     "optimization": 4,
     "methods": 4,
-    "experiments": 5,
     "analysis": 3,
-    "infrastructure": 6,
+    "infrastructure": 5,
+    "experiments": 6,
     "reporting": 7,
     "cli": 8,
 }
@@ -52,11 +53,13 @@ MODULE_LAYERS: dict[str, int] = {
     "infrastructure.failures": 2,
     "infrastructure.runtime": 2,
     "infrastructure.storage": 2,
-    "infrastructure.execution": 6,
-    "infrastructure.manifests": 6,
-    "infrastructure.provenance": 6,
-    "infrastructure.reuse": 6,
-    "infrastructure.workspace": 6,
+    "infrastructure.artifacts": 5,
+    "infrastructure.preparation": 5,
+    "infrastructure.manifests": 5,
+    "infrastructure.provenance": 5,
+    "infrastructure.reuse": 5,
+    "infrastructure.workspace": 5,
+    "infrastructure.evidence": 5,
 }
 
 FORBIDDEN_EDGES: dict[str, frozenset[str]] = {

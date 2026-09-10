@@ -166,7 +166,7 @@ class RawDuplicateReportRequest:
     preprocessing_root: Path
 
 
-def _promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path:
+def promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path:
     target = destination / filename
     with FileLock(str(destination / f"{filename}.lock")):
         descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
@@ -215,7 +215,7 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
             columns=[list(entry.columns) for entry in request.inventory.files],
         )
     )
-    _promote_parquet(frame, destination, "files.parquet")
+    promote_parquet(frame, destination, "files.parquet")
     return destination / RawInventoryArtifact.MANIFEST_JSON
 
 
@@ -243,7 +243,7 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
             DuplicateReportColumn.DUPLICATE_ROW_COUNT,
         ),
     )
-    return _promote_parquet(frame, destination, "duplicates.parquet")
+    return promote_parquet(frame, destination, "duplicates.parquet")
 
 
 def _selected_raw_paths(dataset: DatasetId, raw_root: Path) -> tuple[Path, ...]:

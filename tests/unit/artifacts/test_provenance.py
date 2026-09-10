@@ -68,16 +68,16 @@ def test_relevance_covers_registered_experiments() -> None:
         assert len(relevance) >= 2
 
 
-def test_implementation_fingerprint_is_stage_local() -> None:
+def test_implementation_fingerprint_is_producer_identity() -> None:
     baseline = implementation_fingerprint("fedorbit.infrastructure.manifests")
     assert implementation_fingerprint("fedorbit.infrastructure.manifests") == baseline
     assert implementation_fingerprint("fedorbit.config.loading") != baseline
 
 
-def test_implementation_fingerprint_follows_transitive_imports() -> None:
+def test_implementation_fingerprint_does_not_scan_source() -> None:
     producer = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    consumer = implementation_fingerprint("fedorbit.infrastructure.reuse")
-    assert producer != consumer
+    same_identity = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    assert producer == same_identity
 
 
 def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
@@ -159,7 +159,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
     assert changed != base
 
 
-def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
+def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -177,4 +177,4 @@ def test_stage_dependency_fingerprint_sensitive_to_producer_code() -> None:
         frozenset({"models"}),
         "fedorbit.infrastructure.reuse",
     )
-    assert changed != base
+    assert changed == base

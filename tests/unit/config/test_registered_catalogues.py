@@ -100,4 +100,6 @@ def test_metric_catalogue_identities() -> None:
     assert MetricId.DENSE_BOUND_GAP == "Dense Bound Gap"
     assert MetricId.ABSOLUTE_RISK_REDUCTION == "Absolute Risk Reduction"
     assert MetricId.RELATIVE_RISK_REDUCTION == "Relative Risk Reduction"
+    assert MetricId.ORBIT_SIZE == "Orbit Size"
+    assert MetricId.WORK_STRUCTURE_SPEARMAN == "Work-Structure Spearman"
     assert len(tuple(MetricId)) >= 40

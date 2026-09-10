@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-import fedorbit.infrastructure.execution as execution
+import fedorbit.experiments.training as execution
 from fedorbit.datasets.materialization import DatasetId
+from fedorbit.experiments.training import training_protocol_rows
+from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.evidence import TableScalar
-from fedorbit.infrastructure.execution import ArtifactStore, training_protocol_rows
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.learning.pilot import HOST_DATASETS, NETWORK_DATASETS
 from fedorbit.learning.training import SelectedHyperparameters

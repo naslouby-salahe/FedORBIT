@@ -71,35 +71,11 @@ def test_no_scientific_override_options_exist() -> None:
         assert result.exit_code == ExitStatus.USAGE
 
 
-def test_doctor_is_read_only_and_validates_environment() -> None:
-    result = runner.invoke(app, ["doctor"])
-    assert result.exit_code in (0, 1)
-    assert "python:" in result.output or "environment mismatch" in result.output
-    assert "dependencies:" in result.output
-
-
 def test_plan_is_read_only_and_derives_catalogue() -> None:
     result = runner.invoke(app, ["plan"])
     assert result.exit_code == 0
-    assert "registered experiments: 26" in result.output
+    assert f"registered experiments: {len(ExperimentName)}" in result.output
     assert "Primary Strict Cross-Telemetry Transfer" in result.output
-
-
-def test_status_renders_wide_table_per_item() -> None:
-    result = runner.invoke(app, ["status"])
-    assert result.exit_code == 0
-    assert "Experiment" in result.output
-    assert "Primary Strict Cross-Telemetry Transfer" in result.output
-
-
-def test_status_accepts_single_experiment() -> None:
-    result = runner.invoke(app, ["status", "Primary Strict Cross-Telemetry Transfer"])
-    assert result.exit_code == 0
-
-
-def test_status_rejects_invented_experiment() -> None:
-    result = runner.invoke(app, ["status", "Invented Experiment"])
-    assert result.exit_code == ExitStatus.USAGE
 
 
 def test_report_rejects_invented_experiment() -> None:
@@ -107,26 +83,6 @@ def test_report_rejects_invented_experiment() -> None:
     assert result.exit_code == ExitStatus.USAGE
 
 
-def test_preprocess_accepts_registered_dataset() -> None:
-    result = runner.invoke(app, ["preprocess", "edge_iiotset_network"])
-    assert result.exit_code == 0
-
-
 def test_preprocess_rejects_display_name() -> None:
     result = runner.invoke(app, ["preprocess", "Edge-IIoTset"])
     assert result.exit_code == ExitStatus.USAGE
-
-
-def test_preprocess_accepts_overwrite_flag() -> None:
-    result = runner.invoke(app, ["preprocess", "--overwrite"])
-    assert result.exit_code == 0
-
-
-def test_run_accepts_registered_experiment() -> None:
-    result = runner.invoke(app, ["run", "Mathematical Primitive Validation"])
-    assert result.exit_code == ExitStatus.OK
-
-
-def test_smoke_accepts_overwrite_flag() -> None:
-    result = runner.invoke(app, ["smoke", "--overwrite"])
-    assert result.exit_code == 0

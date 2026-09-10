@@ -10,14 +10,17 @@ from fedorbit.experiments.cells import (
     RegisteredConditions,
     experiment_relevance,
 )
+from fedorbit.experiments.dispatch import ExperimentExecutionRequest, run_experiment
 
 __all__ = [
     "ConditionRegistrationError",
     "ExperimentCatalogue",
     "ExperimentDefinition",
+    "ExperimentExecutionRequest",
     "ExperimentValidationError",
     "RegisteredConditions",
     "build_catalogue",
     "experiment_relevance",
+    "run_experiment",
     "validate_catalogue",
 ]

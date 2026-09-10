@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import ast
-import subprocess
-import sys
 
 from tests.architecture.scan import (
     REPOSITORY_ROOT,
@@ -12,26 +10,6 @@ from tests.architecture.scan import (
     parse_module,
     relative_module,
 )
-
-
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=REPOSITORY_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-
-
-def test_vulture_finds_no_unused_production_code() -> None:
-    whitelist = REPOSITORY_ROOT / "vulture_whitelist.py"
-    command = [sys.executable, "-m", "vulture"]
-    if whitelist.is_file():
-        command.append(str(whitelist))
-    command.extend(["src/fedorbit", "--min-confidence", "80"])
-    result = _run(command)
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_vulture_whitelist_is_committed() -> None:

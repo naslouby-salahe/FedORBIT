@@ -499,6 +499,25 @@ def sparsity_and_dense_results_table(
     )
 
 
+def evidence_status_table(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> EvidenceTable:
+    return _rows_table(
+        (
+            "question",
+            "final_state",
+            "materiality_result",
+            "statistical_result",
+            "evidence_completeness",
+            "scope",
+            "supporting_table",
+            "supporting_figure",
+            "forbidden_wording",
+        ),
+        rows,
+    )
+
+
 def confirmation_results_table(
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> EvidenceTable:
@@ -583,25 +602,54 @@ def scalability_results_table(
             "cuda_memory",
             "timeout",
             "exactness_status",
+            "predicted_work",
         ),
         rows,
     )
 
 
-def _figure(x_label: str, y_label: str, series: Sequence[FigureSeries]) -> EvidenceFigure:
+def _figure(
+    x_label: str,
+    y_label: str,
+    series: Sequence[FigureSeries],
+    *,
+    vertical_reference_lines: tuple[float, ...] = (),
+    horizontal_reference_lines: tuple[float, ...] = (),
+    log_x: bool = False,
+    log_y: bool = False,
+    draw_unit_diagonal: bool = False,
+) -> EvidenceFigure:
     return EvidenceFigure(
-        x_label=ReportAxisLabel(x_label), y_label=ReportAxisLabel(y_label), series=tuple(series)
+        x_label=ReportAxisLabel(x_label),
+        y_label=ReportAxisLabel(y_label),
+        series=tuple(series),
+        vertical_reference_lines=vertical_reference_lines,
+        horizontal_reference_lines=horizontal_reference_lines,
+        log_x=log_x,
+        log_y=log_y,
+        draw_unit_diagonal=draw_unit_diagonal,
     )
 
 
 def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
-    return _figure("paired mean relative macro-CE gain vs local", "primary directed pair", series)
+    material = active_config().scientific.materiality.realized_relative_macro_ce
+    return _figure(
+        "paired mean relative macro-CE gain vs local",
+        "primary directed pair",
+        series,
+        vertical_reference_lines=(0.0, material),
+    )
 
 
 def baseline_paired_difference_plot(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("primary directed pair", "seed-level paired difference", series)
+    return _figure(
+        "primary directed pair",
+        "seed-level paired difference",
+        series,
+        horizontal_reference_lines=(0.0,),
+    )
 
 
 def coupling_gap_phase_figure(
@@ -647,10 +695,17 @@ def scalability_figure(
         "N_S * sum(n_g^3) (log scale)",
         "runtime (log scale)",
         series,
+        log_x=True,
+        log_y=True,
     )
 
 
 def map_value_bound_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("orbit-radius bound", "exact map action value", series)
+    return _figure(
+        "orbit-radius bound",
+        "exact map action value",
+        series,
+        draw_unit_diagonal=True,
+    )

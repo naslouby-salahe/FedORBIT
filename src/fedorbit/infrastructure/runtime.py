@@ -244,6 +244,9 @@ class ExecutionLogger:
             reuse_decision=event.reuse_decision,
         )
 
+    def event(self, event_name: str, **fields: object) -> None:
+        self._logger.info(event_name, **fields)
+
 
 def execution_logger() -> ExecutionLogger:
     return ExecutionLogger(cast(FilteringBoundLogger, structlog.get_logger("fedorbit.execution")))
@@ -311,8 +314,6 @@ class ReproducibilityIdentity:
                     (
                         self.config_digest,
                         self.seed_digest,
-                        self.environment_fingerprint,
-                        self.code_revision.identity(),
                         self.statistical_identity_digest,
                     )
                 ).encode("utf-8")
@@ -320,7 +321,7 @@ class ReproducibilityIdentity:
         )
 
 
-def statistical_identity_digest(environment: EnvironmentSnapshot) -> Sha256Digest:
+def statistical_identity_digest() -> Sha256Digest:
     scientific = active_config().scientific
     statistics = scientific.statistics
     payload = stable_json(
@@ -344,7 +345,6 @@ def statistical_identity_digest(environment: EnvironmentSnapshot) -> Sha256Diges
                 confidence_level=statistics.confidence_level,
                 evaluation_criteria=scientific.evaluation_criteria.model_dump(mode="json"),
                 materiality=scientific.materiality.model_dump(mode="json"),
-                environment=environment.fingerprint_sha256,
             ),
         )
     )
@@ -361,7 +361,7 @@ def build_reproducibility_identity(environment: EnvironmentSnapshot) -> Reproduc
         seed_digest=_seed_digest(),
         environment_fingerprint=environment.fingerprint_sha256,
         code_revision=code_revision,
-        statistical_identity_digest=statistical_identity_digest(environment),
+        statistical_identity_digest=statistical_identity_digest(),
     )
 
 

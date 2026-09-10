@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
@@ -10,7 +10,7 @@ from enum import IntEnum
 import numpy as np
 from numpy.typing import NDArray
 
-from fedorbit.types import CoarseGroup, Index, SampleCount
+from fedorbit.types import CoarseGroup, CorrespondenceBlockId, Index, SampleCount
 
 type BlockCounts = tuple[Index, ...]
 type NodePermutation = tuple[Index, ...]
@@ -36,9 +36,15 @@ class BlockNodeCounts:
             raise CorrespondenceError("block counts must be nonnegative")
 
 
+def correspondence_block_id(group: CoarseGroup | CorrespondenceBlockId) -> CorrespondenceBlockId:
+    if isinstance(group, CoarseGroup):
+        return CorrespondenceBlockId(group.value)
+    return group
+
+
 @dataclass(frozen=True, slots=True)
 class PaddedBlockStructure:
-    coarse_groups: tuple[CoarseGroup, ...]
+    coarse_groups: tuple[CorrespondenceBlockId, ...]
     source_real_counts: tuple[SampleCount, ...]
     target_real_counts: tuple[SampleCount, ...]
 
@@ -112,22 +118,30 @@ class PaddedBlockStructure:
 
 
 def build_padded_block_structure(
-    coarse_groups: Sequence[CoarseGroup],
-    source_real_counts: Mapping[CoarseGroup, SampleCount],
-    target_real_counts: Mapping[CoarseGroup, SampleCount],
+    coarse_groups: Sequence[CoarseGroup] | Sequence[CorrespondenceBlockId],
+    source_real_counts: Mapping[CoarseGroup, SampleCount]
+    | Mapping[CorrespondenceBlockId, SampleCount],
+    target_real_counts: Mapping[CoarseGroup, SampleCount]
+    | Mapping[CorrespondenceBlockId, SampleCount],
 ) -> PaddedBlockStructure:
-    ordered_groups = tuple(coarse_groups)
+    ordered_groups = tuple(correspondence_block_id(group) for group in coarse_groups)
+    source_counts = OrderedDict(
+        (correspondence_block_id(group), count) for group, count in source_real_counts.items()
+    )
+    target_counts = OrderedDict(
+        (correspondence_block_id(group), count) for group, count in target_real_counts.items()
+    )
     missing = [
         group
         for group in ordered_groups
-        if group not in source_real_counts or group not in target_real_counts
+        if group not in source_counts or group not in target_counts
     ]
     if missing:
         raise CorrespondenceError(f"missing real node counts for coarse groups: {missing}")
     return PaddedBlockStructure(
         coarse_groups=ordered_groups,
-        source_real_counts=tuple(source_real_counts[group] for group in ordered_groups),
-        target_real_counts=tuple(target_real_counts[group] for group in ordered_groups),
+        source_real_counts=tuple(source_counts[group] for group in ordered_groups),
+        target_real_counts=tuple(target_counts[group] for group in ordered_groups),
     )
 
 

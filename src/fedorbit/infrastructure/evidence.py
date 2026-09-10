@@ -47,12 +47,27 @@ class FigureSeries:
     name: ReportSeriesName
     x: ReportCoordinates
     y: ReportCoordinates
+    y_low: ReportCoordinates | None = None
+    y_high: ReportCoordinates | None = None
+    x_low: ReportCoordinates | None = None
+    x_high: ReportCoordinates | None = None
+    marker_sizes: ReportCoordinates | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
             raise FigureError("figure series name must be non-empty")
         if len(self.x) != len(self.y):
             raise FigureError("figure series coordinates differ in length")
+        if self.y_low is not None and len(self.y_low) != len(self.y):
+            raise FigureError("figure interval bounds differ in length")
+        if self.y_high is not None and len(self.y_high) != len(self.y):
+            raise FigureError("figure interval bounds differ in length")
+        if self.x_low is not None and len(self.x_low) != len(self.x):
+            raise FigureError("figure interval bounds differ in length")
+        if self.x_high is not None and len(self.x_high) != len(self.x):
+            raise FigureError("figure interval bounds differ in length")
+        if self.marker_sizes is not None and len(self.marker_sizes) != len(self.x):
+            raise FigureError("figure marker sizes differ in length")
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +75,11 @@ class EvidenceFigure:
     x_label: ReportAxisLabel
     y_label: ReportAxisLabel
     series: tuple[FigureSeries, ...]
+    vertical_reference_lines: tuple[float, ...] = ()
+    horizontal_reference_lines: tuple[float, ...] = ()
+    log_x: bool = False
+    log_y: bool = False
+    draw_unit_diagonal: bool = False
 
     def __post_init__(self) -> None:
         if not self.x_label or not self.y_label:
@@ -440,7 +460,37 @@ def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
     )
     axes = plot.subplots()
     for series in figure.series:
-        axes.plot(series.x, series.y, marker="o", label=str(series.name))
+        if series.marker_sizes is not None:
+            axes.scatter(series.x, series.y, s=series.marker_sizes, label=str(series.name))
+        else:
+            axes.plot(series.x, series.y, marker="o", label=str(series.name))
+        if series.y_low is not None and series.y_high is not None:
+            axes.vlines(series.x, series.y_low, series.y_high)
+        if series.x_low is not None and series.x_high is not None:
+            axes.errorbar(
+                series.x,
+                series.y,
+                xerr=(
+                    tuple(mid - low for mid, low in zip(series.x, series.x_low, strict=True)),
+                    tuple(high - mid for mid, high in zip(series.x, series.x_high, strict=True)),
+                ),
+                fmt="none",
+            )
+    for x_value in figure.vertical_reference_lines:
+        axes.axvline(x_value, color="black", linewidth=1.0)
+    for y_value in figure.horizontal_reference_lines:
+        axes.axhline(y_value, color="black", linewidth=1.0)
+    if figure.draw_unit_diagonal:
+        xs = [value for series in figure.series for value in series.x]
+        ys = [value for series in figure.series for value in series.y]
+        if xs and ys:
+            low = min(min(xs), min(ys))
+            high = max(max(xs), max(ys))
+            axes.plot((low, high), (low, high), color="black", linewidth=1.0)
+    if figure.log_x:
+        axes.set_xscale("log")
+    if figure.log_y:
+        axes.set_yscale("log")
     axes.set_xlabel(str(figure.x_label))
     axes.set_ylabel(str(figure.y_label))
     if len(figure.series) > 1:

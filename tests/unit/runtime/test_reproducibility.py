@@ -27,13 +27,11 @@ def test_identity_is_deterministic() -> None:
     assert compatible(first, second)
 
 
-def test_identity_rejects_environment_replacement(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_identity_ignores_environment_package_patch(monkeypatch: pytest.MonkeyPatch) -> None:
     import importlib.metadata
 
     recorded_environment = environment_snapshot()
     recorded = build_reproducibility_identity(recorded_environment)
-
-    original_version = importlib.metadata.version
 
     def _fake_version(_name: str) -> str:
         return "0.0.0"
@@ -41,11 +39,8 @@ def test_identity_rejects_environment_replacement(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(importlib.metadata, "version", _fake_version)
     changed_environment = environment_snapshot()
     current = build_reproducibility_identity(changed_environment)
-    monkeypatch.setattr(importlib.metadata, "version", original_version)
 
-    assert not compatible(current, recorded)
-    with pytest.raises(IncompatibleIdentityError):
-        reject_incompatible(current, recorded)
+    assert compatible(current, recorded)
 
 
 def test_identity_rejects_confirmatory_seed_change() -> None:

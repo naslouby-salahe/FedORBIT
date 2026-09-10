@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import importlib.metadata
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import cast
 
-from fedorbit.config.loading import active_config, repository_root
+from fedorbit.config.loading import active_config
 from fedorbit.types import (
     ArtifactStage,
+    ProducerModuleName,
     SemanticCell,
     SemanticCoordinate,
     Sha256Digest,
@@ -94,41 +93,10 @@ class RuntimeFingerprint:
         return self.digest
 
 
-def _resolve_module_path(module_name: str) -> Path:
-    module_path = repository_root() / "src" / Path(*module_name.split(".")).with_suffix(".py")
-    if not module_path.is_file():
-        module_path = module_path.with_name(module_path.stem) / "__init__.py"
-    if not module_path.is_file():
-        raise ProvenanceError(f"module not found: {module_name}")
-    return module_path
-
-
-def _local_imported_modules(tree: ast.Module) -> tuple[str, ...]:
-    imported: list[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fedorbit"):
-            imported.append(node.module)
-        elif isinstance(node, ast.Import):
-            imported.extend(alias.name for alias in node.names if alias.name.startswith("fedorbit"))
-    return tuple(imported)
-
-
-def _module_source_digest(module_name: str, visited: set[str]) -> str:
-    if module_name in visited:
-        return ""
-    visited.add(module_name)
-    module_path = _resolve_module_path(module_name)
-    digest = hashlib.sha256(module_path.read_bytes())
-    tree = ast.parse(module_path.read_text(encoding="utf-8"))
-    for dependency in _local_imported_modules(tree):
-        digest.update(_module_source_digest(dependency, visited).encode("utf-8"))
-    return digest.hexdigest()
-
-
-def implementation_fingerprint(producer_module: str) -> Sha256Digest:
+def implementation_fingerprint(producer_module: ProducerModuleName) -> Sha256Digest:
     if not producer_module.startswith("fedorbit"):
         raise ProvenanceError(f"producer must be a fedorbit module: {producer_module}")
-    return Sha256Digest(_module_source_digest(producer_module, set()))
+    return Sha256Digest(hashlib.sha256(producer_module.encode("utf-8")).hexdigest())
 
 
 def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
@@ -200,8 +168,9 @@ def stage_dependency_fingerprint(
     relevance: frozenset[SemanticCoordinate],
     upstream_artifact_ids: tuple[str, ...],
     config_sections: frozenset[str],
-    producer_module: str,
+    producer_module: ProducerModuleName,
 ) -> Sha256Digest:
+    del producer_module
     payload = stable_json(
         cast(
             StableJsonPayload,
@@ -210,8 +179,6 @@ def stage_dependency_fingerprint(
                 semantic_coordinates=cell.identity_json(relevance),
                 upstream_artifact_ids=list(upstream_artifact_ids),
                 configuration_sha256=configuration_subset_digest(config_sections),
-                implementation_sha256=implementation_fingerprint(producer_module),
-                runtime_sha256=runtime_fingerprint(stage).sha256,
             ),
         )
     )

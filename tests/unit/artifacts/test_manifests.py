@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from fedorbit.datasets.common import file_sha256
-from fedorbit.infrastructure.execution import ArtifactStore, StorageError
+from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     DatasetManifest,
@@ -20,6 +20,7 @@ from fedorbit.infrastructure.manifests import (
     eligibility_copy,
 )
 from fedorbit.infrastructure.reuse import ArtifactValidationError
+from fedorbit.infrastructure.storage import StorageError
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
@@ -275,7 +276,6 @@ CELL_FIELDS = {
     "relevant_code_sha256": "b" * 64,
     "material_runtime_sha256": "c" * 64,
     "git_commit": "d" * 40,
-    "git_dirty": False,
     "environment_sha256": "e" * 64,
     "state": "Completed",
 }

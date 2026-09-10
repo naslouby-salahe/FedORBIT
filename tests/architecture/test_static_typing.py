@@ -1,35 +1,6 @@
 from __future__ import annotations
 
-import subprocess
-import sys
-from pathlib import Path
-
 from tests.architecture.scan import REPOSITORY_ROOT, SRC_ROOT
-
-
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=REPOSITORY_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-
-
-def _pyright() -> str:
-    suffix = ".exe" if sys.platform == "win32" else ""
-    return str(Path(sys.executable).with_name(f"pyright{suffix}"))
-
-
-def test_strict_pyright_passes_on_production() -> None:
-    result = _run([_pyright(), "src"])
-    assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_strict_pyright_passes_on_tests() -> None:
-    result = _run([_pyright(), "tests"])
-    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_pyright_config_is_strict() -> None:

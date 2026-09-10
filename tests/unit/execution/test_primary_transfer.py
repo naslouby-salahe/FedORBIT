@@ -17,8 +17,7 @@ from fedorbit.analysis.records import (
     MetricDirection,
 )
 from fedorbit.datasets.materialization import TransferConceptGroup
-from fedorbit.infrastructure.execution import (
-    ArtifactStore,
+from fedorbit.experiments.scoring import (
     assemble_cross_client_response_matrix,
     assemble_self_response_matrix,
     assemble_target_response_matrix,
@@ -33,6 +32,7 @@ from fedorbit.infrastructure.execution import (
     solve_orbit_mean_action,
     target_node_risks,
 )
+from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.learning.scoring import (
     CrossEntropy,
@@ -142,6 +142,47 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
     )
     assert reused is not None
     assert reused.artifact_id == manifest.artifact_id
+
+
+def test_persist_primary_transfer_metric_keeps_distinct_metric_identities(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    first = persist_primary_transfer_metric(
+        store,
+        layout,
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host"),
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.LOCAL_ONLY,
+        3319,
+        MetricId.MACRO_CROSS_ENTROPY,
+        0.42,
+        MetricUnit("nats"),
+        MetricDirection.LOWER_IS_BETTER,
+        (ArtifactIdentifier("checkpoint-stub"),),
+        OverwritePolicy.REUSE,
+    )
+    second = persist_primary_transfer_metric(
+        store,
+        layout,
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host"),
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.LOCAL_ONLY,
+        3319,
+        MetricId.MACRO_F1,
+        0.7,
+        MetricUnit("fraction"),
+        MetricDirection.HIGHER_IS_BETTER,
+        (ArtifactIdentifier("checkpoint-stub"),),
+        OverwritePolicy.REUSE,
+    )
+    assert first is not None
+    assert second is not None
+    assert first.artifact_id != second.artifact_id
+    assert len(store.all_manifests()) == 2
 
 
 def _synthetic_packet(node_count: int, base_value: float) -> SourcePacket:

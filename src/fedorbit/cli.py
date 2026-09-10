@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import statistics
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
@@ -13,29 +14,28 @@ from typer import Argument, Exit
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
-from fedorbit.infrastructure.environment import (
-    environment_snapshot,
-    reference_gpu_matches,
-)
-from fedorbit.infrastructure.execution import (
-    ArtifactStore,
-    DatasetPreparationRequest,
-    ExecutionError,
+from fedorbit.experiments.classification import completed_evidence_status_rows
+from fedorbit.experiments.dispatch import (
     ExperimentExecutionRequest,
+    run_experiment,
+    run_smoke_validation,
+)
+from fedorbit.experiments.synthesis import (
     completed_experiment_metric_records,
     completed_experiment_metric_records_with_support,
     completed_primary_transfer_comparison_records,
     completed_primary_transfer_metric_records,
-    execution_store,
-    preprocess_datasets,
-    run_experiment,
-    run_smoke_validation,
-    training_protocol_rows,
     transfer_ontology_and_null_padding_rows,
+)
+from fedorbit.experiments.training import training_protocol_rows
+from fedorbit.infrastructure.artifacts import ArtifactStore, ExecutionError, execution_store
+from fedorbit.infrastructure.environment import (
+    environment_snapshot,
+    reference_gpu_matches,
 )
 from fedorbit.infrastructure.failures import validation_failure_outcome
 from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
-from fedorbit.infrastructure.runtime import current_code_revision
+from fedorbit.infrastructure.preparation import DatasetPreparationRequest, preprocess_datasets
 from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
     build_layout,
@@ -49,19 +49,28 @@ from fedorbit.reporting import (
     ablation_results_table,
     baseline_paired_difference_plot,
     confirmation_results_table,
+    confirmation_safety_coverage_figure,
+    coupling_gap_phase_figure,
     coupling_mechanism_results_table,
     dataset_and_client_protocol_table,
+    evidence_status_table,
     exact_solver_results_table,
     experiment_matrix_table,
+    failure_boundary_figure,
     failure_boundary_results_table,
     generalization_results_table,
     information_resource_matrix_table,
+    map_value_bound_figure,
     model_and_training_protocol_table,
     numerical_constants_and_seeds_table,
+    predicted_vs_realized_transfer_figure,
     primary_strict_transfer_results_table,
     real_transfer_gain_forest_plot,
+    scalability_figure,
     scalability_results_table,
+    semantic_sufficiency_frontier_figure,
     sparsity_and_dense_results_table,
+    sparsity_utility_efficiency_figure,
     transfer_ontology_and_null_padding_table,
 )
 from fedorbit.types import (
@@ -70,6 +79,7 @@ from fedorbit.types import (
     ClientRole,
     DatasetId,
     DatasetIdentifierText,
+    DatasetModality,
     DirectedPairName,
     ExitStatus,
     ExperimentIdentifierText,
@@ -80,10 +90,8 @@ from fedorbit.types import (
     MultiplicityFamily,
     OverwritePolicy,
     RandomSeed,
-    RelativeGain,
     ReportArtifactName,
     ReportSeriesName,
-    RiskReductionColumn,
     StableJsonPayload,
     TransferMethod,
 )
@@ -156,7 +164,11 @@ def preprocess(
     overwrite: bool = False,
 ) -> None:
     try:
-        selected = (dataset_name,) if dataset_name is not None else _registered_datasets()
+        selected = (
+            (dataset_identifier(dataset_name.value),)
+            if dataset_name is not None
+            else _registered_datasets()
+        )
         result = preprocess_datasets(
             DatasetPreparationRequest(
                 datasets=selected,
@@ -200,7 +212,12 @@ def _verified_manifest(
 
 
 def _manifest_payload_mtime_ns(manifest: ReusableArtifactManifest) -> int:
-    return max(Path(payload).stat().st_mtime_ns for payload in manifest.payload_paths)
+    times = tuple(
+        Path(payload).stat().st_mtime_ns
+        for payload in manifest.payload_paths
+        if Path(payload).is_file()
+    )
+    return max(times) if times else 0
 
 
 def _blocked_experiment(layout_root: Path, experiment: ExperimentName) -> bool:
@@ -233,8 +250,6 @@ def _experiment_state(
         resolved = store.resolve(latest.artifact_id)
     except ValueError:
         return ArtifactState.INVALID
-    if resolved.created_git_commit != current_code_revision().commit:
-        return ArtifactState.STALE
     return resolved.state
 
 
@@ -252,6 +267,24 @@ def _dataset_client_roles() -> Mapping[str, ClientRole]:
     return OrderedDict(
         (dataset.value, client.role)
         for dataset, client in active_config().scientific.datasets.clients.items()
+    )
+
+
+def _dataset_modality_by_dataset() -> Mapping[str, str]:
+    modalities: OrderedDict[str, str] = OrderedDict()
+    for dataset in DatasetId:
+        modalities[dataset.value] = (
+            DatasetModality.NETWORK.value
+            if dataset in {DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK}
+            else DatasetModality.HOST.value
+        )
+    return modalities
+
+
+def _excluded_class_counts(manifests: Sequence[DatasetManifest]) -> Mapping[str, int]:
+    return OrderedDict(
+        (manifest.dataset.value, max(0, manifest.feature_quality.dropped_feature_count))
+        for manifest in manifests
     )
 
 
@@ -273,23 +306,48 @@ def _experiment_matrix_rows(
                 prerequisites=", ".join(
                     str(prerequisite) for prerequisite in definition.prerequisites
                 ),
-                evidence_relationship=None,
+                evidence_relationship=(
+                    ", ".join(consumer.value for consumer in definition.evidence_consumers)
+                    if definition.evidence_consumers
+                    else "report export"
+                ),
             )
         )
     return tuple(rows)
 
 
 def _real_transfer_gain_series(
-    comparisons: Mapping[DirectedPairName, RelativeGain],
+    comparisons: Sequence[PairedComparisonRecord],
 ) -> tuple[FigureSeries, ...]:
-    if not comparisons:
+    selected = [
+        record
+        for record in comparisons
+        if record.method_a == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        and record.method_b == TransferMethod.LOCAL_ONLY
+        and record.mean_difference is not None
+    ]
+    if not selected:
         return ()
-    pairs = sorted(comparisons)
+    selected.sort(key=lambda record: record.pair)
+    mids: list[float] = []
+    lows: list[float] = []
+    highs: list[float] = []
+    for record in selected:
+        mid = record.mean_difference
+        if mid is None:
+            continue
+        mids.append(float(mid))
+        lows.append(float(record.bca_ci_low) if record.bca_ci_low is not None else float(mid))
+        highs.append(float(record.bca_ci_high) if record.bca_ci_high is not None else float(mid))
+    if not mids:
+        return ()
     return (
         FigureSeries(
             name=ReportSeriesName(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value),
-            x=tuple(comparisons[pair] for pair in pairs),
-            y=tuple(float(index) for index in range(len(pairs))),
+            x=tuple(mids),
+            y=tuple(float(index) for index in range(len(mids))),
+            x_low=tuple(lows),
+            x_high=tuple(highs),
         ),
     )
 
@@ -458,6 +516,7 @@ def _scalability_results_rows(
         active_images = _metric_values(entries, method, MetricId.ACTIVE_IMAGE_CANDIDATES)
         lap_calls = _metric_values(entries, method, MetricId.LAP_CALLS)
         timeouts = _metric_values(entries, method, MetricId.TIMEOUT_INDICATOR)
+        predicted_work = _metric_values(entries, method, MetricId.PREDICTED_WORK_COORDINATE)
         rows.append(
             OrderedDict(
                 k=k,
@@ -473,6 +532,7 @@ def _scalability_results_rows(
                 cuda_memory=_median(cuda_memory),
                 timeout=sum(1 for value in timeouts if value == 1.0),
                 exactness_status=None,
+                predicted_work=_median(predicted_work),
             )
         )
     return tuple(rows)
@@ -562,15 +622,43 @@ def _sparsity_and_dense_results_rows(
                 if local_only_ce is not None and condition_ce is not None and local_only_ce != 0.0
                 else None
             )
+            runtime = _metric_value_by_condition(
+                sparsity_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.WALL_TIME,
+            )
+            memory = _metric_value_by_condition(
+                sparsity_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.PEAK_HOST_RSS,
+            )
+            coverage = _metric_value_by_condition(
+                sparsity_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.PROPOSAL_ACCEPTANCE_RATE,
+            )
+            certified = _metric_value_by_condition(
+                sparsity_records,
+                pair,
+                method,
+                condition,
+                metric_name=MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
+            )
             rows.append(
                 OrderedDict(
                     support_or_dense_condition=condition,
                     pair=pair,
                     realized_gain=realized_gain,
-                    certified_value=None,
-                    runtime=None,
-                    memory=None,
-                    confirmation_coverage=None,
+                    certified_value=certified,
+                    runtime=runtime,
+                    memory=memory,
+                    confirmation_coverage=coverage,
                     dense_minus_sparse_difference=None,
                 )
             )
@@ -636,6 +724,7 @@ def _generalization_results_rows(
 
 def _confirmation_results_rows(
     records: Sequence[MetricRecord],
+    comparisons: Sequence[PairedComparisonRecord] = (),
 ) -> tuple[Mapping[str, TableScalar], ...]:
     pairs = sorted({record.pair for record in records})
     rows: list[Mapping[str, TableScalar]] = []
@@ -653,23 +742,65 @@ def _confirmation_results_rows(
             continue
         proposals = len(verdicts)
         accepted = sum(1 for value in verdicts if value == 1.0)
-        risk_reduction_columns = OrderedDict((column.value, None) for column in RiskReductionColumn)
+
+        def _mean(metric_name: MetricId, pair_name: DirectedPairName = pair) -> float | None:
+            values = [
+                record.metric_value
+                for record in records
+                if record.pair == pair_name
+                and record.method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+                and record.metric_name == metric_name
+                and record.valid
+                and record.metric_value is not None
+            ]
+            if not values:
+                return None
+            return sum(values) / len(values)
+
         rows.append(
             OrderedDict(
                 pair=pair,
                 proposals=proposals,
                 accepted=accepted,
-                harmful_accepted_rate=None,
-                useful_accepted_rate=None,
-                beneficial_rejected_rate=None,
-                coverage=accepted / proposals,
-                no_confirm_harmful_rate=None,
-                **risk_reduction_columns,
-                ci=None,
-                p=None,
+                harmful_accepted_rate=_mean(MetricId.HARMFUL_ACCEPTED_RATE),
+                useful_accepted_rate=_mean(MetricId.USEFUL_ACCEPTED_RATE),
+                beneficial_rejected_rate=_mean(MetricId.BENEFICIAL_REJECTED_RATE),
+                coverage=_mean(MetricId.COVERAGE_CONFIRM) or (accepted / proposals),
+                no_confirm_harmful_rate=_mean(MetricId.HARM_RATE_NO_CONFIRM),
+                arr=_mean(MetricId.ABSOLUTE_RISK_REDUCTION),
+                rrr=_mean(MetricId.RELATIVE_RISK_REDUCTION),
+                ci=_confirmation_ci(comparisons, pair),
+                p=_confirmation_p(comparisons, pair),
             )
         )
     return tuple(rows)
+
+
+def _confirmation_contrast(
+    comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
+) -> PairedComparisonRecord | None:
+    for record in comparisons:
+        if record.family == MultiplicityFamily.CONFIRMATION_SAFETY and record.pair == pair:
+            return record
+    return None
+
+
+def _confirmation_ci(
+    comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
+) -> str | None:
+    record = _confirmation_contrast(comparisons, pair)
+    if record is None or record.bca_ci_low is None or record.bca_ci_high is None:
+        return None
+    return f"[{record.bca_ci_low}, {record.bca_ci_high}]"
+
+
+def _confirmation_p(
+    comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
+) -> float | None:
+    record = _confirmation_contrast(comparisons, pair)
+    if record is None:
+        return None
+    return record.holm_p
 
 
 def _coupling_gap_row(
@@ -854,6 +985,228 @@ def _failure_boundary_results_rows(
     return tuple(rows)
 
 
+def _numeric_row_series(
+    rows: Sequence[Mapping[str, TableScalar]],
+    x_key: str,
+    y_key: str,
+) -> tuple[FigureSeries, ...]:
+    xs: list[float] = []
+    ys: list[float] = []
+    for index, row in enumerate(rows):
+        y_value = row.get(y_key)
+        if not isinstance(y_value, int | float):
+            continue
+        x_value = row.get(x_key)
+        xs.append(float(x_value) if isinstance(x_value, int | float) else float(index))
+        ys.append(float(y_value))
+    if not xs:
+        return ()
+    return (FigureSeries(name=ReportSeriesName(y_key), x=tuple(xs), y=tuple(ys)),)
+
+
+def _sparsity_figure_series(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> tuple[FigureSeries, ...]:
+    xs: list[float] = []
+    ys: list[float] = []
+    sizes: list[float] = []
+    for row in rows:
+        runtime = row.get("runtime")
+        gain = row.get("realized_gain")
+        memory = row.get("memory")
+        if not isinstance(runtime, int | float) or not isinstance(gain, int | float):
+            continue
+        xs.append(float(runtime))
+        ys.append(float(gain))
+        sizes.append(float(memory) if isinstance(memory, int | float) else 1.0)
+    if not xs:
+        return ()
+    return (
+        FigureSeries(
+            name=ReportSeriesName("sparsity"),
+            x=tuple(xs),
+            y=tuple(ys),
+            marker_sizes=tuple(sizes),
+        ),
+    )
+
+
+def _confirmation_figure_series(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> tuple[FigureSeries, ...]:
+    confirm_x: list[float] = []
+    confirm_y: list[float] = []
+    no_confirm_x: list[float] = []
+    no_confirm_y: list[float] = []
+    for row in rows:
+        coverage = row.get("coverage")
+        harm = row.get("harmful_accepted_rate")
+        no_confirm_harm = row.get("no_confirm_harmful_rate")
+        if isinstance(coverage, int | float) and isinstance(harm, int | float):
+            confirm_x.append(float(coverage))
+            confirm_y.append(float(harm))
+        if isinstance(coverage, int | float) and isinstance(no_confirm_harm, int | float):
+            no_confirm_x.append(float(coverage))
+            no_confirm_y.append(float(no_confirm_harm))
+    series: list[FigureSeries] = []
+    if confirm_x:
+        series.append(
+            FigureSeries(
+                name=ReportSeriesName("with confirmation"),
+                x=tuple(confirm_x),
+                y=tuple(confirm_y),
+            )
+        )
+    if no_confirm_x:
+        series.append(
+            FigureSeries(
+                name=ReportSeriesName("without confirmation"),
+                x=tuple(no_confirm_x),
+                y=tuple(no_confirm_y),
+            )
+        )
+    return tuple(series)
+
+
+def _semantic_sufficiency_series(
+    records: Sequence[MetricRecord],
+) -> tuple[FigureSeries, ...]:
+    orbit: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod, str], float] = (
+        OrderedDict()
+    )
+    local_ce: OrderedDict[tuple[DirectedPairName, RandomSeed, str], float] = OrderedDict()
+    method_ce: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod, str], float] = (
+        OrderedDict()
+    )
+    for record in records:
+        if not record.valid or record.metric_value is None:
+            continue
+        if record.metric_name == MetricId.ORBIT_SIZE:
+            orbit[(record.pair, record.seed, record.method, record.condition)] = record.metric_value
+        if record.metric_name == MetricId.MACRO_CROSS_ENTROPY:
+            if record.method == TransferMethod.LOCAL_ONLY:
+                local_ce[(record.pair, record.seed, record.condition)] = record.metric_value
+            else:
+                method_ce[(record.pair, record.seed, record.method, record.condition)] = (
+                    record.metric_value
+                )
+    by_method: OrderedDict[TransferMethod, list[tuple[float, float]]] = OrderedDict()
+    for key, ce in method_ce.items():
+        pair, seed, method, condition = key
+        baseline = local_ce.get((pair, seed, condition))
+        size = orbit.get(key)
+        if baseline is None or baseline == 0.0 or size is None or size <= 0.0:
+            continue
+        by_method.setdefault(method, []).append((math.log(size), (baseline - ce) / baseline))
+    return tuple(
+        FigureSeries(
+            name=ReportSeriesName(method.value),
+            x=tuple(point[0] for point in points),
+            y=tuple(point[1] for point in points),
+        )
+        for method, points in by_method.items()
+        if points
+    )
+
+
+def _failure_boundary_figure_series(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> tuple[FigureSeries, ...]:
+    grouped: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
+    for index, row in enumerate(rows):
+        dimension = row.get("boundary_dimension")
+        gain = row.get("realized_gain")
+        if not isinstance(dimension, str) or not isinstance(gain, int | float):
+            continue
+        setting = row.get("setting")
+        x_value = float(setting) if isinstance(setting, int | float) else float(index)
+        grouped.setdefault(dimension, []).append((x_value, float(gain)))
+    return tuple(
+        FigureSeries(
+            name=ReportSeriesName(dimension),
+            x=tuple(point[0] for point in points),
+            y=tuple(point[1] for point in points),
+        )
+        for dimension, points in grouped.items()
+        if points
+    )
+
+
+def _predicted_vs_realized_series(
+    records: Sequence[MetricRecord],
+) -> tuple[FigureSeries, ...]:
+    from scipy.stats import spearmanr
+
+    certified: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], float] = (
+        OrderedDict()
+    )
+    realized: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], float] = (
+        OrderedDict()
+    )
+    for record in records:
+        if not record.valid or record.metric_value is None:
+            continue
+        key = (record.pair, record.seed, record.method)
+        if record.metric_name == MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE:
+            certified[key] = record.metric_value
+        if record.metric_name == MetricId.RELATIVE_MACRO_CE_GAIN:
+            realized[key] = record.metric_value
+    by_pair: OrderedDict[DirectedPairName, list[tuple[float, float]]] = OrderedDict()
+    for key, certified_value in certified.items():
+        realized_value = realized.get(key)
+        if realized_value is None:
+            continue
+        by_pair.setdefault(key[0], []).append((certified_value, realized_value))
+    series: list[FigureSeries] = []
+    for pair, points in by_pair.items():
+        xs = tuple(point[0] for point in points)
+        ys = tuple(point[1] for point in points)
+        name = pair
+        if len(points) >= active_config().scientific.statistics.spearman_minimum_valid_points:
+            correlation = float(spearmanr(list(xs), list(ys)).statistic)
+            name = DirectedPairName(f"{pair} Spearman={correlation:.3f}")
+        series.append(FigureSeries(name=ReportSeriesName(name), x=xs, y=ys))
+    return tuple(series)
+
+
+def _scalability_figure_series(
+    rows: Sequence[Mapping[str, TableScalar]],
+) -> tuple[FigureSeries, ...]:
+    return _numeric_row_series(rows, "predicted_work", "runtime_median")
+
+
+def _map_value_bound_series(
+    records: Sequence[MetricRecord],
+) -> tuple[FigureSeries, ...]:
+    bounds: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
+    values: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
+    for record in records:
+        if not record.valid or record.metric_value is None:
+            continue
+        key = (record.condition, record.seed)
+        if record.metric_name == MetricId.ORBIT_RADIUS_MAP_BOUND:
+            bounds[key] = record.metric_value
+        if record.metric_name == MetricId.EXACT_MAP_ACTION_VALUE:
+            values[key] = record.metric_value
+    xs: list[float] = []
+    ys: list[float] = []
+    for key, bound in bounds.items():
+        value = values.get(key)
+        if value is None:
+            continue
+        xs.append(bound)
+        ys.append(value)
+    if not xs:
+        return ()
+    return (
+        FigureSeries(
+            name=ReportSeriesName(MetricId.EXACT_MAP_ACTION_VALUE.value),
+            x=tuple(xs),
+            y=tuple(ys),
+        ),
+    )
+
+
 def report(
     experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT,
     overwrite: bool = False,
@@ -916,9 +1269,11 @@ def report(
                 (
                     dataset_and_client_protocol_table(
                         _base_model_pilot_dataset_manifests(layout),
-                        modality_by_dataset=OrderedDict(),
+                        modality_by_dataset=_dataset_modality_by_dataset(),
                         role_by_dataset=_dataset_client_roles(),
-                        excluded_class_counts=OrderedDict(),
+                        excluded_class_counts=_excluded_class_counts(
+                            _base_model_pilot_dataset_manifests(layout)
+                        ),
                     ),
                     ReportArtifactName("dataset-and-client-protocol"),
                 ),
@@ -948,6 +1303,18 @@ def report(
                         )
                     )
                 )
+            evidence_rows = completed_evidence_status_rows(store)
+            if evidence_rows:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            evidence_status_table(
+                                tuple(row.model_dump(mode="json") for row in evidence_rows)
+                            ),
+                            ReportArtifactName("evidence-status"),
+                        )
+                    )
+                )
             primary_transfer_metrics = completed_primary_transfer_metric_records(store)
             primary_transfer_comparisons = completed_primary_transfer_comparison_records(store)
             typer.echo(
@@ -960,14 +1327,7 @@ def report(
                     )
                 )
             )
-            gain_by_pair = OrderedDict(
-                (comparison.pair, comparison.mean_difference)
-                for comparison in primary_transfer_comparisons
-                if comparison.method_a == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
-                and comparison.method_b == TransferMethod.LOCAL_ONLY
-                and comparison.mean_difference is not None
-            )
-            gain_series = _real_transfer_gain_series(gain_by_pair)
+            gain_series = _real_transfer_gain_series(primary_transfer_comparisons)
             if gain_series:
                 typer.echo(
                     str(
@@ -1061,7 +1421,8 @@ def report(
             confirmation_rows = _confirmation_results_rows(
                 completed_experiment_metric_records(
                     store, ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY
-                )
+                ),
+                primary_transfer_comparisons,
             )
             if confirmation_rows:
                 typer.echo(
@@ -1108,6 +1469,96 @@ def report(
                         )
                     )
                 )
+                boundary_series = _failure_boundary_figure_series(failure_boundary_rows)
+                if boundary_series:
+                    typer.echo(
+                        str(
+                            writer.write_project_evidence_figure(
+                                failure_boundary_figure(boundary_series),
+                                ReportArtifactName("failure-boundary-figure"),
+                            )
+                        )
+                    )
+            coupling_series = _numeric_row_series(
+                coupling_rows, "condition_or_pair", "fixed_action_gap"
+            )
+            if coupling_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            coupling_gap_phase_figure(coupling_series),
+                            ReportArtifactName("coupling-gap-phase-figure"),
+                        )
+                    )
+                )
+            predicted_series = _predicted_vs_realized_series(primary_transfer_metrics)
+            if predicted_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            predicted_vs_realized_transfer_figure(predicted_series),
+                            ReportArtifactName("predicted-vs-realized-transfer-figure"),
+                        )
+                    )
+                )
+            sparsity_series = _sparsity_figure_series(sparsity_and_dense_rows)
+            if sparsity_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            sparsity_utility_efficiency_figure(sparsity_series),
+                            ReportArtifactName("sparsity-utility-efficiency-figure"),
+                        )
+                    )
+                )
+            confirmation_series = _confirmation_figure_series(confirmation_rows)
+            if confirmation_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            confirmation_safety_coverage_figure(confirmation_series),
+                            ReportArtifactName("confirmation-safety-coverage-figure"),
+                        )
+                    )
+                )
+            frontier_series = _semantic_sufficiency_series(
+                completed_experiment_metric_records(
+                    store, ExperimentName.SEMANTIC_SUFFICIENCY_FRONTIER
+                )
+            )
+            if frontier_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            semantic_sufficiency_frontier_figure(frontier_series),
+                            ReportArtifactName("semantic-sufficiency-frontier-figure"),
+                        )
+                    )
+                )
+            scalability_series = _scalability_figure_series(scalability_rows)
+            if scalability_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            scalability_figure(scalability_series),
+                            ReportArtifactName("scalability-figure"),
+                        )
+                    )
+                )
+            map_bound_series = _map_value_bound_series(
+                completed_experiment_metric_records(
+                    store, ExperimentName.EXACT_MAP_VALUE_BOUND_VALIDATION
+                )
+            )
+            if map_bound_series:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            map_value_bound_figure(map_bound_series),
+                            ReportArtifactName("map-value-bound-figure"),
+                        )
+                    )
+                )
         if exported == 0:
             typer.echo("no verified persisted evidence available for report generation")
     except CliUsageError as error:
@@ -1119,10 +1570,11 @@ def run(
     overwrite: bool = False,
 ) -> None:
     try:
-        definition = build_catalogue().definition(experiment_name)
+        resolved = experiment_identifier(experiment_name.value)
+        definition = build_catalogue().definition(resolved)
         run_experiment(
             ExperimentExecutionRequest(
-                experiment=experiment_name,
+                experiment=resolved,
                 definition=definition,
                 overwrite_policy=OverwritePolicy.REPLACE if overwrite else OverwritePolicy.REUSE,
             )

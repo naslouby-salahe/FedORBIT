@@ -67,6 +67,7 @@ class ExperimentDefinition:
     seeds: tuple[RandomSeed, ...]
     derived_planned_cells: Index
     prerequisites: tuple[CataloguePrerequisiteValue, ...]
+    evidence_consumers: tuple[ExperimentName, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +110,7 @@ def build_catalogue() -> ExperimentCatalogue:
         seeds: tuple[RandomSeed, ...],
         derived_cells: Index,
         prerequisites: tuple[CataloguePrerequisiteValue, ...],
+        evidence_consumers: tuple[ExperimentName, ...] = (),
     ) -> ExperimentDefinition:
         return ExperimentDefinition(
             name=name,
@@ -124,6 +126,7 @@ def build_catalogue() -> ExperimentCatalogue:
             seeds=seeds,
             derived_planned_cells=derived_cells,
             prerequisites=prerequisites,
+            evidence_consumers=evidence_consumers,
         )
 
     catalogue: OrderedDict[ExperimentName, ExperimentDefinition] = OrderedDict()
@@ -529,6 +532,18 @@ def build_catalogue() -> ExperimentCatalogue:
         (),
         0,
         (CataloguePrerequisite.COMPLETED_REGISTERED_ARTIFACTS,),
+        (ExperimentName.EVIDENCE_CLASSIFICATION,),
+    )
+
+    catalogue[ExperimentName.EVIDENCE_CLASSIFICATION] = definition(
+        ExperimentName.EVIDENCE_CLASSIFICATION,
+        ExperimentClassification.FINAL_EVIDENCE,
+        (),
+        (),
+        (),
+        (),
+        0,
+        (_experiment_name(ExperimentName.STATISTICAL_SYNTHESIS),),
     )
 
     completed = ExperimentCatalogue(catalogue)

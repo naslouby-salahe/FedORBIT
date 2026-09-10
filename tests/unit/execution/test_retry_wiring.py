@@ -4,16 +4,13 @@ from pathlib import Path
 
 import pytest
 
-import fedorbit.infrastructure.execution as execution
+import fedorbit.experiments.dispatch as execution
 from fedorbit.experiments.catalogue import build_catalogue
-from fedorbit.infrastructure.execution import (
-    ArtifactStore,
-    ExecutionError,
-    ExperimentExecutionRequest,
-    ReusableArtifactManifest,
-    run_experiment,
-)
+from fedorbit.experiments.dispatch import ExperimentExecutionRequest, run_experiment
+from fedorbit.experiments.validation import execute_primitive_validation
+from fedorbit.infrastructure.artifacts import ArtifactStore, ExecutionError
 from fedorbit.infrastructure.failures import ProcessCrashError
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest
 from fedorbit.infrastructure.workspace import WorkspaceLayout, build_layout
 from fedorbit.types import ExperimentName, OverwritePolicy
 
@@ -30,7 +27,7 @@ def test_transient_infrastructure_failure_retries_and_then_succeeds(
 ) -> None:
     layout = build_layout(root=tmp_path)
     monkeypatch.setattr(execution, "build_layout", lambda: layout)
-    real_producer = execution.execute_primitive_validation
+    real_producer = execute_primitive_validation
     calls = {"count": 0}
 
     def flaky_producer(
@@ -62,7 +59,9 @@ def test_infrastructure_failure_exhausts_retries_and_raises(
     monkeypatch.setattr(execution, "execute_primitive_validation", always_crashes)
     with pytest.raises(ExecutionError):
         run_experiment(_request())
-    failure_handling = execution.active_config().runtime.failure_handling
+    from fedorbit.config.loading import active_config
+
+    failure_handling = active_config().runtime.failure_handling
     retries = failure_handling.retries_after_initial_infrastructure_failure
     assert calls["count"] == retries + 1
 

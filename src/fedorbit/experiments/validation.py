@@ -96,6 +96,7 @@ from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     PaddedBlockStructure,
     build_padded_block_structure,
+    enumerate_active_image_maps,
     enumerate_block_permutations,
 )
 from fedorbit.optimization.diagnostics import (
@@ -1064,6 +1065,11 @@ def _validation_payload(block_pattern: tuple[ConceptCount, ...]) -> StableJsonPa
         raise PrimitiveValidationError("assignment serialization round-trip failed")
     total_nodes = sum(block_pattern)
     orbit = tuple(enumerate_block_permutations(equal_blocks))
+    if len(orbit) != equal_blocks.orbit_size:
+        raise PrimitiveValidationError("orbit enumeration length disagrees with orbit size")
+    active_maps = tuple(enumerate_active_image_maps(equal_blocks, tuple(range(total_nodes))))
+    if not active_maps:
+        raise PrimitiveValidationError("active-image enumeration is empty")
     problem = build_robust_action_problem(
         equal_blocks,
         instance.lower_response_matrix,
@@ -1100,6 +1106,8 @@ def _validation_payload(block_pattern: tuple[ConceptCount, ...]) -> StableJsonPa
             assignment_serialization_round_trip=True,
             fixture_error=fixture_error,
             fixture_error_within_tolerance=True,
+            orbit_size=equal_blocks.orbit_size,
+            active_image_map_count=len(active_maps),
         ),
     )
 

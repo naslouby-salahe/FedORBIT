@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import cast
 
 from pydantic import JsonValue
 
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
+from fedorbit.analysis.resources import information_resource_catalogue
 from fedorbit.config.loading import active_config
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.infrastructure.evidence import EvidenceExportError as EvidenceExportError
@@ -262,133 +262,6 @@ def model_and_training_protocol_table(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _InformationResourceFacts:
-    target_raw_data: bool
-    anonymous_source_nodes: bool
-    coarse_groups: bool
-    source_response: bool
-    target_local_response: bool
-    fine_names: bool
-    exact_map: bool
-    confirmation: bool
-    predecision_test_access: bool
-    strict_compatibility: bool
-
-
-_INFORMATION_RESOURCE_MATRIX_FACTS: Mapping[TransferMethod, _InformationResourceFacts] = (
-    OrderedDict(
-        (
-            (
-                TransferMethod.LOCAL_ONLY,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=False,
-                    coarse_groups=False,
-                    source_response=False,
-                    target_local_response=False,
-                    fine_names=False,
-                    exact_map=False,
-                    confirmation=False,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.LOCAL_SIR,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=False,
-                    coarse_groups=True,
-                    source_response=False,
-                    target_local_response=True,
-                    fine_names=False,
-                    exact_map=False,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=True,
-                    coarse_groups=True,
-                    source_response=True,
-                    target_local_response=False,
-                    fine_names=False,
-                    exact_map=False,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=True,
-                    coarse_groups=True,
-                    source_response=True,
-                    target_local_response=False,
-                    fine_names=False,
-                    exact_map=True,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.GENERIC_EXACT_QAP,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=True,
-                    coarse_groups=True,
-                    source_response=True,
-                    target_local_response=False,
-                    fine_names=False,
-                    exact_map=True,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=True,
-                    coarse_groups=True,
-                    source_response=True,
-                    target_local_response=False,
-                    fine_names=False,
-                    exact_map=False,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=True,
-                ),
-            ),
-            (
-                TransferMethod.EXACT_MAP_ORACLE,
-                _InformationResourceFacts(
-                    target_raw_data=False,
-                    anonymous_source_nodes=True,
-                    coarse_groups=True,
-                    source_response=True,
-                    target_local_response=False,
-                    fine_names=True,
-                    exact_map=True,
-                    confirmation=True,
-                    predecision_test_access=False,
-                    strict_compatibility=False,
-                ),
-            ),
-        )
-    )
-)
-
-
 def information_resource_matrix_table() -> EvidenceTable:
     columns = (
         "method",
@@ -417,7 +290,7 @@ def information_resource_matrix_table() -> EvidenceTable:
             facts.predecision_test_access,
             facts.strict_compatibility,
         )
-        for method, facts in _INFORMATION_RESOURCE_MATRIX_FACTS.items()
+        for method, facts in information_resource_catalogue().items()
     )
     return EvidenceTable(columns=_report_columns(columns), rows=rows)
 
@@ -618,6 +491,7 @@ def _figure(
     log_x: bool = False,
     log_y: bool = False,
     draw_unit_diagonal: bool = False,
+    separate_panels: bool = False,
 ) -> EvidenceFigure:
     return EvidenceFigure(
         x_label=ReportAxisLabel(x_label),
@@ -628,6 +502,7 @@ def _figure(
         log_x=log_x,
         log_y=log_y,
         draw_unit_diagonal=draw_unit_diagonal,
+        separate_panels=separate_panels,
     )
 
 
@@ -685,7 +560,12 @@ def semantic_sufficiency_frontier_figure(
 def failure_boundary_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("boundary setting", "certified value / realized gain", series)
+    return _figure(
+        "boundary setting",
+        "certified value / realized gain",
+        series,
+        separate_panels=True,
+    )
 
 
 def scalability_figure(

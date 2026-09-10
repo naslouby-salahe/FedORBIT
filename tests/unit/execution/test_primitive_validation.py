@@ -28,6 +28,8 @@ def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path
     assert payload["rectangular_hull_ordered"]
     assert payload["assignment_serialization_round_trip"]
     assert payload["fixture_error_within_tolerance"]
+    assert payload["orbit_size"] >= 1
+    assert payload["active_image_map_count"] >= 1
     assert manifest.semantic_producer_coordinates == completion.semantic_experiment_coordinates
     assert "mathematical-primitive-validation" in Path(manifest.payload_paths[0]).parts
     reused = execute_primitive_validation(store, layout)

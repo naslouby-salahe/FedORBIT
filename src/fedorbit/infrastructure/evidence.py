@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol, cast
 
 import pandas as pd
+from matplotlib.axes import Axes
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.figure import Figure
 from pydantic import BaseModel, ConfigDict
@@ -52,6 +53,8 @@ class FigureSeries:
     x_low: ReportCoordinates | None = None
     x_high: ReportCoordinates | None = None
     marker_sizes: ReportCoordinates | None = None
+    arrow_x: ReportCoordinates | None = None
+    arrow_y: ReportCoordinates | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -68,6 +71,10 @@ class FigureSeries:
             raise FigureError("figure interval bounds differ in length")
         if self.marker_sizes is not None and len(self.marker_sizes) != len(self.x):
             raise FigureError("figure marker sizes differ in length")
+        if self.arrow_x is not None and len(self.arrow_x) != len(self.x):
+            raise FigureError("figure arrow coordinates differ in length")
+        if self.arrow_y is not None and len(self.arrow_y) != len(self.y):
+            raise FigureError("figure arrow coordinates differ in length")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +87,7 @@ class EvidenceFigure:
     log_x: bool = False
     log_y: bool = False
     draw_unit_diagonal: bool = False
+    separate_panels: bool = False
 
     def __post_init__(self) -> None:
         if not self.x_label or not self.y_label:
@@ -452,37 +460,43 @@ def _metric_svg_bytes(label: str, value: float) -> bytes:
     return buffer.getvalue()
 
 
-def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
-    plot = Figure(
-        figsize=(REPORT_FIGURE_WIDTH / 72, REPORT_FIGURE_HEIGHT / 72),
-        dpi=72,
-        layout="constrained",
-    )
-    axes = plot.subplots()
-    for series in figure.series:
-        if series.marker_sizes is not None:
-            axes.scatter(series.x, series.y, s=series.marker_sizes, label=str(series.name))
-        else:
-            axes.plot(series.x, series.y, marker="o", label=str(series.name))
-        if series.y_low is not None and series.y_high is not None:
-            axes.vlines(series.x, series.y_low, series.y_high)
-        if series.x_low is not None and series.x_high is not None:
-            axes.errorbar(
-                series.x,
-                series.y,
-                xerr=(
-                    tuple(mid - low for mid, low in zip(series.x, series.x_low, strict=True)),
-                    tuple(high - mid for mid, high in zip(series.x, series.x_high, strict=True)),
-                ),
-                fmt="none",
+def _draw_series(axes: Axes, series: FigureSeries) -> None:
+    if series.marker_sizes is not None:
+        axes.scatter(series.x, series.y, s=series.marker_sizes, label=str(series.name))
+    else:
+        axes.plot(series.x, series.y, marker="o", label=str(series.name))
+    if series.y_low is not None and series.y_high is not None:
+        axes.vlines(series.x, series.y_low, series.y_high)
+    if series.x_low is not None and series.x_high is not None:
+        axes.errorbar(
+            series.x,
+            series.y,
+            xerr=(
+                tuple(mid - low for mid, low in zip(series.x, series.x_low, strict=True)),
+                tuple(high - mid for mid, high in zip(series.x, series.x_high, strict=True)),
+            ),
+            fmt="none",
+        )
+    if series.arrow_x is not None and series.arrow_y is not None:
+        for start_x, start_y, end_x, end_y in zip(
+            series.x, series.y, series.arrow_x, series.arrow_y, strict=True
+        ):
+            axes.annotate(
+                "",
+                xy=(end_x, end_y),
+                xytext=(start_x, start_y),
+                arrowprops=OrderedDict(arrowstyle="->", color="black"),
             )
+
+
+def _style_axes(axes: Axes, figure: EvidenceFigure, series_group: tuple[FigureSeries, ...]) -> None:
     for x_value in figure.vertical_reference_lines:
         axes.axvline(x_value, color="black", linewidth=1.0)
     for y_value in figure.horizontal_reference_lines:
         axes.axhline(y_value, color="black", linewidth=1.0)
     if figure.draw_unit_diagonal:
-        xs = [value for series in figure.series for value in series.x]
-        ys = [value for series in figure.series for value in series.y]
+        xs = [value for series in series_group for value in series.x]
+        ys = [value for series in series_group for value in series.y]
         if xs and ys:
             low = min(min(xs), min(ys))
             high = max(max(xs), max(ys))
@@ -493,8 +507,29 @@ def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
         axes.set_yscale("log")
     axes.set_xlabel(str(figure.x_label))
     axes.set_ylabel(str(figure.y_label))
-    if len(figure.series) > 1:
+    if len(series_group) > 1:
         axes.legend()
+
+
+def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
+    panel_count = len(figure.series) if figure.separate_panels else 1
+    plot = Figure(
+        figsize=(REPORT_FIGURE_WIDTH / 72 * max(1, panel_count / 2), REPORT_FIGURE_HEIGHT / 72),
+        dpi=72,
+        layout="constrained",
+    )
+    if figure.separate_panels:
+        axes_grid = plot.subplots(1, panel_count, squeeze=False)
+        for index, series in enumerate(figure.series):
+            axes = axes_grid[0][index]
+            _draw_series(axes, series)
+            _style_axes(axes, figure, (series,))
+            axes.set_title(str(series.name))
+    else:
+        axes = plot.subplots()
+        for series in figure.series:
+            _draw_series(axes, series)
+        _style_axes(axes, figure, figure.series)
     buffer = BytesIO()
     FigureCanvasSVG(plot).print_svg(buffer)
     return buffer.getvalue()

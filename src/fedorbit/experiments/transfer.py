@@ -119,6 +119,7 @@ from fedorbit.types import (
     DatasetId,
     DirectedPairName,
     EvaluationConditionName,
+    ExperimentName,
     MetricId,
     MetricUnit,
     ProducerModuleName,
@@ -133,6 +134,81 @@ from fedorbit.types import (
 
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.transfer")
 _PRINCIPAL_CONDITION = EvaluationConditionName("principal")
+
+
+def _persist_ineligible_methods(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: DirectedPairName,
+    source: DatasetId,
+    target: DatasetId,
+    seed: RandomSeed,
+    methods: tuple[TransferMethod, ...],
+    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
+) -> None:
+    for method in methods:
+        persist_ineligible_transfer_cell(
+            store,
+            layout,
+            request.experiment,
+            pair_direction,
+            source,
+            target,
+            method,
+            seed,
+            request.overwrite_policy,
+            condition,
+        )
+
+
+def _reuse_principal_transfer_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: DirectedPairName,
+    source: DatasetId,
+    target: DatasetId,
+    method: TransferMethod,
+    seed: RandomSeed,
+    condition: EvaluationConditionName,
+) -> bool:
+    from fedorbit.experiments.synthesis import completed_experiment_metric_records
+
+    records = completed_experiment_metric_records(
+        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER
+    )
+    matched = tuple(
+        record
+        for record in records
+        if record.pair == pair_direction
+        and record.method == method
+        and record.seed == seed
+        and record.condition == _PRINCIPAL_CONDITION
+        and record.valid
+        and record.metric_value is not None
+    )
+    if not matched:
+        return False
+    for record in matched:
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            request.experiment,
+            pair_direction,
+            source,
+            target,
+            method,
+            seed,
+            record.metric_name,
+            record.metric_value,
+            record.metric_unit,
+            record.direction,
+            record.input_artifact_ids,
+            request.overwrite_policy,
+            condition,
+        )
+    return True
 
 
 def execute_primary_strict_cross_telemetry_transfer(
@@ -153,6 +229,24 @@ def execute_primary_strict_cross_telemetry_transfer(
                     target, raw_root, layout
                 )
             except MaterializationError:
+                pair_direction = DirectedPairName(
+                    f"{directed_pair.source.value} -> {directed_pair.target.value}"
+                )
+                for seed in confirmatory_seeds:
+                    _persist_ineligible_methods(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        directed_pair.source,
+                        directed_pair.target,
+                        seed,
+                        (
+                            TransferMethod.LOCAL_ONLY,
+                            TransferMethod.LOCAL_SIR,
+                            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        ),
+                    )
                 continue
         materialized = materialized_by_target[target]
         source = directed_pair.source
@@ -381,11 +475,37 @@ def execute_mechanism_ablations(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        if source_materialized is None or target_materialized is None:
-            continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        if source_materialized is None or target_materialized is None:
+            for seed in confirmatory_seeds:
+                _persist_ineligible_methods(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    seed,
+                    tuple(method for method, _scorer in scorers),
+                )
+            continue
         for seed in confirmatory_seeds:
             for method, scorer in scorers:
+                if (
+                    method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+                    and _reuse_principal_transfer_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        _PRINCIPAL_CONDITION,
+                    )
+                ):
+                    continue
                 scored = scorer(
                     store,
                     layout,
@@ -726,11 +846,40 @@ def execute_sparsity_and_dense_fallback(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        if source_materialized is None or target_materialized is None:
-            continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        if source_materialized is None or target_materialized is None:
+            for seed in confirmatory_seeds:
+                _persist_ineligible_methods(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    seed,
+                    (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
+                    EvaluationConditionName("exact sparse s=2"),
+                )
+            continue
+        principal_support = active_config().scientific.action.principal_sparse_support
         for seed in confirmatory_seeds:
             for condition_label, method, solve_action in conditions:
+                if (
+                    method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+                    and condition_label == f"exact sparse s={principal_support}"
+                    and _reuse_principal_transfer_metrics(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        EvaluationConditionName(condition_label),
+                    )
+                ):
+                    continue
                 scored = _score_robust_action_cell(
                     store,
                     layout,
@@ -786,9 +935,20 @@ def execute_real_packet_coupling_mechanism_validation(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        if source_materialized is None or target_materialized is None:
-            continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        if source_materialized is None or target_materialized is None:
+            for seed in confirmatory_seeds:
+                _persist_ineligible_methods(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    seed,
+                    (TransferMethod.MATCHED_RESOURCE_RECTANGULAR,),
+                )
+            continue
         for seed in confirmatory_seeds:
             assembly = _assemble_principal_action(
                 store,

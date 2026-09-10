@@ -93,6 +93,7 @@ REQUIRED_SOURCE_FILES = {
     "src/fedorbit/analysis/metrics.py",
     "src/fedorbit/analysis/comparisons.py",
     "src/fedorbit/analysis/statistics.py",
+    "src/fedorbit/analysis/resources.py",
     "src/fedorbit/infrastructure/workspace.py",
     "src/fedorbit/infrastructure/manifests.py",
     "src/fedorbit/infrastructure/provenance.py",

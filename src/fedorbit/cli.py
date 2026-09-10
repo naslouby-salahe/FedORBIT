@@ -356,9 +356,6 @@ def _baseline_paired_difference_series(
     metric_records: Sequence[MetricRecord],
 ) -> tuple[FigureSeries, ...]:
     pairs = sorted({record.pair for record in metric_records})
-    pair_index: Mapping[DirectedPairName, float] = OrderedDict(
-        (pair, float(index)) for index, pair in enumerate(pairs)
-    )
     local_only_by_pair_seed: Mapping[tuple[DirectedPairName, RandomSeed], float] = OrderedDict(
         ((record.pair, record.seed), record.metric_value)
         for record in metric_records
@@ -374,31 +371,33 @@ def _baseline_paired_difference_series(
         TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
     )
     series: list[FigureSeries] = []
-    for method in baseline_methods:
-        x_values: list[float] = []
-        y_values: list[float] = []
-        for record in metric_records:
-            if (
-                record.method != method
-                or record.condition != "principal"
-                or record.metric_name != MetricId.MACRO_CROSS_ENTROPY
-                or not record.valid
-                or record.metric_value is None
-            ):
-                continue
-            local_only_value = local_only_by_pair_seed.get((record.pair, record.seed))
-            if local_only_value is None:
-                continue
-            x_values.append(pair_index[record.pair])
-            y_values.append(record.metric_value - local_only_value)
-        if x_values:
-            series.append(
-                FigureSeries(
-                    name=ReportSeriesName(method.value),
-                    x=tuple(x_values),
-                    y=tuple(y_values),
+    for pair in pairs:
+        for method in baseline_methods:
+            x_values: list[float] = []
+            y_values: list[float] = []
+            for record in metric_records:
+                if (
+                    record.pair != pair
+                    or record.method != method
+                    or record.condition != "principal"
+                    or record.metric_name != MetricId.MACRO_CROSS_ENTROPY
+                    or not record.valid
+                    or record.metric_value is None
+                ):
+                    continue
+                local_only_value = local_only_by_pair_seed.get((record.pair, record.seed))
+                if local_only_value is None:
+                    continue
+                x_values.append(float(record.seed))
+                y_values.append(record.metric_value - local_only_value)
+            if x_values:
+                series.append(
+                    FigureSeries(
+                        name=ReportSeriesName(f"{pair} {method.value}"),
+                        x=tuple(x_values),
+                        y=tuple(y_values),
+                    )
                 )
-            )
     return tuple(series)
 
 
@@ -1034,38 +1033,33 @@ def _sparsity_figure_series(
 def _confirmation_figure_series(
     rows: Sequence[Mapping[str, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    confirm_x: list[float] = []
-    confirm_y: list[float] = []
-    no_confirm_x: list[float] = []
-    no_confirm_y: list[float] = []
+    starts_x: list[float] = []
+    starts_y: list[float] = []
+    ends_x: list[float] = []
+    ends_y: list[float] = []
     for row in rows:
         coverage = row.get("coverage")
         harm = row.get("harmful_accepted_rate")
         no_confirm_harm = row.get("no_confirm_harmful_rate")
-        if isinstance(coverage, int | float) and isinstance(harm, int | float):
-            confirm_x.append(float(coverage))
-            confirm_y.append(float(harm))
-        if isinstance(coverage, int | float) and isinstance(no_confirm_harm, int | float):
-            no_confirm_x.append(float(coverage))
-            no_confirm_y.append(float(no_confirm_harm))
-    series: list[FigureSeries] = []
-    if confirm_x:
-        series.append(
-            FigureSeries(
-                name=ReportSeriesName("with confirmation"),
-                x=tuple(confirm_x),
-                y=tuple(confirm_y),
-            )
-        )
-    if no_confirm_x:
-        series.append(
-            FigureSeries(
-                name=ReportSeriesName("without confirmation"),
-                x=tuple(no_confirm_x),
-                y=tuple(no_confirm_y),
-            )
-        )
-    return tuple(series)
+        if not isinstance(coverage, int | float):
+            continue
+        if not isinstance(harm, int | float) or not isinstance(no_confirm_harm, int | float):
+            continue
+        starts_x.append(float(coverage))
+        starts_y.append(float(no_confirm_harm))
+        ends_x.append(float(coverage))
+        ends_y.append(float(harm))
+    if not starts_x:
+        return ()
+    return (
+        FigureSeries(
+            name=ReportSeriesName("no-confirm to confirm"),
+            x=tuple(starts_x),
+            y=tuple(starts_y),
+            arrow_x=tuple(ends_x),
+            arrow_y=tuple(ends_y),
+        ),
+    )
 
 
 def _semantic_sufficiency_series(

@@ -154,7 +154,7 @@ def run_smoke_validation(
         raise ExecutionError("pre-confirm snapshots have inconsistent parameter counts")
 
 
-def _latest_completed_manifest(
+def latest_completed_manifest(
     store: ArtifactStore, experiment: ExperimentName
 ) -> ReusableArtifactManifest | None:
     candidates: list[ReusableArtifactManifest] = []
@@ -180,7 +180,7 @@ def _latest_completed_manifest(
 def _write_immediate_experiment_evidence(
     store: ArtifactStore, layout: WorkspaceLayout, experiment: ExperimentName
 ) -> None:
-    manifest = _latest_completed_manifest(store, experiment)
+    manifest = latest_completed_manifest(store, experiment)
     if manifest is None:
         return
     writer = VerifiedEvidenceWriter(store, layout)
@@ -260,7 +260,7 @@ def _execute_producer_with_retry(
             attempt += 1
 
 
-def _registered_experiment_producers(
+def registered_experiment_producers(
     store: ArtifactStore, layout: WorkspaceLayout, request: ExperimentExecutionRequest
 ) -> Mapping[ExperimentName, Callable[[], ReusableArtifactManifest | None]]:
     producers: OrderedDict[ExperimentName, Callable[[], ReusableArtifactManifest | None]] = (
@@ -363,7 +363,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         overwrite_policy=request.overwrite_policy.value,
         seeds=list(request.definition.seeds),
     )
-    producer = _registered_experiment_producers(store, layout, request).get(request.experiment)
+    producer = registered_experiment_producers(store, layout, request).get(request.experiment)
     if producer is None:
         raise ExecutionError(
             f"registered experiment has no scientific producer: {request.experiment.value}"

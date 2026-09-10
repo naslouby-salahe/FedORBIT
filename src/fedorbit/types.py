@@ -451,6 +451,14 @@ class EvidenceStatus(StrEnum):
     NOT_TESTED = "Not Tested"
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceAdjudication:
+    status: EvidenceStatus
+    materiality: str
+    statistical: str
+    completeness: str
+
+
 class SimplificationRuleState(StrEnum):
     APPLIED = "Applied"
     NOT_APPLIED = "Not Applied"
@@ -650,6 +658,11 @@ class MetricId(StrEnum):
     ORBIT_SIZE = "Orbit Size"
 
 
+@dataclass(slots=True)
+class MutableCell[T]:
+    value: T | None = None
+
+
 class DomainModel(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid", frozen=True, validate_default=True, allow_inf_nan=False
@@ -774,6 +787,10 @@ class SemanticCell:
 
 
 class StableSerializationError(ValueError):
+    pass
+
+
+class StrictResourceViolationError(PermissionError):
     pass
 
 

@@ -19,6 +19,7 @@ from fedorbit.analysis.records import (
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.datasets.common import (
     DatasetInspectionRequest,
+    FieldRole,
     file_sha256,
     inspect_dataset,
 )
@@ -30,14 +31,16 @@ from fedorbit.datasets.materialization import (
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import (
+    build_completion_manifest,
+    persist_ineligible_transfer_cell,
     persist_primary_transfer_metric,
 )
 from fedorbit.experiments.solvers import (
-    _solver_benchmark_reference_truth,
-    _synthetic_solver_instance,
     persist_synthetic_diagnostic_metric,
+    solver_benchmark_reference_truth,
+    synthetic_solver_instance,
 )
-from fedorbit.experiments.synthesis import _transfer_ontology_null_padding_rows
+from fedorbit.experiments.synthesis import transfer_ontology_null_padding_rows
 from fedorbit.experiments.synthetic import (
     CouplingGenerationError,
     CouplingInstanceRequest,
@@ -55,13 +58,11 @@ from fedorbit.infrastructure.artifacts import (
 )
 from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import (
-    CompletionManifest,
     ReusableArtifactManifest,
     artifact_id,
-    completion_manifest_self_hash,
 )
 from fedorbit.infrastructure.preparation import (
-    _load_or_materialize_client,
+    load_or_materialize_client,
 )
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
@@ -81,8 +82,9 @@ from fedorbit.infrastructure.workspace import (
     experiment_workspace,
 )
 from fedorbit.interface import (
-    StrictResourceViolationError,
     validate_disjoint_feature_namespaces,
+    validate_no_cross_client_entity_ids,
+    validate_no_cross_client_timestamp_pairing,
     validate_oracle_acl_isolation,
 )
 from fedorbit.learning.scoring import LocalClassCount, ScoreArtifact, ScoringRequest, score_model
@@ -119,7 +121,6 @@ from fedorbit.optimization.objective import (
 from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
-    ArtifactIdentifiers,
     ArtifactPath,
     ArtifactStage,
     ArtifactState,
@@ -151,9 +152,9 @@ from fedorbit.types import (
     Sha256Digest,
     StableJsonPayload,
     StorageLayoutSegment,
+    StrictResourceViolationError,
     SupportCount,
     SupportSize,
-    TerminalState,
     Threshold,
     Tolerance,
     TransferMethod,
@@ -177,7 +178,7 @@ def execute_dataset_client_and_resource_validation(
     materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
     for dataset in active_config().scientific.datasets.clients:
         try:
-            client = _load_or_materialize_client(dataset, raw_root, layout)
+            client = load_or_materialize_client(dataset, raw_root, layout)
         except MaterializationError as error:
             datasets.append(
                 cast(
@@ -229,7 +230,7 @@ def execute_dataset_client_and_resource_validation(
                     target=pair.target.value,
                     state=ArtifactState.COMPLETED.value,
                     shared_transfer_concept_count=len(source_groups & target_groups),
-                    transfer_ontology=_transfer_ontology_null_padding_rows(
+                    transfer_ontology=transfer_ontology_null_padding_rows(
                         DirectedPairName(f"{pair.source.value} -> {pair.target.value}"),
                         source,
                         target,
@@ -238,7 +239,7 @@ def execute_dataset_client_and_resource_validation(
             )
         )
     seed = ExperimentSeed(active_config().scientific.randomness.confirmatory_seeds[0])
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
@@ -297,7 +298,7 @@ def _persist_blocked_experiment(
     atomic_write_json(destination / "blocked.json", payload)
 
 
-def _persist_synthetic_experiment_payload(
+def persist_synthetic_experiment_payload(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
@@ -343,7 +344,7 @@ def _persist_synthetic_experiment_payload(
     configuration_sha256 = Sha256Digest(configuration_subset_digest(configuration_sections))
     code_sha256 = Sha256Digest(implementation_fingerprint(producer_module))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -433,7 +434,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
                     ),
                 )
 
-            manifest = _persist_synthetic_experiment_payload(
+            manifest = persist_synthetic_experiment_payload(
                 store,
                 layout,
                 request,
@@ -447,7 +448,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
             )
             cell_artifact_ids.append(manifest.artifact_id.value)
     generated_instances = len(seeds) * instances_per_seed
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
@@ -613,7 +614,7 @@ def execute_coupling_and_map_bound_validation(
                                     ),
                                 )
 
-                            manifest = _persist_synthetic_experiment_payload(
+                            manifest = persist_synthetic_experiment_payload(
                                 store,
                                 layout,
                                 request,
@@ -648,7 +649,7 @@ def execute_coupling_and_map_bound_validation(
                                 )
                             )
     map_bound_results = _map_bound_fixture_results(seeds)
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
@@ -749,8 +750,8 @@ def _deterministic_replay_consistent(
     support: SupportCount,
     seed: RandomSeed,
 ) -> bool:
-    problem_a, action_a, _ = _synthetic_solver_instance(node_count, pattern, support, seed)
-    problem_b, action_b, _ = _synthetic_solver_instance(node_count, pattern, support, seed)
+    problem_a, action_a, _ = synthetic_solver_instance(node_count, pattern, support, seed)
+    problem_b, action_b, _ = synthetic_solver_instance(node_count, pattern, support, seed)
     solver_config = active_config().solvers.exact_sparse
     outcome_a = fixed_action_worst_correspondence(
         problem_a,
@@ -768,6 +769,19 @@ def _deterministic_replay_consistent(
         outcome_a.separator_objective == outcome_b.separator_objective
         and outcome_a.worst_correspondence.images == outcome_b.worst_correspondence.images
     )
+
+
+def _forbidden_identity_columns(materialized: MaterializedClient) -> frozenset[str]:
+    return frozenset(
+        str(column)
+        for column, role in materialized.schema.roles.items()
+        if role == FieldRole.FORBIDDEN_IDENTITY
+    )
+
+
+def _timestamp_columns(materialized: MaterializedClient) -> frozenset[str]:
+    column = materialized.schema.timestamp_column
+    return frozenset() if column is None else frozenset({str(column)})
 
 
 def execute_baseline_and_oracle_correctness_validation(
@@ -799,10 +813,10 @@ def execute_baseline_and_oracle_correctness_validation(
             (ArtifactIdentifier("synthetic-generator"),),
             request.overwrite_policy,
         )
-        problem, action, blocks = _synthetic_solver_instance(
+        problem, action, blocks = synthetic_solver_instance(
             tractable_k, tractable_pattern, tractable_support, seed
         )
-        exhaustive_truth = _solver_benchmark_reference_truth(
+        exhaustive_truth = solver_benchmark_reference_truth(
             blocks, action, tractable_config.exhaustive_truth_correspondence_count_maximum
         )
         if exhaustive_truth is not None:
@@ -878,7 +892,7 @@ def execute_baseline_and_oracle_correctness_validation(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -888,13 +902,33 @@ def execute_baseline_and_oracle_correctness_validation(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        if source_materialized is None or target_materialized is None:
-            continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        if source_materialized is None or target_materialized is None:
+            for seed in validation_seeds:
+                persist_ineligible_transfer_cell(
+                    store,
+                    layout,
+                    request.experiment,
+                    pair_direction,
+                    source,
+                    target,
+                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                    seed,
+                    request.overwrite_policy,
+                )
+            continue
         try:
             validate_disjoint_feature_namespaces(
                 frozenset(str(name) for name in source_materialized.feature_names),
                 frozenset(str(name) for name in target_materialized.feature_names),
+            )
+            validate_no_cross_client_entity_ids(
+                _forbidden_identity_columns(source_materialized),
+                _forbidden_identity_columns(target_materialized),
+            )
+            validate_no_cross_client_timestamp_pairing(
+                _timestamp_columns(source_materialized),
+                _timestamp_columns(target_materialized),
             )
             validate_oracle_acl_isolation(
                 cell_is_oracle_validation_context=True, oracle_information_accessed=True
@@ -958,15 +992,18 @@ def execute_primitive_validation(
         if existing is not None:
             return existing
     payload_path = _payload_path(layout, fingerprint)
-    payload = _validation_payload(
-        configuration.generators.exact_separator_theorem.block_patterns[0]
+    cells = tuple(
+        _validation_payload(block_pattern, pilot_seed)
+        for block_pattern in configuration.generators.exact_separator_theorem.block_patterns
+        for pilot_seed in configuration.scientific.randomness.pilot_seeds
     )
+    payload = cast(StableJsonPayload, OrderedDict(cells=list(cells)))
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(configuration_subset_digest(_CONFIGURATION_SECTIONS))
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(_STAGE).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -1011,9 +1048,10 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: Sha256Digest) -> Path:
     )
 
 
-def _validation_payload(block_pattern: tuple[ConceptCount, ...]) -> StableJsonPayload:
+def _validation_payload(
+    block_pattern: tuple[ConceptCount, ...], source_seed: RandomSeed
+) -> StableJsonPayload:
     configuration = active_config()
-    source_seed = configuration.scientific.randomness.pilot_seeds[0]
     fixture_tolerance = (
         configuration.experiments.mathematical_primitive_validation.fixture_error_tolerance
     )
@@ -1123,39 +1161,4 @@ def _score_deterministic_validation_batch() -> ScoreArtifact:
             targets=torch.tensor((0, 1)),
             local_class_count=LocalClassCount(2),
         )
-    )
-
-
-def _completion(
-    coordinates: SemanticCoordinateText,
-    fingerprint: Sha256Digest,
-    payload_path: ArtifactPath,
-    payload_sha256: Sha256Digest,
-    configuration_sha256: Sha256Digest,
-    code_sha256: Sha256Digest,
-    runtime_sha256: Sha256Digest,
-    stage: ArtifactStage = _STAGE,
-    upstream_artifact_ids: ArtifactIdentifiers = (),
-) -> CompletionManifest:
-    completion = CompletionManifest.model_validate(
-        OrderedDict(
-            schema_version="1.0",
-            semantic_experiment_coordinates=coordinates,
-            producer_stage=stage,
-            terminal_state=TerminalState.COMPLETED,
-            dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=upstream_artifact_ids,
-            mandatory_artifact_paths=(str(payload_path),),
-            mandatory_artifact_sha256=payload_sha256,
-            scientific_configuration_sha256=configuration_sha256,
-            relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
-            upstream_lineage=stable_json(OrderedDict[str, StableJsonPayload]()),
-            completion_validation_state="validated",
-            completion_written_last=True,
-            completion_manifest_sha256="",
-        )
-    )
-    return completion.model_copy(
-        update=OrderedDict(completion_manifest_sha256=completion_manifest_self_hash(completion))
     )

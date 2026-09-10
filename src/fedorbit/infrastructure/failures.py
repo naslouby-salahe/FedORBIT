@@ -8,6 +8,7 @@ from fedorbit.types import (
     FailureReason,
     Index,
     RetryCount,
+    StrictResourceViolationError,
     SupportRecordIdentifier,
     TerminalState,
 )
@@ -46,10 +47,6 @@ class SplitOverlapError(FedorbitValidationError):
 
 
 class ConflictingDuplicatesError(FedorbitValidationError):
-    pass
-
-
-class StrictResourceViolationError(FedorbitValidationError):
     pass
 
 

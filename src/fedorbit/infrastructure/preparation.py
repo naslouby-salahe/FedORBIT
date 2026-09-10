@@ -171,7 +171,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
     )
 
 
-_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.MODELS})
+BASE_MODEL_PILOT_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.MODELS})
 
 
 def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
@@ -312,7 +312,7 @@ def persist_materialized_client(
     return tuple(split_paths)
 
 
-def _persist_client_invalid(
+def persist_client_invalid(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     dataset: DatasetId,
@@ -331,7 +331,7 @@ def _persist_client_invalid(
     atomic_write_json(destination / f"{dataset.value}-invalid.json", payload)
 
 
-def _load_or_materialize_client(
+def load_or_materialize_client(
     dataset: DatasetId, raw_root: Path, layout: WorkspaceLayout
 ) -> MaterializedClient:
     prepared = layout.preprocessing / "prepared" / dataset.value / "client.pt"

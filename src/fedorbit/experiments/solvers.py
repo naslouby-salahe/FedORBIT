@@ -22,9 +22,9 @@ from fedorbit.datasets.materialization import (
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import (
-    _assemble_principal_action,
-    _completion,
-    _solve_fedorbit_exact_sparse_action,
+    assemble_principal_action,
+    build_completion_manifest,
+    solve_fedorbit_exact_sparse_action,
 )
 from fedorbit.experiments.synthetic import (
     CouplingGenerationError,
@@ -49,7 +49,7 @@ from fedorbit.infrastructure.manifests import (
     artifact_id,
 )
 from fedorbit.infrastructure.preparation import (
-    _load_or_materialize_client,
+    load_or_materialize_client,
 )
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
@@ -222,7 +222,7 @@ def persist_synthetic_benchmark_metric(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -259,7 +259,7 @@ def persist_synthetic_benchmark_metric(
     return manifest
 
 
-def _synthetic_solver_instance(
+def synthetic_solver_instance(
     node_count: ConceptCount,
     block_pattern: ScalabilityBlockPattern,
     support: SupportCount,
@@ -282,7 +282,7 @@ def _synthetic_solver_instance(
     return problem, action, blocks
 
 
-def _solver_benchmark_reference_truth(
+def solver_benchmark_reference_truth(
     blocks: PaddedBlockStructure,
     action: CurriculumAction,
     exhaustive_truth_correspondence_count_maximum: StepCount,
@@ -598,12 +598,12 @@ def execute_exact_sparse_solver_benchmark(
                 condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
                 for seed in confirmatory_seeds:
                     try:
-                        problem, action, blocks = _synthetic_solver_instance(
+                        problem, action, blocks = synthetic_solver_instance(
                             node_count, pattern, support, seed
                         )
                     except ScalabilityGenerationError:
                         continue
-                    reference_truth = _solver_benchmark_reference_truth(
+                    reference_truth = solver_benchmark_reference_truth(
                         blocks, action, config.exhaustive_truth_correspondence_count_maximum
                     )
                     _score_exact_sparse_solver_benchmark_cell(
@@ -640,7 +640,7 @@ def execute_scalability_and_efficiency(
                 condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
                 for seed in confirmatory_seeds:
                     try:
-                        problem, action, blocks = _synthetic_solver_instance(
+                        problem, action, blocks = synthetic_solver_instance(
                             node_count, pattern, support, seed
                         )
                     except ScalabilityGenerationError:
@@ -688,7 +688,7 @@ def execute_scalability_and_efficiency(
             dense_support = config.exact_qap_supports[0]
             for seed in confirmatory_seeds:
                 try:
-                    problem, action, _ = _synthetic_solver_instance(
+                    problem, action, _ = synthetic_solver_instance(
                         node_count, pattern, dense_support, seed
                     )
                 except ScalabilityGenerationError:
@@ -719,12 +719,12 @@ def execute_scalability_and_efficiency(
         source = directed_pair.source
         target = directed_pair.target
         try:
-            source_materialized = _load_or_materialize_client(source, raw_root, layout)
-            target_materialized = _load_or_materialize_client(target, raw_root, layout)
+            source_materialized = load_or_materialize_client(source, raw_root, layout)
+            target_materialized = load_or_materialize_client(target, raw_root, layout)
         except MaterializationError:
             continue
         for seed in confirmatory_seeds:
-            assembly = _assemble_principal_action(
+            assembly = assemble_principal_action(
                 store,
                 layout,
                 source,
@@ -733,7 +733,7 @@ def execute_scalability_and_efficiency(
                 target_materialized,
                 seed,
                 device,
-                _solve_fedorbit_exact_sparse_action,
+                solve_fedorbit_exact_sparse_action,
             )
             if assembly is None:
                 continue
@@ -882,7 +882,7 @@ def persist_synthetic_diagnostic_metric(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),

@@ -55,6 +55,7 @@ class FigureSeries:
     marker_sizes: ReportCoordinates | None = None
     arrow_x: ReportCoordinates | None = None
     arrow_y: ReportCoordinates | None = None
+    panel: ReportSeriesName | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -88,6 +89,7 @@ class EvidenceFigure:
     log_y: bool = False
     draw_unit_diagonal: bool = False
     separate_panels: bool = False
+    y_tick_labels: tuple[ReportSeriesName, ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.x_label or not self.y_label:
@@ -507,12 +509,26 @@ def _style_axes(axes: Axes, figure: EvidenceFigure, series_group: tuple[FigureSe
         axes.set_yscale("log")
     axes.set_xlabel(str(figure.x_label))
     axes.set_ylabel(str(figure.y_label))
+    if figure.y_tick_labels is not None:
+        axes.set_yticks(range(len(figure.y_tick_labels)))
+        axes.set_yticklabels([str(label) for label in figure.y_tick_labels])
     if len(series_group) > 1:
         axes.legend()
 
 
+def _panel_groups(
+    series: tuple[FigureSeries, ...],
+) -> tuple[tuple[str, tuple[FigureSeries, ...]], ...]:
+    grouped: OrderedDict[str, list[FigureSeries]] = OrderedDict()
+    for item in series:
+        key = str(item.panel) if item.panel is not None else str(item.name)
+        grouped.setdefault(key, []).append(item)
+    return tuple((key, tuple(items)) for key, items in grouped.items())
+
+
 def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
-    panel_count = len(figure.series) if figure.separate_panels else 1
+    panels = _panel_groups(figure.series) if figure.separate_panels else ()
+    panel_count = len(panels) if figure.separate_panels else 1
     plot = Figure(
         figsize=(REPORT_FIGURE_WIDTH / 72 * max(1, panel_count / 2), REPORT_FIGURE_HEIGHT / 72),
         dpi=72,
@@ -520,11 +536,12 @@ def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
     )
     if figure.separate_panels:
         axes_grid = plot.subplots(1, panel_count, squeeze=False)
-        for index, series in enumerate(figure.series):
+        for index, (title, panel_series) in enumerate(panels):
             axes = axes_grid[0][index]
-            _draw_series(axes, series)
-            _style_axes(axes, figure, (series,))
-            axes.set_title(str(series.name))
+            for series in panel_series:
+                _draw_series(axes, series)
+            _style_axes(axes, figure, panel_series)
+            axes.set_title(title)
     else:
         axes = plot.subplots()
         for series in figure.series:

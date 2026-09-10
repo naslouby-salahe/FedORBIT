@@ -39,7 +39,7 @@ from fedorbit.datasets.materialization import (
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY, transfer_concept_for, transfer_eligibility
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
-from fedorbit.experiments.scoring import _completion, _latest_completed_manifest
+from fedorbit.experiments.scoring import build_completion_manifest, latest_completed_manifest
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
 )
@@ -123,7 +123,7 @@ def _concept_split_support(
     return total
 
 
-def _transfer_ontology_null_padding_rows(
+def transfer_ontology_null_padding_rows(
     pair: DirectedPairName,
     source_client: MaterializedClient,
     target_client: MaterializedClient,
@@ -232,7 +232,7 @@ def completed_experiment_metric_records_with_support(
 def transfer_ontology_and_null_padding_rows(
     store: ArtifactStore,
 ) -> tuple[Mapping[str, TableScalar], ...]:
-    manifest = _latest_completed_manifest(
+    manifest = latest_completed_manifest(
         store, ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION
     )
     if manifest is None or len(manifest.payload_paths) != 1:
@@ -390,7 +390,7 @@ def persist_primary_transfer_comparison(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -1904,7 +1904,7 @@ def persist_coupling_mechanism_comparison(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -2027,7 +2027,7 @@ def persist_baseline_comparison(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -2144,7 +2144,7 @@ def persist_statistical_metadata(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.STATISTICS).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),

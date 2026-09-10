@@ -15,18 +15,18 @@ from fedorbit.datasets.materialization import (
 )
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import (
-    _common_eligible_groups,
-    _load_dataset_source_packet,
     assemble_cross_client_response_matrix,
     assemble_target_response_matrix,
+    common_eligible_groups,
     cross_client_padded_blocks,
+    load_dataset_source_packet,
     persist_primary_transfer_metric,
 )
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
 )
 from fedorbit.infrastructure.preparation import (
-    _load_or_materialize_client,
+    load_or_materialize_client,
 )
 from fedorbit.infrastructure.runtime import (
     RandomSeed,
@@ -100,7 +100,7 @@ def _score_packet_only_recovery_attempt(
     target_materialized: MaterializedClient,
     seed: RandomSeed,
 ) -> tuple[bool, tuple[ArtifactIdentifier, ...]] | None:
-    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    common = common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
         return None
     source_eligible, target_eligible = common
@@ -109,10 +109,10 @@ def _score_packet_only_recovery_attempt(
     source_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     target_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
-        source_packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        source_packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if source_packet is not None:
             source_packets[coarse_group] = source_packet
-        target_packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        target_packet = load_dataset_source_packet(layout, target, seed, coarse_group)
         if target_packet is not None:
             target_packets[coarse_group] = target_packet
     if not source_packets or not target_packets:
@@ -150,7 +150,7 @@ def execute_map_availability_applicability_audit(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)

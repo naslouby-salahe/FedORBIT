@@ -15,6 +15,7 @@ from fedorbit.types import (
     DirectedPair,
     ExperimentName,
     ExperimentSeed,
+    ProducerModuleName,
     SemanticCell,
     SemanticCoordinate,
     SupportSize,
@@ -69,20 +70,25 @@ def test_relevance_covers_registered_experiments() -> None:
 
 
 def test_implementation_fingerprint_is_producer_identity() -> None:
-    baseline = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    assert implementation_fingerprint("fedorbit.infrastructure.manifests") == baseline
-    assert implementation_fingerprint("fedorbit.config.loading") != baseline
+    baseline = implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
+    assert (
+        implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
+        == baseline
+    )
+    assert implementation_fingerprint(ProducerModuleName("fedorbit.config.loading")) != baseline
 
 
 def test_implementation_fingerprint_does_not_scan_source() -> None:
-    producer = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    same_identity = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    producer = implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
+    same_identity = implementation_fingerprint(
+        ProducerModuleName("fedorbit.infrastructure.manifests")
+    )
     assert producer == same_identity
 
 
 def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
     with pytest.raises(ProvenanceError):
-        implementation_fingerprint("os.path")
+        implementation_fingerprint(ProducerModuleName("os.path"))
 
 
 def test_runtime_fingerprint_is_stage_local() -> None:
@@ -112,7 +118,7 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         relevance,
         ("upstream-1",),
         frozenset({"models", "generators"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     assert stage_dependency_fingerprint(*arguments) == stage_dependency_fingerprint(*arguments)
 
@@ -125,7 +131,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         ("upstream-1",),
         frozenset({"models"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -133,7 +139,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         ("upstream-2",),
         frozenset({"models"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     assert changed != base
 
@@ -146,7 +152,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -154,7 +160,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({"models", "generators"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     assert changed != base
 
@@ -167,7 +173,7 @@ def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.infrastructure.manifests",
+        ProducerModuleName("fedorbit.infrastructure.manifests"),
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -175,6 +181,6 @@ def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
         relevance,
         (),
         frozenset({"models"}),
-        "fedorbit.infrastructure.reuse",
+        ProducerModuleName("fedorbit.infrastructure.reuse"),
     )
     assert changed == base

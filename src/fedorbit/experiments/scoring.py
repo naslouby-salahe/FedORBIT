@@ -68,6 +68,11 @@ from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
     experiment_workspace,
 )
+from fedorbit.interface import (
+    AccessLogger,
+    ResourceKind,
+    validate_dynamic_access_log_scan,
+)
 from fedorbit.learning.checkpoints import load_base_checkpoint
 from fedorbit.learning.pilot import (
     create_classifier,
@@ -140,6 +145,7 @@ from fedorbit.types import (
     CheckpointDirectorySegment,
     ClassCount,
     ClassIndex,
+    ClientRole,
     CoarseGroup,
     ConfigurationSection,
     ContrastCoordinates,
@@ -152,14 +158,17 @@ from fedorbit.types import (
     ExperimentCondition,
     ExperimentName,
     ExperimentSeed,
+    FilesystemSlug,
     Index,
     InvalidReason,
     MetricId,
     MetricUnit,
+    MutableCell,
     OracleTransferConcept,
     OverwritePolicy,
     ProducerModuleName,
     SampleCount,
+    ScaleFactor,
     Score,
     SemanticCell,
     SemanticCoordinates,
@@ -179,7 +188,7 @@ from fedorbit.types import (
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.scoring")
 
 
-def _completion(
+def build_completion_manifest(
     coordinates: SemanticCoordinateText,
     fingerprint: Sha256Digest,
     payload_path: ArtifactPath,
@@ -214,7 +223,7 @@ def _completion(
     )
 
 
-def _latest_completed_manifest(
+def latest_completed_manifest(
     store: ArtifactStore, experiment: ExperimentName
 ) -> ReusableArtifactManifest | None:
     candidates: list[ReusableArtifactManifest] = []
@@ -269,7 +278,7 @@ def _checkpoint_artifact_id(
     return None
 
 
-def _score_local_only_cell(
+def score_local_only_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     target: DatasetId,
@@ -404,7 +413,7 @@ def persist_primary_transfer_metric(
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),
@@ -474,7 +483,7 @@ def persist_ineligible_transfer_cell(
     )
 
 
-def _persist_primary_transfer_cell_metrics(
+def persist_primary_transfer_cell_metrics(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
@@ -528,7 +537,7 @@ def _persist_primary_transfer_cell_metrics(
         )
 
 
-def _persist_boundary_diagnostic_metrics(
+def persist_boundary_diagnostic_metrics(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
@@ -630,7 +639,7 @@ def self_padded_blocks(
     return build_padded_block_structure(coarse_groups, counts, counts)
 
 
-def _load_dataset_source_packet(
+def load_dataset_source_packet(
     layout: WorkspaceLayout,
     target: DatasetId,
     seed: RandomSeed,
@@ -752,8 +761,11 @@ def _confirm_assimilate_and_score(
     contrast_coordinates: ContrastCoordinates,
     assimilation_coordinates: AssimilationCoordinates,
     n_classes: ClassCount,
-    confirmation_verdict_sink: list[bool] | None = None,
+    confirmation_verdict_sink: MutableCell[bool] | None = None,
 ) -> ScoreArtifact:
+    access = AccessLogger()
+    access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+    access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
     pre_confirm = capture_pre_confirm_pair(model, optimizer)
     verdict = run_proposal_confirmation(
         ConfirmationRequest(
@@ -772,7 +784,7 @@ def _confirm_assimilate_and_score(
         )
     )
     if confirmation_verdict_sink is not None:
-        confirmation_verdict_sink.append(verdict.accepted)
+        confirmation_verdict_sink.value = verdict.accepted
     lifecycle = PreTestLifecycle()
     lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
     lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
@@ -795,12 +807,14 @@ def _confirm_assimilate_and_score(
     lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
     lifecycle.open_test()
     lifecycle.assert_opened()
+    access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
+    validate_dynamic_access_log_scan(access.trace())
     return score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
 
 
-def _action_sha256(action: CurriculumAction) -> Sha256Digest:
+def action_sha256(action: CurriculumAction) -> Sha256Digest:
     return Sha256Digest(
         hashlib.sha256(
             ",".join(f"{value:.17g}" for value in action.coordinates).encode()
@@ -808,7 +822,7 @@ def _action_sha256(action: CurriculumAction) -> Sha256Digest:
     )
 
 
-def _score_local_sir_cell(
+def score_local_sir_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     target: DatasetId,
@@ -828,7 +842,7 @@ def _score_local_sir_cell(
     blocks = self_padded_blocks(eligible_groups_by_coarse)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in eligible_groups_by_coarse:
-        packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        packet = load_dataset_source_packet(layout, target, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
     if not packets_by_coarse:
@@ -903,14 +917,14 @@ def _score_local_sir_cell(
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
-            action_artifact_sha256=_action_sha256(action),
+            action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
     )
     return score, n_classes, input_artifact_ids
 
 
-def _common_eligible_groups(
+def common_eligible_groups(
     source: DatasetId,
     target: DatasetId,
     source_materialized: MaterializedClient,
@@ -1058,7 +1072,7 @@ def assemble_target_response_matrix(
     return matrix
 
 
-def _score_matched_resource_rectangular_cell(
+def score_matched_resource_rectangular_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1074,7 +1088,7 @@ def _score_matched_resource_rectangular_cell(
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
-    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    common = common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
         return None
     source_eligible, target_eligible = common
@@ -1082,7 +1096,7 @@ def _score_matched_resource_rectangular_cell(
     blocks = cross_client_padded_blocks(source_eligible, target_eligible)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
-        packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
     if not packets_by_coarse:
@@ -1163,14 +1177,14 @@ def _score_matched_resource_rectangular_cell(
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
-            action_artifact_sha256=_action_sha256(action),
+            action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
     )
     return score, n_classes, input_artifact_ids
 
 
-def _score_point_correspondence_commitment_cell(
+def score_point_correspondence_commitment_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1186,7 +1200,7 @@ def _score_point_correspondence_commitment_cell(
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
-    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    common = common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
         return None
     source_eligible, target_eligible = common
@@ -1195,10 +1209,10 @@ def _score_point_correspondence_commitment_cell(
     source_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     target_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
-        source_packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        source_packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if source_packet is not None:
             source_packets[coarse_group] = source_packet
-        target_packet = _load_dataset_source_packet(layout, target, seed, coarse_group)
+        target_packet = load_dataset_source_packet(layout, target, seed, coarse_group)
         if target_packet is not None:
             target_packets[coarse_group] = target_packet
     if not source_packets or not target_packets:
@@ -1284,7 +1298,7 @@ def _score_point_correspondence_commitment_cell(
             source_packet_artifact_id=ArtifactIdentifier(
                 first_source_packet.packet_integrity_sha256
             ),
-            action_artifact_sha256=_action_sha256(action),
+            action_artifact_sha256=action_sha256(action),
         ),
         n_classes,
     )
@@ -1311,7 +1325,7 @@ class PrincipalActionAssembly:
     first_packet_artifact_id: ArtifactIdentifier
 
 
-def _assemble_principal_action(
+def assemble_principal_action(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1338,14 +1352,14 @@ def _assemble_principal_action(
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
-    common = _common_eligible_groups(source, target, source_materialized, target_materialized)
+    common = common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
         return None
     source_eligible_original, target_eligible_original = common
     common_coarse = tuple(target_eligible_original)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
-        packet = _load_dataset_source_packet(layout, source, seed, coarse_group)
+        packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
     if not packets_by_coarse:
@@ -1507,7 +1521,7 @@ def _assemble_principal_action(
     )
 
 
-def _score_robust_action_cell(
+def score_robust_action_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1516,7 +1530,7 @@ def _score_robust_action_cell(
     target_materialized: MaterializedClient,
     seed: RandomSeed,
     device: torch.device,
-    method_slug: str,
+    method_slug: FilesystemSlug,
     solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
     settle_and_score: Callable[
         [
@@ -1543,11 +1557,11 @@ def _score_robust_action_cell(
     ]
     | None = None,
     checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
-    action_sink: list[CurriculumAction] | None = None,
-    confirmation_verdict_sink: list[bool] | None = None,
+    action_sink: MutableCell[CurriculumAction] | None = None,
+    confirmation_verdict_sink: MutableCell[bool] | None = None,
     fine_singleton: bool = False,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    assembly = _assemble_principal_action(
+    assembly = assemble_principal_action(
         store,
         layout,
         source,
@@ -1565,7 +1579,7 @@ def _score_robust_action_cell(
     if assembly is None:
         return None
     if action_sink is not None:
-        action_sink.append(assembly.action)
+        action_sink.value = assembly.action
     multipliers = curriculum_multipliers_from_action(
         assembly.action, assembly.blocks, assembly.target_eligible, assembly.n_classes
     )
@@ -1584,7 +1598,7 @@ def _score_robust_action_cell(
         seed=seed,
         clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
         source_packet_artifact_id=assembly.first_packet_artifact_id,
-        action_artifact_sha256=_action_sha256(assembly.action),
+        action_artifact_sha256=action_sha256(assembly.action),
     )
     if settle_and_score is None:
         score = _confirm_assimilate_and_score(
@@ -1619,15 +1633,15 @@ def _score_robust_action_cell(
     return score, assembly.n_classes, assembly.input_artifact_ids
 
 
-def _solve_fedorbit_exact_sparse_action(
+def solve_fedorbit_exact_sparse_action(
     problem: RobustActionProblem,
     seed: RandomSeed,
-    certified_value_sink: list[Score] | None = None,
+    certified_value_sink: MutableCell[Score] | None = None,
 ) -> CurriculumAction | None:
     del seed
     solution = solve_robust_action(problem)
     if certified_value_sink is not None:
-        certified_value_sink.append(solution.certified_robust_value)
+        certified_value_sink.value = solution.certified_robust_value
     return solution.selected_action
 
 
@@ -1641,21 +1655,21 @@ def _solve_generic_exact_qap_action(
     return outcome.certified_solution.certified_action
 
 
-def _solve_exact_map_oracle_action(
+def solve_exact_map_oracle_action(
     problem: RobustActionProblem,
     seed: RandomSeed,
-    certified_value_sink: list[Score] | None = None,
+    certified_value_sink: MutableCell[Score] | None = None,
 ) -> CurriculumAction | None:
     del seed
     identity = BlockCorrespondence.lexicographically_smallest(problem.blocks)
     committed_matrix = identity.permute_response_matrix(problem.lower_response_matrix)
     solution = optimize_against_fixed_matrix(problem, committed_matrix)
     if certified_value_sink is not None:
-        certified_value_sink.append(solution.objective_value)
+        certified_value_sink.value = solution.objective_value
     return solution.selected_action
 
 
-def _score_fedorbit_exact_sparse_solver_cell(
+def score_fedorbit_exact_sparse_solver_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1665,7 +1679,7 @@ def _score_fedorbit_exact_sparse_solver_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1674,8 +1688,8 @@ def _score_fedorbit_exact_sparse_solver_cell(
         target_materialized,
         seed,
         device,
-        "fedorbit-exact-sparse-solver",
-        _solve_fedorbit_exact_sparse_action,
+        FilesystemSlug("fedorbit-exact-sparse-solver"),
+        solve_fedorbit_exact_sparse_action,
     )
 
 
@@ -1694,6 +1708,12 @@ def _settle_without_confirmation_and_score(
     n_classes: ClassCount,
 ) -> ScoreArtifact:
     del confirm, contrast_coordinates
+    access = AccessLogger()
+    access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+    lifecycle = PreTestLifecycle()
+    lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.CONFIRMATION_DECISION_FINALIZED)
     pre_confirm = capture_pre_confirm_pair(model, optimizer)
     if action.realized_support_size > 0:
         apply_accepted_assimilation(
@@ -1709,12 +1729,18 @@ def _settle_without_confirmation_and_score(
         )
     else:
         settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
+    lifecycle.complete_phase(PreTestPhase.ASSIMILATION_SETTLED)
+    lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
+    lifecycle.open_test()
+    lifecycle.assert_opened()
+    access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
+    validate_dynamic_access_log_scan(access.trace())
     return score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
 
 
-def _score_fedorbit_without_confirmation_cell(
+def score_fedorbit_without_confirmation_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1724,7 +1750,7 @@ def _score_fedorbit_without_confirmation_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1733,13 +1759,13 @@ def _score_fedorbit_without_confirmation_cell(
         target_materialized,
         seed,
         device,
-        "fedorbit-without-confirmation",
-        _solve_fedorbit_exact_sparse_action,
+        FilesystemSlug("fedorbit-without-confirmation"),
+        solve_fedorbit_exact_sparse_action,
         _settle_without_confirmation_and_score,
     )
 
 
-def _score_generic_exact_qap_cell(
+def score_generic_exact_qap_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1749,7 +1775,7 @@ def _score_generic_exact_qap_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1758,12 +1784,12 @@ def _score_generic_exact_qap_cell(
         target_materialized,
         seed,
         device,
-        "generic-exact-qap",
+        FilesystemSlug("generic-exact-qap"),
         _solve_generic_exact_qap_action,
     )
 
 
-def _score_exact_map_oracle_cell(
+def score_exact_map_oracle_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1773,7 +1799,7 @@ def _score_exact_map_oracle_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1782,8 +1808,8 @@ def _score_exact_map_oracle_cell(
         target_materialized,
         seed,
         device,
-        "exact-map-oracle",
-        _solve_exact_map_oracle_action,
+        FilesystemSlug("exact-map-oracle"),
+        solve_exact_map_oracle_action,
     )
 
 
@@ -1834,7 +1860,7 @@ def solve_coupling_destroyed_action(
     return solve_robust_action(destroyed_problem).selected_action
 
 
-def _score_coarse_block_mean_cell(
+def score_coarse_block_mean_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1844,7 +1870,7 @@ def _score_coarse_block_mean_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1853,12 +1879,12 @@ def _score_coarse_block_mean_cell(
         target_materialized,
         seed,
         device,
-        "coarse-block-mean",
+        FilesystemSlug("coarse-block-mean"),
         solve_coarse_block_mean_action,
     )
 
 
-def _score_coarse_block_min_cell(
+def score_coarse_block_min_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1868,7 +1894,7 @@ def _score_coarse_block_min_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1877,12 +1903,12 @@ def _score_coarse_block_min_cell(
         target_materialized,
         seed,
         device,
-        "coarse-block-min",
+        FilesystemSlug("coarse-block-min"),
         solve_coarse_block_min_action,
     )
 
 
-def _score_orbit_mean_cell(
+def score_orbit_mean_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1892,7 +1918,7 @@ def _score_orbit_mean_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1901,12 +1927,12 @@ def _score_orbit_mean_cell(
         target_materialized,
         seed,
         device,
-        "orbit-mean",
+        FilesystemSlug("orbit-mean"),
         solve_orbit_mean_action,
     )
 
 
-def _score_coupling_destroyed_fedorbit_cell(
+def score_coupling_destroyed_fedorbit_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1916,7 +1942,7 @@ def _score_coupling_destroyed_fedorbit_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -1925,12 +1951,12 @@ def _score_coupling_destroyed_fedorbit_cell(
         target_materialized,
         seed,
         device,
-        "coupling-destroyed-fedorbit",
+        FilesystemSlug("coupling-destroyed-fedorbit"),
         solve_coupling_destroyed_action,
     )
 
 
-def _score_local_sir_cell_adapter(
+def score_local_sir_cell_adapter(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -1941,11 +1967,11 @@ def _score_local_sir_cell_adapter(
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
     del source, source_materialized
-    return _score_local_sir_cell(store, layout, target, target_materialized, seed, device)
+    return score_local_sir_cell(store, layout, target, target_materialized, seed, device)
 
 
 def _confirm_assimilate_score_capturing_verdict(
-    verdicts: list[ConfirmationVerdict],
+    verdicts: MutableCell[ConfirmationVerdict],
 ) -> Callable[
     [
         torch.nn.Module,
@@ -1978,6 +2004,9 @@ def _confirm_assimilate_score_capturing_verdict(
         n_classes: ClassCount,
     ) -> ScoreArtifact:
         del action
+        access = AccessLogger()
+        access.record(ClientRole.TARGET, ResourceKind.TRAIN)
+        access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
         pre_confirm = capture_pre_confirm_pair(model, optimizer)
         verdict = run_proposal_confirmation(
             ConfirmationRequest(
@@ -1995,7 +2024,7 @@ def _confirm_assimilate_score_capturing_verdict(
                 contrast_coordinates,
             )
         )
-        verdicts.append(verdict)
+        verdicts.value = verdict
         lifecycle = PreTestLifecycle()
         lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
         lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
@@ -2018,6 +2047,8 @@ def _confirm_assimilate_score_capturing_verdict(
         lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
         lifecycle.open_test()
         lifecycle.assert_opened()
+        access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
+        validate_dynamic_access_log_scan(access.trace())
         return score_model(
             ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
         )
@@ -2025,7 +2056,7 @@ def _confirm_assimilate_score_capturing_verdict(
     return settle_and_score
 
 
-def _score_fedorbit_with_confirmation_verdict_cell(
+def score_fedorbit_with_confirmation_verdict_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -2034,9 +2065,9 @@ def _score_fedorbit_with_confirmation_verdict_cell(
     target_materialized: MaterializedClient,
     seed: RandomSeed,
     device: torch.device,
-    verdicts: list[ConfirmationVerdict],
+    verdicts: MutableCell[ConfirmationVerdict],
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    return _score_robust_action_cell(
+    return score_robust_action_cell(
         store,
         layout,
         source,
@@ -2045,13 +2076,13 @@ def _score_fedorbit_with_confirmation_verdict_cell(
         target_materialized,
         seed,
         device,
-        "fedorbit-exact-sparse-solver",
-        _solve_fedorbit_exact_sparse_action,
+        FilesystemSlug("fedorbit-exact-sparse-solver"),
+        solve_fedorbit_exact_sparse_action,
         _confirm_assimilate_score_capturing_verdict(verdicts),
     )
 
 
-def _score_local_only_cell_adapter(
+def score_local_only_cell_adapter(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     source: DatasetId,
@@ -2062,14 +2093,14 @@ def _score_local_only_cell_adapter(
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
     del source, source_materialized
-    scored = _score_local_only_cell(store, layout, target, target_materialized, seed, device)
+    scored = score_local_only_cell(store, layout, target, target_materialized, seed, device)
     if scored is None:
         return None
     score, n_classes, artifact_id = scored
     return score, n_classes, (artifact_id,)
 
 
-def _solve_fedorbit_exact_sparse_action_at_support(
+def solve_fedorbit_exact_sparse_action_at_support(
     support_limit: SupportCount,
 ) -> Callable[..., CurriculumAction | None]:
     def solve(
@@ -2086,7 +2117,7 @@ def _solve_fedorbit_exact_sparse_action_at_support(
     return solve
 
 
-def _solve_dense_ccp_fallback_action(
+def solve_dense_ccp_fallback_action(
     problem: RobustActionProblem, seed: RandomSeed
 ) -> CurriculumAction | None:
     outcome = solve_dense_ccp(
@@ -2095,10 +2126,10 @@ def _solve_dense_ccp_fallback_action(
     return outcome.selected_action
 
 
-def _solve_matched_resource_rectangular_action(
+def solve_matched_resource_rectangular_action(
     problem: RobustActionProblem,
     seed: RandomSeed,
-    certified_value_sink: list[Score] | None = None,
+    certified_value_sink: MutableCell[Score] | None = None,
 ) -> CurriculumAction | None:
     del seed
     hull = build_rectangular_hull(
@@ -2106,7 +2137,7 @@ def _solve_matched_resource_rectangular_action(
     )
     solution = optimize_against_fixed_matrix(problem, hull.lower_bounds)
     if certified_value_sink is not None:
-        certified_value_sink.append(solution.objective_value)
+        certified_value_sink.value = solution.objective_value
     return solution.selected_action
 
 
@@ -2125,7 +2156,7 @@ _SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
 )
 
 
-def _semantic_partition_bucket_of(
+def semantic_partition_bucket_of(
     partition: str | tuple[str, ...],
 ) -> Mapping[CoarseGroup, CoarseGroup] | None:
     if partition == SemanticPartitionId.PRINCIPAL_THREE_COARSE_GROUPS:
@@ -2140,12 +2171,13 @@ def _semantic_partition_bucket_of(
     return None
 
 
-def _semantic_partition_label(partition: str | tuple[str, ...]) -> str:
-    return partition if isinstance(partition, str) else "|".join(partition)
+def semantic_partition_label(partition: str | tuple[str, ...]) -> EvaluationConditionName:
+    text = partition if isinstance(partition, str) else "|".join(partition)
+    return EvaluationConditionName(text)
 
 
-def _response_scale_perturbation(
-    scale: float,
+def response_scale_perturbation(
+    scale: ScaleFactor,
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]:
@@ -2160,7 +2192,7 @@ def _response_scale_perturbation(
     return perturb
 
 
-def _ci_half_width_perturbation(
+def ci_half_width_perturbation(
     multiplier: float,
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
@@ -2176,7 +2208,7 @@ def _ci_half_width_perturbation(
     return perturb
 
 
-def _response_heterogeneity_perturbation(
+def response_heterogeneity_perturbation(
     multiplier: float,
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
@@ -2204,6 +2236,6 @@ def _response_heterogeneity_perturbation(
     return perturb
 
 
-_WeakSignalPerturbation = Callable[
+WeakSignalPerturbation = Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]

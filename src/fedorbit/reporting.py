@@ -28,6 +28,7 @@ from fedorbit.types import (
     ReportAxisLabel,
     ReportColumnName,
     ReportColumns,
+    ReportSeriesName,
     RiskReductionColumn,
     TransferMethod,
 )
@@ -492,6 +493,7 @@ def _figure(
     log_y: bool = False,
     draw_unit_diagonal: bool = False,
     separate_panels: bool = False,
+    y_tick_labels: tuple[ReportSeriesName, ...] | None = None,
 ) -> EvidenceFigure:
     return EvidenceFigure(
         x_label=ReportAxisLabel(x_label),
@@ -503,16 +505,21 @@ def _figure(
         log_y=log_y,
         draw_unit_diagonal=draw_unit_diagonal,
         separate_panels=separate_panels,
+        y_tick_labels=y_tick_labels,
     )
 
 
-def real_transfer_gain_forest_plot(series: Sequence[FigureSeries]) -> EvidenceFigure:
+def real_transfer_gain_forest_plot(
+    series: Sequence[FigureSeries],
+    pair_labels: tuple[ReportSeriesName, ...] = (),
+) -> EvidenceFigure:
     material = active_config().scientific.materiality.realized_relative_macro_ce
     return _figure(
         "paired mean relative macro-CE gain vs local",
         "primary directed pair",
         series,
         vertical_reference_lines=(0.0, material),
+        y_tick_labels=pair_labels or None,
     )
 
 
@@ -520,10 +527,11 @@ def baseline_paired_difference_plot(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "primary directed pair",
+        "seed",
         "seed-level paired difference",
         series,
         horizontal_reference_lines=(0.0,),
+        separate_panels=True,
     )
 
 

@@ -18,6 +18,7 @@ from fedorbit.types import (
     RngNamespace,
     SampleCount,
     StableJsonPayload,
+    StrictResourceViolationError,
     is_sha256_digest,
 )
 
@@ -145,10 +146,6 @@ TARGET_LOCAL_WHITELIST = frozenset(
         ResourceKind.LOCAL_IMPORTANCE_VECTOR,
     }
 )
-
-
-class StrictResourceViolationError(PermissionError):
-    pass
 
 
 class StrictResourcePolicy:

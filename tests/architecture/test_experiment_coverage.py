@@ -6,7 +6,7 @@ from fedorbit.cli import app
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.experiments.dispatch import (
     ExperimentExecutionRequest,
-    _registered_experiment_producers,
+    registered_experiment_producers,
 )
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
@@ -21,7 +21,7 @@ def test_experiment_enum_matches_catalogue() -> None:
 def test_catalogue_matches_registered_producers(tmp_path: Path) -> None:
     catalogue = build_catalogue()
     experiment = ExperimentName.STATISTICAL_SYNTHESIS
-    producers = _registered_experiment_producers(
+    producers = registered_experiment_producers(
         ArtifactStore(tmp_path),
         build_layout(),
         ExperimentExecutionRequest(

@@ -27,11 +27,14 @@ from fedorbit.infrastructure.workspace import (
 from fedorbit.types import (
     ArtifactState,
     ConfigurationSection,
+    DirectedPairName,
     DomainModel,
+    EvidenceAdjudication,
     EvidenceStatus,
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
+    Floor,
     MetricId,
     MultiplicityFamily,
     ProducerModuleName,
@@ -66,35 +69,35 @@ def _status(
     materiality: str,
     statistical: str,
     completeness: str,
-) -> tuple[EvidenceStatus, str, str, str]:
-    return (status, materiality, statistical, completeness)
+) -> EvidenceAdjudication:
+    return EvidenceAdjudication(status, materiality, statistical, completeness)
 
 
-def _not_tested(reason: str) -> tuple[EvidenceStatus, str, str, str]:
+def _not_tested(reason: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.NOT_TESTED, "not evaluated", reason, "incomplete")
 
 
-def _supported(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _supported(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.SUPPORTED, materiality, statistical, "complete")
 
 
-def _not_supported(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _not_supported(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.NOT_SUPPORTED, materiality, statistical, "complete")
 
 
-def _partial(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _partial(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.PARTIALLY_SUPPORTED, materiality, statistical, "complete")
 
 
-def _mechanism_only(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _mechanism_only(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.MECHANISM_ONLY, materiality, statistical, "complete")
 
 
-def _conditional(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _conditional(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.CONDITIONAL, materiality, statistical, "complete")
 
 
-def _null_result(materiality: str, statistical: str) -> tuple[EvidenceStatus, str, str, str]:
+def _null_result(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.NULL_RESULT, materiality, statistical, "complete")
 
 
@@ -156,7 +159,7 @@ def _pair_records(
 def _successful_pairs(
     records: tuple[PairedComparisonRecord, ...],
     holm_maximum: float,
-    bca_floor: float,
+    bca_floor: Floor,
 ) -> tuple[PairedComparisonRecord, ...]:
     return tuple(
         record
@@ -180,30 +183,52 @@ def _harmful_pairs(
     )
 
 
-def _utility_family_status(
+def _local_reference_dominant_pairs(
+    records: tuple[PairedComparisonRecord, ...],
+    holm_maximum: float,
+) -> frozenset[str]:
+    threshold = active_config().scientific.materiality.realized_relative_macro_ce
+    dominant: set[str] = set()
+    for record in records:
+        if record.decision == ComparisonDecision.EQUIVALENT:
+            dominant.add(record.pair)
+            continue
+        if (
+            record.mean_difference is not None
+            and record.holm_p is not None
+            and record.bca_ci_high is not None
+            and record.mean_difference <= -threshold
+            and record.holm_p <= holm_maximum
+            and record.bca_ci_high < 0.0
+        ):
+            dominant.add(record.pair)
+    return frozenset(dominant)
+
+
+def utility_family_status(
     comparisons: tuple[PairedComparisonRecord, ...],
     method_a: TransferMethod,
     method_b: TransferMethod,
     holm_maximum: float,
-    bca_floor: float,
+    bca_floor: Floor,
     required_pairs: int,
     kill_local_reference: bool,
-) -> tuple[EvidenceStatus, str, str, str]:
+) -> EvidenceAdjudication:
     records = _pair_records(comparisons, method_a, method_b)
     if not records:
         return _not_tested("no contrasts")
-    if kill_local_reference:
-        equivalent = sum(
-            1 for record in records if record.decision == ComparisonDecision.EQUIVALENT
-        )
-        if equivalent >= required_pairs:
-            return _not_supported("local reference sufficient", "equivalence kill fired")
     harmful = _harmful_pairs(records)
     if harmful:
         return _not_supported("material harm on a primary pair", "failure rule")
     successful = _successful_pairs(records, holm_maximum, bca_floor)
     if len(successful) >= required_pairs:
         return _supported("material", "holm and BCa satisfied")
+    if kill_local_reference and not successful:
+        dominant = _local_reference_dominant_pairs(records, holm_maximum)
+        if len(dominant) >= required_pairs:
+            return _not_supported(
+                "local reference sufficient", "equivalence or superiority kill fired"
+            )
     analyzable = len({record.pair for record in records})
     if (
         analyzable == 3
@@ -216,7 +241,7 @@ def _utility_family_status(
     return _null_result("no material pair", "no harm")
 
 
-def _classify_exactness(store: ArtifactStore) -> tuple[EvidenceStatus, str, str, str]:
+def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
     cells = _theorem_cells(store)
     if not cells:
         return _not_tested("no theorem cells")
@@ -227,9 +252,66 @@ def _classify_exactness(store: ArtifactStore) -> tuple[EvidenceStatus, str, str,
     return _not_supported("wrong minima or invalid certificates", "exactness failed")
 
 
+def _ablation_pair_method_means(
+    store: ArtifactStore, method: TransferMethod
+) -> Mapping[DirectedPairName, float]:
+    from fedorbit.experiments.synthesis import completed_experiment_metric_records
+
+    by_pair: OrderedDict[DirectedPairName, list[float]] = OrderedDict()
+    for record in completed_experiment_metric_records(store, ExperimentName.MECHANISM_ABLATIONS):
+        if (
+            record.method != method
+            or record.metric_name != MetricId.RELATIVE_MACRO_CE_GAIN
+            or not record.valid
+            or record.metric_value is None
+        ):
+            continue
+        by_pair.setdefault(record.pair, []).append(float(record.metric_value))
+    means: OrderedDict[DirectedPairName, float] = OrderedDict()
+    for pair, values in by_pair.items():
+        means[pair] = sum(values) / len(values)
+    return means
+
+
+def _mechanism_retention_pairs(
+    store: ArtifactStore,
+    comparisons: tuple[PairedComparisonRecord, ...],
+) -> int:
+    criteria = active_config().scientific.evaluation_criteria.coupling_mechanism
+    full_means = _ablation_pair_method_means(store, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER)
+    destroyed_means = _ablation_pair_method_means(store, TransferMethod.COUPLING_DESTROYED_FEDORBIT)
+    equivalent_pairs = {
+        record.pair
+        for record in comparisons
+        if record.family == MultiplicityFamily.MECHANISM_ABLATIONS
+        and record.decision == ComparisonDecision.EQUIVALENT
+    }
+    retention_pairs = 0
+    for pair, full_mean in full_means.items():
+        if pair not in equivalent_pairs or full_mean <= 0.0:
+            continue
+        destroyed_mean = destroyed_means.get(pair)
+        if destroyed_mean is None:
+            continue
+        retention = destroyed_mean / full_mean
+        if retention >= criteria.destruction_positive_gain_retention_minimum:
+            retention_pairs += 1
+    return retention_pairs
+
+
+def _material_coupling_pairs(comparisons: tuple[PairedComparisonRecord, ...]) -> int:
+    return sum(
+        1
+        for record in comparisons
+        if record.family == MultiplicityFamily.COUPLING_MECHANISM
+        and record.decision == ComparisonDecision.SUPERIOR
+    )
+
+
 def _classify_joint_correspondence(
     store: ArtifactStore,
-) -> tuple[EvidenceStatus, str, str, str]:
+    comparisons: tuple[PairedComparisonRecord, ...],
+) -> EvidenceAdjudication:
     criteria = active_config().scientific.evaluation_criteria.coupling_mechanism
     material = active_config().scientific.materiality.coupling_objective_units
     synthetic = _metric_values(
@@ -239,40 +321,36 @@ def _classify_joint_correspondence(
     )
     if not synthetic:
         return _not_tested("no coupling gaps")
-    destruction = _metric_values(
-        store,
-        ExperimentName.MECHANISM_ABLATIONS,
-        MetricId.RELATIVE_MACRO_CE_GAIN,
-    )
-    retained = False
-    if destruction:
-        retained = (
-            sum(1 for gain in destruction if gain > 0.0) / len(destruction)
-            >= criteria.destruction_positive_gain_retention_minimum
-        )
-    if retained:
+    retention_pairs = _mechanism_retention_pairs(store, comparisons)
+    retention_present = retention_pairs >= criteria.primary_pairs_with_material_mean_gap_required
+    if retention_present:
         return _not_supported("coupling destruction retains gain", "mechanism attribution fails")
     synthetic_fraction = sum(1 for gap in synthetic if gap > material) / len(synthetic)
     accuracy = criteria.theorem_zero_strict_classification_accuracy_required
     synthetic_pass = synthetic_fraction >= accuracy or any(gap > material for gap in synthetic)
+    if not synthetic_pass:
+        return _not_supported("synthetic mechanism criterion failed", "gap fraction unmet")
     real_gaps = _metric_values(
         store,
         ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
         MetricId.ROBUST_COUPLING_VALUE_GAP,
     )
-    if not synthetic_pass:
-        return _not_supported("synthetic mechanism criterion failed", "gap fraction unmet")
     if not real_gaps:
         return _mechanism_only("synthetic mechanism complete", "real-packet criterion unavailable")
     real_fraction = sum(1 for gap in real_gaps if gap > material) / len(real_gaps)
-    if real_fraction >= criteria.real_packet_fraction_with_material_gap_minimum:
+    material_pairs = _material_coupling_pairs(comparisons)
+    real_pass = (
+        real_fraction >= criteria.real_packet_fraction_with_material_gap_minimum
+        and material_pairs >= criteria.primary_pairs_with_material_mean_gap_required
+    )
+    if real_pass:
         return _supported("synthetic and real-packet gaps material", "coupling criteria passed")
     return _mechanism_only("synthetic mechanism complete", "real-packet materiality not reached")
 
 
 def _classify_action_certification(
     store: ArtifactStore,
-) -> tuple[EvidenceStatus, str, str, str]:
+) -> EvidenceAdjudication:
     tolerance = active_config().scientific.materiality.coupling_objective_units
     common = _metric_values(
         store,
@@ -313,7 +391,7 @@ def _classify_action_certification(
 
 def _classify_sparse_operational(
     store: ArtifactStore,
-) -> tuple[EvidenceStatus, str, str, str]:
+) -> EvidenceAdjudication:
     required = active_config().scientific.evaluation_criteria.sparse_operational_relevance
     useful_floor = active_config().scientific.materiality.useful_transfer_relative_macro_ce_gain
     sparse = _metric_values(
@@ -334,7 +412,7 @@ def _classify_sparse_operational(
 
 def _classify_confirmation(
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> tuple[EvidenceStatus, str, str, str]:
+) -> EvidenceAdjudication:
     required = active_config().scientific.evaluation_criteria.confirmation_safety
     rows = tuple(
         record for record in comparisons if record.family == MultiplicityFamily.CONFIRMATION_SAFETY
@@ -357,7 +435,7 @@ def _classify_confirmation(
     return _null_result("no pair meets harm reduction", "no worsening")
 
 
-def _classify_work_structure(store: ArtifactStore) -> tuple[EvidenceStatus, str, str, str]:
+def _classify_work_structure(store: ArtifactStore) -> EvidenceAdjudication:
     values = _metric_values(
         store, ExperimentName.SCALABILITY_AND_EFFICIENCY, MetricId.WORK_STRUCTURE_SPEARMAN
     )
@@ -377,21 +455,39 @@ def _classify_work_structure(store: ArtifactStore) -> tuple[EvidenceStatus, str,
     return _partial("certificates match", "non-positive Spearman")
 
 
+_EXACT_SPARSE_DEPENDENT_QUESTIONS = frozenset(
+    {
+        ResearchQuestion.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,
+        ResearchQuestion.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,
+        ResearchQuestion.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE,
+        ResearchQuestion.OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT,
+        ResearchQuestion.TARGET_CONFIRMATION_SAFETY,
+        ResearchQuestion.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT,
+    }
+)
+
+
 def _classify_question(
     question: ResearchQuestion,
     store: ArtifactStore,
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> tuple[EvidenceStatus, str, str, str]:
+) -> EvidenceAdjudication:
     criteria = active_config().scientific.evaluation_criteria
     if question == ResearchQuestion.EXACT_SPARSE_SEPARATOR_EXACTNESS:
         return _classify_exactness(store)
+    if question in _EXACT_SPARSE_DEPENDENT_QUESTIONS:
+        exactness = _classify_exactness(store)
+        if exactness.status == EvidenceStatus.NOT_SUPPORTED:
+            return _not_supported(
+                "exact-sparse separator exactness failed", "exactness-failure kill rule"
+            )
     if question == ResearchQuestion.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM:
-        return _classify_joint_correspondence(store)
+        return _classify_joint_correspondence(store, comparisons)
     if question == ResearchQuestion.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION:
         return _classify_action_certification(store)
     if question == ResearchQuestion.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY:
         required = criteria.strict_cross_telemetry_utility
-        return _utility_family_status(
+        return utility_family_status(
             comparisons,
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             TransferMethod.LOCAL_ONLY,
@@ -402,7 +498,7 @@ def _classify_question(
         )
     if question == ResearchQuestion.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE:
         required = criteria.external_source_value_vs_local_sir
-        return _utility_family_status(
+        return utility_family_status(
             comparisons,
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             TransferMethod.LOCAL_SIR,
@@ -610,7 +706,7 @@ def execute_evidence_classification(
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
     from fedorbit.experiments.synthesis import completed_primary_transfer_comparison_records
-    from fedorbit.experiments.validation import _persist_synthetic_experiment_payload
+    from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 
     synthesis = _latest_synthesis_manifest(store)
     comparisons = completed_primary_transfer_comparison_records(store)
@@ -622,9 +718,11 @@ def execute_evidence_classification(
     )
     rows: list[StableJsonPayload] = []
     for question in ResearchQuestion:
-        status, materiality, statistical, completeness = _classify_question(
-            question, store, comparisons
-        )
+        adjudication = _classify_question(question, store, comparisons)
+        status = adjudication.status
+        materiality = adjudication.materiality
+        statistical = adjudication.statistical
+        completeness = adjudication.completeness
         rows.append(
             cast(
                 StableJsonPayload,
@@ -643,7 +741,7 @@ def execute_evidence_classification(
         )
     simplification = _simplification_rule_states(store, comparisons)
     seed = ExperimentSeed(0)
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,

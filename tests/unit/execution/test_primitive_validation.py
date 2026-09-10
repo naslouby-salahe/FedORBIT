@@ -21,15 +21,21 @@ def test_primitive_validation_persists_verified_nonclaim_evidence(tmp_path: Path
         == '{"experiment":"Mathematical Primitive Validation","seed":0}'
     )
     payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
-    assert payload["assignment_is_bijective"]
-    assert payload["lower_bound_not_above_upper_bound"]
-    assert payload["null_padding_present"]
-    assert payload["orbit_mean_finite"]
-    assert payload["rectangular_hull_ordered"]
-    assert payload["assignment_serialization_round_trip"]
-    assert payload["fixture_error_within_tolerance"]
-    assert payload["orbit_size"] >= 1
-    assert payload["active_image_map_count"] >= 1
+    cells = payload["cells"]
+    assert len(cells) > 1
+    block_patterns = {tuple(cell["block_pattern"]) for cell in cells}
+    seeds = {cell["seed"] for cell in cells}
+    assert len(block_patterns) > 1
+    assert len(seeds) > 1
+    for cell in cells:
+        assert cell["assignment_is_bijective"]
+        assert cell["lower_bound_not_above_upper_bound"]
+        assert cell["orbit_mean_finite"]
+        assert cell["rectangular_hull_ordered"]
+        assert cell["assignment_serialization_round_trip"]
+        assert cell["fixture_error_within_tolerance"]
+        assert cell["orbit_size"] >= 1
+        assert cell["active_image_map_count"] >= 1
     assert manifest.semantic_producer_coordinates == completion.semantic_experiment_coordinates
     assert "mathematical-primitive-validation" in Path(manifest.payload_paths[0]).parts
     reused = execute_primitive_validation(store, layout)

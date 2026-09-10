@@ -28,8 +28,8 @@ from fedorbit.datasets.materialization import (
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
-from fedorbit.experiments.scoring import _completion
-from fedorbit.experiments.validation import _persist_synthetic_experiment_payload
+from fedorbit.experiments.scoring import build_completion_manifest
+from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
     ExecutionError,
@@ -41,10 +41,10 @@ from fedorbit.infrastructure.manifests import (
     artifact_id,
 )
 from fedorbit.infrastructure.preparation import (
-    _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-    _load_or_materialize_client,
-    _persist_client_invalid,
+    BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
     build_dataset_manifest,
+    load_or_materialize_client,
+    persist_client_invalid,
     persist_dataset_manifest,
 )
 from fedorbit.infrastructure.provenance import (
@@ -152,9 +152,9 @@ def execute_base_model_pilot(
 
         materialize_started_at = time.monotonic()
         try:
-            materialized = _load_or_materialize_client(dataset, raw_root, layout)
+            materialized = load_or_materialize_client(dataset, raw_root, layout)
         except MaterializationError as error:
-            _persist_client_invalid(layout, experiment, dataset, InvalidReason(str(error)))
+            persist_client_invalid(layout, experiment, dataset, InvalidReason(str(error)))
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
@@ -181,7 +181,7 @@ def execute_base_model_pilot(
             )
         )
         persist_dataset_manifest(layout, experiment, dataset, build_dataset_manifest(materialized))
-        _execute_client_base_model_pilot(
+        execute_client_base_model_pilot(
             store,
             layout,
             experiment,
@@ -206,7 +206,7 @@ def execute_source_response_estimator_pilot(
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
     seed = ExperimentSeed(active_config().scientific.randomness.pilot_seeds[0])
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
@@ -243,9 +243,9 @@ def _execute_final_source_response_band_validation(
     )
     for dataset in active_config().scientific.datasets.clients:
         try:
-            materialized = _load_or_materialize_client(dataset, raw_root, layout)
+            materialized = load_or_materialize_client(dataset, raw_root, layout)
         except MaterializationError as error:
-            _persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
+            persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             continue
         selected_path = selected_root / f"{dataset.value}.json"
         if not selected_path.is_file():
@@ -325,9 +325,9 @@ def _source_response_estimator_client_results(
     client_results: list[StableJsonPayload] = []
     for dataset in active_config().scientific.datasets.clients:
         try:
-            materialized = _load_or_materialize_client(dataset, raw_root, layout)
+            materialized = load_or_materialize_client(dataset, raw_root, layout)
         except MaterializationError as error:
-            _persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
+            persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             client_results.append(
                 cast(
                     StableJsonPayload,
@@ -338,7 +338,7 @@ def _source_response_estimator_client_results(
         groups = transfer_concept_groups(dataset, materialized)
         eligible = tuple(group for group in groups if group.source_eligible)
         if len(eligible) < 2:
-            _persist_client_invalid(
+            persist_client_invalid(
                 layout,
                 request.experiment,
                 dataset,
@@ -442,7 +442,7 @@ def execute_final_source_response_band_validation(
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
     _execute_final_source_response_band_validation(layout, request)
-    return _persist_synthetic_experiment_payload(
+    return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
@@ -545,7 +545,7 @@ def training_protocol_rows(
     return tuple(rows)
 
 
-def _execute_client_base_model_pilot(
+def execute_client_base_model_pilot(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
@@ -619,7 +619,7 @@ def _execute_client_base_model_pilot(
                 checkpoint_cell,
                 relevance,
                 (),
-                _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
+                BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
                 _MODULE_NAME,
             )
             if overwrite_policy == OverwritePolicy.REUSE:
@@ -755,7 +755,7 @@ def _persist_base_checkpoint(
             checkpoint_cell,
             relevance,
             (),
-            _BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
+            BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
             _MODULE_NAME,
         )
     )
@@ -774,11 +774,11 @@ def _persist_base_checkpoint(
     save_base_checkpoint(checkpoint, payload_path)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(
-        configuration_subset_digest(_BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
+        configuration_subset_digest(BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
     )
     code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(stage).sha256)
-    completion = _completion(
+    completion = build_completion_manifest(
         coordinates,
         fingerprint,
         ArtifactPath(payload_path),

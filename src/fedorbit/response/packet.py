@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from fedorbit.config.loading import active_config
 from fedorbit.config.models import FrozenModel
+from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
@@ -20,6 +21,7 @@ from fedorbit.interface import (
     validate_exact_fields,
     validate_rfc3339_utc,
     validate_sha256,
+    validate_static_leakage_scan,
 )
 from fedorbit.learning.pilot import create_classifier
 from fedorbit.learning.training import BaseCheckpoint, ClassWeights
@@ -91,6 +93,17 @@ class PacketValidityState(StrEnum):
 
 RESPONSE_PACKET_SCHEMA = ResponsePacketSchema.V1
 PACKET_PERMITTED_FIELDS = frozenset(field.value for field in PacketField)
+
+
+def _fine_semantic_label_terms() -> frozenset[str]:
+    terms: set[str] = set()
+    for _, edge_labels, ton_labels in TRANSFER_ONTOLOGY.values():
+        terms.update(str(label) for label in edge_labels)
+        terms.update(str(label) for label in ton_labels)
+    return frozenset(terms)
+
+
+FINE_SEMANTIC_LABEL_TERMS = _fine_semantic_label_terms()
 
 
 class PacketError(ValueError):
@@ -263,6 +276,7 @@ class SourcePacket:
         validate_sha256(self.packet_integrity_sha256, "packet integrity SHA-256")
         if self.packet_schema_metadata is not RESPONSE_PACKET_SCHEMA:
             raise PacketError("unrecognized source-response packet schema")
+        validate_static_leakage_scan(self.serialized().encode("utf-8"), FINE_SEMANTIC_LABEL_TERMS)
         node_count = len(self.anonymous_fine_node_ids)
         if not all(
             len(values) == node_count

@@ -22,49 +22,49 @@ from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import (
     PrincipalActionAssembly,
-    _action_sha256,
-    _assemble_principal_action,
-    _ci_half_width_perturbation,
-    _persist_boundary_diagnostic_metrics,
-    _persist_primary_transfer_cell_metrics,
-    _response_heterogeneity_perturbation,
-    _response_scale_perturbation,
-    _score_coarse_block_mean_cell,
-    _score_coarse_block_min_cell,
-    _score_coupling_destroyed_fedorbit_cell,
-    _score_exact_map_oracle_cell,
-    _score_fedorbit_exact_sparse_solver_cell,
-    _score_fedorbit_with_confirmation_verdict_cell,
-    _score_fedorbit_without_confirmation_cell,
-    _score_generic_exact_qap_cell,
-    _score_local_only_cell,
-    _score_local_only_cell_adapter,
-    _score_local_sir_cell,
-    _score_local_sir_cell_adapter,
-    _score_matched_resource_rectangular_cell,
-    _score_orbit_mean_cell,
-    _score_point_correspondence_commitment_cell,
-    _score_robust_action_cell,
-    _semantic_partition_bucket_of,
-    _semantic_partition_label,
-    _solve_dense_ccp_fallback_action,
-    _solve_exact_map_oracle_action,
-    _solve_fedorbit_exact_sparse_action,
-    _solve_fedorbit_exact_sparse_action_at_support,
-    _solve_matched_resource_rectangular_action,
-    _WeakSignalPerturbation,
+    WeakSignalPerturbation,
+    action_sha256,
+    assemble_principal_action,
+    ci_half_width_perturbation,
     curriculum_multipliers_from_action,
+    persist_boundary_diagnostic_metrics,
     persist_ineligible_transfer_cell,
+    persist_primary_transfer_cell_metrics,
     persist_primary_transfer_metric,
+    response_heterogeneity_perturbation,
+    response_scale_perturbation,
+    score_coarse_block_mean_cell,
+    score_coarse_block_min_cell,
+    score_coupling_destroyed_fedorbit_cell,
+    score_exact_map_oracle_cell,
+    score_fedorbit_exact_sparse_solver_cell,
+    score_fedorbit_with_confirmation_verdict_cell,
+    score_fedorbit_without_confirmation_cell,
+    score_generic_exact_qap_cell,
+    score_local_only_cell,
+    score_local_only_cell_adapter,
+    score_local_sir_cell,
+    score_local_sir_cell_adapter,
+    score_matched_resource_rectangular_cell,
+    score_orbit_mean_cell,
+    score_point_correspondence_commitment_cell,
+    score_robust_action_cell,
+    semantic_partition_bucket_of,
+    semantic_partition_label,
+    solve_dense_ccp_fallback_action,
+    solve_exact_map_oracle_action,
+    solve_fedorbit_exact_sparse_action,
+    solve_fedorbit_exact_sparse_action_at_support,
+    solve_matched_resource_rectangular_action,
 )
 from fedorbit.experiments.solvers import persist_synthetic_diagnostic_metric
-from fedorbit.experiments.training import _execute_client_base_model_pilot
+from fedorbit.experiments.training import execute_client_base_model_pilot
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
     ExecutionError,
 )
 from fedorbit.infrastructure.preparation import (
-    _load_or_materialize_client,
+    load_or_materialize_client,
 )
 from fedorbit.infrastructure.runtime import (
     RandomSeed,
@@ -120,8 +120,10 @@ from fedorbit.types import (
     DirectedPairName,
     EvaluationConditionName,
     ExperimentName,
+    FilesystemSlug,
     MetricId,
     MetricUnit,
+    MutableCell,
     ProducerModuleName,
     RngNamespace,
     Score,
@@ -225,7 +227,7 @@ def execute_primary_strict_cross_telemetry_transfer(
         target = directed_pair.target
         if target not in materialized_by_target:
             try:
-                materialized_by_target[target] = _load_or_materialize_client(
+                materialized_by_target[target] = load_or_materialize_client(
                     target, raw_root, layout
                 )
             except MaterializationError:
@@ -252,7 +254,7 @@ def execute_primary_strict_cross_telemetry_transfer(
         source = directed_pair.source
         if source not in materialized_by_target:
             with contextlib.suppress(MaterializationError):
-                materialized_by_target[source] = _load_or_materialize_client(
+                materialized_by_target[source] = load_or_materialize_client(
                     source, raw_root, layout
                 )
         source_materialized = materialized_by_target.get(source)
@@ -260,10 +262,10 @@ def execute_primary_strict_cross_telemetry_transfer(
             f"{directed_pair.source.value} -> {directed_pair.target.value}"
         )
         for seed in confirmatory_seeds:
-            local_only = _score_local_only_cell(store, layout, target, materialized, seed, device)
+            local_only = score_local_only_cell(store, layout, target, materialized, seed, device)
             if local_only is not None:
                 score, n_classes, checkpoint_artifact_id = local_only
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -276,10 +278,10 @@ def execute_primary_strict_cross_telemetry_transfer(
                     n_classes,
                     (checkpoint_artifact_id,),
                 )
-            local_sir = _score_local_sir_cell(store, layout, target, materialized, seed, device)
+            local_sir = score_local_sir_cell(store, layout, target, materialized, seed, device)
             if local_sir is not None:
                 score, n_classes, input_artifact_ids = local_sir
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -293,7 +295,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                     input_artifact_ids,
                 )
             if source_materialized is not None:
-                matched_resource_rectangular = _score_matched_resource_rectangular_cell(
+                matched_resource_rectangular = score_matched_resource_rectangular_cell(
                     store,
                     layout,
                     source,
@@ -305,7 +307,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                 )
                 if matched_resource_rectangular is not None:
                     score, n_classes, input_artifact_ids = matched_resource_rectangular
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -318,7 +320,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                         n_classes,
                         input_artifact_ids,
                     )
-                point_correspondence = _score_point_correspondence_commitment_cell(
+                point_correspondence = score_point_correspondence_commitment_cell(
                     store,
                     layout,
                     source,
@@ -330,7 +332,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                 )
                 if point_correspondence is not None:
                     score, n_classes, input_artifact_ids = point_correspondence
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -343,7 +345,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                         n_classes,
                         input_artifact_ids,
                     )
-                fedorbit_exact_sparse = _score_fedorbit_exact_sparse_solver_cell(
+                fedorbit_exact_sparse = score_fedorbit_exact_sparse_solver_cell(
                     store,
                     layout,
                     source,
@@ -355,7 +357,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                 )
                 if fedorbit_exact_sparse is not None:
                     score, n_classes, input_artifact_ids = fedorbit_exact_sparse
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -368,7 +370,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                         n_classes,
                         input_artifact_ids,
                     )
-                generic_exact_qap = _score_generic_exact_qap_cell(
+                generic_exact_qap = score_generic_exact_qap_cell(
                     store,
                     layout,
                     source,
@@ -380,7 +382,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                 )
                 if generic_exact_qap is not None:
                     score, n_classes, input_artifact_ids = generic_exact_qap
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -393,7 +395,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                         n_classes,
                         input_artifact_ids,
                     )
-                exact_map_oracle = _score_exact_map_oracle_cell(
+                exact_map_oracle = score_exact_map_oracle_cell(
                     store,
                     layout,
                     source,
@@ -405,7 +407,7 @@ def execute_primary_strict_cross_telemetry_transfer(
                 )
                 if exact_map_oracle is not None:
                     score, n_classes, input_artifact_ids = exact_map_oracle
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -434,7 +436,7 @@ def execute_mechanism_ablations(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -458,17 +460,17 @@ def execute_mechanism_ablations(
         ],
         ...,
     ] = (
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
-        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _score_matched_resource_rectangular_cell),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, score_fedorbit_exact_sparse_solver_cell),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, score_matched_resource_rectangular_cell),
         (
             TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
-            _score_point_correspondence_commitment_cell,
+            score_point_correspondence_commitment_cell,
         ),
-        (TransferMethod.COUPLING_DESTROYED_FEDORBIT, _score_coupling_destroyed_fedorbit_cell),
-        (TransferMethod.COARSE_BLOCK_MEAN, _score_coarse_block_mean_cell),
-        (TransferMethod.COARSE_BLOCK_MIN, _score_coarse_block_min_cell),
-        (TransferMethod.ORBIT_MEAN, _score_orbit_mean_cell),
-        (TransferMethod.LOCAL_SIR, _score_local_sir_cell_adapter),
+        (TransferMethod.COUPLING_DESTROYED_FEDORBIT, score_coupling_destroyed_fedorbit_cell),
+        (TransferMethod.COARSE_BLOCK_MEAN, score_coarse_block_mean_cell),
+        (TransferMethod.COARSE_BLOCK_MIN, score_coarse_block_min_cell),
+        (TransferMethod.ORBIT_MEAN, score_orbit_mean_cell),
+        (TransferMethod.LOCAL_SIR, score_local_sir_cell_adapter),
     )
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -519,7 +521,7 @@ def execute_mechanism_ablations(
                 if scored is None:
                     continue
                 score, n_classes, input_artifact_ids = scored
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -612,7 +614,7 @@ def execute_target_confirmation_and_portability(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -626,12 +628,12 @@ def execute_target_confirmation_and_portability(
             continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
-            local_only = _score_local_only_cell(
+            local_only = score_local_only_cell(
                 store, layout, target, target_materialized, seed, device
             )
             if local_only is not None:
                 score, n_classes, checkpoint_id = local_only
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -644,8 +646,8 @@ def execute_target_confirmation_and_portability(
                     n_classes,
                     (checkpoint_id,),
                 )
-            verdicts: list[ConfirmationVerdict] = []
-            with_confirmation = _score_fedorbit_with_confirmation_verdict_cell(
+            verdict_sink: MutableCell[ConfirmationVerdict] = MutableCell()
+            with_confirmation = score_fedorbit_with_confirmation_verdict_cell(
                 store,
                 layout,
                 source,
@@ -654,11 +656,12 @@ def execute_target_confirmation_and_portability(
                 target_materialized,
                 seed,
                 device,
-                verdicts,
+                verdict_sink,
             )
+            verdicts = [] if verdict_sink.value is None else [verdict_sink.value]
             if with_confirmation is not None:
                 score, n_classes, input_artifact_ids = with_confirmation
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -688,7 +691,7 @@ def execute_target_confirmation_and_portability(
                         input_artifact_ids,
                         request.overwrite_policy,
                     )
-            without_confirmation = _score_fedorbit_without_confirmation_cell(
+            without_confirmation = score_fedorbit_without_confirmation_cell(
                 store,
                 layout,
                 source,
@@ -700,7 +703,7 @@ def execute_target_confirmation_and_portability(
             )
             if without_confirmation is not None:
                 score, n_classes, input_artifact_ids = without_confirmation
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -744,20 +747,20 @@ def execute_secondary_cross_modality_generalization(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
 
     scorers = (
-        (TransferMethod.LOCAL_ONLY, _score_local_only_cell_adapter),
-        (TransferMethod.LOCAL_SIR, _score_local_sir_cell_adapter),
-        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _score_matched_resource_rectangular_cell),
+        (TransferMethod.LOCAL_ONLY, score_local_only_cell_adapter),
+        (TransferMethod.LOCAL_SIR, score_local_sir_cell_adapter),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, score_matched_resource_rectangular_cell),
         (
             TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
-            _score_point_correspondence_commitment_cell,
+            score_point_correspondence_commitment_cell,
         ),
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _score_fedorbit_exact_sparse_solver_cell),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, score_fedorbit_exact_sparse_solver_cell),
     )
     for directed_pair in secondary_pairs:
         source = directed_pair.source
@@ -782,7 +785,7 @@ def execute_secondary_cross_modality_generalization(
                 if scored is None:
                     continue
                 score, n_classes, input_artifact_ids = scored
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -811,7 +814,7 @@ def execute_sparsity_and_dense_fallback(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -827,19 +830,19 @@ def execute_sparsity_and_dense_fallback(
         (
             "exact sparse s=1",
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-            _solve_fedorbit_exact_sparse_action_at_support(1),
+            solve_fedorbit_exact_sparse_action_at_support(1),
         ),
         (
             "exact sparse s=2",
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-            _solve_fedorbit_exact_sparse_action_at_support(2),
+            solve_fedorbit_exact_sparse_action_at_support(2),
         ),
         (
             "exact sparse s=3",
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-            _solve_fedorbit_exact_sparse_action_at_support(3),
+            solve_fedorbit_exact_sparse_action_at_support(3),
         ),
-        ("dense CCP", TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, _solve_dense_ccp_fallback_action),
+        ("dense CCP", TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, solve_dense_ccp_fallback_action),
     )
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -880,7 +883,7 @@ def execute_sparsity_and_dense_fallback(
                     )
                 ):
                     continue
-                scored = _score_robust_action_cell(
+                scored = score_robust_action_cell(
                     store,
                     layout,
                     source,
@@ -889,13 +892,13 @@ def execute_sparsity_and_dense_fallback(
                     target_materialized,
                     seed,
                     device,
-                    "sparsity-and-dense-fallback",
+                    FilesystemSlug("sparsity-and-dense-fallback"),
                     solve_action,
                 )
                 if scored is None:
                     continue
                 score, n_classes, input_artifact_ids = scored
-                _persist_primary_transfer_cell_metrics(
+                persist_primary_transfer_cell_metrics(
                     store,
                     layout,
                     request,
@@ -925,7 +928,7 @@ def execute_real_packet_coupling_mechanism_validation(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -950,7 +953,7 @@ def execute_real_packet_coupling_mechanism_validation(
                 )
             continue
         for seed in confirmatory_seeds:
-            assembly = _assemble_principal_action(
+            assembly = assemble_principal_action(
                 store,
                 layout,
                 source,
@@ -959,7 +962,7 @@ def execute_real_packet_coupling_mechanism_validation(
                 target_materialized,
                 seed,
                 device,
-                _solve_fedorbit_exact_sparse_action,
+                solve_fedorbit_exact_sparse_action,
             )
             if assembly is None:
                 continue
@@ -1017,7 +1020,7 @@ def execute_multi_source_selection_validation(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
@@ -1034,7 +1037,7 @@ def execute_multi_source_selection_validation(
                 source_materialized = materialized(source)
                 if source_materialized is None:
                     continue
-                assembly = _assemble_principal_action(
+                assembly = assemble_principal_action(
                     store,
                     layout,
                     source,
@@ -1043,7 +1046,7 @@ def execute_multi_source_selection_validation(
                     target_materialized,
                     seed,
                     device,
-                    _solve_fedorbit_exact_sparse_action,
+                    solve_fedorbit_exact_sparse_action,
                 )
                 if assembly is None:
                     continue
@@ -1112,7 +1115,7 @@ def execute_multi_source_selection_validation(
                             seed=seed,
                             clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
                             source_packet_artifact_id=assembly.first_packet_artifact_id,
-                            action_artifact_sha256=_action_sha256(assembly.action),
+                            action_artifact_sha256=action_sha256(assembly.action),
                         ),
                     )
                 else:
@@ -1160,22 +1163,22 @@ def execute_semantic_sufficiency_frontier(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
 
     scorers = (
-        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, _solve_fedorbit_exact_sparse_action),
-        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, _solve_matched_resource_rectangular_action),
-        (TransferMethod.EXACT_MAP_ORACLE, _solve_exact_map_oracle_action),
+        (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, solve_fedorbit_exact_sparse_action),
+        (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, solve_matched_resource_rectangular_action),
+        (TransferMethod.EXACT_MAP_ORACLE, solve_exact_map_oracle_action),
     )
     for partition in config.partitions:
         fine_singleton = partition == SemanticPartitionId.ORACLE_FINE_SINGLETON_GROUPS
-        bucket_of = None if fine_singleton else _semantic_partition_bucket_of(partition)
+        bucket_of = None if fine_singleton else semantic_partition_bucket_of(partition)
         if not fine_singleton and bucket_of is None:
             raise ExecutionError(f"semantic sufficiency partition is not registered: {partition!r}")
-        condition = EvaluationConditionName(_semantic_partition_label(partition))
+        condition = semantic_partition_label(partition)
         for directed_pair in primary_pairs:
             source = directed_pair.source
             target = directed_pair.target
@@ -1186,10 +1189,10 @@ def execute_semantic_sufficiency_frontier(
             pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
             for seed in confirmatory_seeds:
                 for method, solve_action in scorers:
-                    certified_value_sink: list[Score] = []
-                    action_sink: list[CurriculumAction] = []
-                    confirmation_verdict_sink: list[bool] = []
-                    scored = _score_robust_action_cell(
+                    certified_value_sink: MutableCell[Score] = MutableCell()
+                    action_sink: MutableCell[CurriculumAction] = MutableCell()
+                    confirmation_verdict_sink: MutableCell[bool] = MutableCell()
+                    scored = score_robust_action_cell(
                         store,
                         layout,
                         source,
@@ -1198,7 +1201,7 @@ def execute_semantic_sufficiency_frontier(
                         target_materialized,
                         seed,
                         device,
-                        "semantic-sufficiency-frontier",
+                        FilesystemSlug("semantic-sufficiency-frontier"),
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         bucket_of,
@@ -1209,7 +1212,7 @@ def execute_semantic_sufficiency_frontier(
                     if scored is None:
                         continue
                     score, n_classes, input_artifact_ids = scored
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -1223,7 +1226,7 @@ def execute_semantic_sufficiency_frontier(
                         input_artifact_ids,
                         condition,
                     )
-                    _persist_boundary_diagnostic_metrics(
+                    persist_boundary_diagnostic_metrics(
                         store,
                         layout,
                         request,
@@ -1234,9 +1237,9 @@ def execute_semantic_sufficiency_frontier(
                         seed,
                         input_artifact_ids,
                         condition,
-                        certified_value_sink[0] if certified_value_sink else None,
-                        action_sink[0] if action_sink else None,
-                        confirmation_verdict_sink[0] if confirmation_verdict_sink else None,
+                        certified_value_sink.value,
+                        action_sink.value,
+                        confirmation_verdict_sink.value,
                     )
 
 
@@ -1255,23 +1258,23 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
         if dataset not in materialized_by_dataset:
             with contextlib.suppress(MaterializationError):
-                materialized_by_dataset[dataset] = _load_or_materialize_client(
+                materialized_by_dataset[dataset] = load_or_materialize_client(
                     dataset, raw_root, layout
                 )
         return materialized_by_dataset.get(dataset)
 
-    conditions: list[tuple[str, _WeakSignalPerturbation | None, SupportCount | None]] = []
+    conditions: list[tuple[str, WeakSignalPerturbation | None, SupportCount | None]] = []
     for scale in config.response_scales:
-        conditions.append((f"response-scale-{scale}", _response_scale_perturbation(scale), None))
+        conditions.append((f"response-scale-{scale}", response_scale_perturbation(scale), None))
     for multiplier in config.ci_half_width_multipliers:
         conditions.append(
-            (f"ci-half-width-{multiplier}", _ci_half_width_perturbation(multiplier), None)
+            (f"ci-half-width-{multiplier}", ci_half_width_perturbation(multiplier), None)
         )
     for multiplier in config.response_heterogeneity_multipliers:
         conditions.append(
             (
                 f"response-heterogeneity-{multiplier}",
-                _response_heterogeneity_perturbation(multiplier),
+                response_heterogeneity_perturbation(multiplier),
                 None,
             )
         )
@@ -1287,7 +1290,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             continue
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
-            local_only = _score_local_only_cell_adapter(
+            local_only = score_local_only_cell_adapter(
                 store,
                 layout,
                 source,
@@ -1299,22 +1302,22 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             )
             for condition_label, perturb, support_limit in conditions:
                 exact_sparse_solve = (
-                    _solve_fedorbit_exact_sparse_action_at_support(support_limit)
+                    solve_fedorbit_exact_sparse_action_at_support(support_limit)
                     if support_limit is not None
-                    else _solve_fedorbit_exact_sparse_action
+                    else solve_fedorbit_exact_sparse_action
                 )
                 condition = EvaluationConditionName(condition_label)
                 for method, solve_action in (
                     (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, exact_sparse_solve),
                     (
                         TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
-                        _solve_matched_resource_rectangular_action,
+                        solve_matched_resource_rectangular_action,
                     ),
                 ):
-                    certified_value_sink: list[Score] = []
-                    action_sink: list[CurriculumAction] = []
-                    confirmation_verdict_sink: list[bool] = []
-                    scored = _score_robust_action_cell(
+                    certified_value_sink: MutableCell[Score] = MutableCell()
+                    action_sink: MutableCell[CurriculumAction] = MutableCell()
+                    confirmation_verdict_sink: MutableCell[bool] = MutableCell()
+                    scored = score_robust_action_cell(
                         store,
                         layout,
                         source,
@@ -1323,7 +1326,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         target_materialized,
                         seed,
                         device,
-                        "weak-signal-boundaries",
+                        FilesystemSlug("weak-signal-boundaries"),
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         None,
@@ -1346,7 +1349,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         )
                         continue
                     score, n_classes, input_artifact_ids = scored
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -1360,7 +1363,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         input_artifact_ids,
                         condition,
                     )
-                    _persist_boundary_diagnostic_metrics(
+                    persist_boundary_diagnostic_metrics(
                         store,
                         layout,
                         request,
@@ -1371,13 +1374,13 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         seed,
                         input_artifact_ids,
                         condition,
-                        certified_value_sink[0] if certified_value_sink else None,
-                        action_sink[0] if action_sink else None,
-                        confirmation_verdict_sink[0] if confirmation_verdict_sink else None,
+                        certified_value_sink.value,
+                        action_sink.value,
+                        confirmation_verdict_sink.value,
                     )
                 if local_only is not None:
                     score, n_classes, input_artifact_ids = local_only
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -1415,7 +1418,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             subsampled_target = subsampled_materialized_client(
                 target_materialized, fraction, subsample_seed
             )
-            _execute_client_base_model_pilot(
+            execute_client_base_model_pilot(
                 store,
                 layout,
                 request.experiment,
@@ -1428,23 +1431,23 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 execution_logger(),
             )
             for seed in confirmatory_seeds:
-                local_only = _score_local_only_cell(
+                local_only = score_local_only_cell(
                     store, layout, target, subsampled_target, seed, device, request.experiment
                 )
                 for method, solve_action in (
                     (
                         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-                        _solve_fedorbit_exact_sparse_action,
+                        solve_fedorbit_exact_sparse_action,
                     ),
                     (
                         TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
-                        _solve_matched_resource_rectangular_action,
+                        solve_matched_resource_rectangular_action,
                     ),
                 ):
-                    certified_value_sink: list[Score] = []
-                    action_sink: list[CurriculumAction] = []
-                    confirmation_verdict_sink: list[bool] = []
-                    scored = _score_robust_action_cell(
+                    certified_value_sink: MutableCell[Score] = MutableCell()
+                    action_sink: MutableCell[CurriculumAction] = MutableCell()
+                    confirmation_verdict_sink: MutableCell[bool] = MutableCell()
+                    scored = score_robust_action_cell(
                         store,
                         layout,
                         source,
@@ -1453,7 +1456,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         subsampled_target,
                         seed,
                         device,
-                        "weak-signal-boundaries",
+                        FilesystemSlug("weak-signal-boundaries"),
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
                         None,
@@ -1465,7 +1468,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                     if scored is None:
                         continue
                     score, n_classes, input_artifact_ids = scored
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,
@@ -1479,7 +1482,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         input_artifact_ids,
                         condition,
                     )
-                    _persist_boundary_diagnostic_metrics(
+                    persist_boundary_diagnostic_metrics(
                         store,
                         layout,
                         request,
@@ -1490,13 +1493,13 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         seed,
                         input_artifact_ids,
                         condition,
-                        certified_value_sink[0] if certified_value_sink else None,
-                        action_sink[0] if action_sink else None,
-                        confirmation_verdict_sink[0] if confirmation_verdict_sink else None,
+                        certified_value_sink.value,
+                        action_sink.value,
+                        confirmation_verdict_sink.value,
                     )
                 if local_only is not None:
                     score, n_classes, artifact_id = local_only
-                    _persist_primary_transfer_cell_metrics(
+                    persist_primary_transfer_cell_metrics(
                         store,
                         layout,
                         request,

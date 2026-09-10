@@ -318,7 +318,7 @@ def _experiment_matrix_rows(
 
 def _real_transfer_gain_series(
     comparisons: Sequence[PairedComparisonRecord],
-) -> tuple[FigureSeries, ...]:
+) -> tuple[tuple[FigureSeries, ...], tuple[ReportSeriesName, ...]]:
     selected = [
         record
         for record in comparisons
@@ -327,11 +327,12 @@ def _real_transfer_gain_series(
         and record.mean_difference is not None
     ]
     if not selected:
-        return ()
+        return (), ()
     selected.sort(key=lambda record: record.pair)
     mids: list[float] = []
     lows: list[float] = []
     highs: list[float] = []
+    pair_labels: list[ReportSeriesName] = []
     for record in selected:
         mid = record.mean_difference
         if mid is None:
@@ -339,9 +340,10 @@ def _real_transfer_gain_series(
         mids.append(float(mid))
         lows.append(float(record.bca_ci_low) if record.bca_ci_low is not None else float(mid))
         highs.append(float(record.bca_ci_high) if record.bca_ci_high is not None else float(mid))
+        pair_labels.append(ReportSeriesName(record.pair))
     if not mids:
-        return ()
-    return (
+        return (), ()
+    series = (
         FigureSeries(
             name=ReportSeriesName(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER.value),
             x=tuple(mids),
@@ -350,6 +352,7 @@ def _real_transfer_gain_series(
             x_high=tuple(highs),
         ),
     )
+    return series, tuple(pair_labels)
 
 
 def _baseline_paired_difference_series(
@@ -393,9 +396,10 @@ def _baseline_paired_difference_series(
             if x_values:
                 series.append(
                     FigureSeries(
-                        name=ReportSeriesName(f"{pair} {method.value}"),
+                        name=ReportSeriesName(method.value),
                         x=tuple(x_values),
                         y=tuple(y_values),
+                        panel=ReportSeriesName(pair),
                     )
                 )
     return tuple(series)
@@ -1321,12 +1325,12 @@ def report(
                     )
                 )
             )
-            gain_series = _real_transfer_gain_series(primary_transfer_comparisons)
+            gain_series, gain_pair_labels = _real_transfer_gain_series(primary_transfer_comparisons)
             if gain_series:
                 typer.echo(
                     str(
                         writer.write_project_evidence_figure(
-                            real_transfer_gain_forest_plot(gain_series),
+                            real_transfer_gain_forest_plot(gain_series, gain_pair_labels),
                             ReportArtifactName("real-transfer-gain-forest-plot"),
                         )
                     )

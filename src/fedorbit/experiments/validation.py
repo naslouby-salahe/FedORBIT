@@ -139,11 +139,11 @@ from fedorbit.types import (
     ExperimentCondition,
     ExperimentName,
     ExperimentSeed,
+    Index,
     MetricId,
     MetricUnit,
     OverwritePolicy,
     ProducerModuleName,
-    ReplicateCount,
     ReuseDecision,
     ScalabilityBlockPattern,
     SemanticCell,
@@ -394,74 +394,77 @@ def execute_exact_sparse_theorem_exhaustive_validation(
     solver_config = active_config().solvers.exact_sparse
     seeds = active_config().scientific.randomness.confirmatory_seeds
     instances_per_seed = generator_config.generated_instances_per_block_pattern_support_seed_cell
-    seed = ExperimentSeed(request.definition.seeds[0])
-    cell_artifact_ids: list[str] = []
+    summary_seed = ExperimentSeed(request.definition.seeds[0])
+    instance_artifact_ids: list[str] = []
     for pattern in generator_config.block_patterns:
         total_nodes = sum(pattern)
         groups = tuple(CoarseGroup)[: len(pattern)]
         counts = OrderedDict(zip(groups, pattern, strict=True))
         blocks = build_padded_block_structure(groups, counts, counts)
         orbit = tuple(enumerate_block_permutations(blocks))
+        pattern_key = "-".join(str(size) for size in pattern)
         for support in generator_config.supports:
             if support > total_nodes:
                 continue
-            pattern_key = "-".join(str(size) for size in pattern)
+            for seed in seeds:
+                for instance_index in range(instances_per_seed):
 
-            def _cell_payload(
-                fingerprint: Sha256Digest,
-                cell_pattern: tuple[ConceptCount, ...] = pattern,
-                cell_support: SupportCount = support,
-                cell_blocks: PaddedBlockStructure = blocks,
-                cell_orbit: tuple[BlockCorrespondence, ...] = orbit,
-            ) -> StableJsonPayload:
-                cell = _theorem_exhaustive_validation_cell(
-                    cell_pattern,
-                    cell_support,
-                    seeds,
-                    instances_per_seed,
-                    cell_blocks,
-                    cell_orbit,
-                    solver_config.lap_objective_tie_tolerance,
-                    solver_config.action_tie_tolerance,
-                    solver_config.exact_validation_absolute_tolerance,
-                )
-                return cast(
-                    StableJsonPayload,
-                    OrderedDict(
-                        experiment=request.experiment.value,
-                        dependency_fingerprint_sha256=fingerprint,
-                        cell=cell,
-                    ),
-                )
+                    def _instance_payload(
+                        fingerprint: Sha256Digest,
+                        cell_pattern: tuple[ConceptCount, ...] = pattern,
+                        cell_support: SupportCount = support,
+                        cell_seed: RandomSeed = seed,
+                        cell_instance_index: Index = instance_index,
+                        cell_blocks: PaddedBlockStructure = blocks,
+                        cell_orbit: tuple[BlockCorrespondence, ...] = orbit,
+                    ) -> StableJsonPayload:
+                        cell = theorem_exhaustive_validation_instance(
+                            cell_pattern,
+                            cell_support,
+                            cell_seed,
+                            cell_instance_index,
+                            cell_blocks,
+                            cell_orbit,
+                            solver_config.lap_objective_tie_tolerance,
+                            solver_config.action_tie_tolerance,
+                            solver_config.exact_validation_absolute_tolerance,
+                        )
+                        return cast(
+                            StableJsonPayload,
+                            OrderedDict(
+                                experiment=request.experiment.value,
+                                dependency_fingerprint_sha256=fingerprint,
+                                cell=cell,
+                            ),
+                        )
 
-            manifest = persist_synthetic_experiment_payload(
-                store,
-                layout,
-                request,
-                seed,
-                _cell_payload,
-                _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-                _MODULE_NAME,
-                f"theorem-exhaustive.{pattern_key}.s{support}",
-                ExperimentCondition(f"pattern-{pattern_key}"),
-                SupportSize(support),
-            )
-            cell_artifact_ids.append(manifest.artifact_id.value)
-    generated_instances = len(seeds) * instances_per_seed
+                    manifest = persist_synthetic_experiment_payload(
+                        store,
+                        layout,
+                        request,
+                        summary_seed,
+                        _instance_payload,
+                        _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+                        _MODULE_NAME,
+                        f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}",
+                        ExperimentCondition(
+                            f"pattern-{pattern_key}-seed{seed}-instance{instance_index}"
+                        ),
+                        SupportSize(support),
+                    )
+                    instance_artifact_ids.append(manifest.artifact_id.value)
     return persist_synthetic_experiment_payload(
         store,
         layout,
         request,
-        seed,
+        summary_seed,
         lambda fingerprint: cast(
             StableJsonPayload,
             OrderedDict(
                 experiment=request.experiment.value,
                 dependency_fingerprint_sha256=fingerprint,
-                total_cells=len(cell_artifact_ids),
-                generated_instances_per_cell=generated_instances,
-                total_instances=len(cell_artifact_ids) * generated_instances,
-                cell_artifact_ids=tuple(cell_artifact_ids),
+                total_instances=len(instance_artifact_ids),
+                instance_artifact_ids=tuple(instance_artifact_ids),
             ),
         ),
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
@@ -470,11 +473,11 @@ def execute_exact_sparse_theorem_exhaustive_validation(
     )
 
 
-def _theorem_exhaustive_validation_cell(
+def theorem_exhaustive_validation_instance(
     pattern: tuple[ConceptCount, ...],
     support: SupportCount,
-    seeds: tuple[RandomSeed, ...],
-    instances_per_seed: ReplicateCount,
+    seed: RandomSeed,
+    instance_index: Index,
     blocks: PaddedBlockStructure,
     orbit: tuple[BlockCorrespondence, ...],
     lap_objective_tie_tolerance: Tolerance,
@@ -482,51 +485,41 @@ def _theorem_exhaustive_validation_cell(
     exact_validation_absolute_tolerance: Tolerance,
 ) -> StableJsonPayload:
     total_nodes = sum(pattern)
-    max_absolute_objective_error = 0.0
-    wrong_minima_count = 0
-    invalid_certificate_count = 0
-    for seed in seeds:
-        for instance_index in range(instances_per_seed):
-            instance = generate_exact_separator_instance(
-                ExactSeparatorInstanceRequest(pattern, seed, support, instance_index)
-            )
-            problem = build_robust_action_problem(
-                blocks,
-                instance.lower_response_matrix,
-                instance.upper_response_matrix,
-                instance.target_importance / instance.target_importance.sum(),
-                tuple(range(total_nodes)),
-            )
-            action = CurriculumAction(problem=problem, coordinates=instance.active_action)
-            outcome = fixed_action_worst_correspondence(
-                problem, action, lap_objective_tie_tolerance, action_tie_tolerance
-            )
-            exhaustive_truth = min(
-                evaluate_objective(action, correspondence) for correspondence in orbit
-            )
-            error = abs(outcome.separator_objective - exhaustive_truth)
-            max_absolute_objective_error = max(max_absolute_objective_error, error)
-            if not verify_exactness_certificate(
-                outcome.separator_objective, exhaustive_truth, exact_validation_absolute_tolerance
-            ):
-                wrong_minima_count += 1
-            if not verify_correspondence_certificate(
-                outcome.worst_correspondence,
-                outcome.separator_objective,
-                action,
-                exact_validation_absolute_tolerance,
-            ):
-                invalid_certificate_count += 1
+    instance = generate_exact_separator_instance(
+        ExactSeparatorInstanceRequest(pattern, seed, support, instance_index)
+    )
+    problem = build_robust_action_problem(
+        blocks,
+        instance.lower_response_matrix,
+        instance.upper_response_matrix,
+        instance.target_importance / instance.target_importance.sum(),
+        tuple(range(total_nodes)),
+    )
+    action = CurriculumAction(problem=problem, coordinates=instance.active_action)
+    outcome = fixed_action_worst_correspondence(
+        problem, action, lap_objective_tie_tolerance, action_tie_tolerance
+    )
+    exhaustive_truth = min(evaluate_objective(action, correspondence) for correspondence in orbit)
+    error = abs(outcome.separator_objective - exhaustive_truth)
+    exact_minima = verify_exactness_certificate(
+        outcome.separator_objective, exhaustive_truth, exact_validation_absolute_tolerance
+    )
+    valid_certificate = verify_correspondence_certificate(
+        outcome.worst_correspondence,
+        outcome.separator_objective,
+        action,
+        exact_validation_absolute_tolerance,
+    )
     return cast(
         StableJsonPayload,
         OrderedDict(
             block_pattern=list(pattern),
             support=support,
-            seeds=list(seeds),
-            generated_instances=len(seeds) * instances_per_seed,
-            max_absolute_objective_error=max_absolute_objective_error,
-            wrong_minima_count=wrong_minima_count,
-            invalid_certificate_count=invalid_certificate_count,
+            seed=seed,
+            instance_index=instance_index,
+            absolute_objective_error=error,
+            exact_minima=exact_minima,
+            valid_certificate=valid_certificate,
         ),
     )
 

@@ -39,6 +39,7 @@ class ArtifactStore:
         self._completions = root / StorageLayoutSegment.COMPLETIONS
         self._staging = root / StorageLayoutSegment.STAGING
         self._index_path = self._root / "fingerprint-index.json"
+        self._manifest_cache: OrderedDict[str, ReusableArtifactManifest] | None = None
 
     @property
     def root(self) -> Path:
@@ -62,6 +63,8 @@ class ArtifactStore:
             manifest.model_dump(mode="json"),
         )
         self._index_fingerprint(manifest.dependency_fingerprint_sha256, manifest.artifact_id)
+        if self._manifest_cache is not None:
+            self._manifest_cache[manifest.artifact_id.value] = manifest
 
     def write_completed(
         self,
@@ -134,15 +137,7 @@ class ArtifactStore:
                     artifact_path=manifest.payload_paths[0] if manifest.payload_paths else None,
                 )
                 return manifest
-        if not self._manifests.is_dir():
-            logger.event("cache_miss", fingerprint=fingerprint_sha256.value, reason="no_manifests")
-            return None
-        for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
-            if path.name == self._index_path.name:
-                continue
-            manifest = ReusableArtifactManifest.model_validate_json(
-                path.read_text(encoding="utf-8")
-            )
+        for manifest in self._load_manifest_cache().values():
             if manifest.dependency_fingerprint_sha256 != fingerprint_sha256.value:
                 continue
             try:
@@ -176,18 +171,25 @@ class ArtifactStore:
         )
         if retained != index:
             atomic_write_json(self._index_path, cast(StableJsonPayload, retained))
+        if self._manifest_cache is not None:
+            self._manifest_cache.pop(artifact_id.value, None)
+
+    def _load_manifest_cache(self) -> OrderedDict[str, ReusableArtifactManifest]:
+        if self._manifest_cache is None:
+            cache: OrderedDict[str, ReusableArtifactManifest] = OrderedDict()
+            if self._manifests.is_dir():
+                for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
+                    if path.name == self._index_path.name:
+                        continue
+                    manifest = ReusableArtifactManifest.model_validate_json(
+                        path.read_text(encoding="utf-8")
+                    )
+                    cache[manifest.artifact_id.value] = manifest
+            self._manifest_cache = cache
+        return self._manifest_cache
 
     def all_manifests(self) -> tuple[ReusableArtifactManifest, ...]:
-        if not self._manifests.is_dir():
-            return ()
-        manifests: list[ReusableArtifactManifest] = []
-        for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
-            if path.name == self._index_path.name:
-                continue
-            manifests.append(
-                ReusableArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
-            )
-        return tuple(manifests)
+        return tuple(self._load_manifest_cache().values())
 
     def _read_index(self) -> OrderedDict[str, str]:
         if not self._index_path.is_file():

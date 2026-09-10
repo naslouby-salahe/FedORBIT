@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from fedorbit.analysis.records import ComparisonDecision, PairedComparisonRecord
 from fedorbit.config.loading import active_config
@@ -11,19 +14,27 @@ from fedorbit.experiments.classification import (
     utility_family_status,
 )
 from fedorbit.experiments.dispatch import ExperimentExecutionRequest
+from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactState,
+    ConfigurationSection,
     ContrastName,
     DirectedPairName,
     EvidenceStatus,
+    ExperimentCondition,
     ExperimentName,
+    ExperimentSeed,
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
+    ProducerModuleName,
+    ResearchQuestion,
     Sha256Digest,
+    StableJsonPayload,
+    SupportSize,
     TransferMethod,
 )
 
@@ -241,3 +252,97 @@ def test_utility_family_local_sir_kill_does_not_fire_with_fedorbit_advantage() -
         True,
     )
     assert result.status != EvidenceStatus.NOT_SUPPORTED
+
+
+def _theorem_instance_payload(
+    exact_minima: bool, valid_certificate: bool
+) -> Callable[[Sha256Digest], StableJsonPayload]:
+    def build(fingerprint: Sha256Digest) -> StableJsonPayload:
+        cell: StableJsonPayload = cast(
+            StableJsonPayload,
+            OrderedDict(
+                block_pattern=[2],
+                support=1,
+                seed=1103,
+                instance_index=0,
+                absolute_objective_error=0.0,
+                exact_minima=exact_minima,
+                valid_certificate=valid_certificate,
+            ),
+        )
+        return cast(
+            StableJsonPayload,
+            OrderedDict(
+                experiment=ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION.value,
+                dependency_fingerprint_sha256=fingerprint,
+                cell=cell,
+            ),
+        )
+
+    return build
+
+
+def test_evidence_classification_exactness_reflects_theorem_instances(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    theorem_request = ExperimentExecutionRequest(
+        experiment=ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
+        definition=catalogue.definition(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    persist_synthetic_experiment_payload(
+        store,
+        layout,
+        theorem_request,
+        ExperimentSeed(theorem_request.definition.seeds[0]),
+        _theorem_instance_payload(True, True),
+        frozenset({ConfigurationSection.ACTION}),
+        ProducerModuleName("fedorbit.experiments.validation"),
+        "theorem-exhaustive.test-pass",
+        ExperimentCondition("pattern-2-seed1103-instance0"),
+        SupportSize(1),
+    )
+    request = ExperimentExecutionRequest(
+        experiment=ExperimentName.EVIDENCE_CLASSIFICATION,
+        definition=catalogue.definition(ExperimentName.EVIDENCE_CLASSIFICATION),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    manifest = execute_evidence_classification(store, layout, request)
+    payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
+    rows = {row["question"]: row for row in payload["statuses"]}
+    exactness_row = rows[ResearchQuestion.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
+    assert exactness_row["final_state"] == EvidenceStatus.SUPPORTED.value
+
+
+def test_evidence_classification_exactness_fails_on_wrong_minima(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    theorem_request = ExperimentExecutionRequest(
+        experiment=ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,
+        definition=catalogue.definition(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    persist_synthetic_experiment_payload(
+        store,
+        layout,
+        theorem_request,
+        ExperimentSeed(theorem_request.definition.seeds[0]),
+        _theorem_instance_payload(False, True),
+        frozenset({ConfigurationSection.ACTION}),
+        ProducerModuleName("fedorbit.experiments.validation"),
+        "theorem-exhaustive.test-fail",
+        ExperimentCondition("pattern-2-seed1103-instance1"),
+        SupportSize(1),
+    )
+    request = ExperimentExecutionRequest(
+        experiment=ExperimentName.EVIDENCE_CLASSIFICATION,
+        definition=catalogue.definition(ExperimentName.EVIDENCE_CLASSIFICATION),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    manifest = execute_evidence_classification(store, layout, request)
+    payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
+    rows = {row["question"]: row for row in payload["statuses"]}
+    exactness_row = rows[ResearchQuestion.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
+    assert exactness_row["final_state"] == EvidenceStatus.NOT_SUPPORTED.value

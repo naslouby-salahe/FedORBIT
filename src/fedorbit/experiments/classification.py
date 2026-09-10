@@ -101,9 +101,8 @@ def _null_result(materiality: str, statistical: str) -> EvidenceAdjudication:
     return _status(EvidenceStatus.NULL_RESULT, materiality, statistical, "complete")
 
 
-def _count_field(cell: Mapping[str, int | float | str | list[int]], key: str) -> int:
-    value = cell.get(key, 1)
-    return int(value) if isinstance(value, int | float) else 1
+def _cell_bool_field(cell: Mapping[str, int | float | str | list[int]], key: str) -> bool:
+    return bool(cell.get(key, False))
 
 
 def _theorem_cells(
@@ -126,9 +125,6 @@ def _theorem_cells(
         cell = payload.get("cell")
         if isinstance(cell, dict):
             cells.append(cast(Mapping[str, int | float | str | list[int]], cell))
-        for nested in payload.get("cells", ()):
-            if isinstance(nested, dict):
-                cells.append(cast(Mapping[str, int | float | str | list[int]], nested))
     return tuple(cells)
 
 
@@ -245,8 +241,8 @@ def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
     cells = _theorem_cells(store)
     if not cells:
         return _not_tested("no theorem cells")
-    wrong = sum(_count_field(cell, "wrong_minima_count") for cell in cells)
-    invalid = sum(_count_field(cell, "invalid_certificate_count") for cell in cells)
+    wrong = sum(1 for cell in cells if not _cell_bool_field(cell, "exact_minima"))
+    invalid = sum(1 for cell in cells if not _cell_bool_field(cell, "valid_certificate"))
     if wrong == 0 and invalid == 0:
         return _supported("separator exact on registered cells", "certificate verified")
     return _not_supported("wrong minima or invalid certificates", "exactness failed")

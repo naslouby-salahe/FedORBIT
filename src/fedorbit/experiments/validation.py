@@ -255,7 +255,7 @@ def execute_dataset_client_and_resource_validation(
         ),
         frozenset(),
         _MODULE_NAME,
-        "dataset-client-resource-validation",
+        "dataset-client-resource-validation", #TODO: should be enums not hardcoded strings
     )
 
 
@@ -295,7 +295,8 @@ def _persist_blocked_experiment(
             blocked_datasets=reasons,
         ),
     )
-    atomic_write_json(destination / "blocked.json", payload)
+    atomic_write_json(destination / "blocked.json" #TODO: should be enum, not hardcoded string
+                      , payload)
 
 
 def persist_synthetic_experiment_payload(
@@ -306,7 +307,7 @@ def persist_synthetic_experiment_payload(
     payload_builder: Callable[[Sha256Digest], StableJsonPayload],
     configuration_sections: frozenset[ConfigurationSection],
     producer_module: ProducerModuleName,
-    artifact_name: str,
+    artifact_name: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     condition: ExperimentCondition | None = None,
     support: SupportSize | None = None,
 ) -> ReusableArtifactManifest:
@@ -358,7 +359,7 @@ def persist_synthetic_experiment_payload(
             artifact_id=artifact_id(
                 ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
             ),
-            artifact_type="other",
+            artifact_type="other", #TODO: should be enums not hardcoded strings
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
             dependency_fingerprint_sha256=fingerprint,
@@ -395,7 +396,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
     seeds = active_config().scientific.randomness.confirmatory_seeds
     instances_per_seed = generator_config.generated_instances_per_block_pattern_support_seed_cell
     summary_seed = ExperimentSeed(request.definition.seeds[0])
-    instance_artifact_ids: list[str] = []
+    instance_artifact_ids: list[str] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for pattern in generator_config.block_patterns:
         total_nodes = sum(pattern)
         groups = tuple(CoarseGroup)[: len(pattern)]
@@ -469,7 +470,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
         ),
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
         _MODULE_NAME,
-        "theorem-exhaustive-validation",
+        "theorem-exhaustive-validation", #TODO: should be enums not hardcoded strings
     )
 
 
@@ -539,7 +540,7 @@ def execute_coupling_and_map_bound_validation(
     incompatible_gap_threshold = coupling_config.incompatible_fixed_action_gap_strictly_greater_than
     summary_seed = ExperimentSeed(request.definition.seeds[0])
     logger = execution_logger()
-    cell_artifact_ids: list[str] = []
+    cell_artifact_ids: list[str] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     total_generated = 0
     total_generation_failures = 0
     total_incompatible_gap_failures = 0
@@ -622,10 +623,10 @@ def execute_coupling_and_map_bound_validation(
                             cell_artifact_ids.append(manifest.artifact_id.value)
                             payload = json.loads(Path(manifest.payload_paths[0]).read_text())
                             cell = payload["cell"]
-                            total_generated += int(cell["generated"])
-                            total_generation_failures += int(cell["generation_failures"])
+                            total_generated += int(cell["generated"]) #TODO: should be enums not hardcoded strings
+                            total_generation_failures += int(cell["generation_failures"]) #TODO: should be enums not hardcoded strings
                             total_incompatible_gap_failures += int(
-                                cell["incompatible_gap_failures"]
+                                cell["incompatible_gap_failures"] #TODO: should be enums not hardcoded strings
                             )
                             logger.record(
                                 ExecutionLogEvent(
@@ -661,7 +662,7 @@ def execute_coupling_and_map_bound_validation(
         ),
         _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
         _MODULE_NAME,
-        "coupling-and-map-bound-validation",
+        "coupling-and-map-bound-validation", #TODO: should be enums not hardcoded strings
     )
 
 
@@ -764,7 +765,8 @@ def _deterministic_replay_consistent(
     )
 
 
-def _forbidden_identity_columns(materialized: MaterializedClient) -> frozenset[str]:
+def _forbidden_identity_columns(materialized: MaterializedClient
+                                ) -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return frozenset(
         str(column)
         for column, role in materialized.schema.roles.items()
@@ -772,7 +774,8 @@ def _forbidden_identity_columns(materialized: MaterializedClient) -> frozenset[s
     )
 
 
-def _timestamp_columns(materialized: MaterializedClient) -> frozenset[str]:
+def _timestamp_columns(materialized: MaterializedClient
+                       ) -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     column = materialized.schema.timestamp_column
     return frozenset() if column is None else frozenset({str(column)})
 
@@ -1010,7 +1013,7 @@ def execute_primitive_validation(
             artifact_id=artifact_id(
                 ArtifactTypeName(ArtifactType.OTHER.value), payload, Sha256Digest(fingerprint)
             ),
-            artifact_type="other",
+            artifact_type="other", #TODO: should be enums not hardcoded strings
             semantic_producer_coordinates=coordinates,
             producer_stage=_STAGE,
             dependency_fingerprint_sha256=fingerprint,
@@ -1035,8 +1038,8 @@ def execute_primitive_validation(
 def _payload_path(layout: WorkspaceLayout, fingerprint: Sha256Digest) -> Path:
     return (
         experiment_workspace(layout, _EXPERIMENT)
-        / "artifacts"
-        / "derived"
+        / "artifacts" #TODO: should be enums not hardcoded strings
+        / "derived" #TODO: should be enums not hardcoded strings
         / f"primitive-validation.{fingerprint[:16]}.json"
     )
 
@@ -1092,7 +1095,8 @@ def _validation_payload(
         )
     )
     deserialized = json.loads(serialized_assignment)
-    if deserialized["column_for_row"] != list(assignment.column_for_row):
+    if deserialized["column_for_row" #TODO: should be enums not hardcoded strings
+                    ] != list(assignment.column_for_row):
         raise PrimitiveValidationError("assignment serialization round-trip failed")
     total_nodes = sum(block_pattern)
     orbit = tuple(enumerate_block_permutations(equal_blocks))

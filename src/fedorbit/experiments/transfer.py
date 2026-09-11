@@ -219,7 +219,7 @@ def execute_primary_strict_cross_telemetry_transfer(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: should be enums not hardcoded strings
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
     materialized_by_target: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -821,7 +821,7 @@ def execute_sparsity_and_dense_fallback(
 
     conditions: tuple[
         tuple[
-            str,
+            str, #TODO: should be enums not hardcoded strings
             TransferMethod,
             Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
         ],
@@ -1012,7 +1012,7 @@ def execute_multi_source_selection_validation(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     config = active_config().experiments.multi_source_selection_validation
     all_clients = active_config().scientific.datasets.clients

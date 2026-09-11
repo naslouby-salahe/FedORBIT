@@ -111,7 +111,7 @@ def generate_exact_separator_instance(
     coordinates = cast(
         StableJsonPayload,
         OrderedDict(
-            generator="exact_separator_theorem",
+            generator="exact_separator_theorem", #TODO: should be enum, not hardcoded string
             block_pattern=list(request.block_pattern),
             active_support_size=request.active_support_size,
             instance_index=request.instance_index,
@@ -514,7 +514,7 @@ def _apply_deterministic_sparsity(
     return result
 
 
-_CorrespondenceImageMinimizerSet = frozenset[tuple[int, ...]]
+_CorrespondenceImageMinimizerSet = frozenset[tuple[int, ...]] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 def _active_term_minimizer_sets(
@@ -539,7 +539,7 @@ def _active_term_minimizer_sets(
     return tuple(minimizer_sets)
 
 
-MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION: SupportCount = 2
+MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION: SupportCount = 2 #TODO: move to constants
 
 
 def eligible_coupling_support_sizes(
@@ -554,7 +554,7 @@ def eligible_coupling_support_sizes(
     return registered_support_sizes
 
 
-_JOINT_REALIZABILITY_MAX_ITERATIONS: RepetitionCount = 100
+_JOINT_REALIZABILITY_MAX_ITERATIONS: RepetitionCount = 100 #TODO: move to constants
 
 
 def _joint_realizability_column_shift(

@@ -38,7 +38,7 @@ class ArtifactStore:
         self._manifests = root / StorageLayoutSegment.MANIFESTS
         self._completions = root / StorageLayoutSegment.COMPLETIONS
         self._staging = root / StorageLayoutSegment.STAGING
-        self._index_path = self._root / "fingerprint-index.json"
+        self._index_path = self._root / "fingerprint-index.json" #TODO: should be enums not hardcoded strings
         self._manifest_cache: OrderedDict[str, ReusableArtifactManifest] | None = None
 
     @property
@@ -111,7 +111,7 @@ class ArtifactStore:
             try:
                 validate_completed_artifact(manifest, self.read_completion(artifact_id))
             except ValueError as error:
-                raise StorageError(str(error)) from error
+                raise StorageError(error) from error
         return manifest
 
     def find_by_fingerprint(
@@ -124,14 +124,14 @@ class ArtifactStore:
                 manifest = self.resolve(indexed)
             except ValueError:
                 logger.event(
-                    "cache_miss",
+                    "cache_miss", #TODO: should be enum not hardcoded string
                     fingerprint=fingerprint_sha256.value,
-                    reason="indexed_manifest_invalid",
+                    reason="indexed_manifest_invalid", #TODO: should be enum not hardcoded string
                 )
                 return None
             if manifest.dependency_fingerprint_sha256 == fingerprint_sha256.value:
                 logger.event(
-                    "cache_hit",
+                    "cache_hit", #TODO: should be enum not hardcoded string
                     fingerprint=fingerprint_sha256.value,
                     artifact_id=manifest.artifact_id.value,
                     artifact_path=manifest.payload_paths[0] if manifest.payload_paths else None,
@@ -144,20 +144,20 @@ class ArtifactStore:
                 resolved = self.resolve(manifest.artifact_id)
             except ValueError:
                 logger.event(
-                    "cache_miss",
+                    "cache_miss", #TODO: should be enum not hardcoded string
                     fingerprint=fingerprint_sha256.value,
-                    reason="manifest_invalid",
+                    reason="manifest_invalid", #TODO: should be enum not hardcoded string
                 )
                 return None
             self._index_fingerprint(fingerprint_sha256.value, resolved.artifact_id)
             logger.event(
-                "cache_hit",
+                "cache_hit", #TODO: should be enum not hardcoded string
                 fingerprint=fingerprint_sha256.value,
                 artifact_id=resolved.artifact_id.value,
                 artifact_path=resolved.payload_paths[0] if resolved.payload_paths else None,
             )
             return resolved
-        logger.event("cache_miss", fingerprint=fingerprint_sha256.value, reason="absent")
+        logger.event("cache_miss", fingerprint=fingerprint_sha256.value, reason="absent") #TODO: should be enum not hardcoded string
         return None
 
     def remove_manifest(self, artifact_id: ArtifactIdentifier) -> None:
@@ -174,7 +174,8 @@ class ArtifactStore:
         if self._manifest_cache is not None:
             self._manifest_cache.pop(artifact_id.value, None)
 
-    def _load_manifest_cache(self) -> OrderedDict[str, ReusableArtifactManifest]:
+    def _load_manifest_cache(self) -> OrderedDict[str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                                                  ReusableArtifactManifest]:
         if self._manifest_cache is None:
             cache: OrderedDict[str, ReusableArtifactManifest] = OrderedDict()
             if self._manifests.is_dir():
@@ -191,25 +192,28 @@ class ArtifactStore:
     def all_manifests(self) -> tuple[ReusableArtifactManifest, ...]:
         return tuple(self._load_manifest_cache().values())
 
-    def _read_index(self) -> OrderedDict[str, str]:
+    def _read_index(self) -> OrderedDict[str, str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         if not self._index_path.is_file():
             return OrderedDict()
         parsed = json.loads(self._index_path.read_text(encoding="utf-8"))
         if not isinstance(parsed, dict):
             return OrderedDict()
-        entries: OrderedDict[str, str] = OrderedDict()
+        entries: OrderedDict[str, str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                             ] = OrderedDict()
         for key, value in parsed.items():
             if isinstance(key, str) and isinstance(value, str):
                 entries[key] = value
         return entries
 
-    def _lookup_index(self, fingerprint: str) -> ArtifactIdentifier | None:
+    def _lookup_index(self, fingerprint: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                      ) -> ArtifactIdentifier | None:
         identifier = self._read_index().get(fingerprint)
         if identifier is None:
             return None
         return ArtifactIdentifier(identifier)
 
-    def _index_fingerprint(self, fingerprint: str, artifact_id: ArtifactIdentifier) -> None:
+    def _index_fingerprint(self, fingerprint: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                           , artifact_id: ArtifactIdentifier) -> None:
         index = self._read_index()
         if index.get(fingerprint) == artifact_id.value:
             return

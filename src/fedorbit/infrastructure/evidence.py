@@ -83,8 +83,8 @@ class EvidenceFigure:
     x_label: ReportAxisLabel
     y_label: ReportAxisLabel
     series: tuple[FigureSeries, ...]
-    vertical_reference_lines: tuple[float, ...] = ()
-    horizontal_reference_lines: tuple[float, ...] = ()
+    vertical_reference_lines: tuple[float, ...] = () #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    horizontal_reference_lines: tuple[float, ...] = () #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     log_x: bool = False
     log_y: bool = False
     draw_unit_diagonal: bool = False
@@ -102,7 +102,7 @@ class TableError(ValueError):
     pass
 
 
-TableScalar = str | int | float | bool | None
+TableScalar = str | int | float | bool | None #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)

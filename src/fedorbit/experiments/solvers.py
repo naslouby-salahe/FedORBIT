@@ -160,7 +160,7 @@ def persist_synthetic_benchmark_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float,
+    metric_value: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -210,8 +210,8 @@ def persist_synthetic_benchmark_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts"
-        / "derived"
+        / "artifacts" #TODO: use enum, not hardcoded string
+        / "derived" #TODO: use enum, not hardcoded string
         / f"metric.{condition}.support-{support}.{method.value}.{seed}.{metric_name.value}.json"
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
@@ -713,7 +713,9 @@ def execute_scalability_and_efficiency(
         TransferMethod.GENERIC_EXACT_QAP,
         TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" #TODO: should be enum instead of hardcoded string
+                          if torch.cuda.is_available() else
+                          "cpu") #TODO: should be enum instead of hardcoded string
     principal_support = active_config().scientific.action.principal_sparse_support
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -803,7 +805,7 @@ def _persist_work_structure_spearman(
         store,
         layout,
         request.experiment,
-        EvaluationConditionName("work-structure"),
+        EvaluationConditionName("work-structure"), #TODO: should be enum instead of hardcoded string
         active_config().scientific.randomness.confirmatory_seeds[0],
         MetricId.WORK_STRUCTURE_SPEARMAN,
         correlation,
@@ -870,8 +872,8 @@ def persist_synthetic_diagnostic_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts"
-        / "derived"
+        / "artifacts" #TODO: should be enum instead of hardcoded string
+        / "derived" #TODO: should be enum instead of hardcoded string
         / f"metric.{condition}.{seed}.{metric_name.value}.json"
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))

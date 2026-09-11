@@ -27,11 +27,11 @@ Sha256Digest = NewType("Sha256Digest", str)
 TabularColumnName = NewType("TabularColumnName", str)
 ValidationReason = NewType("ValidationReason", str)
 ModelParameterName = NewType("ModelParameterName", str)
-DirectedPairName = NewType("DirectedPairName", str)
-EvaluationConditionName = NewType("EvaluationConditionName", str)
-MetricUnit = NewType("MetricUnit", str)
-InvalidReason = NewType("InvalidReason", str)
-ContrastName = NewType("ContrastName", str)
+DirectedPairName = NewType("DirectedPairName", str) #TODO: convert to enum
+EvaluationConditionName = NewType("EvaluationConditionName", str) #TODO: convert to enum
+MetricUnit = NewType("MetricUnit", str) #TODO: convert to enum
+InvalidReason = NewType("InvalidReason", str) #TODO: convert to enum
+ContrastName = NewType("ContrastName", str) #TODO: convert to enum
 StatisticalTestName = NewType("StatisticalTestName", str)
 FieldDescription = NewType("FieldDescription", str)
 FailureReason = NewType("FailureReason", str)
@@ -41,7 +41,7 @@ AvailabilityReason = NewType("AvailabilityReason", str)
 ResourceLimitReason = NewType("ResourceLimitReason", str)
 StrictResourceValidity = NewType("StrictResourceValidity", bool)
 PValueName = NewType("PValueName", str)
-BootstrapPurpose = NewType("BootstrapPurpose", str)
+BootstrapPurpose = NewType("BootstrapPurpose", str) #TODO: convert to enum
 BootstrapDegeneracy = NewType("BootstrapDegeneracy", bool)
 ArrayAxis = NewType("ArrayAxis", int)
 ClassIndex = NewType("ClassIndex", int)
@@ -57,7 +57,7 @@ CudaVersion = NewType("CudaVersion", str)
 CpuName = NewType("CpuName", str)
 OperatingSystemRelease = NewType("OperatingSystemRelease", str)
 PythonVersion = NewType("PythonVersion", str)
-FilesystemSlug = NewType("FilesystemSlug", str)
+FilesystemSlug = NewType("FilesystemSlug", str) #TODO: convert to enum
 ArtifactFileSuffix = NewType("ArtifactFileSuffix", str)
 ArtifactSchemaVersion = NewType("ArtifactSchemaVersion", str)
 ArtifactTypeName = NewType("ArtifactTypeName", str)
@@ -76,7 +76,7 @@ ReportSeriesName = NewType("ReportSeriesName", str)
 ReportAxisLabel = NewType("ReportAxisLabel", str)
 ReportColumnName = NewType("ReportColumnName", str)
 ReportArtifactName = NewType("ReportArtifactName", str)
-ProducerModuleName = NewType("ProducerModuleName", str)
+ProducerModuleName = NewType("ProducerModuleName", str) #TODO: why is this needed? unless really used and wired and needed. I prefer removing it. and using a more dynamic way
 CorrespondenceBlockId = NewType("CorrespondenceBlockId", str)
 
 
@@ -685,7 +685,7 @@ class ArtifactPath:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactIdentifier:
-    value: str
+    value: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this. I prefer enum for this
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "artifact identifier")
@@ -693,7 +693,7 @@ class ArtifactIdentifier:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactFingerprint:
-    value: str
+    value: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "artifact fingerprint")
@@ -701,7 +701,7 @@ class ArtifactFingerprint:
 
 @dataclass(frozen=True, slots=True)
 class SemanticCoordinates:
-    value: str
+    value: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "semantic coordinates")
@@ -709,7 +709,7 @@ class SemanticCoordinates:
 
 @dataclass(frozen=True, slots=True)
 class ExperimentCondition:
-    value: str
+    value: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not self.value:
@@ -718,7 +718,7 @@ class ExperimentCondition:
 
 @dataclass(frozen=True, slots=True)
 class SupportSize:
-    value: int
+    value: int #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if self.value < 1:
@@ -727,7 +727,7 @@ class SupportSize:
 
 @dataclass(frozen=True, slots=True)
 class ExperimentSeed:
-    value: int
+    value: int #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     def __post_init__(self) -> None:
         if not 0 <= self.value < UINT32_LIMIT:

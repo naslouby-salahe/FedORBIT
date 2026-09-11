@@ -39,7 +39,7 @@ def validate_edge_schema(schema: AdapterSchema) -> None:
 
 def validate_binary_multiclass_consistency(rows: tuple[LabelObservation, ...]) -> None:
     for row in rows:
-        is_normal = normalize_label(row.multiclass_label) == "normal"
+        is_normal = normalize_label(row.multiclass_label) == "normal" #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         if row.binary_label not in (0, 1):
             raise EdgeValidationError("binary label must be 0 or 1")
         if is_normal != (row.binary_label == 0):

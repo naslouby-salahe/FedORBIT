@@ -94,7 +94,6 @@ from fedorbit.types import (
     ExposedCoarseGroupId,
     InfrastructureLogCoordinate,
     OverwritePolicy,
-    ProducerModuleName,
     ReuseDecision,
     Rfc3339UtcTimestamp,
     ScalabilityBlockPattern,
@@ -102,8 +101,6 @@ from fedorbit.types import (
     Sha256Digest,
     StableJsonPayload,
 )
-
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.dispatch")
 
 
 def run_smoke_validation(
@@ -356,7 +353,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     RecoveryBoundary(store).discard_interrupted_staging()
     logger = execution_logger()
     logger.event(
-        "experiment_start",
+        "experiment_start", #TODO: should be enum not hardcoded string
         experiment=request.experiment.value,
         classification=request.definition.classification.value,
         planned_cells=int(request.definition.derived_planned_cells),
@@ -372,7 +369,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     _execute_producer_with_retry(producer, store, layout, request.experiment)
     elapsed: ElapsedSeconds = time.perf_counter() - started_at
     logger.event(
-        "experiment_end",
+        "experiment_end", #TODO: should be enum not hardcoded string
         experiment=request.experiment.value,
         elapsed_seconds=elapsed,
         state=ArtifactState.COMPLETED.value,

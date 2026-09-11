@@ -215,7 +215,7 @@ def build_completion_manifest(
             relevant_code_sha256=code_sha256,
             material_runtime_sha256=runtime_sha256,
             upstream_lineage=stable_json(OrderedDict[str, StableJsonPayload]()),
-            completion_validation_state="validated",
+            completion_validation_state="validated", #TODO: should be enum not hardcoded string
             completion_written_last=True,
             completion_manifest_sha256="",
         )
@@ -262,11 +262,11 @@ def _target_confirmatory_checkpoint_path(
 ) -> Path:
     return (
         experiment_workspace(layout, checkpoint_source_experiment)
-        / "checkpoints"
+        / "checkpoints" #TODO: use enum, not hardcoded string
         / CheckpointDirectorySegment.TRAINING
         / target.value
         / f"seed-{seed}"
-        / "checkpoint.pt"
+        / "checkpoint.pt" #TODO: use enum, not hardcoded string
     )
 
 
@@ -347,7 +347,7 @@ def persist_primary_transfer_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float | None,
+    metric_value: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -400,8 +400,8 @@ def persist_primary_transfer_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts"
-        / "derived"
+        / "artifacts" #TODO: use enum, not hardcoded string
+        / "derived" #TODO: use enum, not hardcoded string
         / (
             f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
             f".{method.value}.{condition}.{seed}.{metric_name.value}.json"
@@ -649,8 +649,8 @@ def load_dataset_source_packet(
 ) -> SourcePacket | None:
     path = (
         experiment_workspace(layout, ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
-        / "artifacts"
-        / "packets"
+        / "artifacts" #TODO: use enum, not hardcoded string
+        / "packets" #TODO: use enum, not hardcoded string
         / target.value
         / f"seed-{seed}"
         / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
@@ -2192,7 +2192,7 @@ _SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
 
 
 def semantic_partition_bucket_of(
-    partition: str | tuple[str, ...],
+    partition: str | tuple[str, ...],#TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Mapping[CoarseGroup, CoarseGroup] | None:
     if partition == SemanticPartitionId.PRINCIPAL_THREE_COARSE_GROUPS:
         return _SEMANTIC_PARTITION_PRINCIPAL
@@ -2206,7 +2206,8 @@ def semantic_partition_bucket_of(
     return None
 
 
-def semantic_partition_label(partition: str | tuple[str, ...]) -> EvaluationConditionName:
+def semantic_partition_label(partition: str | tuple[str, ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                             ) -> EvaluationConditionName:
     text = partition if isinstance(partition, str) else "|".join(partition)
     return EvaluationConditionName(text)
 
@@ -2228,7 +2229,7 @@ def response_scale_perturbation(
 
 
 def ci_half_width_perturbation(
-    multiplier: float,
+    multiplier: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]:
@@ -2244,7 +2245,7 @@ def ci_half_width_perturbation(
 
 
 def response_heterogeneity_perturbation(
-    multiplier: float,
+    multiplier: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]:

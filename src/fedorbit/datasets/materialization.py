@@ -111,7 +111,7 @@ def deterministic_smallest_hash_subsample_indices(
     class_row_indices: tuple[Index, ...],
     fraction: Fraction,
     seed: RandomSeed,
-    coordinates_text: str,
+    coordinates_text: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> tuple[Index, ...]:
     keep = max(1, round(fraction * len(class_row_indices)))
     ranked: list[tuple[int, Index]] = []
@@ -129,7 +129,7 @@ def subsample_split_tensors(
     split: SplitTensors,
     fraction: Fraction,
     seed: RandomSeed,
-    coordinates_text: str,
+    coordinates_text: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> SplitTensors:
     target_values: list[int] = split.targets.tolist()
     keep_indices: list[int] = []
@@ -241,7 +241,7 @@ def _read_component_rows(
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed = tuple(TabularColumnName(cast(str, column)) for column in frame.columns)
+        observed = tuple(TabularColumnName(column) for column in frame.columns)
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)

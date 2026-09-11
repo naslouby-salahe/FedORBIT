@@ -16,13 +16,13 @@ _bound_config: ContextVar[FedorbitConfig | None] = ContextVar("fedorbit_config",
 def repository_root() -> Path:
     current = Path(__file__).resolve()
     for candidate in (current, *current.parents):
-        if (candidate / "pyproject.toml").is_file():
+        if (candidate / "pyproject.toml").is_file(): #TODO: use enums instead of hardcoded strings
             return candidate
     raise FileNotFoundError("FedORBIT repository root not found from package location")
 
 
 def default_config_path() -> Path:
-    return repository_root() / "configs" / "fedorbit.yaml"
+    return repository_root() / "configs" / "fedorbit.yaml" #TODO: use enums instead of hardcoded strings
 
 
 def raw_dataset_root() -> Path:

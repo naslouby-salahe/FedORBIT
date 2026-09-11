@@ -338,7 +338,7 @@ def validate_metric_records(records: MetricRecordCollection) -> MetricRecordColl
 
 def _require_unique_semantic_identities(
     identities: tuple[EvaluationSemanticIdentity, ...],
-    error_message: str,
+    error_message: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> None:
     if len(set(identities)) != len(identities):
         raise EvaluationValidationError(error_message)

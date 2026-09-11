@@ -66,49 +66,64 @@ def _latest_synthesis_manifest(store: ArtifactStore) -> ReusableArtifactManifest
 
 def _status(
     status: EvidenceStatus,
-    materiality: str,
-    statistical: str,
-    completeness: str,
+    materiality: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    statistical: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    completeness: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceAdjudication:
     return EvidenceAdjudication(status, materiality, statistical, completeness)
 
 
-def _not_tested(reason: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.NOT_TESTED, "not evaluated", reason, "incomplete")
+def _not_tested(reason: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.NOT_TESTED, "not evaluated", reason, "incomplete") #TODO: should be enum. Not hardcoded string
 
 
-def _supported(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.SUPPORTED, materiality, statistical, "complete")
+def _supported(materiality: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+               statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+               ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.SUPPORTED, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _not_supported(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.NOT_SUPPORTED, materiality, statistical, "complete")
+def _not_supported(materiality: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                   statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                   ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.NOT_SUPPORTED, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _partial(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.PARTIALLY_SUPPORTED, materiality, statistical, "complete")
+def _partial(materiality: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+             , statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+             ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.PARTIALLY_SUPPORTED, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _mechanism_only(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.MECHANISM_ONLY, materiality, statistical, "complete")
+def _mechanism_only(materiality: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                    statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                    ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.MECHANISM_ONLY, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _conditional(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.CONDITIONAL, materiality, statistical, "complete")
+def _conditional(materiality: str,  #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                 statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                 ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.CONDITIONAL, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _null_result(materiality: str, statistical: str) -> EvidenceAdjudication:
-    return _status(EvidenceStatus.NULL_RESULT, materiality, statistical, "complete")
+def _null_result(materiality: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                 , statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                 ) -> EvidenceAdjudication:
+    return _status(EvidenceStatus.NULL_RESULT, materiality, statistical, "complete") #TODO: should be enum. Not hardcoded string
 
 
-def _cell_bool_field(cell: Mapping[str, int | float | str | list[int]], key: str) -> bool:
+def _cell_bool_field(cell: Mapping[str, int | float | str | list[int]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                     key: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                     ) -> bool:
     return bool(cell.get(key, False))
 
 
 def _theorem_cells(
     store: ArtifactStore,
-) -> tuple[Mapping[str, int | float | str | list[int]], ...]:
-    cells: list[Mapping[str, int | float | str | list[int]]] = []
+) -> tuple[Mapping[str, int | float | str | list[int]], ...]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    cells: list[Mapping[str, int | float | str | list[int]]] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for manifest in store.all_manifests():
         if (
             ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION.value
@@ -130,7 +145,7 @@ def _theorem_cells(
 
 def _metric_values(
     store: ArtifactStore, experiment: ExperimentName, metric_name: MetricId
-) -> tuple[float, ...]:
+) -> tuple[float, ...]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
     return tuple(
@@ -154,7 +169,7 @@ def _pair_records(
 
 def _successful_pairs(
     records: tuple[PairedComparisonRecord, ...],
-    holm_maximum: float,
+    holm_maximum: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     bca_floor: Floor,
 ) -> tuple[PairedComparisonRecord, ...]:
     return tuple(
@@ -181,8 +196,8 @@ def _harmful_pairs(
 
 def _local_reference_dominant_pairs(
     records: tuple[PairedComparisonRecord, ...],
-    holm_maximum: float,
-) -> frozenset[str]:
+    holm_maximum: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     threshold = active_config().scientific.materiality.realized_relative_macro_ce
     dominant: set[str] = set()
     for record in records:
@@ -205,52 +220,52 @@ def utility_family_status(
     comparisons: tuple[PairedComparisonRecord, ...],
     method_a: TransferMethod,
     method_b: TransferMethod,
-    holm_maximum: float,
-    bca_floor: Floor,
-    required_pairs: int,
+    holm_maximum: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_floor: Floor, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    required_pairs: int, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     kill_local_reference: bool,
 ) -> EvidenceAdjudication:
     records = _pair_records(comparisons, method_a, method_b)
     if not records:
-        return _not_tested("no contrasts")
+        return _not_tested("no contrasts") #TODO: should be enum. Not hardcoded string
     harmful = _harmful_pairs(records)
     if harmful:
-        return _not_supported("material harm on a primary pair", "failure rule")
+        return _not_supported("material harm on a primary pair", "failure rule") #TODO: should be enum. Not hardcoded string
     successful = _successful_pairs(records, holm_maximum, bca_floor)
     if len(successful) >= required_pairs:
-        return _supported("material", "holm and BCa satisfied")
+        return _supported("material", "holm and BCa satisfied") #TODO: should be enum. Not hardcoded string
     if kill_local_reference and not successful:
         dominant = _local_reference_dominant_pairs(records, holm_maximum)
         if len(dominant) >= required_pairs:
             return _not_supported(
                 "local reference sufficient", "equivalence or superiority kill fired"
-            )
+            ) #TODO: should be enum. Not hardcoded string
     analyzable = len({record.pair for record in records})
     if (
         analyzable == 3
         and len(successful) == 3
         and len(active_config().scientific.datasets.primary_directed_pairs) == 6
     ):
-        return _conditional("three eligible pairs", "pre-outcome scope reduction")
+        return _conditional("three eligible pairs", "pre-outcome scope reduction") #TODO: should be enum. Not hardcoded string
     if successful:
-        return _partial("subset of pairs material", "full pair threshold unmet")
-    return _null_result("no material pair", "no harm")
+        return _partial("subset of pairs material", "full pair threshold unmet") #TODO: should be enum. Not hardcoded string
+    return _null_result("no material pair", "no harm") #TODO: should be enum. Not hardcoded string
 
 
 def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
     cells = _theorem_cells(store)
     if not cells:
-        return _not_tested("no theorem cells")
-    wrong = sum(1 for cell in cells if not _cell_bool_field(cell, "exact_minima"))
-    invalid = sum(1 for cell in cells if not _cell_bool_field(cell, "valid_certificate"))
+        return _not_tested("no theorem cells") #TODO: should be enum. Not hardcoded string
+    wrong = sum(1 for cell in cells if not _cell_bool_field(cell, "exact_minima")) #TODO: should be enum, not hardcoded string
+    invalid = sum(1 for cell in cells if not _cell_bool_field(cell, "valid_certificate")) #TODO: should be enum, not hardcoded string
     if wrong == 0 and invalid == 0:
-        return _supported("separator exact on registered cells", "certificate verified")
-    return _not_supported("wrong minima or invalid certificates", "exactness failed")
+        return _supported("separator exact on registered cells", "certificate verified") #TODO: should be enum. Not hardcoded string
+    return _not_supported("wrong minima or invalid certificates", "exactness failed") #TODO: should be enum. Not hardcoded string
 
 
 def _ablation_pair_method_means(
     store: ArtifactStore, method: TransferMethod
-) -> Mapping[DirectedPairName, float]:
+) -> Mapping[DirectedPairName, float]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
     by_pair: OrderedDict[DirectedPairName, list[float]] = OrderedDict()
@@ -272,7 +287,7 @@ def _ablation_pair_method_means(
 def _mechanism_retention_pairs(
     store: ArtifactStore,
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> int:
+) -> int: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     criteria = active_config().scientific.evaluation_criteria.coupling_mechanism
     full_means = _ablation_pair_method_means(store, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER)
     destroyed_means = _ablation_pair_method_means(store, TransferMethod.COUPLING_DESTROYED_FEDORBIT)
@@ -295,7 +310,7 @@ def _mechanism_retention_pairs(
     return retention_pairs
 
 
-def _material_coupling_pairs(comparisons: tuple[PairedComparisonRecord, ...]) -> int:
+def _material_coupling_pairs(comparisons: tuple[PairedComparisonRecord, ...]) -> int: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return sum(
         1
         for record in comparisons
@@ -316,23 +331,23 @@ def _classify_joint_correspondence(
         MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
     )
     if not synthetic:
-        return _not_tested("no coupling gaps")
+        return _not_tested("no coupling gaps") #TODO: should be enum, not hardcoded string
     retention_pairs = _mechanism_retention_pairs(store, comparisons)
     retention_present = retention_pairs >= criteria.primary_pairs_with_material_mean_gap_required
     if retention_present:
-        return _not_supported("coupling destruction retains gain", "mechanism attribution fails")
+        return _not_supported("coupling destruction retains gain", "mechanism attribution fails") #TODO: should be enum, not hardcoded string
     synthetic_fraction = sum(1 for gap in synthetic if gap > material) / len(synthetic)
     accuracy = criteria.theorem_zero_strict_classification_accuracy_required
     synthetic_pass = synthetic_fraction >= accuracy or any(gap > material for gap in synthetic)
     if not synthetic_pass:
-        return _not_supported("synthetic mechanism criterion failed", "gap fraction unmet")
+        return _not_supported("synthetic mechanism criterion failed", "gap fraction unmet") #TODO: should be enum, not hardcoded string
     real_gaps = _metric_values(
         store,
         ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
         MetricId.ROBUST_COUPLING_VALUE_GAP,
     )
     if not real_gaps:
-        return _mechanism_only("synthetic mechanism complete", "real-packet criterion unavailable")
+        return _mechanism_only("synthetic mechanism complete", "real-packet criterion unavailable") #TODO: should be enum, not hardcoded string
     real_fraction = sum(1 for gap in real_gaps if gap > material) / len(real_gaps)
     material_pairs = _material_coupling_pairs(comparisons)
     real_pass = (
@@ -340,8 +355,8 @@ def _classify_joint_correspondence(
         and material_pairs >= criteria.primary_pairs_with_material_mean_gap_required
     )
     if real_pass:
-        return _supported("synthetic and real-packet gaps material", "coupling criteria passed")
-    return _mechanism_only("synthetic mechanism complete", "real-packet materiality not reached")
+        return _supported("synthetic and real-packet gaps material", "coupling criteria passed") #TODO: should be enum, not hardcoded string
+    return _mechanism_only("synthetic mechanism complete", "real-packet materiality not reached") #TODO: should be enum, not hardcoded string
 
 
 def _classify_action_certification(
@@ -369,20 +384,20 @@ def _classify_action_certification(
         MetricId.EXACT_MAP_ACTION_VALUE,
     )
     if not common and not robust:
-        return _not_tested("no unresolved-map fixtures")
+        return _not_tested("no unresolved-map fixtures") #TODO: should be enum, not hardcoded string
     bound_valid = True
     if bounds and values:
         count = min(len(values), len(bounds))
         bound_valid = all(values[index] <= bounds[index] + tolerance for index in range(count))
     if not bound_valid:
-        return _not_supported("orbit-radius bound violated", "map-value bound failure")
+        return _not_supported("orbit-radius bound violated", "map-value bound failure") #TODO: should be enum, not hardcoded string
     common_ok = bool(common) and all(abs(value) <= tolerance for value in common)
     robust_ok = bool(robust) and all(abs(value) <= tolerance or value > 0.0 for value in robust)
     if common_ok and robust_ok:
-        return _supported("common-action and robust-compromise constructed", "map bound valid")
+        return _supported("common-action and robust-compromise constructed", "map bound valid") #TODO: should be enum, not hardcoded string
     if common_ok or robust_ok:
-        return _partial("one controlled family constructed", "map bound valid")
-    return _not_supported("exact map recovery required", "neither controlled family holds")
+        return _partial("one controlled family constructed", "map bound valid") #TODO: should be enum, not hardcoded string
+    return _not_supported("exact map recovery required", "neither controlled family holds") #TODO: should be enum, not hardcoded string
 
 
 def _classify_sparse_operational(
@@ -394,16 +409,16 @@ def _classify_sparse_operational(
         store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
     )
     if not sparse:
-        return _not_tested("no sparsity metrics")
+        return _not_tested("no sparsity metrics") #TODO: should be enum, not hardcoded string
     kill = _sparse_irrelevance_applied(store)
     if kill:
-        return _not_supported("dense dominates sparse supports", "sparse-irrelevance kill")
+        return _not_supported("dense dominates sparse supports", "sparse-irrelevance kill") #TODO: should be enum, not hardcoded string
     useful = sum(1 for gain in sparse if gain > useful_floor)
     if useful >= required.primary_pairs_with_useful_gain_required:
-        return _supported("sparse support retains useful gain", "pair threshold met")
+        return _supported("sparse support retains useful gain", "pair threshold met") #TODO: should be enum, not hardcoded string
     if useful:
-        return _partial("at least one sparse support useful", "full operational rule unmet")
-    return _null_result("no useful sparse support", "irrelevance kill not fired")
+        return _partial("at least one sparse support useful", "full operational rule unmet") #TODO: should be enum, not hardcoded string
+    return _null_result("no useful sparse support", "irrelevance kill not fired") #TODO: should be enum, not hardcoded string
 
 
 def _classify_confirmation(
@@ -414,7 +429,7 @@ def _classify_confirmation(
         record for record in comparisons if record.family == MultiplicityFamily.CONFIRMATION_SAFETY
     )
     if not rows:
-        return _not_tested("no confirmation contrasts")
+        return _not_tested("no confirmation contrasts") #TODO: should be enum, not hardcoded string
     worsening = tuple(
         record
         for record in rows
@@ -422,13 +437,13 @@ def _classify_confirmation(
         and record.mean_difference < -required.pair_harmful_rate_worsening_maximum
     )
     if worsening:
-        return _not_supported("harmful-rate worsening", "safety failure")
+        return _not_supported("harmful-rate worsening", "safety failure") #TODO: should be enum, not hardcoded string
     successful = sum(1 for record in rows if record.decision == ComparisonDecision.SUPERIOR)
     if successful >= required.qualifying_primary_pairs_required:
-        return _supported("confirmation reduces harmful rate", "ARR criterion met")
+        return _supported("confirmation reduces harmful rate", "ARR criterion met") #TODO: should be enum, not hardcoded string
     if successful:
-        return _partial("subset of pairs meet ARR/RRR", "qualifying-pair threshold unmet")
-    return _null_result("no pair meets harm reduction", "no worsening")
+        return _partial("subset of pairs meet ARR/RRR", "qualifying-pair threshold unmet") #TODO: should be enum, not hardcoded string
+    return _null_result("no pair meets harm reduction", "no worsening") #TODO: should be enum, not hardcoded string
 
 
 def _classify_work_structure(store: ArtifactStore) -> EvidenceAdjudication:
@@ -441,14 +456,14 @@ def _classify_work_structure(store: ArtifactStore) -> EvidenceAdjudication:
         MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY,
     )
     if not values and not certificates:
-        return _not_tested("no work-structure Spearman")
+        return _not_tested("no work-structure Spearman") #TODO: should be enum, not hardcoded string
     if certificates and any(value < 1.0 for value in certificates):
-        return _not_supported("counter or certificate mismatch", "approximation required")
+        return _not_supported("counter or certificate mismatch", "approximation required") #TODO: should be enum, not hardcoded string
     if not values:
-        return _partial("certificates match", "runtime-trend evidence missing")
+        return _partial("certificates match", "runtime-trend evidence missing") #TODO: should be enum, not hardcoded string
     if values[0] > 0.0:
-        return _supported("runtime tracks predicted work", "Spearman positive")
-    return _partial("certificates match", "non-positive Spearman")
+        return _supported("runtime tracks predicted work", "Spearman positive") #TODO: should be enum, not hardcoded string
+    return _partial("certificates match", "non-positive Spearman") #TODO: should be enum, not hardcoded string
 
 
 _EXACT_SPARSE_DEPENDENT_QUESTIONS = frozenset(
@@ -475,7 +490,7 @@ def _classify_question(
         exactness = _classify_exactness(store)
         if exactness.status == EvidenceStatus.NOT_SUPPORTED:
             return _not_supported(
-                "exact-sparse separator exactness failed", "exactness-failure kill rule"
+                "exact-sparse separator exactness failed", "exactness-failure kill rule" #TODO: should be enum, not hardcoded string
             )
     if question == ResearchQuestion.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM:
         return _classify_joint_correspondence(store, comparisons)
@@ -512,11 +527,15 @@ def _classify_question(
     return _not_tested("no dedicated contrast family")
 
 
-def _rule_payload(rule: str, state: SimplificationRuleState, reason: str) -> StableJsonPayload:
+def _rule_payload(rule: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                  state: SimplificationRuleState, 
+                  reason: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                  ) -> StableJsonPayload:
     return cast(StableJsonPayload, OrderedDict(rule=rule, state=state.value, reason=reason))
 
 
-def _median(values: tuple[float, ...]) -> float | None:
+def _median(values: tuple[float, ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            ) -> float | None: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     if not values:
         return None
     ordered = tuple(sorted(values))
@@ -539,7 +558,8 @@ def _sparse_irrelevance_applied(store: ArtifactStore) -> bool:
     return useful_fraction < rule.valid_primary_unit_fraction_minimum
 
 
-def _generic_qap_rule(store: ArtifactStore) -> tuple[SimplificationRuleState, str]:
+def _generic_qap_rule(store: ArtifactStore) -> tuple[SimplificationRuleState,
+                                                     str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
     records = completed_experiment_metric_records(
@@ -562,21 +582,22 @@ def _generic_qap_rule(store: ArtifactStore) -> tuple[SimplificationRuleState, st
         and record.metric_value is not None
     )
     if not sparse or not qap:
-        return SimplificationRuleState.NOT_TESTED, "solver runtime ratios not jointly populated"
+        return SimplificationRuleState.NOT_TESTED, "solver runtime ratios not jointly populated" #TODO: should be enum, not hardcoded string
     sparse_median = _median(sparse)
     qap_median = _median(qap)
     if sparse_median is None or qap_median is None or sparse_median <= 0.0:
-        return SimplificationRuleState.NOT_TESTED, "non-positive exact-sparse runtime"
+        return SimplificationRuleState.NOT_TESTED, "non-positive exact-sparse runtime" #TODO: should be enum, not hardcoded string
     rule = active_config().scientific.simplification_rules.generic_qap_dominates
     ratio = qap_median / sparse_median
     if ratio <= rule.median_runtime_ratio_to_exact_sparse_maximum:
-        return SimplificationRuleState.APPLIED, "QAP median runtime at or below exact-sparse"
-    return SimplificationRuleState.NOT_APPLIED, "QAP median runtime exceeds exact-sparse"
+        return SimplificationRuleState.APPLIED, "QAP median runtime at or below exact-sparse" #TODO: should be enum, not hardcoded string
+    return SimplificationRuleState.NOT_APPLIED, "QAP median runtime exceeds exact-sparse" #TODO: should be enum, not hardcoded string
 
 
 def _strict_interface_rule(
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> tuple[SimplificationRuleState, str]:
+) -> tuple[SimplificationRuleState, 
+           str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     rule = active_config().scientific.simplification_rules.strict_interface_removes_gain
     fedorbit = _pair_records(
         comparisons, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, TransferMethod.LOCAL_ONLY
@@ -585,7 +606,7 @@ def _strict_interface_rule(
     if not fedorbit or not oracle:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "FedORBIT and oracle contrasts not jointly populated",
+            "FedORBIT and oracle contrasts not jointly populated", #TODO: should be enum, not hardcoded string
         )
     oracle_by_pair = OrderedDict((record.pair, record) for record in oracle)
     hits = 0
@@ -603,9 +624,9 @@ def _strict_interface_rule(
     if hits >= rule.primary_pair_majority_required:
         return (
             SimplificationRuleState.APPLIED,
-            "strict interface removes gain while oracle succeeds",
+            "strict interface removes gain while oracle succeeds", #TODO: should be enum, not hardcoded string
         )
-    return SimplificationRuleState.NOT_APPLIED, "strict-interface majority not reached"
+    return SimplificationRuleState.NOT_APPLIED, "strict-interface majority not reached" #TODO: should be enum, not hardcoded string
 
 
 def _source_response_rule(store: ArtifactStore) -> tuple[SimplificationRuleState, str]:
@@ -617,13 +638,13 @@ def _source_response_rule(store: ArtifactStore) -> tuple[SimplificationRuleState
     if not failures:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "principal source-packet failure fraction not persisted",
+            "principal source-packet failure fraction not persisted", #TODO: should be enum, not hardcoded string
         )
     rule = active_config().scientific.simplification_rules.source_response_is_too_unstable
     fraction = sum(1 for value in failures if value > 0.0) / len(failures)
     if fraction > rule.principal_source_packet_failure_fraction_strictly_greater_than:
-        return SimplificationRuleState.APPLIED, "source-packet failure fraction exceeds threshold"
-    return SimplificationRuleState.NOT_APPLIED, "source-packet failure fraction below threshold"
+        return SimplificationRuleState.APPLIED, "source-packet failure fraction exceeds threshold" #TODO: should be enum, not hardcoded string
+    return SimplificationRuleState.NOT_APPLIED, "source-packet failure fraction below threshold" #TODO: should be enum, not hardcoded string
 
 
 def _simplification_rule_states(
@@ -646,10 +667,10 @@ def _simplification_rule_states(
             if below >= minimum
             else SimplificationRuleState.NOT_APPLIED
         )
-        rectangular_reason = "real-packet coupling below materiality"
+        rectangular_reason = "real-packet coupling below materiality" #TODO: should be enum, not hardcoded string
     else:
         rectangular = SimplificationRuleState.NOT_TESTED
-        rectangular_reason = "no real-packet coupling gaps"
+        rectangular_reason = "no real-packet coupling gaps" #TODO: should be enum, not hardcoded string
     sparse_gains = _metric_values(
         store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
     )
@@ -659,10 +680,10 @@ def _simplification_rule_states(
             if _sparse_irrelevance_applied(store)
             else SimplificationRuleState.NOT_APPLIED
         )
-        sparse_reason = "sparse useful-unit fraction"
+        sparse_reason = "sparse useful-unit fraction" #TODO: should be enum, not hardcoded string
     else:
         sparse_state = SimplificationRuleState.NOT_TESTED
-        sparse_reason = "no sparsity metrics"
+        sparse_reason = "no sparsity metrics" #TODO: should be enum, not hardcoded string
     point_rows = _pair_records(
         comparisons,
         TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
@@ -679,20 +700,20 @@ def _simplification_rule_states(
         point_state = (
             SimplificationRuleState.APPLIED if advantage else SimplificationRuleState.NOT_APPLIED
         )
-        point_reason = "point-matching vs exact-sparse contrast"
+        point_reason = "point-matching vs exact-sparse contrast" #TODO: should be enum, not hardcoded string
     else:
         point_state = SimplificationRuleState.NOT_TESTED
-        point_reason = "no point-matching contrasts"
+        point_reason = "no point-matching contrasts" #TODO: should be enum, not hardcoded string
     qap_state, qap_reason = _generic_qap_rule(store)
     interface_state, interface_reason = _strict_interface_rule(comparisons)
     source_state, source_reason = _source_response_rule(store)
     return (
-        _rule_payload("rectangularization_is_sufficient", rectangular, rectangular_reason),
-        _rule_payload("generic_qap_dominates", qap_state, qap_reason),
-        _rule_payload("sparse_support_is_operationally_irrelevant", sparse_state, sparse_reason),
-        _rule_payload("point_matching_is_sufficient", point_state, point_reason),
-        _rule_payload("strict_interface_removes_gain", interface_state, interface_reason),
-        _rule_payload("source_response_is_too_unstable", source_state, source_reason),
+        _rule_payload("rectangularization_is_sufficient", rectangular, rectangular_reason), #TODO: should be enum, not hardcoded string
+        _rule_payload("generic_qap_dominates", qap_state, qap_reason), #TODO: should be enum, not hardcoded string
+        _rule_payload("sparse_support_is_operationally_irrelevant", sparse_state, sparse_reason), #TODO: should be enum, not hardcoded string
+        _rule_payload("point_matching_is_sufficient", point_state, point_reason), #TODO: should be enum, not hardcoded string
+        _rule_payload("strict_interface_removes_gain", interface_state, interface_reason), #TODO: should be enum, not hardcoded string
+        _rule_payload("source_response_is_too_unstable", source_state, source_reason), #TODO: should be enum, not hardcoded string
     )
 
 
@@ -728,9 +749,9 @@ def execute_evidence_classification(
                     materiality_result=materiality,
                     statistical_result=statistical,
                     evidence_completeness=completeness,
-                    scope="registered primary evidence",
-                    supporting_table="evidence-status",
-                    supporting_figure="real-transfer-gain-forest-plot",
+                    scope="registered primary evidence", #TODO: should be enum, not hardcoded strings
+                    supporting_table="evidence-status", #TODO: should be enum, not hardcoded strings
+                    supporting_figure="real-transfer-gain-forest-plot", #TODO: should be enum, not hardcoded strings
                     forbidden_wording="",
                 ),
             )
@@ -754,7 +775,7 @@ def execute_evidence_classification(
         ),
         frozenset({ConfigurationSection.METRICS}),
         _MODULE_NAME,
-        "evidence-classification",
+        "evidence-classification", #TODO: should be enum, not hardcoded strings
     )
 
 

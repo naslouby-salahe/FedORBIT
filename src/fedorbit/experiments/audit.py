@@ -68,7 +68,7 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.audit")
+_MODULE_NAME = ProducerModuleName("fedorbit.experiments.audit") #TODO: why is this needed? And not used
 
 
 def _human_audit_researcher_id(index: Index) -> str:
@@ -80,13 +80,13 @@ def _human_audit_directory(
     experiment: ExperimentName,
     source: DatasetId,
     target: DatasetId,
-    researcher_id: str,
+    researcher_id: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Path:
     return (
         experiment_workspace(layout, experiment)
-        / "artifacts"
-        / "fitted"
-        / "human_audit"
+        / "artifacts" #TODO: should be from enum
+        / "fitted" #TODO: should be from enum
+        / "human_audit" #TODO: should be from enum
         / f"{source.value}-to-{target.value}"
         / researcher_id
     )
@@ -219,7 +219,7 @@ def execute_map_availability_applicability_audit(
                 _human_audit_directory(
                     layout, request.experiment, source, target, submission.researcher_id
                 )
-                / "validated.sha256.json",
+                / "validated.sha256.json", #TODO: should be from enum
                 cast(
                     StableJsonPayload,
                     OrderedDict(sha256=submission_sha256(submission)),

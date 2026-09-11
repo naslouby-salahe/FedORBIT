@@ -23,9 +23,9 @@ def validate_ton_iot_schema(schema: AdapterSchema, component: TonIotComponent) -
         raise TonIotValidationError("ToN-IoT schema dataset does not match component")
     if schema.timestamp_column is None:
         raise TonIotValidationError("ToN-IoT schema has no resolved timestamp")
-    if schema.multiclass_label_column != "type" or schema.binary_label_column != "label":
+    if schema.multiclass_label_column != "type" or schema.binary_label_column != "label": #TODO: should be enum
         raise TonIotValidationError("ToN-IoT label semantics are unresolved")
-    identity_markers = ("src_ip", "dst_ip", "pid", "process_id")
+    identity_markers = ("src_ip", "dst_ip", "pid", "process_id") #TODO: Should be enum
     for column in schema.observed_columns:
         lowered = column.casefold()
         if any(marker in lowered for marker in identity_markers) and (
@@ -36,7 +36,7 @@ def validate_ton_iot_schema(schema: AdapterSchema, component: TonIotComponent) -
 
 def validate_ton_iot_label_consistency(rows: tuple[TonIotLabelObservation, ...]) -> None:
     for row in rows:
-        is_normal = normalize_label(row.multiclass_label) == "normal"
+        is_normal = normalize_label(row.multiclass_label) == "normal" #TODO: should be enum
         if row.binary_label not in (0, 1):
             raise TonIotValidationError("binary label must be 0 or 1")
         if is_normal != (row.binary_label == 0):

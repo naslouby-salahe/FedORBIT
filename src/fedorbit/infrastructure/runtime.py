@@ -244,7 +244,8 @@ class ExecutionLogger:
             reuse_decision=event.reuse_decision,
         )
 
-    def event(self, event_name: str, **fields: object) -> None:
+    def event(self, event_name: str #TODO: should be enum not hardcoded string
+              , **fields: object) -> None:
         self._logger.info(event_name, **fields)
 
 

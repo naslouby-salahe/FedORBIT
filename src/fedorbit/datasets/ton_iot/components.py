@@ -36,7 +36,7 @@ def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
         AdapterContract(
             dataset_id,
             (TabularColumnName(expected_timestamp),),
-            (TabularColumnName("type"),),
-            (TabularColumnName("label"),),
+            (TabularColumnName("type"),), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            (TabularColumnName("label"),), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         )
     )

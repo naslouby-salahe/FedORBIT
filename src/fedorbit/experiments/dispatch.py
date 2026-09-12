@@ -93,11 +93,12 @@ from fedorbit.types import (
     ExecutionEventName,
     ExperimentName,
     ExposedCoarseGroupId,
+    FailureHandlingLogCoordinate,
     FieldDescription,
-    InfrastructureLogCoordinate,
     OverwritePolicy,
     Rfc3339UtcTimestamp,
     ScalabilityBlockPattern,
+    ScientificAlgorithmicFailureError,
     SemanticCoordinates,
     Sha256Digest,
     StableJsonPayload,
@@ -236,25 +237,28 @@ def _execute_producer_with_retry(
             )
             _write_immediate_experiment_evidence(store, layout, experiment)
             return
-        except InfrastructureFailureError as error:
+        except (InfrastructureFailureError, ScientificAlgorithmicFailureError) as error:
             classification = classify_failure(error)
             decision = policy.decide(attempt, classification)
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
-                    cell_coordinates=SemanticCoordinates(InfrastructureLogCoordinate.RETRY),
+                    cell_coordinates=SemanticCoordinates(
+                        FailureHandlingLogCoordinate.INFRASTRUCTURE_RETRY
+                        if decision.retry
+                        else FailureHandlingLogCoordinate.SCIENTIFIC_FAILURE
+                    ),
                     artifact_id=None,
                     state=ArtifactState.RUNNING if decision.retry else ArtifactState.FAILED,
                     reuse_note=FieldDescription(
-                        f"attempt {attempt + 1}: {type(error).__name__}: {error} -> "
-                        f"{'retry' if decision.retry else 'exhausted'}"
+                        f"attempt {attempt + 1}: {classification.category}: "
+                        f"{type(error).__name__}: {error} -> "
+                        f"{'retry' if decision.retry else 'terminal'}"
                     ),
                 )
             )
             if not decision.retry:
-                raise ExecutionError(
-                    f"infrastructure failure exhausted retries: {error}"
-                ) from error
+                raise ExecutionError(f"{classification.category} failure: {error}") from error
             attempt += 1
 
 

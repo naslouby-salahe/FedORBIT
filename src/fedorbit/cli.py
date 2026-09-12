@@ -469,7 +469,7 @@ def _metric_values(
 
 
 def _parse_k_pattern_condition(
-    condition: str,
+    condition: EvaluationConditionName,
 ) -> tuple[int, str] | None:
     if not condition.startswith("k"):
         return None

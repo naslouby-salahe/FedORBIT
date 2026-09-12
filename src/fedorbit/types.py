@@ -53,6 +53,7 @@ StatisticalTestName = NewType("StatisticalTestName", str)
 FieldDescription = NewType("FieldDescription", str)
 FailureReason = NewType("FailureReason", str)
 SupportRecordIdentifier = NewType("SupportRecordIdentifier", str)
+ResearcherIdentifier = NewType("ResearcherIdentifier", str)
 CutMasterCounterName = NewType("CutMasterCounterName", str)
 ResourceLimitReason = NewType("ResourceLimitReason", str)
 StrictResourceValidity = NewType("StrictResourceValidity", bool)
@@ -345,8 +346,9 @@ class ExecutionEventName(StrEnum):
     SOLVER_CELL_START = "solver_cell_start"
 
 
-class InfrastructureLogCoordinate(StrEnum):
-    RETRY = "infrastructure-retry"
+class FailureHandlingLogCoordinate(StrEnum):
+    INFRASTRUCTURE_RETRY = "infrastructure-retry"
+    SCIENTIFIC_FAILURE = "scientific-failure"
 
 
 class DatasetPreprocessingState(StrEnum):
@@ -1087,6 +1089,10 @@ class StableSerializationError(ValueError):
 
 
 class StrictResourceViolationError(PermissionError):
+    pass
+
+
+class ScientificAlgorithmicFailureError(RuntimeError):
     pass
 
 

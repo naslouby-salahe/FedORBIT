@@ -14,6 +14,7 @@ from fedorbit.types import (
     DurationMinutes,
     ExposedCoarseGroupId,
     OracleTransferConcept,
+    ResearcherIdentifier,
     Rfc3339UtcTimestamp,
     Sha256Digest,
     StableJsonPayload,
@@ -37,7 +38,7 @@ class UnresolvedAlternativeEntry(DomainModel):
 
 
 class MapAvailabilityAuditSubmission(DomainModel):
-    researcher_id: str
+    researcher_id: ResearcherIdentifier
     directed_pair: DirectedPair
     session_start_utc: Rfc3339UtcTimestamp
     session_end_utc: Rfc3339UtcTimestamp
@@ -51,7 +52,7 @@ _BLANK_SESSION_TIMESTAMP = Rfc3339UtcTimestamp("1970-01-01T00:00:00Z")
 
 
 def blank_audit_template(
-    researcher_id: str,
+    researcher_id: ResearcherIdentifier,
     directed_pair: DirectedPair,
 ) -> MapAvailabilityAuditSubmission:
     return MapAvailabilityAuditSubmission(

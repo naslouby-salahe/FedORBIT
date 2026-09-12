@@ -8,6 +8,7 @@ from fedorbit.types import (
     FailureReason,
     Index,
     RetryCount,
+    ScientificAlgorithmicFailureError,
     StrictResourceViolationError,
     SupportRecordIdentifier,
     TerminalState,
@@ -62,14 +63,6 @@ class SchemaFailureError(FedorbitValidationError):
     pass
 
 
-class ScientificAlgorithmicFailureError(RuntimeError):
-    pass
-
-
-class SparseMasterNonConvergenceError(ScientificAlgorithmicFailureError):
-    pass
-
-
 class CertificateNotProducedError(ScientificAlgorithmicFailureError):
     pass
 
@@ -108,7 +101,7 @@ _VALIDATION_TYPES = (
     SchemaFailureError,
 )
 
-_ALGORITHMIC_TYPES = (SparseMasterNonConvergenceError, CertificateNotProducedError)
+_ALGORITHMIC_TYPES: tuple[type[BaseException], ...] = (ScientificAlgorithmicFailureError,)
 
 
 def classify_failure(error: BaseException) -> FailureClassification:

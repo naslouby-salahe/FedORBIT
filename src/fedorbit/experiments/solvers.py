@@ -780,8 +780,8 @@ def _persist_work_structure_spearman(
 
     records = completed_experiment_metric_records_with_support(store, request.experiment)
     grouped: OrderedDict[tuple[str, int | None], list[tuple[float, float]]] = OrderedDict()
-    work_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
-    runtime_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
+    work_by_key: OrderedDict[tuple[EvaluationConditionName, RandomSeed], float] = OrderedDict()
+    runtime_by_key: OrderedDict[tuple[EvaluationConditionName, RandomSeed], float] = OrderedDict()
     for record, support in records:
         if record.method != TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER:
             continue

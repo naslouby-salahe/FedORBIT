@@ -14,7 +14,6 @@ from fedorbit.infrastructure.failures import (
     ProcessCrashError,
     RetryPolicy,
     SchemaFailureError,
-    SparseMasterNonConvergenceError,
     SplitOverlapError,
     StrictResourceViolationError,
     TheoremPrimitiveMismatchError,
@@ -26,6 +25,7 @@ from fedorbit.infrastructure.failures import (
     solver_limit_outcome,
     validation_failure_outcome,
 )
+from fedorbit.optimization.exact_sparse import SparseMasterNonConvergenceError
 from fedorbit.types import (
     CutMasterCounterName,
     FailureCategory,

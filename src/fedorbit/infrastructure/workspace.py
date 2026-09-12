@@ -224,14 +224,14 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
 def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
     destination = request.preprocessing_root / "validation" / request.dataset.value
     destination.mkdir(parents=True, exist_ok=True)
-    occurrence_counts: Counter[str] = Counter()
+    occurrence_counts: Counter[Sha256Digest] = Counter()
     for source in _selected_raw_paths(request.dataset, request.raw_root):
         with source.open("rb") as handle:
             if not handle.readline().strip():
                 raise RawInventoryError(f"empty selected table: {source}")
             for row in handle:
                 if row.strip():
-                    occurrence_counts[hashlib.sha256(row).hexdigest()] += 1
+                    occurrence_counts[Sha256Digest(hashlib.sha256(row).hexdigest())] += 1
     duplicate_rows = tuple(
         (row_sha256, count, count - 1)
         for row_sha256, count in sorted(occurrence_counts.items())

@@ -41,6 +41,7 @@ from fedorbit.types import (
     NodeIndexList,
     NodeIndices,
     SampleCount,
+    ScientificAlgorithmicFailureError,
     Score,
     SupportCount,
     Tolerance,
@@ -67,7 +68,7 @@ class HighsPresolve(StrEnum):
     ON = "on"
 
 
-class SparseMasterNonConvergenceError(RuntimeError):
+class SparseMasterNonConvergenceError(ScientificAlgorithmicFailureError):
     pass
 
 

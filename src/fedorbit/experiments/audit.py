@@ -64,6 +64,7 @@ from fedorbit.types import (
     Index,
     MetricId,
     MetricUnit,
+    ResearcherIdentifier,
     StableJsonPayload,
     StorageLayoutSegment,
     TransferMethod,
@@ -72,8 +73,8 @@ from fedorbit.types import (
 
 def _human_audit_researcher_id(
     index: Index,
-) -> str:
-    return f"researcher-{index + 1}"
+) -> ResearcherIdentifier:
+    return ResearcherIdentifier(f"researcher-{index + 1}")
 
 
 def _human_audit_directory(
@@ -81,7 +82,7 @@ def _human_audit_directory(
     experiment: ExperimentName,
     source: DatasetId,
     target: DatasetId,
-    researcher_id: str,
+    researcher_id: ResearcherIdentifier,
 ) -> Path:
     return (
         experiment_workspace(layout, experiment)

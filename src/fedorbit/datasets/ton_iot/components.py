@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
-from fedorbit.datasets.common import AdapterContract, DatasetAdapter
+from fedorbit.datasets.common import AdapterContract, DatasetAdapter, KnownDatasetField
 from fedorbit.types import ClientComponentName, DatasetId, DatasetRelativePath, TabularColumnName
 
 
@@ -36,7 +36,7 @@ def ton_iot_adapter(dataset_id: DatasetId) -> DatasetAdapter:
         AdapterContract(
             dataset_id,
             (TabularColumnName(expected_timestamp),),
-            (TabularColumnName("type"),), # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-            (TabularColumnName("label"),), # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            (TabularColumnName(KnownDatasetField.TON_MULTICLASS_LABEL),),
+            (TabularColumnName(KnownDatasetField.TON_BINARY_LABEL),),
         )
     )

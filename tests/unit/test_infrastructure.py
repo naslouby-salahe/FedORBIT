@@ -14,7 +14,7 @@ from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactState,
-    ArtifactTypeName,
+    ArtifactType,
     ExecutionCell,
     OverwritePolicy,
     SemanticCoordinates,
@@ -22,7 +22,7 @@ from fedorbit.types import (
 )
 
 COORDINATES = {"experiment": "Preprocessing", "dataset": "edge_iiotset_network"}
-_PREPARED_SPLIT_ARTIFACT_TYPE = ArtifactTypeName("prepared_split")
+_PREPARED_SPLIT_ARTIFACT_TYPE = ArtifactType.PREPARED_SPLIT
 
 
 def _cell(coordinates: str, fingerprint: str) -> ExecutionCell:
@@ -42,7 +42,7 @@ def _payload(tmp_path: Path, name: str, content: bytes) -> Path:
 def _manifest(
     payload: Path,
     fingerprint: Sha256Digest,
-    artifact_type: ArtifactTypeName = _PREPARED_SPLIT_ARTIFACT_TYPE,
+    artifact_type: ArtifactType = _PREPARED_SPLIT_ARTIFACT_TYPE,
 ) -> ReusableArtifactManifest:
     return ReusableArtifactManifest.model_validate(
         {
@@ -109,7 +109,7 @@ def test_stale_descendant_is_overwritten(tmp_path: Path) -> None:
     fingerprint = dependency_fingerprint(
         COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
     )
-    manifest = _manifest(payload, fingerprint, artifact_type=ArtifactTypeName("checkpoint"))
+    manifest = _manifest(payload, fingerprint, artifact_type=ArtifactType.CHECKPOINT)
     store.write_reusable(manifest)
     reuse = ExecutionReuse(store)
     decisions = reuse.decide(
@@ -142,9 +142,7 @@ def test_stale_descendants_detected_via_upstream_ids(tmp_path: Path) -> None:
     )
     manifest = ReusableArtifactManifest.model_validate(
         {
-            **_manifest(
-                payload, fingerprint, artifact_type=ArtifactTypeName("checkpoint")
-            ).model_dump(),
+            **_manifest(payload, fingerprint, artifact_type=ArtifactType.CHECKPOINT).model_dump(),
             "upstream_artifact_ids": (ArtifactIdentifier("upstream-artifact-1"),),
         }
     )
@@ -160,7 +158,7 @@ def test_promote_completed_manifests_validates_before_reuse(tmp_path: Path) -> N
     fingerprint = dependency_fingerprint(
         COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
     )
-    manifest = _manifest(payload, fingerprint, artifact_type=ArtifactTypeName("response_packet"))
+    manifest = _manifest(payload, fingerprint, artifact_type=ArtifactType.RESPONSE_PACKET)
     reuse = ExecutionReuse(store)
     reuse.promote_completed((manifest,))
     assert store.resolve(manifest.artifact_id).artifact_id == manifest.artifact_id

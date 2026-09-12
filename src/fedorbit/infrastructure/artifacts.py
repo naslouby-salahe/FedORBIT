@@ -17,11 +17,13 @@ from fedorbit.infrastructure.runtime import ExecutionLogEvent, execution_logger
 from fedorbit.infrastructure.storage import StorageError, atomic_write_json
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.types import (
+    ArtifactCacheMissReason,
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactState,
+    ArtifactStoreFileName,
     ExecutionCell,
-    ExecutionStageName,
+    ExecutionEventName,
     SemanticCoordinates,
     StableJsonPayload,
     StorageLayoutSegment,
@@ -38,21 +40,23 @@ class ArtifactStore:
         self._manifests = root / StorageLayoutSegment.MANIFESTS
         self._completions = root / StorageLayoutSegment.COMPLETIONS
         self._staging = root / StorageLayoutSegment.STAGING
-        self._index_path = self._root / "fingerprint-index.json" # TODO: should be enum
-        self._manifest_cache: OrderedDict[str, ReusableArtifactManifest] | None = None # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        self._index_path = self._root / ArtifactStoreFileName.FINGERPRINT_INDEX
+        self._manifest_cache: OrderedDict[ArtifactIdentifier, ReusableArtifactManifest] | None = (
+            None
+        )
 
     @property
     def root(self) -> Path:
         return self._root
 
     def manifest_path(self, artifact_id: ArtifactIdentifier) -> Path:
-        return self._manifests / f"{artifact_id.value}.json" # TODO: should be enum
+        return self._manifests / f"{artifact_id.value}.json"
 
     def manifest_dir(self) -> Path:
         return self._manifests
 
     def completion_path(self, artifact_id: ArtifactIdentifier) -> Path:
-        return self._completions / f"{artifact_id.value}.json" # TODO: should be enum
+        return self._completions / f"{artifact_id.value}.json"
 
     def staging_dir(self) -> Path:
         return self._staging
@@ -62,9 +66,11 @@ class ArtifactStore:
             self.manifest_path(manifest.artifact_id),
             manifest.model_dump(mode="json"),
         )
-        self._index_fingerprint(manifest.dependency_fingerprint_sha256, manifest.artifact_id)
+        self._index_fingerprint(
+            ArtifactFingerprint(manifest.dependency_fingerprint_sha256), manifest.artifact_id
+        )
         if self._manifest_cache is not None:
-            self._manifest_cache[manifest.artifact_id.value] = manifest
+            self._manifest_cache[manifest.artifact_id] = manifest
 
     def write_completed(
         self,
@@ -88,7 +94,7 @@ class ArtifactStore:
                 cell_coordinates=SemanticCoordinates(str(manifest.semantic_producer_coordinates)),
                 artifact_id=manifest.artifact_id,
                 state=ArtifactState.COMPLETED,
-                stage=ExecutionStageName(manifest.producer_stage.value),
+                stage=manifest.producer_stage,
             )
         )
 
@@ -118,20 +124,20 @@ class ArtifactStore:
         self, fingerprint_sha256: ArtifactFingerprint
     ) -> ReusableArtifactManifest | None:
         logger = execution_logger()
-        indexed = self._lookup_index(fingerprint_sha256.value)
+        indexed = self._lookup_index(fingerprint_sha256)
         if indexed is not None:
             try:
                 manifest = self.resolve(indexed)
             except ValueError:
                 logger.event(
-                    "cache_miss", # TODO: should be enum
+                    ExecutionEventName.CACHE_MISS,
                     fingerprint=fingerprint_sha256.value,
-                    reason="indexed_manifest_invalid", # TODO: should be enum
+                    reason=ArtifactCacheMissReason.INDEXED_MANIFEST_INVALID,
                 )
                 return None
             if manifest.dependency_fingerprint_sha256 == fingerprint_sha256.value:
                 logger.event(
-                    "cache_hit", # TODO: should be enum
+                    ExecutionEventName.CACHE_HIT,
                     fingerprint=fingerprint_sha256.value,
                     artifact_id=manifest.artifact_id.value,
                     artifact_path=manifest.payload_paths[0] if manifest.payload_paths else None,
@@ -144,20 +150,24 @@ class ArtifactStore:
                 resolved = self.resolve(manifest.artifact_id)
             except ValueError:
                 logger.event(
-                    "cache_miss", # TODO: should be enum
+                    ExecutionEventName.CACHE_MISS,
                     fingerprint=fingerprint_sha256.value,
-                    reason="manifest_invalid", # TODO: should be enum
+                    reason=ArtifactCacheMissReason.MANIFEST_INVALID,
                 )
                 return None
-            self._index_fingerprint(fingerprint_sha256.value, resolved.artifact_id)
+            self._index_fingerprint(fingerprint_sha256, resolved.artifact_id)
             logger.event(
-                "cache_hit", # TODO: should be enum
+                ExecutionEventName.CACHE_HIT,
                 fingerprint=fingerprint_sha256.value,
                 artifact_id=resolved.artifact_id.value,
                 artifact_path=resolved.payload_paths[0] if resolved.payload_paths else None,
             )
             return resolved
-        logger.event("cache_miss", fingerprint=fingerprint_sha256.value, reason="absent") # TODO: should be enum
+        logger.event(
+            ExecutionEventName.CACHE_MISS,
+            fingerprint=fingerprint_sha256.value,
+            reason=ArtifactCacheMissReason.ABSENT,
+        )
         return None
 
     def remove_manifest(self, artifact_id: ArtifactIdentifier) -> None:
@@ -167,17 +177,27 @@ class ArtifactStore:
         retained = OrderedDict(
             (fingerprint, identifier)
             for fingerprint, identifier in index.items()
-            if identifier != artifact_id.value
+            if identifier != artifact_id
         )
         if retained != index:
-            atomic_write_json(self._index_path, cast(StableJsonPayload, retained))
+            atomic_write_json(
+                self._index_path,
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        (fingerprint.value, identifier.value)
+                        for fingerprint, identifier in retained.items()
+                    ),
+                ),
+            )
         if self._manifest_cache is not None:
-            self._manifest_cache.pop(artifact_id.value, None)
+            self._manifest_cache.pop(artifact_id, None)
 
-    def _load_manifest_cache(self) -> OrderedDict[str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                                                  ReusableArtifactManifest]:
+    def _load_manifest_cache(
+        self,
+    ) -> OrderedDict[ArtifactIdentifier, ReusableArtifactManifest]:
         if self._manifest_cache is None:
-            cache: OrderedDict[str, ReusableArtifactManifest] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            cache: OrderedDict[ArtifactIdentifier, ReusableArtifactManifest] = OrderedDict()
             if self._manifests.is_dir():
                 for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
                     if path.name == self._index_path.name:
@@ -185,40 +205,52 @@ class ArtifactStore:
                     manifest = ReusableArtifactManifest.model_validate_json(
                         path.read_text(encoding="utf-8")
                     )
-                    cache[manifest.artifact_id.value] = manifest
+                    cache[manifest.artifact_id] = manifest
             self._manifest_cache = cache
         return self._manifest_cache
 
     def all_manifests(self) -> tuple[ReusableArtifactManifest, ...]:
         return tuple(self._load_manifest_cache().values())
 
-    def _read_index(self) -> OrderedDict[str, str]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    def _read_index(
+        self,
+    ) -> OrderedDict[ArtifactFingerprint, ArtifactIdentifier]:
         if not self._index_path.is_file():
             return OrderedDict()
         parsed = json.loads(self._index_path.read_text(encoding="utf-8"))
         if not isinstance(parsed, dict):
             return OrderedDict()
-        entries: OrderedDict[str, str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                             ] = OrderedDict()
+        entries: OrderedDict[ArtifactFingerprint, ArtifactIdentifier] = OrderedDict()
         for key, value in parsed.items():
             if isinstance(key, str) and isinstance(value, str):
-                entries[key] = value
+                entries[ArtifactFingerprint(key)] = ArtifactIdentifier(value)
         return entries
 
-    def _lookup_index(self, fingerprint: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                      ) -> ArtifactIdentifier | None:
-        identifier = self._read_index().get(fingerprint)
-        if identifier is None:
-            return None
-        return ArtifactIdentifier(identifier)
+    def _lookup_index(
+        self,
+        fingerprint: ArtifactFingerprint,
+    ) -> ArtifactIdentifier | None:
+        return self._read_index().get(fingerprint)
 
-    def _index_fingerprint(self, fingerprint: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                           , artifact_id: ArtifactIdentifier) -> None:
+    def _index_fingerprint(
+        self,
+        fingerprint: ArtifactFingerprint,
+        artifact_id: ArtifactIdentifier,
+    ) -> None:
         index = self._read_index()
-        if index.get(fingerprint) == artifact_id.value:
+        if index.get(fingerprint) == artifact_id:
             return
-        index[fingerprint] = artifact_id.value
-        atomic_write_json(self._index_path, cast(StableJsonPayload, index))
+        index[fingerprint] = artifact_id
+        atomic_write_json(
+            self._index_path,
+            cast(
+                StableJsonPayload,
+                OrderedDict(
+                    (indexed_fingerprint.value, indexed_artifact_id.value)
+                    for indexed_fingerprint, indexed_artifact_id in index.items()
+                ),
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)

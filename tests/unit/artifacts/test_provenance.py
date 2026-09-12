@@ -5,17 +5,18 @@ import pytest
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.infrastructure.provenance import (
     ProvenanceError,
+    configuration_subset_digest,
     implementation_fingerprint,
     runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.types import (
     ArtifactStage,
+    ConfigurationSection,
     DatasetId,
     DirectedPair,
     ExperimentName,
     ExperimentSeed,
-    ProducerModuleName,
     SemanticCell,
     SemanticCoordinate,
     SupportSize,
@@ -70,25 +71,20 @@ def test_relevance_covers_registered_experiments() -> None:
 
 
 def test_implementation_fingerprint_is_producer_identity() -> None:
-    baseline = implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
-    assert (
-        implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
-        == baseline
-    )
-    assert implementation_fingerprint(ProducerModuleName("fedorbit.config.loading")) != baseline
+    baseline = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    assert implementation_fingerprint("fedorbit.infrastructure.manifests") == baseline
+    assert implementation_fingerprint("fedorbit.config.loading") != baseline
 
 
 def test_implementation_fingerprint_does_not_scan_source() -> None:
-    producer = implementation_fingerprint(ProducerModuleName("fedorbit.infrastructure.manifests"))
-    same_identity = implementation_fingerprint(
-        ProducerModuleName("fedorbit.infrastructure.manifests")
-    )
+    producer = implementation_fingerprint("fedorbit.infrastructure.manifests")
+    same_identity = implementation_fingerprint("fedorbit.infrastructure.manifests")
     assert producer == same_identity
 
 
 def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
     with pytest.raises(ProvenanceError):
-        implementation_fingerprint(ProducerModuleName("os.path"))
+        implementation_fingerprint("os.path")
 
 
 def test_runtime_fingerprint_is_stage_local() -> None:
@@ -117,8 +113,8 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
-        frozenset({"models", "generators"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS, ConfigurationSection.GENERATORS}),
+        "fedorbit.infrastructure.manifests",
     )
     assert stage_dependency_fingerprint(*arguments) == stage_dependency_fingerprint(*arguments)
 
@@ -130,16 +126,16 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         PRIMARY_CELL,
         relevance,
         ("upstream-1",),
-        frozenset({"models"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS}),
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         ("upstream-2",),
-        frozenset({"models"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS}),
+        "fedorbit.infrastructure.manifests",
     )
     assert changed != base
 
@@ -151,16 +147,16 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         PRIMARY_CELL,
         relevance,
         (),
-        frozenset({"models"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS}),
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),
-        frozenset({"models", "generators"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS, ConfigurationSection.GENERATORS}),
+        "fedorbit.infrastructure.manifests",
     )
     assert changed != base
 
@@ -172,15 +168,26 @@ def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
         PRIMARY_CELL,
         relevance,
         (),
-        frozenset({"models"}),
-        ProducerModuleName("fedorbit.infrastructure.manifests"),
+        frozenset({ConfigurationSection.MODELS}),
+        "fedorbit.infrastructure.manifests",
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
         (),
-        frozenset({"models"}),
-        ProducerModuleName("fedorbit.infrastructure.reuse"),
+        frozenset({ConfigurationSection.MODELS}),
+        "fedorbit.infrastructure.reuse",
     )
     assert changed == base
+
+
+def test_every_configuration_section_contributes_to_the_dependency_digest() -> None:
+    empty = configuration_subset_digest(frozenset())
+    per_section = {
+        section: configuration_subset_digest(frozenset({section}))
+        for section in ConfigurationSection
+    }
+    absent = [section for section, digest in per_section.items() if digest == empty]
+    assert not absent, f"configuration sections absent from the dependency digest: {absent}"
+    assert len(set(per_section.values())) == len(ConfigurationSection)

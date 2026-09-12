@@ -13,6 +13,7 @@ from fedorbit.infrastructure.evidence import TableScalar
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.learning.pilot import HOST_DATASETS, NETWORK_DATASETS
 from fedorbit.learning.training import SelectedHyperparameters
+from fedorbit.types import ReportColumnName
 
 
 def test_training_protocol_rows_report_selected_hyperparameters_per_client(
@@ -37,26 +38,29 @@ def test_training_protocol_rows_report_selected_hyperparameters_per_client(
     monkeypatch.setattr(execution, "_pilot_selected_hyperparameters", fake_selected)
 
     rows = training_protocol_rows(store)
-    models: dict[str, Mapping[str, TableScalar]] = {str(row["model"]): row for row in rows}
+    models: dict[str, Mapping[ReportColumnName, TableScalar]] = {
+        str(row[ReportColumnName.MODEL]): row for row in rows
+    }
     assert set(models) == {dataset.value for dataset in selections}
 
     network_row = models[DatasetId.EDGE_IIOTSET_NETWORK.value]
-    assert network_row["architecture"] == "256-128-64 MLP (NetworkFlowClassifier)"
-    assert network_row["normalization"] == "LayerNorm"
-    assert network_row["activation"] == "GELU"
-    assert network_row["initialization"] == "Xavier uniform"
-    assert network_row["optimizer"] == "AdamW"
-    assert network_row["selected_learning_rate"] == pytest.approx(1e-3)
-    assert network_row["selected_weight_decay"] == pytest.approx(1e-4)
-    assert network_row["selected_dropout"] == pytest.approx(0.1)
+    assert network_row[ReportColumnName.ARCHITECTURE] == "256-128-64 MLP (NetworkFlowClassifier)"
+    assert network_row[ReportColumnName.NORMALIZATION] == "LayerNorm"
+    assert network_row[ReportColumnName.ACTIVATION] == "GELU"
+    assert network_row[ReportColumnName.INITIALIZATION] == "Xavier uniform"
+    assert network_row[ReportColumnName.OPTIMIZER] == "AdamW"
+    assert network_row[ReportColumnName.SELECTED_LEARNING_RATE] == pytest.approx(1e-3)
+    assert network_row[ReportColumnName.SELECTED_WEIGHT_DECAY] == pytest.approx(1e-4)
+    assert network_row[ReportColumnName.SELECTED_DROPOUT] == pytest.approx(0.1)
 
     host_row = models[DatasetId.TON_IOT_WINDOWS10_HOST.value]
-    assert host_row["architecture"] == "192-96-48 MLP (HostClassifier)"
-    assert host_row["normalization"] == "BatchNorm1d"
-    assert host_row["activation"] == "ReLU"
-    assert host_row["initialization"] == "Kaiming uniform"
-    assert isinstance(host_row["stopping_rule"], str)
-    assert "epochs" in host_row["stopping_rule"]
+    assert host_row[ReportColumnName.ARCHITECTURE] == "192-96-48 MLP (HostClassifier)"
+    assert host_row[ReportColumnName.NORMALIZATION] == "BatchNorm1d"
+    assert host_row[ReportColumnName.ACTIVATION] == "ReLU"
+    assert host_row[ReportColumnName.INITIALIZATION] == "Kaiming uniform"
+    stopping_rule = host_row[ReportColumnName.STOPPING_RULE]
+    assert isinstance(stopping_rule, str)
+    assert "epochs" in stopping_rule
 
     for dataset in NETWORK_DATASETS:
         assert dataset.value in models

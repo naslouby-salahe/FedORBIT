@@ -1,24 +1,9 @@
 from __future__ import annotations
 
-import importlib.metadata
 import json
 
-import pytest
-
 from fedorbit.config.models import FedorbitConfig
-from fedorbit.infrastructure.environment import (
-    DEPENDENCY_SPECS,
-    environment_snapshot,
-    reference_gpu_matches,
-)
-
-
-def test_dependency_versions_match_configured_contract() -> None:
-    snapshot = environment_snapshot()
-    assert len(snapshot.dependencies) == len(DEPENDENCY_SPECS)
-    for dependency in snapshot.dependencies:
-        assert dependency.observed == importlib.metadata.version(dependency.distribution)
-        assert dependency.observed == dependency.configured, dependency.configured_key
+from fedorbit.infrastructure.environment import environment_snapshot, reference_gpu_matches
 
 
 def test_snapshot_records_python_version() -> None:
@@ -49,20 +34,6 @@ def test_fingerprint_is_deterministic() -> None:
     second = environment_snapshot().fingerprint_sha256
     assert first == second
     assert len(first) == 64
-
-
-def test_fingerprint_changes_with_dependency_version(monkeypatch: pytest.MonkeyPatch) -> None:
-    baseline = environment_snapshot().fingerprint_sha256
-    original_version = importlib.metadata.version
-
-    def altered_version(distribution: str) -> str:
-        if distribution == "numpy":
-            return "9.9.9"
-        return original_version(distribution)
-
-    monkeypatch.setattr(importlib.metadata, "version", altered_version)
-    altered = environment_snapshot().fingerprint_sha256
-    assert altered != baseline
 
 
 def test_environment_snapshot_is_json_serializable() -> None:

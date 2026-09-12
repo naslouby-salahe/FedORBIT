@@ -59,18 +59,17 @@ from fedorbit.types import (
     ConfigurationSection,
     DatasetId,
     DatasetPreprocessingState,
+    ExecutionEventName,
     ExperimentName,
     InvalidReason,
+    OracleTransferConcept,
     OverwritePolicy,
-    ProducerModuleName,
     ResourceLimitReason,
     SampleCount,
     Sha256Digest,
     StableJsonPayload,
     StorageLayoutSegment,
 )
-
-_MODULE_NAME = ProducerModuleName("fedorbit.infrastructure.preparation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,7 +97,7 @@ class DatasetPreparationResult:
 def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparationResult:
     logger = execution_logger()
     logger.event(
-        "preprocess_start", # TODO: should be enum
+        ExecutionEventName.PREPROCESS_START,
         datasets=[dataset.value for dataset in request.datasets],
         overwrite_policy=request.overwrite_policy.value,
     )
@@ -159,7 +158,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
             ) from error
         persist_materialized_client(layout, materialized, request.overwrite_policy)
     logger.event(
-        "preprocess_end", # TODO: should be enum
+        ExecutionEventName.PREPROCESS_END,
         datasets=[dataset.value for dataset in request.datasets],
         blocked=len(resource_blocked),
     )
@@ -186,14 +185,14 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
     )
     raw_counts = OrderedDict((entry.path, entry.row_count) for entry in provenance.raw_files)
     adapter_feature_roles = OrderedDict(
-        (column, materialized.schema.role_of(column).value)
+        (column, materialized.schema.role_of(column))
         for column in materialized.schema.feature_order
     )
     local_class_counts = OrderedDict(
         (label, sum(counts.values())) for label, counts in materialized.class_row_counts.items()
     )
-    transfer_candidate_counts: Mapping[str, SampleCount] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        (str(group.concept.value), group.train_support)
+    transfer_candidate_counts: Mapping[OracleTransferConcept, SampleCount] = OrderedDict(
+        (group.concept, group.train_support)
         for group in transfer_concept_groups(materialized.dataset, materialized)
     )
     feature_quality = FeatureQualityManifest(
@@ -216,7 +215,7 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
             raw_files=raw_files,
             raw_sha256=raw_sha256,
             raw_counts=raw_counts,
-            schema=ArtifactSchemaVersion("1.0"), # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema=ArtifactSchemaVersion.V1,
             adapter_feature_order=materialized.schema.feature_order,
             adapter_feature_roles=adapter_feature_roles,
             accepted_schema_aliases=(provenance.accepted_timestamp_column,),
@@ -233,7 +232,7 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
             preprocessing_state=DatasetPreprocessingState.MATERIALIZED,
             dependency_fingerprint_sha256=dependency_fingerprint_sha256,
             producer_code_sha256=Sha256Digest(
-                implementation_fingerprint(ProducerModuleName("fedorbit.datasets.materialization"))
+                implementation_fingerprint("fedorbit.datasets.materialization")
             ),
         )
     )
@@ -247,9 +246,9 @@ def persist_dataset_manifest(
 ) -> Path:
     destination = (
         experiment_workspace(layout, experiment)
-        / "artifacts" # TODO: should be enum
-        / "derived" # TODO: should be enum
-        / f"dataset-manifest.{dataset.value}.json" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"dataset-manifest.{dataset.value}.json"
     )
     atomic_write_json(destination, manifest.model_dump(mode="json"))
     return destination
@@ -263,7 +262,7 @@ def persist_materialized_client(
     dataset = materialized.dataset
     split_paths: list[Path] = []
     for split, tensors in materialized.splits.items():
-        destination = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet" # TODO: should be enum
+        destination = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet"
         if overwrite_policy == OverwritePolicy.REUSE and destination.is_file():
             split_paths.append(destination)
             continue
@@ -271,13 +270,13 @@ def persist_materialized_client(
             tensors.features.detach().cpu().numpy(),
             columns=materialized.feature_names,
         )
-        frame.insert(len(frame.columns), "target", tensors.targets.detach().cpu().numpy()) # TODO: should be enum
+        frame.insert(len(frame.columns), "target", tensors.targets.detach().cpu().numpy())
         destination.parent.mkdir(parents=True, exist_ok=True)
         promote_parquet(frame, destination.parent, destination.name)
         split_paths.append(destination)
     manifest = build_dataset_manifest(materialized)
     atomic_write_json(
-        layout.preprocessing / "prepared" / dataset.value / "data.json", # TODO: should be enum
+        layout.preprocessing / "prepared" / dataset.value / "data.json",
         manifest.model_dump(mode="json"),
     )
     eligibility = tuple(
@@ -294,7 +293,7 @@ def persist_materialized_client(
         for group in transfer_concept_groups(dataset, materialized)
     )
     atomic_write_json(
-        layout.preprocessing / "features" / dataset.value / "data.json", # TODO: should be enum
+        layout.preprocessing / "features" / dataset.value / "data.json",
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -307,7 +306,7 @@ def persist_materialized_client(
     )
     torch.save(
         materialized,
-        layout.preprocessing / "prepared" / dataset.value / "client.pt", # TODO: should be enum
+        layout.preprocessing / "prepared" / dataset.value / "client.pt",
     )
     return tuple(split_paths)
 
@@ -318,7 +317,11 @@ def persist_client_invalid(
     dataset: DatasetId,
     reason: InvalidReason,
 ) -> None:
-    destination = experiment_workspace(layout, experiment) / "artifacts" / "derived" # TODO: should be enum
+    destination = (
+        experiment_workspace(layout, experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+    )
     payload = cast(
         StableJsonPayload,
         OrderedDict(
@@ -328,23 +331,23 @@ def persist_client_invalid(
             reason=reason,
         ),
     )
-    atomic_write_json(destination / f"{dataset.value}-invalid.json", payload) # TODO: should be enum
+    atomic_write_json(destination / f"{dataset.value}-invalid.json", payload)
 
 
 def load_or_materialize_client(
     dataset: DatasetId, raw_root: Path, layout: WorkspaceLayout
 ) -> MaterializedClient:
-    prepared = layout.preprocessing / "prepared" / dataset.value / "client.pt" # TODO: should be enum
+    prepared = layout.preprocessing / "prepared" / dataset.value / "client.pt"
     if prepared.is_file():
         loaded = torch.load(prepared, map_location="cpu", weights_only=False)
         if isinstance(loaded, MaterializedClient):
             execution_logger().event(
-                "prepared_client_load", # TODO: should be enum
+                ExecutionEventName.PREPARED_CLIENT_LOAD,
                 dataset=dataset.value,
                 artifact_path=str(prepared),
             )
             return loaded
-    execution_logger().event("prepared_client_miss", dataset=dataset.value) # TODO: should be enum
+    execution_logger().event(ExecutionEventName.PREPARED_CLIENT_MISS, dataset=dataset.value)
     materialized = materialize_client(dataset, raw_root)
     if materialized.feature_quality.candidate_count_before_filtering > 0:
         persist_materialized_client(layout, materialized, OverwritePolicy.REUSE)

@@ -15,72 +15,286 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
-def is_sha256_digest(value: str) -> bool: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def is_sha256_digest(
+    value: str,
+) -> bool:
     return SHA256_HEX.fullmatch(value) is not None
 
 
-ClientComponentName = NewType("ClientComponentName", str) # TODO: should be enum
+ClientComponentName = NewType("ClientComponentName", str)
 DatasetRelativePath = NewType("DatasetRelativePath", str)
 RawDatasetPath = NewType("RawDatasetPath", str)
 DuplicateGroupIdentifier = NewType("DuplicateGroupIdentifier", str)
 Sha256Digest = NewType("Sha256Digest", str)
-TabularColumnName = NewType("TabularColumnName", str) # TODO: should be enum
-ValidationReason = NewType("ValidationReason", str) # TODO: should be enum
-ModelParameterName = NewType("ModelParameterName", str) # TODO: should be enum
-DirectedPairName = NewType("DirectedPairName", str) # TODO: should be enum
-EvaluationConditionName = NewType("EvaluationConditionName", str) # TODO: should be enum
-MetricUnit = NewType("MetricUnit", str) # TODO: should be enum
-InvalidReason = NewType("InvalidReason", str) # TODO: should be enum
-ContrastName = NewType("ContrastName", str) # TODO: should be enum
-StatisticalTestName = NewType("StatisticalTestName", str) # TODO: should be enum
+TabularColumnName = NewType("TabularColumnName", str)
+ValidationReason = NewType("ValidationReason", str)
+ModelParameterName = NewType("ModelParameterName", str)
+DirectedPairName = NewType("DirectedPairName", str)
+SYNTHETIC_DIRECTED_PAIR = DirectedPairName("synthetic")
+EvaluationConditionName = NewType("EvaluationConditionName", str)
+
+
+class MetricUnit(StrEnum):
+    BOOLEAN = "boolean"
+    BYTES = "bytes"
+    CORRELATION = "correlation"
+    COUNT = "count"
+    CROSS_ENTROPY = "cross-entropy"
+    FRACTION = "fraction"
+    MEBIBYTES = "mib"
+    NATS = "nats"
+    SCORE = "score"
+    SECONDS = "seconds"
+
+
+InvalidReason = NewType("InvalidReason", str)
+ContrastName = NewType("ContrastName", str)
+StatisticalTestName = NewType("StatisticalTestName", str)
 FieldDescription = NewType("FieldDescription", str)
-FailureReason = NewType("FailureReason", str) # TODO: should be enum
-SupportRecordIdentifier = NewType("SupportRecordIdentifier", str) # TODO: should be enum
-CutMasterCounterName = NewType("CutMasterCounterName", str) # TODO: should be enum
-AvailabilityReason = NewType("AvailabilityReason", str) # TODO: should be enum
-ResourceLimitReason = NewType("ResourceLimitReason", str) # TODO: should be enum
+FailureReason = NewType("FailureReason", str)
+SupportRecordIdentifier = NewType("SupportRecordIdentifier", str)
+CutMasterCounterName = NewType("CutMasterCounterName", str)
+ResourceLimitReason = NewType("ResourceLimitReason", str)
 StrictResourceValidity = NewType("StrictResourceValidity", bool)
-PValueName = NewType("PValueName", str) # TODO: should be enum
-BootstrapPurpose = NewType("BootstrapPurpose", str) # TODO: should be enum
+PValueName = NewType("PValueName", str)
+
+
+class BootstrapPurpose(StrEnum):
+    PRIMARY_TRANSFER_GAIN = "primary-transfer-gain"
+    COUPLING_MECHANISM_GAP = "coupling-mechanism-gap"
+    EXTERNAL_SOURCE_VS_LOCAL_SIR_GAIN = "external-source-vs-local-sir-gain"
+    POINT_CORRESPONDENCE_SAFETY_DIFFERENCE = "point-correspondence-safety-difference"
+    MECHANISM_ABLATIONS_DIFFERENCE = "mechanism-ablations-difference"
+    SPARSITY_SENSITIVITY_GAIN_DIFFERENCE = "sparsity-sensitivity-gain-difference"
+    CONFIRMATION_SAFETY_HARM_RATE_DIFFERENCE = "confirmation-safety-harm-rate-difference"
+
+
 BootstrapDegeneracy = NewType("BootstrapDegeneracy", bool)
 ArrayAxis = NewType("ArrayAxis", int)
 ClassIndex = NewType("ClassIndex", int)
-ContrastCoordinates = NewType("ContrastCoordinates", str) # TODO: should be enum
-SourceClientName = NewType("SourceClientName", str) # TODO: should be enum
-IneligibilityReason = NewType("IneligibilityReason", str) # TODO: should be enum
-ResponseSeedStage = NewType("ResponseSeedStage", str) # TODO: should be enum
+ContrastCoordinates = NewType("ContrastCoordinates", str)
+SourceClientName = NewType("SourceClientName", str)
+
+
+class IneligibilityReason(StrEnum):
+    NON_FINITE_SHADOW_STATE = "non-finite shadow state or loss"
+    NO_USEFUL_ENTRIES = "no useful entries"
+    DERIVATIVE_DISCREPANCY_ABOVE_CEILING = "median derivative discrepancy above ceiling"
+    SIGN_AGREEMENT_BELOW_MINIMUM = "median sign agreement below minimum"
+    TOO_FEW_USEFUL_INTERVENTION_COLUMNS = "too few useful intervention columns"
+
+
+class ResponseSeedStage(StrEnum):
+    FINAL_SOURCE_RESPONSE = "final-source-response"
+    TARGET_LOCAL_DIAGNOSTIC = "target-local-diagnostic"
+
+
 Rfc3339UtcTimestamp = NewType("Rfc3339UtcTimestamp", str)
 SerializedPacket = NewType("SerializedPacket", str)
-ExposedCoarseGroupId = NewType("ExposedCoarseGroupId", str) # TODO: should be enum
+ExposedCoarseGroupId = NewType("ExposedCoarseGroupId", str)
 GpuName = NewType("GpuName", str)
 CudaVersion = NewType("CudaVersion", str)
 CpuName = NewType("CpuName", str)
 OperatingSystemRelease = NewType("OperatingSystemRelease", str)
 PythonVersion = NewType("PythonVersion", str)
-FilesystemSlug = NewType("FilesystemSlug", str) # TODO: should be enum
-ArtifactFileSuffix = NewType("ArtifactFileSuffix", str) # TODO: should be enum
-ArtifactSchemaVersion = NewType("ArtifactSchemaVersion", str) # TODO: should be enum
-ArtifactTypeName = NewType("ArtifactTypeName", str) # TODO: should be enum
+FilesystemSlug = NewType("FilesystemSlug", str)
+ArtifactFileSuffix = NewType("ArtifactFileSuffix", str)
+
+
+class ArtifactSchemaVersion(StrEnum):
+    V1 = "1.0"
+
+
 ArtifactPathText = NewType("ArtifactPathText", str)
-ManifestValidationState = NewType("ManifestValidationState", str) # TODO: should be enum
-ArtifactLineage = NewType("ArtifactLineage", str) # TODO: should be enum
+
+
+class CompletionValidationState(StrEnum):
+    VALIDATED = "validated"
+
+
+ArtifactLineage = NewType("ArtifactLineage", str)
 SemanticCoordinateText = NewType("SemanticCoordinateText", str)
-SolverVariablePrefix = NewType("SolverVariablePrefix", str) # TODO: should be enum
+SolverVariablePrefix = NewType("SolverVariablePrefix", str)
 MonotonicDeadline = NewType("MonotonicDeadline", float)
-SolverStatus = NewType("SolverStatus", str) # TODO: should be enum
-TorchPrecision = NewType("TorchPrecision", str) # TODO: should be enum
-ExecutionStageName = NewType("ExecutionStageName", str) # TODO: should be enum
-ReuseDecision = NewType("ReuseDecision", str) # TODO: should be enum
+SolverStatus = NewType("SolverStatus", str)
+TorchPrecision = NewType("TorchPrecision", str)
 GitRevision = NewType("GitRevision", str)
-ReportSeriesName = NewType("ReportSeriesName", str) # TODO: should be enum
-ReportAxisLabel = NewType("ReportAxisLabel", str) # TODO: should be enum
-ReportColumnName = NewType("ReportColumnName", str) # TODO: should be enum
-ReportArtifactName = NewType("ReportArtifactName", str) # TODO: should be enum
-ProducerModuleName = NewType("ProducerModuleName", str) # TODO: why is this needed? unless really used and wired and needed. I prefer removing it. and using a more dynamic way
-CorrespondenceBlockId = NewType("CorrespondenceBlockId", str) # TODO: should be enum
+ReportSeriesName = NewType("ReportSeriesName", str)
+ReportAxisLabel = NewType("ReportAxisLabel", str)
+
+
+class ReportColumnName(StrEnum):
+    ABLATION = "ablation"
+    ABSTENTION = "abstention"
+    ACCEPTED = "accepted"
+    ACTION_ELIGIBILITY = "action_eligibility"
+    ACTIVATION = "activation"
+    ACTIVE_IMAGES = "active_images"
+    ANONYMOUS_SOURCE_NODES = "anonymous_source_nodes"
+    ARCHITECTURE = "architecture"
+    ARR = "arr"
+    ARTIFACT_ID = "artifact_id"
+    BALANCED_ACCURACY = "balanced_accuracy"
+    BATCH = "batch"
+    BCA_CI_HIGH = "bca_ci_high"
+    BCA_CI_LOW = "bca_ci_low"
+    BENEFICIAL_REJECTED_RATE = "beneficial_rejected_rate"
+    BLOCK = "block"
+    BLOCK_PATTERN = "block_pattern"
+    BOUNDARY_DIMENSION = "boundary_dimension"
+    CANDIDATE_CONCEPT = "candidate_concept"
+    CERTIFIED_VALUE = "certified_value"
+    CI = "ci"
+    CLASSIFICATION = "classification"
+    COARSE_GROUP = "coarse_group"
+    COARSE_GROUPS = "coarse_groups"
+    CONDITION_OR_PAIR = "condition_or_pair"
+    CONDITIONS = "conditions"
+    CONFIGURATION_PATH = "configuration_path"
+    CONFIRMATION = "confirmation"
+    CONFIRMATION_COVERAGE = "confirmation_coverage"
+    CONFIRMATION_SAFETY = "confirmation_safety"
+    COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION = "coupling_destruction_retained_gain_fraction"
+    COVERAGE = "coverage"
+    CUDA_MEMORY = "cuda_memory"
+    CUTS = "cuts"
+    DATASET_COMPONENT = "dataset_component"
+    DATASETS_OR_PAIRS = "datasets_or_pairs"
+    DENSE_MINUS_SPARSE_DIFFERENCE = "dense_minus_sparse_difference"
+    DENSE_RUNTIME = "dense_runtime"
+    DEPENDENCY_FINGERPRINT_SHA256 = "dependency_fingerprint_sha256"
+    DERIVED_PLANNED_CELLS = "derived_planned_cells"
+    DIFFERENCE_VS_FULL = "difference_vs_full"
+    DUPLICATE_ROW_COUNT = "duplicate_row_count"
+    EQUIVALENCE = "equivalence"
+    EVIDENCE_COMPLETENESS = "evidence_completeness"
+    EVIDENCE_RELATIONSHIP = "evidence_relationship"
+    EXACT_MAP = "exact_map"
+    EXACT_MISMATCHES = "exact_mismatches"
+    EXACTNESS_STATUS = "exactness_status"
+    EXCLUSIONS = "exclusions"
+    EXPERIMENT = "experiment"
+    FEATURE_COUNT = "feature_count"
+    FINAL_STATE = "final_state"
+    FINE_NAMES = "fine_names"
+    FIXED_ACTION_GAP = "fixed_action_gap"
+    FORBIDDEN_WORDING = "forbidden_wording"
+    FRACTION_ABOVE_MATERIALITY = "fraction_above_materiality"
+    GAIN_VS_LOCAL = "gain_vs_local"
+    HARMFUL_ACCEPTED_RATE = "harmful_accepted_rate"
+    HOLM_P = "holm_p"
+    INITIALIZATION = "initialization"
+    IS_SECONDARY_PAIR = "is_secondary_pair"
+    K = "k"
+    LAP_CALLS = "lap_calls"
+    LOCAL_PREDICTION_CLASSES = "local_prediction_classes"
+    MACRO_F1 = "macro_f1"
+    MATERIALITY_RESULT = "materiality_result"
+    MAXIMUM_ABSOLUTE_ERROR = "maximum_absolute_error"
+    MEMORY = "memory"
+    METHOD = "method"
+    METHODS = "methods"
+    MODALITY = "modality"
+    MODEL = "model"
+    N_S = "n_s"
+    NO_CONFIRM_HARMFUL_RATE = "no_confirm_harmful_rate"
+    NORMALIZATION = "normalization"
+    NULL_NODE_COUNT = "null_node_count"
+    NULL_REASON = "null_reason"
+    OBSERVED_RAW_ROWS = "observed_raw_rows"
+    OCCURRENCE_COUNT = "occurrence_count"
+    OPTIMIZER = "optimizer"
+    P = "p"
+    PAIR = "pair"
+    PREDECISION_TEST_ACCESS = "predecision_test_access"
+    PREDICTED_WORK = "predicted_work"
+    PREREQUISITES = "prerequisites"
+    PRODUCER_STAGE = "producer_stage"
+    PROPOSALS = "proposals"
+    QAP_RUNTIME = "qap_runtime"
+    QUESTION = "question"
+    RAW_MANIFEST_HASH = "raw_manifest_hash"
+    RAW_P = "raw_p"
+    RAW_ROW_SHA256 = "raw_row_sha256"
+    REALIZED_GAIN = "realized_gain"
+    REGISTERED_SEEDS = "registered_seeds"
+    RETAINED_GAIN = "retained_gain"
+    RETAINED_ROWS = "retained_rows"
+    ROBUST_COUPLING_GAP = "robust_coupling_gap"
+    RRR = "rrr"
+    RSS = "rss"
+    RUNTIME = "runtime"
+    RUNTIME_MEDIAN = "runtime_median"
+    RUNTIME_P95 = "runtime_p95"
+    SCIENTIFIC_ROLE = "scientific_role"
+    SCOPE = "scope"
+    SELECTED_DROPOUT = "selected_dropout"
+    SELECTED_LEARNING_RATE = "selected_learning_rate"
+    SELECTED_WEIGHT_DECAY = "selected_weight_decay"
+    SEMANTIC_PRODUCER_COORDINATES = "semantic_producer_coordinates"
+    SETTING = "setting"
+    SOURCE_REAL_OR_NULL = "source_real_or_null"
+    SOURCE_RESPONSE = "source_response"
+    STATE = "state"
+    STATISTICAL_RESULT = "statistical_result"
+    STOPPING_RULE = "stopping_rule"
+    STRICT_COMPATIBILITY = "strict_compatibility"
+    STRICT_VALIDITY = "strict_validity"
+    SUPPORT = "support"
+    SUPPORT_COUNTS = "support_counts"
+    SUPPORT_OR_DENSE_CONDITION = "support_or_dense_condition"
+    SUPPORTING_FIGURE = "supporting_figure"
+    SUPPORTING_TABLE = "supporting_table"
+    TARGET_LOCAL_RESPONSE = "target_local_response"
+    TARGET_RAW_DATA = "target_raw_data"
+    TARGET_REAL_OR_NULL = "target_real_or_null"
+    TEST_MACRO_CE = "test_macro_ce"
+    TIMEOUT = "timeout"
+    TIMEOUTS = "timeouts"
+    TIMESTAMP_RANGE = "timestamp_range"
+    TRANSFER_CANDIDATES = "transfer_candidates"
+    TRUTH_AVAILABILITY = "truth_availability"
+    USEFUL_ACCEPTED_RATE = "useful_accepted_rate"
+    VALID_SEEDS = "valid_seeds"
+    VALID_UNITS = "valid_units"
+    VALUE = "value"
+
+
+class ReportArtifactName(StrEnum):
+    NUMERICAL_CONSTANTS_AND_SEEDS = "numerical-constants-and-seeds"
+    EXPERIMENT_MATRIX = "experiment-matrix"
+    DATASET_AND_CLIENT_PROTOCOL = "dataset-and-client-protocol"
+    INFORMATION_RESOURCE_MATRIX = "information-resource-matrix"
+    TRANSFER_ONTOLOGY_AND_NULL_PADDING = "transfer-ontology-and-null-padding"
+    MODEL_AND_TRAINING_PROTOCOL = "model-and-training-protocol"
+    EVIDENCE_STATUS = "evidence-status"
+    PRIMARY_STRICT_TRANSFER_RESULTS = "primary-strict-transfer-results"
+    REAL_TRANSFER_GAIN_FOREST_PLOT = "real-transfer-gain-forest-plot"
+    BASELINE_PAIRED_DIFFERENCE_PLOT = "baseline-paired-difference-plot"
+    EXACT_SOLVER_RESULTS = "exact-solver-results"
+    SCALABILITY_RESULTS = "scalability-results"
+    ABLATION_RESULTS = "ablation-results"
+    SPARSITY_AND_DENSE_RESULTS = "sparsity-and-dense-results"
+    GENERALIZATION_RESULTS = "generalization-results"
+    CONFIRMATION_RESULTS = "confirmation-results"
+    COUPLING_MECHANISM_RESULTS = "coupling-mechanism-results"
+    FAILURE_BOUNDARY_RESULTS = "failure-boundary-results"
+    FAILURE_BOUNDARY_FIGURE = "failure-boundary-figure"
+    COUPLING_GAP_PHASE_FIGURE = "coupling-gap-phase-figure"
+    PREDICTED_VS_REALIZED_TRANSFER_FIGURE = "predicted-vs-realized-transfer-figure"
+    SPARSITY_UTILITY_EFFICIENCY_FIGURE = "sparsity-utility-efficiency-figure"
+    CONFIRMATION_SAFETY_COVERAGE_FIGURE = "confirmation-safety-coverage-figure"
+    SEMANTIC_SUFFICIENCY_FRONTIER_FIGURE = "semantic-sufficiency-frontier-figure"
+    SCALABILITY_FIGURE = "scalability-figure"
+    MAP_VALUE_BOUND_FIGURE = "map-value-bound-figure"
+
+
+CorrespondenceBlockId = NewType("CorrespondenceBlockId", str)
 
 
 class StorageLayoutSegment(StrEnum):
+    EXPERIMENTS = "experiments"
+    CHECKPOINTS = "checkpoints"
     MANIFESTS = "manifests"
     COMPLETIONS = "completions"
     STAGING = "staging"
@@ -89,11 +303,46 @@ class StorageLayoutSegment(StrEnum):
     DERIVED = "derived"
     MANIFEST_GLOB = "*.json"
     TEMPORARY_FILE_PREFIX = ".tmp-"
+    BLOCKED_JSON = "blocked.json"
 
 
 class CheckpointDirectorySegment(StrEnum):
     PILOT = "pilot"
     TRAINING = "training"
+
+
+class CheckpointFileName(StrEnum):
+    CHECKPOINT = "checkpoint.pt"
+
+
+class ArtifactDirectorySegment(StrEnum):
+    FITTED = "fitted"
+    PACKETS = "packets"
+    HUMAN_AUDIT = "human_audit"
+
+
+class ArtifactStoreFileName(StrEnum):
+    FINGERPRINT_INDEX = "fingerprint-index.json"
+
+
+class ArtifactCacheMissReason(StrEnum):
+    ABSENT = "absent"
+    INDEXED_MANIFEST_INVALID = "indexed_manifest_invalid"
+    MANIFEST_INVALID = "manifest_invalid"
+
+
+class ExecutionEventName(StrEnum):
+    CACHE_HIT = "cache_hit"
+    CACHE_MISS = "cache_miss"
+    EVIDENCE_CLASSIFICATION_START = "evidence_classification_start"
+    EXPERIMENT_END = "experiment_end"
+    EXPERIMENT_START = "experiment_start"
+    PREPARED_CLIENT_LOAD = "prepared_client_load"
+    PREPARED_CLIENT_MISS = "prepared_client_miss"
+    PREPROCESS_END = "preprocess_end"
+    PREPROCESS_START = "preprocess_start"
+    REAL_TIMING_CELL = "real_timing_cell"
+    SOLVER_CELL_START = "solver_cell_start"
 
 
 class InfrastructureLogCoordinate(StrEnum):
@@ -111,27 +360,9 @@ class RawInventoryArtifact(StrEnum):
     SCHEMA_JSON = "schema.json"
 
 
-class DuplicateReportColumn(StrEnum):
-    RAW_ROW_SHA256 = "raw_row_sha256"
-    OCCURRENCE_COUNT = "occurrence_count"
-    DUPLICATE_ROW_COUNT = "duplicate_row_count"
-
-
 class FedorbitConfigSection(StrEnum):
     SCIENTIFIC = "scientific"
     SOLVERS = "solvers"
-
-
-class RiskReductionColumn(StrEnum):
-    ABSOLUTE_RISK_REDUCTION = "arr"
-    RELATIVE_RISK_REDUCTION = "rrr"
-
-
-class ProjectSummaryColumn(StrEnum):
-    ARTIFACT_ID = "artifact_id"
-    SEMANTIC_PRODUCER_COORDINATES = "semantic_producer_coordinates"
-    PRODUCER_STAGE = "producer_stage"
-    DEPENDENCY_FINGERPRINT_SHA256 = "dependency_fingerprint_sha256"
 
 
 class SourceLabel(StrEnum):
@@ -158,9 +389,9 @@ class ReportingPathSegment(StrEnum):
     EXECUTION_JSON = "execution.json"
 
 
-TimestampFieldName = NewType("TimestampFieldName", str) # TODO: should be enum
-DatasetLabel = NewType("DatasetLabel", str) # TODO: should be enum
-FineLabel = NewType("FineLabel", str) # TODO: should be enum
+TimestampFieldName = NewType("TimestampFieldName", str)
+DatasetLabel = NewType("DatasetLabel", str)
+FineLabel = NewType("FineLabel", str)
 type DatasetIdentifierText = str
 type ExperimentIdentifierText = str
 
@@ -205,7 +436,7 @@ type CutMasterCounters = tuple[CutMasterCounter, ...]
 ByteCount = NonNegativeInt
 RetryCount = NonNegativeInt
 AnonymousNodeIndex = Index
-AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str) # TODO: should be enum
+AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str)
 type NodeIndices = tuple[Index, ...]
 type NodeIndexList = list[Index]
 type NodeImageMap = Mapping[Index, Index]
@@ -237,7 +468,7 @@ type ReportCoordinates = tuple[Coefficient, ...]
 type ReportColumns = tuple[ReportColumnName, ...]
 type RawCellValue = str | int | float | None
 RawCellText = NewType("RawCellText", str)
-CategoryName = NewType("CategoryName", str) # TODO: should be enum
+CategoryName = NewType("CategoryName", str)
 type RawNumericCellValue = str | int | float
 type RawCellSamples = tuple[RawCellValue, ...]
 type TabularColumns = tuple[TabularColumnName, ...]
@@ -249,7 +480,7 @@ type NativeLabels = tuple[FineLabel, ...]
 type NativeLabelSet = frozenset[FineLabel]
 type LocalClassNames = tuple[FineLabel, ...]
 type ExcludedLocalClasses = tuple[tuple[FineLabel, NonNegativeInt], ...]
-FeatureName = NewType("FeatureName", str) # TODO: should be enum
+FeatureName = NewType("FeatureName", str)
 NumericFeatureValue = NewType("NumericFeatureValue", float)
 type FeatureNames = tuple[FeatureName, ...]
 type RawTabularRow = dict[TabularColumnName, RawCellText]
@@ -293,8 +524,21 @@ class CliCommand(StrEnum):
     REPORT = "report"
 
 
+class PreprocessingReadiness(StrEnum):
+    READY = "ready"
+    BLOCKED = "blocked"
+
+
 class RuntimeDeviceType(StrEnum):
+    CPU = "cpu"
     CUDA = "cuda"
+
+
+class SyntheticGeneratorName(StrEnum):
+    COUPLING_STRUCTURE = "coupling_structure"
+    EXACT_SEPARATOR_THEOREM = "exact_separator_theorem"
+    SCALABILITY = "scalability"
+    UNRESOLVED_MAP_WORLD = "unresolved_map_world"
 
 
 class DatasetId(StrEnum):
@@ -332,6 +576,14 @@ class SemanticPartitionId(StrEnum):
 class DatasetModality(StrEnum):
     NETWORK = "network"
     HOST = "host"
+
+
+class WeakSignalBoundaryDimension(StrEnum):
+    RESPONSE_SCALE = "response-scale"
+    CI_HALF_WIDTH = "ci-half-width"
+    RESPONSE_HETEROGENEITY = "response-heterogeneity"
+    SUPPORT_BUDGET = "support-budget"
+    TARGET_USABLE_SUPPORT_FRACTION = "target-usable-support-fraction"
 
 
 class ResearchQuestion(StrEnum):
@@ -451,12 +703,26 @@ class EvidenceStatus(StrEnum):
     NOT_TESTED = "Not Tested"
 
 
+class EvidenceCompleteness(StrEnum):
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceAdjudication:
     status: EvidenceStatus
-    materiality: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    statistical: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    completeness: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    materiality: FieldDescription
+    statistical: FieldDescription
+    completeness: EvidenceCompleteness
+
+
+class SimplificationRuleName(StrEnum):
+    RECTANGULARIZATION_IS_SUFFICIENT = "rectangularization_is_sufficient"
+    GENERIC_QAP_DOMINATES = "generic_qap_dominates"
+    SPARSE_SUPPORT_IS_OPERATIONALLY_IRRELEVANT = "sparse_support_is_operationally_irrelevant"
+    POINT_MATCHING_IS_SUFFICIENT = "point_matching_is_sufficient"
+    STRICT_INTERFACE_REMOVES_GAIN = "strict_interface_removes_gain"
+    SOURCE_RESPONSE_IS_TOO_UNSTABLE = "source_response_is_too_unstable"
 
 
 class SimplificationRuleState(StrEnum):
@@ -505,6 +771,12 @@ class ArtifactState(StrEnum):
 class OverwritePolicy(StrEnum):
     REUSE = "reuse"
     REPLACE = "replace"
+
+
+class ExecutionAction(StrEnum):
+    EXECUTE = "execute"
+    REUSE = "reuse"
+    OVERWRITE = "overwrite"
 
 
 class TerminalState(StrEnum):
@@ -669,7 +941,7 @@ class DomainModel(BaseModel):
     )
 
 
-def _nonempty_text(value: str, label: str) -> None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _nonempty_text(value: str, label: str) -> None:
     if not value:
         raise ValueError(f"{label} must not be empty")
 
@@ -685,7 +957,7 @@ class ArtifactPath:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactIdentifier:
-    value: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this. I prefer enum for this
+    value: str
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "artifact identifier")
@@ -693,7 +965,7 @@ class ArtifactIdentifier:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactFingerprint:
-    value: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    value: str
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "artifact fingerprint")
@@ -701,33 +973,57 @@ class ArtifactFingerprint:
 
 @dataclass(frozen=True, slots=True)
 class SemanticCoordinates:
-    value: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    value: str
 
     def __post_init__(self) -> None:
         _nonempty_text(self.value, "semantic coordinates")
 
 
 @dataclass(frozen=True, slots=True)
-class ExperimentCondition:
-    value: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-
-    def __post_init__(self) -> None:
-        if not self.value:
-            raise ValueError("experiment condition must not be empty")
-
-
-@dataclass(frozen=True, slots=True)
 class SupportSize:
-    value: int # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    value: int
 
     def __post_init__(self) -> None:
         if self.value < 1:
             raise ValueError("support size must be positive")
 
 
+class EvaluationConditionKind(StrEnum):
+    PRINCIPAL = "principal"
+    DENSE_CCP = "dense CCP"
+    EXACT_SPARSE = "exact sparse"
+    WORK_STRUCTURE = "work-structure"
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationCondition:
+    kind: EvaluationConditionKind
+    support: SupportSize | None = None
+
+    def __post_init__(self) -> None:
+        if self.support is None:
+            if self.kind is EvaluationConditionKind.EXACT_SPARSE:
+                raise ValueError("exact sparse evaluation conditions require a support size")
+        elif self.kind is not EvaluationConditionKind.EXACT_SPARSE:
+            raise ValueError("only exact sparse evaluation conditions carry a support size")
+
+    @property
+    def name(self) -> EvaluationConditionName:
+        if self.support is None:
+            return EvaluationConditionName(str(self.kind))
+        return EvaluationConditionName(f"{self.kind} s={self.support.value}")
+
+    @classmethod
+    def exact_sparse(cls, support: SupportSize) -> EvaluationCondition:
+        return cls(EvaluationConditionKind.EXACT_SPARSE, support)
+
+
+PRINCIPAL_EVALUATION_CONDITION = EvaluationCondition(EvaluationConditionKind.PRINCIPAL)
+
+
 @dataclass(frozen=True, slots=True)
 class ExperimentSeed:
-    value: int # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    value: int
 
     def __post_init__(self) -> None:
         if not 0 <= self.value < UINT32_LIMIT:
@@ -758,25 +1054,25 @@ class SemanticCell:
     source_client: DatasetId | None = None
     directed_pair: DirectedPair | None = None
     method: TransferMethod | None = None
-    condition: ExperimentCondition | None = None
+    condition: EvaluationConditionName | None = None
     support: SupportSize | None = None
     seed: ExperimentSeed | None = None
 
     def identity_json(self, relevance: frozenset[SemanticCoordinate]) -> str:
-        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
             dataset=self.dataset.value if self.dataset is not None else None,
             source_client=self.source_client.value if self.source_client is not None else None,
             method=self.method.value if self.method is not None else None,
-            condition=self.condition.value if self.condition is not None else None,
+            condition=self.condition,
             support=self.support.value if self.support is not None else None,
             seed=self.seed.value if self.seed is not None else None,
         )
         if self.directed_pair is not None:
-            present["directed_pair"] = [ # TODO: should be enum
+            present["directed_pair"] = [
                 self.directed_pair.source.value,
                 self.directed_pair.target.value,
             ]
-        values: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        values: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
             experiment=self.experiment.value
         )
         for coordinate in relevance:

@@ -16,7 +16,7 @@ from typing import cast
 from filelock import FileLock
 
 from fedorbit.config.loading import active_config, repository_root
-from fedorbit.datasets.ontology import normalize_label
+from fedorbit.datasets.ontology import NormalTrafficLabel, normalize_label
 from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.types import (
     ComponentColumns,
@@ -120,6 +120,7 @@ class KnownDatasetField(StrEnum):
     EDGE_BINARY_LABEL = "Attack_label"
     TON_MULTICLASS_LABEL = "type"
     TON_BINARY_LABEL = "label"
+    RAW_FILE_DIGESTS = "raw-file-digests.json"
 
 
 class PreprocessingObservationArtifact(StrEnum):
@@ -130,11 +131,18 @@ class PreprocessingObservationArtifact(StrEnum):
 
 
 def _digest_cache_path() -> Path:
-    execution_root = active_config().runtime.artifact_layout.execution_root
-    return repository_root() / execution_root / "cache" / "raw-file-digests.json" # TODO: use enums for this and move to paths for consistency
+    layout = active_config().runtime.artifact_layout
+    return (
+        repository_root()
+        / layout.execution_root
+        / layout.cache_directory
+        / KnownDatasetField.RAW_FILE_DIGESTS
+    )
 
 
-def _load_digest_cache(cache_path: Path) -> dict[str, dict[str, int | str]]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _load_digest_cache(
+    cache_path: Path,
+) -> dict[str, dict[str, int | str]]:
     if not cache_path.is_file():
         return OrderedDict()
     try:
@@ -156,15 +164,15 @@ def file_sha256(path: Path) -> Sha256Digest:
     resolved = str(path.resolve())
     stat = path.stat()
     cache_path = _digest_cache_path()
-    with FileLock(str(cache_path) + ".cachelock"):  # TODO: use enum instead of hardcoded strings
+    with FileLock(str(cache_path) + ".cachelock"):
         cache = _load_digest_cache(cache_path)
         entry = cache.get(resolved)
         if (
             entry is not None
-            and entry.get("size") == stat.st_size # TODO: use enum instead of hardcoded strings
-            and entry.get("mtime_ns") == stat.st_mtime_ns # TODO: use enum instead of hardcoded strings
+            and entry.get("size") == stat.st_size
+            and entry.get("mtime_ns") == stat.st_mtime_ns
         ):
-            return Sha256Digest(cast(str, entry["sha256"])) # TODO: use enum instead of hardcoded strings
+            return Sha256Digest(cast(str, entry["sha256"]))
         digest = _hash_file_contents(path)
         cache[resolved] = OrderedDict(
             size=stat.st_size,
@@ -664,8 +672,7 @@ def _binary_label_disagrees(multiclass: DatasetLabel, binary: DatasetLabel) -> b
     normalized = normalize_label(multiclass)
     if binary not in BinaryLabel:
         return True
-    return (normalized == "normal" # TODO: should be enum
-            ) != (binary == BinaryLabel.BENIGN)
+    return (normalized == NormalTrafficLabel.NORMAL) != (binary == BinaryLabel.BENIGN)
 
 
 def _sorted_counts(counts: Counter[DatasetLabel]) -> tuple[LabelCount, ...]:

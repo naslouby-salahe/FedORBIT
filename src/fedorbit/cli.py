@@ -14,7 +14,7 @@ from typer import Argument, Exit
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
-from fedorbit.experiments.classification import completed_evidence_status_rows
+from fedorbit.experiments.classification import EvidenceStatusRow, completed_evidence_status_rows
 from fedorbit.experiments.dispatch import (
     ExperimentExecutionRequest,
     run_experiment,
@@ -74,6 +74,7 @@ from fedorbit.reporting import (
     transfer_ontology_and_null_padding_table,
 )
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactState,
     CliCommand,
     ClientRole,
@@ -81,19 +82,25 @@ from fedorbit.types import (
     DatasetIdentifierText,
     DatasetModality,
     DirectedPairName,
+    EvaluationConditionName,
     ExitStatus,
     ExperimentIdentifierText,
     ExperimentLocalMethod,
     ExperimentName,
     FailureReason,
+    Index,
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
+    PreprocessingReadiness,
     RandomSeed,
     ReportArtifactName,
+    ReportColumnName,
     ReportSeriesName,
     StableJsonPayload,
+    StorageLayoutSegment,
     TransferMethod,
+    WeakSignalBoundaryDimension,
 )
 
 
@@ -140,7 +147,6 @@ def doctor() -> None:
     gpu_ok = reference_gpu_matches()
     raw_root = raw_dataset_root()
     typer.echo(f"python: {snapshot.python_version}")
-    typer.echo(f"dependencies: {len(snapshot.dependencies)} registered")
     typer.echo(f"reference gpu matches: {gpu_ok}")
     typer.echo(f"raw data root present: {raw_root.is_dir()}")
     if not gpu_ok or not raw_root.is_dir():
@@ -177,13 +183,17 @@ def preprocess(
         )
         for observation in result.observations:
             event_time = observation.event_time
-            state = "ready" if observation.valid_for_chronological_preprocessing else "blocked" # TODO: should be enum
+            state = (
+                PreprocessingReadiness.READY
+                if observation.valid_for_chronological_preprocessing
+                else PreprocessingReadiness.BLOCKED
+            )
             typer.echo(
                 f"{observation.dataset.value}: {state} | chronology={event_time.state.value} | "
                 f"reason={event_time.reason}"
             )
         for dataset, reason in result.resource_blocked_datasets:
-            typer.echo(f"{dataset.value}: blocked | reason={reason}")
+            typer.echo(f"{dataset.value}: {PreprocessingReadiness.BLOCKED} | reason={reason}")
     except (CliUsageError, ExecutionError) as error:
         exit_from_error(error)
 
@@ -223,11 +233,11 @@ def _manifest_payload_mtime_ns(manifest: ReusableArtifactManifest) -> int:
 def _blocked_experiment(layout_root: Path, experiment: ExperimentName) -> bool:
     return (
         layout_root
-        / "experiments" # TODO: should be enum
+        / StorageLayoutSegment.EXPERIMENTS
         / safe_slug(experiment.value)
-        / "artifacts" # TODO: should be enum
-        / "derived" # TODO: should be enum
-        / "blocked.json" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / StorageLayoutSegment.BLOCKED_JSON
     ).is_file()
 
 
@@ -257,60 +267,82 @@ def _base_model_pilot_dataset_manifests(layout: WorkspaceLayout) -> tuple[Datase
     workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
     manifests: list[DatasetManifest] = []
     for dataset in DatasetId:
-        path = workspace / "artifacts" / "derived" / f"dataset-manifest.{dataset.value}.json" # TODO: should be enum
+        path = (
+            workspace
+            / StorageLayoutSegment.ARTIFACTS
+            / StorageLayoutSegment.DERIVED
+            / f"dataset-manifest.{dataset.value}.json"
+        )
         if path.is_file():
             manifests.append(DatasetManifest.model_validate_json(path.read_text(encoding="utf-8")))
     return tuple(manifests)
 
 
-def _dataset_client_roles() -> Mapping[str, ClientRole]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _dataset_client_roles() -> Mapping[DatasetId, ClientRole]:
     return OrderedDict(
-        (dataset.value, client.role)
+        (dataset, client.role)
         for dataset, client in active_config().scientific.datasets.clients.items()
     )
 
 
-def _dataset_modality_by_dataset() -> Mapping[str, str]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    modalities: OrderedDict[str, str] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _dataset_modality_by_dataset() -> Mapping[DatasetId, DatasetModality]:
+    modalities: OrderedDict[DatasetId, DatasetModality] = OrderedDict()
     for dataset in DatasetId:
-        modalities[dataset.value] = (
-            DatasetModality.NETWORK.value
+        modalities[dataset] = (
+            DatasetModality.NETWORK
             if dataset in {DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK}
-            else DatasetModality.HOST.value
+            else DatasetModality.HOST
         )
     return modalities
 
 
-def _excluded_class_counts(manifests: Sequence[DatasetManifest]) -> Mapping[str, int]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _excluded_class_counts(
+    manifests: Sequence[DatasetManifest],
+) -> Mapping[DatasetId, Index]:
     return OrderedDict(
-        (manifest.dataset.value, max(0, manifest.feature_quality.dropped_feature_count))
+        (manifest.dataset, max(0, manifest.feature_quality.dropped_feature_count))
         for manifest in manifests
     )
 
 
 def _experiment_matrix_rows(
     catalogue: ExperimentCatalogue,
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    rows: list[Mapping[str, TableScalar]] = []
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for name in catalogue.registered_names():
         definition = catalogue.definition(name)
         rows.append(
             OrderedDict(
-                experiment=name.value,
-                classification=definition.classification.value,
-                datasets_or_pairs=", ".join(scope.value for scope in definition.datasets_or_pairs),
-                methods=", ".join(str(method) for method in definition.methods),
-                registered_seeds=", ".join(str(seed) for seed in definition.seeds),
-                conditions=str(definition.conditions),
-                derived_planned_cells=int(definition.derived_planned_cells),
-                prerequisites=", ".join(
-                    str(prerequisite) for prerequisite in definition.prerequisites
-                ),
-                evidence_relationship=(
-                    ", ".join(consumer.value for consumer in definition.evidence_consumers)
-                    if definition.evidence_consumers
-                    else "report export" # TODO: should be enum
-                ),
+                (
+                    (ReportColumnName.EXPERIMENT, name.value),
+                    (ReportColumnName.CLASSIFICATION, definition.classification.value),
+                    (
+                        ReportColumnName.DATASETS_OR_PAIRS,
+                        ", ".join(scope.value for scope in definition.datasets_or_pairs),
+                    ),
+                    (
+                        ReportColumnName.METHODS,
+                        ", ".join(str(method) for method in definition.methods),
+                    ),
+                    (
+                        ReportColumnName.REGISTERED_SEEDS,
+                        ", ".join(str(seed) for seed in definition.seeds),
+                    ),
+                    (ReportColumnName.CONDITIONS, str(definition.conditions)),
+                    (ReportColumnName.DERIVED_PLANNED_CELLS, int(definition.derived_planned_cells)),
+                    (
+                        ReportColumnName.PREREQUISITES,
+                        ", ".join(str(prerequisite) for prerequisite in definition.prerequisites),
+                    ),
+                    (
+                        ReportColumnName.EVIDENCE_RELATIONSHIP,
+                        (
+                            ", ".join(consumer.value for consumer in definition.evidence_consumers)
+                            if definition.evidence_consumers
+                            else "report export"
+                        ),
+                    ),
+                )
             )
         )
     return tuple(rows)
@@ -363,7 +395,7 @@ def _baseline_paired_difference_series(
         ((record.pair, record.seed), record.metric_value)
         for record in metric_records
         if record.method == TransferMethod.LOCAL_ONLY
-        and record.condition == "principal" # TODO: should be enum
+        and record.condition == PRINCIPAL_EVALUATION_CONDITION.name
         and record.metric_name == MetricId.MACRO_CROSS_ENTROPY
         and record.valid
         and record.metric_value is not None
@@ -382,7 +414,7 @@ def _baseline_paired_difference_series(
                 if (
                     record.pair != pair
                     or record.method != method
-                    or record.condition != "principal" # TODO: should be enum
+                    or record.condition != PRINCIPAL_EVALUATION_CONDITION.name
                     or record.metric_name != MetricId.MACRO_CROSS_ENTROPY
                     or not record.valid
                     or record.metric_value is None
@@ -405,13 +437,17 @@ def _baseline_paired_difference_series(
     return tuple(series)
 
 
-def _median(values: Sequence[float]) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _median(
+    values: Sequence[float],
+) -> float | None:
     if not values:
         return None
     return statistics.median(values)
 
 
-def _percentile_95(values: Sequence[float]) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _percentile_95(
+    values: Sequence[float],
+) -> float | None:
     if not values:
         return None
     if len(values) == 1:
@@ -421,7 +457,7 @@ def _percentile_95(values: Sequence[float]) -> float | None: # TODO: do not use 
 
 def _metric_values(
     records: Sequence[MetricRecord], method: TransferMethod, metric_name: MetricId
-) -> list[float]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> list[float]:
     return [
         record.metric_value
         for record in records
@@ -432,7 +468,9 @@ def _metric_values(
     ]
 
 
-def _parse_k_pattern_condition(condition: str) -> tuple[int, str] | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _parse_k_pattern_condition(
+    condition: str,
+) -> tuple[int, str] | None:
     if not condition.startswith("k"):
         return None
     k_text, separator, pattern = condition[1:].partition("-")
@@ -443,14 +481,14 @@ def _parse_k_pattern_condition(condition: str) -> tuple[int, str] | None: # TODO
 
 def _exact_solver_results_rows(
     records_with_support: Sequence[tuple[MetricRecord, int | None]],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     groups: OrderedDict[tuple[int, str, int | None], list[MetricRecord]] = OrderedDict()
     for record, support in records_with_support:
         parsed = _parse_k_pattern_condition(record.condition)
         if parsed is None:
             continue
         groups.setdefault((*parsed, support), []).append(record)
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for (k, pattern, support), entries in groups.items():
         errors = _metric_values(
             entries, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, MetricId.ABSOLUTE_OBJECTIVE_ERROR
@@ -481,20 +519,64 @@ def _exact_solver_results_rows(
         )
         rows.append(
             OrderedDict(
-                k=k,
-                block_pattern=pattern,
-                support=support,
-                truth_availability=bool(errors),
-                exact_mismatches=sum(1 for value in validity if value == 0.0),
-                maximum_absolute_error=max(errors) if errors else None,
-                runtime_median=_median(runtimes),
-                runtime_p95=_percentile_95(runtimes),
-                qap_runtime=_median(qap_runtimes),
-                dense_runtime=_median(dense_runtimes),
-                timeouts=sum(1 for value in qap_timeouts if value == 1.0),
-                memory=_median(memory),
-                active_images=_median(active_images),
-                lap_calls=_median(lap_calls),
+                (
+                    (
+                        ReportColumnName.K,
+                        k,
+                    ),
+                    (
+                        ReportColumnName.BLOCK_PATTERN,
+                        pattern,
+                    ),
+                    (
+                        ReportColumnName.SUPPORT,
+                        support,
+                    ),
+                    (
+                        ReportColumnName.TRUTH_AVAILABILITY,
+                        bool(errors),
+                    ),
+                    (
+                        ReportColumnName.EXACT_MISMATCHES,
+                        sum(1 for value in validity if value == 0.0),
+                    ),
+                    (
+                        ReportColumnName.MAXIMUM_ABSOLUTE_ERROR,
+                        max(errors) if errors else None,
+                    ),
+                    (
+                        ReportColumnName.RUNTIME_MEDIAN,
+                        _median(runtimes),
+                    ),
+                    (
+                        ReportColumnName.RUNTIME_P95,
+                        _percentile_95(runtimes),
+                    ),
+                    (
+                        ReportColumnName.QAP_RUNTIME,
+                        _median(qap_runtimes),
+                    ),
+                    (
+                        ReportColumnName.DENSE_RUNTIME,
+                        _median(dense_runtimes),
+                    ),
+                    (
+                        ReportColumnName.TIMEOUTS,
+                        sum(1 for value in qap_timeouts if value == 1.0),
+                    ),
+                    (
+                        ReportColumnName.MEMORY,
+                        _median(memory),
+                    ),
+                    (
+                        ReportColumnName.ACTIVE_IMAGES,
+                        _median(active_images),
+                    ),
+                    (
+                        ReportColumnName.LAP_CALLS,
+                        _median(lap_calls),
+                    ),
+                )
             )
         )
     return tuple(rows)
@@ -502,7 +584,7 @@ def _exact_solver_results_rows(
 
 def _scalability_results_rows(
     records_with_support: Sequence[tuple[MetricRecord, int | None]],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     groups: OrderedDict[tuple[int, str, int | None, TransferMethod], list[MetricRecord]] = (
         OrderedDict()
     )
@@ -511,7 +593,7 @@ def _scalability_results_rows(
         if parsed is None:
             continue
         groups.setdefault((*parsed, support, record.method), []).append(record)
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for (k, pattern, support, method), entries in groups.items():
         runtimes = _metric_values(entries, method, MetricId.WALL_TIME)
         rss = _metric_values(entries, method, MetricId.PEAK_HOST_RSS)
@@ -522,20 +604,64 @@ def _scalability_results_rows(
         predicted_work = _metric_values(entries, method, MetricId.PREDICTED_WORK_COORDINATE)
         rows.append(
             OrderedDict(
-                k=k,
-                block=pattern,
-                support=support,
-                method=method.value,
-                n_s=_median(active_images),
-                lap_calls=_median(lap_calls),
-                cuts=None,
-                runtime_median=_median(runtimes),
-                runtime_p95=_percentile_95(runtimes),
-                rss=_median(rss),
-                cuda_memory=_median(cuda_memory),
-                timeout=sum(1 for value in timeouts if value == 1.0),
-                exactness_status=None,
-                predicted_work=_median(predicted_work),
+                (
+                    (
+                        ReportColumnName.K,
+                        k,
+                    ),
+                    (
+                        ReportColumnName.BLOCK,
+                        pattern,
+                    ),
+                    (
+                        ReportColumnName.SUPPORT,
+                        support,
+                    ),
+                    (
+                        ReportColumnName.METHOD,
+                        method.value,
+                    ),
+                    (
+                        ReportColumnName.N_S,
+                        _median(active_images),
+                    ),
+                    (
+                        ReportColumnName.LAP_CALLS,
+                        _median(lap_calls),
+                    ),
+                    (
+                        ReportColumnName.CUTS,
+                        None,
+                    ),
+                    (
+                        ReportColumnName.RUNTIME_MEDIAN,
+                        _median(runtimes),
+                    ),
+                    (
+                        ReportColumnName.RUNTIME_P95,
+                        _percentile_95(runtimes),
+                    ),
+                    (
+                        ReportColumnName.RSS,
+                        _median(rss),
+                    ),
+                    (
+                        ReportColumnName.CUDA_MEMORY,
+                        _median(cuda_memory),
+                    ),
+                    (
+                        ReportColumnName.TIMEOUT,
+                        sum(1 for value in timeouts if value == 1.0),
+                    ),
+                    (
+                        ReportColumnName.EXACTNESS_STATUS,
+                        None,
+                    ),
+                    (
+                        ReportColumnName.PREDICTED_WORK,
+                        _median(predicted_work),
+                    ),
+                )
             )
         )
     return tuple(rows)
@@ -543,31 +669,59 @@ def _scalability_results_rows(
 
 def _ablation_results_rows(
     records: Sequence[MetricRecord],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     pairs = sorted({record.pair for record in records})
     ablation_methods = sorted(
         {record.method for record in records if record.method != TransferMethod.LOCAL_ONLY},
         key=lambda method: method.value,
     )
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for pair in pairs:
         full_ce = _metric_value_by_condition(
-            records, pair, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, "principal"
+            records,
+            pair,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            PRINCIPAL_EVALUATION_CONDITION.name,
         )
         for method in ablation_methods:
-            ablation_ce = _metric_value_by_condition(records, pair, method, "principal") # TODO: should be enum
+            ablation_ce = _metric_value_by_condition(
+                records, pair, method, PRINCIPAL_EVALUATION_CONDITION.name
+            )
             if ablation_ce is None:
                 continue
             difference_vs_full = ablation_ce - full_ce if full_ce is not None else None
             rows.append(
                 OrderedDict(
-                    ablation=method.value,
-                    pair=pair,
-                    realized_gain=None,
-                    difference_vs_full=difference_vs_full,
-                    equivalence=None,
-                    retained_gain=None,
-                    confirmation_safety=None,
+                    (
+                        (
+                            ReportColumnName.ABLATION,
+                            method.value,
+                        ),
+                        (
+                            ReportColumnName.PAIR,
+                            pair,
+                        ),
+                        (
+                            ReportColumnName.REALIZED_GAIN,
+                            None,
+                        ),
+                        (
+                            ReportColumnName.DIFFERENCE_VS_FULL,
+                            difference_vs_full,
+                        ),
+                        (
+                            ReportColumnName.EQUIVALENCE,
+                            None,
+                        ),
+                        (
+                            ReportColumnName.RETAINED_GAIN,
+                            None,
+                        ),
+                        (
+                            ReportColumnName.CONFIRMATION_SAFETY,
+                            None,
+                        ),
+                    )
                 )
             )
     return tuple(rows)
@@ -575,11 +729,11 @@ def _ablation_results_rows(
 
 def _metric_value_by_condition(
     records: Sequence[MetricRecord],
-    pair: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    pair: DirectedPairName,
     method: TransferMethod,
-    condition: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    condition: EvaluationConditionName,
     metric_name: MetricId = MetricId.MACRO_CROSS_ENTROPY,
-) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> float | None:
     matches = [
         record
         for record in records
@@ -600,13 +754,16 @@ def _metric_value_by_condition(
 def _sparsity_and_dense_results_rows(
     sparsity_records: Sequence[MetricRecord],
     local_only_records: Sequence[MetricRecord],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     pairs = sorted({record.pair for record in sparsity_records})
     conditions = sorted({record.condition for record in sparsity_records})
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for pair in pairs:
         local_only_ce = _metric_value_by_condition(
-            local_only_records, pair, TransferMethod.LOCAL_ONLY, "principal"
+            local_only_records,
+            pair,
+            TransferMethod.LOCAL_ONLY,
+            PRINCIPAL_EVALUATION_CONDITION.name,
         )
         for condition in conditions:
             method = next(
@@ -655,14 +812,40 @@ def _sparsity_and_dense_results_rows(
             )
             rows.append(
                 OrderedDict(
-                    support_or_dense_condition=condition,
-                    pair=pair,
-                    realized_gain=realized_gain,
-                    certified_value=certified,
-                    runtime=runtime,
-                    memory=memory,
-                    confirmation_coverage=coverage,
-                    dense_minus_sparse_difference=None,
+                    (
+                        (
+                            ReportColumnName.SUPPORT_OR_DENSE_CONDITION,
+                            condition,
+                        ),
+                        (
+                            ReportColumnName.PAIR,
+                            pair,
+                        ),
+                        (
+                            ReportColumnName.REALIZED_GAIN,
+                            realized_gain,
+                        ),
+                        (
+                            ReportColumnName.CERTIFIED_VALUE,
+                            certified,
+                        ),
+                        (
+                            ReportColumnName.RUNTIME,
+                            runtime,
+                        ),
+                        (
+                            ReportColumnName.MEMORY,
+                            memory,
+                        ),
+                        (
+                            ReportColumnName.CONFIRMATION_COVERAGE,
+                            coverage,
+                        ),
+                        (
+                            ReportColumnName.DENSE_MINUS_SPARSE_DIFFERENCE,
+                            None,
+                        ),
+                    )
                 )
             )
     return tuple(rows)
@@ -670,7 +853,7 @@ def _sparsity_and_dense_results_rows(
 
 def _generalization_results_rows(
     metric_records: Sequence[MetricRecord],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     pairs = sorted({record.pair for record in metric_records})
     method_order = (
         TransferMethod.LOCAL_ONLY,
@@ -679,7 +862,7 @@ def _generalization_results_rows(
         TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
     )
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for pair in pairs:
         for method in method_order:
             valid_seeds = len(
@@ -696,30 +879,45 @@ def _generalization_results_rows(
                 continue
             rows.append(
                 OrderedDict(
-                    pair=pair,
-                    method=method.value,
-                    valid_seeds=valid_seeds,
-                    test_macro_ce=_metric_value_by_condition(
-                        metric_records, pair, method, "principal"
-                    ),
-                    macro_f1=_metric_value_by_condition(
-                        metric_records, pair, method, "principal", metric_name=MetricId.MACRO_F1
-                    ),
-                    balanced_accuracy=_metric_value_by_condition(
-                        metric_records,
-                        pair,
-                        method,
-                        "principal",
-                        metric_name=MetricId.BALANCED_ACCURACY,
-                    ),
-                    gain_vs_local=None,
-                    bca_ci_low=None,
-                    bca_ci_high=None,
-                    raw_p=None,
-                    holm_p=None,
-                    strict_validity=None,
-                    confirmation_coverage=None,
-                    is_secondary_pair=True,
+                    (
+                        (ReportColumnName.PAIR, pair),
+                        (ReportColumnName.METHOD, method.value),
+                        (ReportColumnName.VALID_SEEDS, valid_seeds),
+                        (
+                            ReportColumnName.TEST_MACRO_CE,
+                            _metric_value_by_condition(
+                                metric_records, pair, method, PRINCIPAL_EVALUATION_CONDITION.name
+                            ),
+                        ),
+                        (
+                            ReportColumnName.MACRO_F1,
+                            _metric_value_by_condition(
+                                metric_records,
+                                pair,
+                                method,
+                                PRINCIPAL_EVALUATION_CONDITION.name,
+                                metric_name=MetricId.MACRO_F1,
+                            ),
+                        ),
+                        (
+                            ReportColumnName.BALANCED_ACCURACY,
+                            _metric_value_by_condition(
+                                metric_records,
+                                pair,
+                                method,
+                                PRINCIPAL_EVALUATION_CONDITION.name,
+                                metric_name=MetricId.BALANCED_ACCURACY,
+                            ),
+                        ),
+                        (ReportColumnName.GAIN_VS_LOCAL, None),
+                        (ReportColumnName.BCA_CI_LOW, None),
+                        (ReportColumnName.BCA_CI_HIGH, None),
+                        (ReportColumnName.RAW_P, None),
+                        (ReportColumnName.HOLM_P, None),
+                        (ReportColumnName.STRICT_VALIDITY, None),
+                        (ReportColumnName.CONFIRMATION_COVERAGE, None),
+                        (ReportColumnName.IS_SECONDARY_PAIR, True),
+                    )
                 )
             )
     return tuple(rows)
@@ -728,9 +926,9 @@ def _generalization_results_rows(
 def _confirmation_results_rows(
     records: Sequence[MetricRecord],
     comparisons: Sequence[PairedComparisonRecord] = (),
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     pairs = sorted({record.pair for record in records})
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for pair in pairs:
         verdicts = [
             record.metric_value
@@ -746,7 +944,7 @@ def _confirmation_results_rows(
         proposals = len(verdicts)
         accepted = sum(1 for value in verdicts if value == 1.0)
 
-        def _mean(metric_name: MetricId, pair_name: DirectedPairName = pair) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        def _mean(metric_name: MetricId, pair_name: DirectedPairName = pair) -> float | None:
             values = [
                 record.metric_value
                 for record in records
@@ -762,18 +960,56 @@ def _confirmation_results_rows(
 
         rows.append(
             OrderedDict(
-                pair=pair,
-                proposals=proposals,
-                accepted=accepted,
-                harmful_accepted_rate=_mean(MetricId.HARMFUL_ACCEPTED_RATE),
-                useful_accepted_rate=_mean(MetricId.USEFUL_ACCEPTED_RATE),
-                beneficial_rejected_rate=_mean(MetricId.BENEFICIAL_REJECTED_RATE),
-                coverage=_mean(MetricId.COVERAGE_CONFIRM) or (accepted / proposals),
-                no_confirm_harmful_rate=_mean(MetricId.HARM_RATE_NO_CONFIRM),
-                arr=_mean(MetricId.ABSOLUTE_RISK_REDUCTION),
-                rrr=_mean(MetricId.RELATIVE_RISK_REDUCTION),
-                ci=_confirmation_ci(comparisons, pair),
-                p=_confirmation_p(comparisons, pair),
+                (
+                    (
+                        ReportColumnName.PAIR,
+                        pair,
+                    ),
+                    (
+                        ReportColumnName.PROPOSALS,
+                        proposals,
+                    ),
+                    (
+                        ReportColumnName.ACCEPTED,
+                        accepted,
+                    ),
+                    (
+                        ReportColumnName.HARMFUL_ACCEPTED_RATE,
+                        _mean(MetricId.HARMFUL_ACCEPTED_RATE),
+                    ),
+                    (
+                        ReportColumnName.USEFUL_ACCEPTED_RATE,
+                        _mean(MetricId.USEFUL_ACCEPTED_RATE),
+                    ),
+                    (
+                        ReportColumnName.BENEFICIAL_REJECTED_RATE,
+                        _mean(MetricId.BENEFICIAL_REJECTED_RATE),
+                    ),
+                    (
+                        ReportColumnName.COVERAGE,
+                        _mean(MetricId.COVERAGE_CONFIRM) or (accepted / proposals),
+                    ),
+                    (
+                        ReportColumnName.NO_CONFIRM_HARMFUL_RATE,
+                        _mean(MetricId.HARM_RATE_NO_CONFIRM),
+                    ),
+                    (
+                        ReportColumnName.ARR,
+                        _mean(MetricId.ABSOLUTE_RISK_REDUCTION),
+                    ),
+                    (
+                        ReportColumnName.RRR,
+                        _mean(MetricId.RELATIVE_RISK_REDUCTION),
+                    ),
+                    (
+                        ReportColumnName.CI,
+                        _confirmation_ci(comparisons, pair),
+                    ),
+                    (
+                        ReportColumnName.P,
+                        _confirmation_p(comparisons, pair),
+                    ),
+                )
             )
         )
     return tuple(rows)
@@ -790,7 +1026,7 @@ def _confirmation_contrast(
 
 def _confirmation_ci(
     comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
-) -> str | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> str | None:
     record = _confirmation_contrast(comparisons, pair)
     if record is None or record.bca_ci_low is None or record.bca_ci_high is None:
         return None
@@ -799,7 +1035,7 @@ def _confirmation_ci(
 
 def _confirmation_p(
     comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
-) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> float | None:
     record = _confirmation_contrast(comparisons, pair)
     if record is None:
         return None
@@ -807,23 +1043,49 @@ def _confirmation_p(
 
 
 def _coupling_gap_row(
-    condition_or_pair: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    gap_values: Sequence[float], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    condition_or_pair: str,
+    gap_values: Sequence[float],
     fixed_action_values: Sequence[float],
-    ci: str | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    holm_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-) -> Mapping[str, TableScalar]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    ci: str | None,
+    holm_p: float | None,
+) -> Mapping[ReportColumnName, TableScalar]:
     materiality = active_config().scientific.materiality.coupling_objective_units
     above_materiality = sum(1 for value in gap_values if value > materiality)
     return OrderedDict(
-        condition_or_pair=condition_or_pair,
-        valid_units=len(gap_values),
-        fixed_action_gap=statistics.fmean(fixed_action_values) if fixed_action_values else None,
-        robust_coupling_gap=statistics.fmean(gap_values) if gap_values else None,
-        fraction_above_materiality=above_materiality / len(gap_values) if gap_values else None,
-        ci=ci,
-        holm_p=holm_p,
-        coupling_destruction_retained_gain_fraction=None,
+        (
+            (
+                ReportColumnName.CONDITION_OR_PAIR,
+                condition_or_pair,
+            ),
+            (
+                ReportColumnName.VALID_UNITS,
+                len(gap_values),
+            ),
+            (
+                ReportColumnName.FIXED_ACTION_GAP,
+                statistics.fmean(fixed_action_values) if fixed_action_values else None,
+            ),
+            (
+                ReportColumnName.ROBUST_COUPLING_GAP,
+                statistics.fmean(gap_values) if gap_values else None,
+            ),
+            (
+                ReportColumnName.FRACTION_ABOVE_MATERIALITY,
+                above_materiality / len(gap_values) if gap_values else None,
+            ),
+            (
+                ReportColumnName.CI,
+                ci,
+            ),
+            (
+                ReportColumnName.HOLM_P,
+                holm_p,
+            ),
+            (
+                ReportColumnName.COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION,
+                None,
+            ),
+        )
     )
 
 
@@ -831,8 +1093,8 @@ def _coupling_mechanism_results_rows(
     synthetic_records: Sequence[MetricRecord],
     real_packet_records: Sequence[MetricRecord],
     comparison_records: Sequence[PairedComparisonRecord],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    rows: list[Mapping[str, TableScalar]] = []
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     conditions = sorted({record.condition for record in synthetic_records})
     for condition in conditions:
         gap_values = [
@@ -897,31 +1159,27 @@ def _coupling_mechanism_results_rows(
     return tuple(rows)
 
 
-_WEAK_SIGNAL_BOUNDARY_DIMENSIONS = (
-    "response-scale", # TODO: should be enum
-    "ci-half-width", # TODO: should be enum
-    "response-heterogeneity", # TODO: should be enum
-    "support-budget", # TODO: should be enum
-    "target-usable-support-fraction", # TODO: should be enum
-)
+_WEAK_SIGNAL_BOUNDARY_DIMENSIONS = tuple(WeakSignalBoundaryDimension)
 
 
-def _boundary_dimension_and_setting(condition: str) -> tuple[str, str]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _boundary_dimension_and_setting(
+    condition: EvaluationConditionName,
+) -> tuple[str, str]:
     for dimension in _WEAK_SIGNAL_BOUNDARY_DIMENSIONS:
         prefix = f"{dimension}-"
         if condition.startswith(prefix):
             return dimension, condition[len(prefix) :]
-    return "semantic-sufficiency-partition", condition # TODO: should be enum
+    return "semantic-sufficiency-partition", condition
 
 
 def _failure_boundary_results_rows(
     weak_signal_records: Sequence[MetricRecord],
     semantic_records: Sequence[MetricRecord],
     primary_transfer_records: Sequence[MetricRecord],
-) -> tuple[Mapping[str, TableScalar], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    rows: list[Mapping[str, TableScalar]] = []
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for experiment_records in (weak_signal_records, semantic_records):
-        cells: set[tuple[DirectedPairName, str, TransferMethod]] = {
+        cells: set[tuple[DirectedPairName, EvaluationConditionName, TransferMethod]] = {
             (record.pair, record.condition, record.method)
             for record in experiment_records
             if record.method != TransferMethod.LOCAL_ONLY
@@ -935,7 +1193,10 @@ def _failure_boundary_results_rows(
             )
             if local_only_ce is None:
                 local_only_ce = _metric_value_by_condition(
-                    primary_transfer_records, pair, TransferMethod.LOCAL_ONLY, "principal"
+                    primary_transfer_records,
+                    pair,
+                    TransferMethod.LOCAL_ONLY,
+                    PRINCIPAL_EVALUATION_CONDITION.name,
                 )
             method_ce = _metric_value_by_condition(experiment_records, pair, method, condition)
             realized_gain = (
@@ -973,25 +1234,57 @@ def _failure_boundary_results_rows(
             )
             rows.append(
                 OrderedDict(
-                    boundary_dimension=dimension,
-                    setting=setting,
-                    pair=pair,
-                    method=method.value,
-                    certified_value=certified_value,
-                    realized_gain=realized_gain,
-                    abstention=abstention,
-                    null_node_count=null_node_count,
-                    confirmation_coverage=confirmation_coverage,
-                    state="Completed", # TODO: should be enum
+                    (
+                        (
+                            ReportColumnName.BOUNDARY_DIMENSION,
+                            dimension,
+                        ),
+                        (
+                            ReportColumnName.SETTING,
+                            setting,
+                        ),
+                        (
+                            ReportColumnName.PAIR,
+                            pair,
+                        ),
+                        (
+                            ReportColumnName.METHOD,
+                            method.value,
+                        ),
+                        (
+                            ReportColumnName.CERTIFIED_VALUE,
+                            certified_value,
+                        ),
+                        (
+                            ReportColumnName.REALIZED_GAIN,
+                            realized_gain,
+                        ),
+                        (
+                            ReportColumnName.ABSTENTION,
+                            abstention,
+                        ),
+                        (
+                            ReportColumnName.NULL_NODE_COUNT,
+                            null_node_count,
+                        ),
+                        (
+                            ReportColumnName.CONFIRMATION_COVERAGE,
+                            confirmation_coverage,
+                        ),
+                        (
+                            ReportColumnName.STATE,
+                            "Completed",
+                        ),
+                    )
                 )
             )
     return tuple(rows)
 
 
 def _numeric_row_series(
-    rows: Sequence[Mapping[str, TableScalar]],
-    x_key: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    y_key: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
+    x_key: ReportColumnName,
+    y_key: ReportColumnName,
 ) -> tuple[FigureSeries, ...]:
     xs: list[float] = []
     ys: list[float] = []
@@ -1008,15 +1301,15 @@ def _numeric_row_series(
 
 
 def _sparsity_figure_series(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
     xs: list[float] = []
     ys: list[float] = []
     sizes: list[float] = []
     for row in rows:
-        runtime = row.get("runtime")
-        gain = row.get("realized_gain")
-        memory = row.get("memory")
+        runtime = row.get(ReportColumnName.RUNTIME)
+        gain = row.get(ReportColumnName.REALIZED_GAIN)
+        memory = row.get(ReportColumnName.MEMORY)
         if not isinstance(runtime, int | float) or not isinstance(gain, int | float):
             continue
         xs.append(float(runtime))
@@ -1026,7 +1319,7 @@ def _sparsity_figure_series(
         return ()
     return (
         FigureSeries(
-            name=ReportSeriesName("sparsity"), # TODO: should be enum
+            name=ReportSeriesName("sparsity"),
             x=tuple(xs),
             y=tuple(ys),
             marker_sizes=tuple(sizes),
@@ -1035,16 +1328,16 @@ def _sparsity_figure_series(
 
 
 def _confirmation_figure_series(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
     starts_x: list[float] = []
     starts_y: list[float] = []
     ends_x: list[float] = []
     ends_y: list[float] = []
     for row in rows:
-        coverage = row.get("coverage")
-        harm = row.get("harmful_accepted_rate")
-        no_confirm_harm = row.get("no_confirm_harmful_rate")
+        coverage = row.get(ReportColumnName.COVERAGE)
+        harm = row.get(ReportColumnName.HARMFUL_ACCEPTED_RATE)
+        no_confirm_harm = row.get(ReportColumnName.NO_CONFIRM_HARMFUL_RATE)
         if not isinstance(coverage, int | float):
             continue
         if not isinstance(harm, int | float) or not isinstance(no_confirm_harm, int | float):
@@ -1057,7 +1350,7 @@ def _confirmation_figure_series(
         return ()
     return (
         FigureSeries(
-            name=ReportSeriesName("no-confirm to confirm"), # TODO: should be enum
+            name=ReportSeriesName("no-confirm to confirm"),
             x=tuple(starts_x),
             y=tuple(starts_y),
             arrow_x=tuple(ends_x),
@@ -1108,15 +1401,15 @@ def _semantic_sufficiency_series(
 
 
 def _failure_boundary_figure_series(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    grouped: OrderedDict[str, list[tuple[float, float]]] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    grouped: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
     for index, row in enumerate(rows):
-        dimension = row.get("boundary_dimension")
-        gain = row.get("realized_gain")
+        dimension = row.get(ReportColumnName.BOUNDARY_DIMENSION)
+        gain = row.get(ReportColumnName.REALIZED_GAIN)
         if not isinstance(dimension, str) or not isinstance(gain, int | float):
             continue
-        setting = row.get("setting")
+        setting = row.get(ReportColumnName.SETTING)
         x_value = float(setting) if isinstance(setting, int | float) else float(index)
         grouped.setdefault(dimension, []).append((x_value, float(gain)))
     return tuple(
@@ -1168,9 +1461,11 @@ def _predicted_vs_realized_series(
 
 
 def _scalability_figure_series(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    return _numeric_row_series(rows, "predicted_work", "runtime_median")
+    return _numeric_row_series(
+        rows, ReportColumnName.PREDICTED_WORK, ReportColumnName.RUNTIME_MEDIAN
+    )
 
 
 def _map_value_bound_series(
@@ -1202,6 +1497,54 @@ def _map_value_bound_series(
             x=tuple(xs),
             y=tuple(ys),
         ),
+    )
+
+
+def _evidence_status_rows(
+    rows: Sequence[EvidenceStatusRow],
+) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
+    return tuple(
+        OrderedDict(
+            (
+                (
+                    ReportColumnName.QUESTION,
+                    row.question,
+                ),
+                (
+                    ReportColumnName.FINAL_STATE,
+                    row.final_state,
+                ),
+                (
+                    ReportColumnName.MATERIALITY_RESULT,
+                    row.materiality_result,
+                ),
+                (
+                    ReportColumnName.STATISTICAL_RESULT,
+                    row.statistical_result,
+                ),
+                (
+                    ReportColumnName.EVIDENCE_COMPLETENESS,
+                    row.evidence_completeness,
+                ),
+                (
+                    ReportColumnName.SCOPE,
+                    row.scope,
+                ),
+                (
+                    ReportColumnName.SUPPORTING_TABLE,
+                    row.supporting_table,
+                ),
+                (
+                    ReportColumnName.SUPPORTING_FIGURE,
+                    row.supporting_figure,
+                ),
+                (
+                    ReportColumnName.FORBIDDEN_WORDING,
+                    row.forbidden_wording,
+                ),
+            )
+        )
+        for row in rows
     )
 
 
@@ -1258,11 +1601,11 @@ def report(
             for table, name in (
                 (
                     numerical_constants_and_seeds_table(),
-                    ReportArtifactName("numerical-constants-and-seeds"), # TODO: should be enum
+                    ReportArtifactName.NUMERICAL_CONSTANTS_AND_SEEDS,
                 ),
                 (
                     experiment_matrix_table(_experiment_matrix_rows(catalogue)),
-                    ReportArtifactName("experiment-matrix"), # TODO: should be enum
+                    ReportArtifactName.EXPERIMENT_MATRIX,
                 ),
                 (
                     dataset_and_client_protocol_table(
@@ -1273,11 +1616,11 @@ def report(
                             _base_model_pilot_dataset_manifests(layout)
                         ),
                     ),
-                    ReportArtifactName("dataset-and-client-protocol"), # TODO: should be enum
+                    ReportArtifactName.DATASET_AND_CLIENT_PROTOCOL,
                 ),
                 (
                     information_resource_matrix_table(),
-                    ReportArtifactName("information-resource-matrix"), # TODO: should be enum
+                    ReportArtifactName.INFORMATION_RESOURCE_MATRIX,
                 ),
             ):
                 typer.echo(str(writer.write_project_evidence_table(table, name)))
@@ -1287,7 +1630,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             transfer_ontology_and_null_padding_table(transfer_ontology_rows),
-                            ReportArtifactName("transfer-ontology-and-null-padding"), # TODO: should be enum
+                            ReportArtifactName.TRANSFER_ONTOLOGY_AND_NULL_PADDING,
                         )
                     )
                 )
@@ -1297,7 +1640,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             model_and_training_protocol_table(model_training_rows),
-                            ReportArtifactName("model-and-training-protocol"), # TODO: should be enum
+                            ReportArtifactName.MODEL_AND_TRAINING_PROTOCOL,
                         )
                     )
                 )
@@ -1306,10 +1649,8 @@ def report(
                 typer.echo(
                     str(
                         writer.write_project_evidence_table(
-                            evidence_status_table(
-                                tuple(row.model_dump(mode="json") for row in evidence_rows)
-                            ),
-                            ReportArtifactName("evidence-status"), # TODO: should be enum
+                            evidence_status_table(_evidence_status_rows(evidence_rows)),
+                            ReportArtifactName.EVIDENCE_STATUS,
                         )
                     )
                 )
@@ -1321,7 +1662,7 @@ def report(
                         primary_strict_transfer_results_table(
                             primary_transfer_metrics, primary_transfer_comparisons
                         ),
-                        ReportArtifactName("primary-strict-transfer-results"), # TODO: should be enum
+                        ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
                     )
                 )
             )
@@ -1331,7 +1672,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             real_transfer_gain_forest_plot(gain_series, gain_pair_labels),
-                            ReportArtifactName("real-transfer-gain-forest-plot"), # TODO: should be enum
+                            ReportArtifactName.REAL_TRANSFER_GAIN_FOREST_PLOT,
                         )
                     )
                 )
@@ -1343,7 +1684,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             baseline_paired_difference_plot(baseline_difference_series),
-                            ReportArtifactName("baseline-paired-difference-plot"), # TODO: should be enum
+                            ReportArtifactName.BASELINE_PAIRED_DIFFERENCE_PLOT,
                         )
                     )
                 )
@@ -1357,7 +1698,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             exact_solver_results_table(solver_benchmark_rows),
-                            ReportArtifactName("exact-solver-results"), # TODO: should be enum
+                            ReportArtifactName.EXACT_SOLVER_RESULTS,
                         )
                     )
                 )
@@ -1371,7 +1712,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             scalability_results_table(scalability_rows),
-                            ReportArtifactName("scalability-results"), # TODO: should be enum
+                            ReportArtifactName.SCALABILITY_RESULTS,
                         )
                     )
                 )
@@ -1383,7 +1724,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             ablation_results_table(ablation_rows),
-                            ReportArtifactName("ablation-results"), # TODO: should be enum
+                            ReportArtifactName.ABLATION_RESULTS,
                         )
                     )
                 )
@@ -1398,7 +1739,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             sparsity_and_dense_results_table(sparsity_and_dense_rows),
-                            ReportArtifactName("sparsity-and-dense-results"), # TODO: should be enum
+                            ReportArtifactName.SPARSITY_AND_DENSE_RESULTS,
                         )
                     )
                 )
@@ -1412,7 +1753,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             generalization_results_table(generalization_rows),
-                            ReportArtifactName("generalization-results"), # TODO: should be enum
+                            ReportArtifactName.GENERALIZATION_RESULTS,
                         )
                     )
                 )
@@ -1427,7 +1768,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             confirmation_results_table(confirmation_rows),
-                            ReportArtifactName("confirmation-results"), # TODO: should be enum
+                            ReportArtifactName.CONFIRMATION_RESULTS,
                         )
                     )
                 )
@@ -1445,7 +1786,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             coupling_mechanism_results_table(coupling_rows),
-                            ReportArtifactName("coupling-mechanism-results"), # TODO: should be enum
+                            ReportArtifactName.COUPLING_MECHANISM_RESULTS,
                         )
                     )
                 )
@@ -1463,7 +1804,7 @@ def report(
                     str(
                         writer.write_project_evidence_table(
                             failure_boundary_results_table(failure_boundary_rows),
-                            ReportArtifactName("failure-boundary-results"), # TODO: should be enum
+                            ReportArtifactName.FAILURE_BOUNDARY_RESULTS,
                         )
                     )
                 )
@@ -1473,19 +1814,21 @@ def report(
                         str(
                             writer.write_project_evidence_figure(
                                 failure_boundary_figure(boundary_series),
-                                ReportArtifactName("failure-boundary-figure"), # TODO: should be enum
+                                ReportArtifactName.FAILURE_BOUNDARY_FIGURE,
                             )
                         )
                     )
             coupling_series = _numeric_row_series(
-                coupling_rows, "condition_or_pair", "fixed_action_gap"
+                coupling_rows,
+                ReportColumnName.CONDITION_OR_PAIR,
+                ReportColumnName.FIXED_ACTION_GAP,
             )
             if coupling_series:
                 typer.echo(
                     str(
                         writer.write_project_evidence_figure(
                             coupling_gap_phase_figure(coupling_series),
-                            ReportArtifactName("coupling-gap-phase-figure"), # TODO: should be enum
+                            ReportArtifactName.COUPLING_GAP_PHASE_FIGURE,
                         )
                     )
                 )
@@ -1495,7 +1838,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             predicted_vs_realized_transfer_figure(predicted_series),
-                            ReportArtifactName("predicted-vs-realized-transfer-figure"), # TODO: should be enum
+                            ReportArtifactName.PREDICTED_VS_REALIZED_TRANSFER_FIGURE,
                         )
                     )
                 )
@@ -1505,7 +1848,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             sparsity_utility_efficiency_figure(sparsity_series),
-                            ReportArtifactName("sparsity-utility-efficiency-figure"), # TODO: should be enum
+                            ReportArtifactName.SPARSITY_UTILITY_EFFICIENCY_FIGURE,
                         )
                     )
                 )
@@ -1515,7 +1858,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             confirmation_safety_coverage_figure(confirmation_series),
-                            ReportArtifactName("confirmation-safety-coverage-figure"), # TODO: should be enum
+                            ReportArtifactName.CONFIRMATION_SAFETY_COVERAGE_FIGURE,
                         )
                     )
                 )
@@ -1529,7 +1872,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             semantic_sufficiency_frontier_figure(frontier_series),
-                            ReportArtifactName("semantic-sufficiency-frontier-figure"), # TODO: should be enum
+                            ReportArtifactName.SEMANTIC_SUFFICIENCY_FRONTIER_FIGURE,
                         )
                     )
                 )
@@ -1539,7 +1882,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             scalability_figure(scalability_series),
-                            ReportArtifactName("scalability-figure"), # TODO: should be enum
+                            ReportArtifactName.SCALABILITY_FIGURE,
                         )
                     )
                 )
@@ -1553,7 +1896,7 @@ def report(
                     str(
                         writer.write_project_evidence_figure(
                             map_value_bound_figure(map_bound_series),
-                            ReportArtifactName("map-value-bound-figure"), # TODO: should be enum
+                            ReportArtifactName.MAP_VALUE_BOUND_FIGURE,
                         )
                     )
                 )

@@ -61,7 +61,7 @@ class NamedPValue:
     def __post_init__(self) -> None:
         if not self.name:
             raise StatisticsError("p-value name must be non-empty")
-        if not math.isfinite(self.p_value) or not 0.0 <= self.p_value <= 1.0:  # TODO: should be constant
+        if not math.isfinite(self.p_value) or not 0.0 <= self.p_value <= 1.0:
             raise StatisticsError("p-value must be finite and lie in [0,1]")
 
 
@@ -101,7 +101,7 @@ _CHI_SQUARE_CDF = cast(Callable[..., Estimate], scipy_stats.chi2.cdf)
 
 
 def nominal_alpha() -> SignificanceLevel:
-    alpha: SignificanceLevel = 1.0 - active_config().scientific.statistics.confidence_level  # TODO: should be constant
+    alpha: SignificanceLevel = 1.0 - active_config().scientific.statistics.confidence_level
     return alpha
 
 
@@ -116,14 +116,14 @@ def sign_flip_p_value(
     differences: DifferenceSeries,
     comparison_tolerance: Tolerance,
 ) -> SignificanceLevel:
-    nonzero = tuple(value for value in differences if value != 0.0)  # TODO: should be constant
+    nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
-        certain: SignificanceLevel = 1.0  # TODO: should be constant
+        certain: SignificanceLevel = 1.0
         return certain
     observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):  # TODO: should be constant
+    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
         permuted_mean = math.fsum(
             sign * value for sign, value in zip(signs, nonzero, strict=True)
         ) / len(nonzero)
@@ -141,14 +141,14 @@ def one_sided_sign_flip_p_value(
 ) -> SignificanceLevel:
     if alternative not in {StatisticalAlternative.GREATER, StatisticalAlternative.LESS}:
         raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
-    nonzero = tuple(value for value in differences if value != 0.0)  # TODO: should be constant
+    nonzero = tuple(value for value in differences if value != 0.0)
     if not nonzero:
-        certain: SignificanceLevel = 1.0  # TODO: should be constant
+        certain: SignificanceLevel = 1.0
         return certain
     observed_mean = _mean(nonzero)
     extremes = 0
     total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):  # TODO: should be constant
+    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
         permuted_mean = math.fsum(
             sign * value for sign, value in zip(signs, nonzero, strict=True)
         ) / len(nonzero)
@@ -182,7 +182,7 @@ def exact_sign_flip_test(
         method - reference
         for method, reference in zip(method_values, reference_values, strict=True)
     )
-    nonzero_count = sum(value != 0.0 for value in differences)  # TODO: should be constant
+    nonzero_count = sum(value != 0.0 for value in differences)
     statistics_config = active_config().scientific.statistics
     maximum = statistics_config.exact_sign_flip_max_nonzero_differences_for_enumeration
     if nonzero_count > maximum:
@@ -345,7 +345,7 @@ def tost_equivalence(
 def holm_step_down(raw_p_values: PValueSet) -> PValueSet:
     ordered = sorted(raw_p_values.entries, key=lambda entry: (entry.p_value, entry.name))
     adjusted: list[NamedPValue] = []
-    running_max = 0.0  # TODO: should be constant
+    running_max = 0.0
     family_size = len(ordered)
     for index, entry in enumerate(ordered):
         scaled = min(1.0, entry.p_value * (family_size - index))

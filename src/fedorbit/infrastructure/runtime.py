@@ -21,18 +21,21 @@ from fedorbit.config.loading import active_config, repository_root
 from fedorbit.infrastructure.environment import EnvironmentSnapshot
 from fedorbit.types import (
     ArtifactIdentifier,
+    ArtifactStage,
     ArtifactState,
     ByteCount,
     DatasetId,
     DerivedSeed,
     ElapsedSeconds,
-    ExecutionStageName,
+    ExecutionAction,
+    ExecutionEventName,
     ExperimentName,
+    FieldDescription,
     GitRevision,
     MemoryMib,
     RandomSeed,
-    ReuseDecision,
     RngNamespace,
+    RuntimeDeviceType,
     SemanticCoordinates,
     SerializedPacket,
     Sha256Digest,
@@ -74,6 +77,19 @@ _set_deterministic_algorithms = cast(Callable[[bool], None], torch.use_determini
 
 class PrincipalDeterminismError(RuntimeError):
     pass
+
+
+class ExecutionDeviceUnavailableError(RuntimeError):
+    pass
+
+
+def execution_device() -> torch.device:
+    configured = active_config().runtime.execution_device
+    if configured is RuntimeDeviceType.CUDA and not torch.cuda.is_available():
+        raise ExecutionDeviceUnavailableError(
+            "configured execution device is unavailable on this host: cuda"
+        )
+    return torch.device(configured)
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,12 +233,13 @@ class ExecutionLogEvent:
     cell_coordinates: SemanticCoordinates
     artifact_id: ArtifactIdentifier | None
     state: ArtifactState
-    stage: ExecutionStageName | None = None
+    stage: ArtifactStage | None = None
     experiment: ExperimentName | None = None
     dataset: DatasetId | None = None
     seed: RandomSeed | None = None
     elapsed_seconds: ElapsedSeconds | None = None
-    reuse_decision: ReuseDecision | None = None
+    reuse_action: ExecutionAction | None = None
+    reuse_note: FieldDescription | None = None
 
 
 class ExecutionLogger:
@@ -241,11 +258,11 @@ class ExecutionLogger:
             dataset=event.dataset.value if event.dataset is not None else None,
             seed=event.seed,
             elapsed_seconds=event.elapsed_seconds,
-            reuse_decision=event.reuse_decision,
+            reuse_action=event.reuse_action,
+            reuse_note=event.reuse_note,
         )
 
-    def event(self, event_name: str
-              , **fields: object) -> None:
+    def event(self, event_name: ExecutionEventName, **fields: object) -> None:
         self._logger.info(event_name, **fields)
 
 
@@ -274,7 +291,7 @@ def _git_head() -> GitRevision:
         timeout=30,
     )
     if result.returncode != 0:
-        return GitRevision("no-git") # TODO: should be enum
+        return GitRevision("no-git")
     return GitRevision(result.stdout.strip())
 
 
@@ -467,7 +484,7 @@ class TorchGeneratorStream:
 
 
 def torch_generator(request: TorchGeneratorRequest) -> TorchGeneratorStream:
-    generator = torch.Generator(device="cpu") # TODO: should be enum instead of hardcoded string
+    generator = torch.Generator(device=RuntimeDeviceType.CPU)
     generator.manual_seed(request.seed)
     return TorchGeneratorStream(generator)
 

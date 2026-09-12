@@ -9,7 +9,10 @@ from fedorbit.cli import (
     dataset_identifier,
     experiment_identifier,
 )
-from fedorbit.types import ExitStatus, ExperimentName
+from fedorbit.types import (
+    ExitStatus,
+    ExperimentName,
+)
 
 runner = CliRunner()
 

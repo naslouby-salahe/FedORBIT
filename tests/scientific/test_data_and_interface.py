@@ -41,7 +41,6 @@ GOVERNED_VALUE_PROBES = (
     ("experiments", "scalability_and_efficiency", "k_values"),
     ("runtime", "failure_handling", "retries_after_initial_infrastructure_failure"),
     ("runtime", "artifact_layout", "execution_root"),
-    ("environment", "python"),
     ("reporting", "precision", "p_value_less_than_threshold"),
 )
 

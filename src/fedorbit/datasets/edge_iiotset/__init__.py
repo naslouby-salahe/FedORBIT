@@ -5,10 +5,8 @@ from fedorbit.datasets.edge_iiotset.loader import (
     inspect_edge_tabular_files,
 )
 from fedorbit.datasets.edge_iiotset.schema import (
-    EDGE_BINARY_LABEL,
     EDGE_EXCLUSIONS,
     EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS,
-    EDGE_MULTICLASS_LABEL,
     edge_iiotset_adapter,
 )
 from fedorbit.datasets.edge_iiotset.validation import (
@@ -19,10 +17,8 @@ from fedorbit.datasets.edge_iiotset.validation import (
 )
 
 __all__ = [
-    "EDGE_BINARY_LABEL",
     "EDGE_EXCLUSIONS",
     "EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS",
-    "EDGE_MULTICLASS_LABEL",
     "EdgeLoaderError",
     "EdgeTabularFile",
     "EdgeValidationError",

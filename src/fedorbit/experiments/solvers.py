@@ -4,8 +4,6 @@ import hashlib
 from collections import OrderedDict
 from typing import cast
 
-import torch
-
 from fedorbit.analysis.records import (
     MetricDirection,
     MetricRecord,
@@ -19,8 +17,8 @@ from fedorbit.datasets.common import (
 from fedorbit.datasets.materialization import (
     MaterializationError,
 )
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import (
     assemble_principal_action,
     build_completion_manifest,
@@ -63,6 +61,7 @@ from fedorbit.infrastructure.runtime import (
     SeedDerivationRequest,
     current_code_revision,
     derive_seed32,
+    execution_device,
     execution_logger,
     measure_efficiency,
 )
@@ -105,21 +104,23 @@ from fedorbit.optimization.objective import (
     zero_action,
 )
 from fedorbit.types import (
+    SYNTHETIC_DIRECTED_PAIR,
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactIdentifiers,
     ArtifactPath,
+    ArtifactSchemaVersion,
     ArtifactStage,
     ArtifactState,
     ArtifactType,
-    ArtifactTypeName,
     CoarseGroup,
     ConceptCount,
     ConfigurationSection,
     ContrastCoordinates,
-    DirectedPairName,
+    EvaluationCondition,
+    EvaluationConditionKind,
     EvaluationConditionName,
-    ExperimentCondition,
+    ExecutionEventName,
     ExperimentName,
     ExperimentSeed,
     Index,
@@ -127,7 +128,6 @@ from fedorbit.types import (
     MetricId,
     MetricUnit,
     OverwritePolicy,
-    ProducerModuleName,
     ReplicateCount,
     RngNamespace,
     ScalabilityBlockPattern,
@@ -138,6 +138,7 @@ from fedorbit.types import (
     Sha256Digest,
     StableJsonPayload,
     StepCount,
+    StorageLayoutSegment,
     SupportCount,
     SupportSize,
     TerminalState,
@@ -145,7 +146,6 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.solvers")
 _THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.ACTION, ConfigurationSection.GENERATORS, ConfigurationSection.SOLVERS}
 )
@@ -160,7 +160,7 @@ def persist_synthetic_benchmark_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    metric_value: float,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -170,7 +170,7 @@ def persist_synthetic_benchmark_metric(
     cell = SemanticCell(
         experiment=experiment,
         method=method,
-        condition=ExperimentCondition(condition),
+        condition=condition,
         support=SupportSize(support),
         seed=ExperimentSeed(seed),
     )
@@ -182,7 +182,7 @@ def persist_synthetic_benchmark_metric(
             relevance,
             (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-            _MODULE_NAME,
+            __name__,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -191,7 +191,7 @@ def persist_synthetic_benchmark_metric(
             return existing
     metric = MetricRecord(
         experiment=experiment,
-        pair=DirectedPairName("synthetic"), # TODO: should be enum instead of hardcoded string
+        pair=SYNTHETIC_DIRECTED_PAIR,
         method=method,
         condition=condition,
         seed=seed,
@@ -210,9 +210,9 @@ def persist_synthetic_benchmark_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" # TODO: use enum, not hardcoded string
-        / "derived" # TODO: use enum, not hardcoded string
-        / f"metric.{condition}.support-{support}.{method.value}.{seed}.{metric_name.value}.json" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"metric.{condition}.support-{support}.{method.value}.{seed}.{metric_name.value}.json"
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
     atomic_write_json(payload_path, payload)
@@ -220,7 +220,7 @@ def persist_synthetic_benchmark_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
     completion = build_completion_manifest(
         coordinates,
@@ -234,9 +234,7 @@ def persist_synthetic_benchmark_metric(
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
-            artifact_id=artifact_id(
-                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
-            ),
+            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
             artifact_type=ArtifactType.PREDICTION,
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
@@ -247,7 +245,7 @@ def persist_synthetic_benchmark_metric(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version=ArtifactSchemaVersion.V1,
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -322,7 +320,7 @@ def _persist_solver_benchmark_error_metrics(
         seed,
         MetricId.ABSOLUTE_OBJECTIVE_ERROR,
         float(absolute_error),
-        MetricUnit("score"), # TODO: should be enum instead of hardcoded string
+        MetricUnit.SCORE,
         MetricDirection.LOWER_IS_BETTER,
         input_artifact_ids,
         overwrite_policy,
@@ -338,7 +336,7 @@ def _persist_solver_benchmark_error_metrics(
         seed,
         MetricId.RELATIVE_OBJECTIVE_ERROR,
         float(relative_error),
-        MetricUnit("fraction"), # TODO: should be enum instead of hardcoded string
+        MetricUnit.FRACTION,
         MetricDirection.LOWER_IS_BETTER,
         input_artifact_ids,
         overwrite_policy,
@@ -357,7 +355,7 @@ def _persist_solver_benchmark_error_metrics(
             reported_objective, reference_truth, exact_validation_absolute_tolerance
         )
         else 0.0,
-        MetricUnit("boolean"), # TODO: should be enum instead of hardcoded string
+        MetricUnit.BOOLEAN,
         MetricDirection.HIGHER_IS_BETTER,
         input_artifact_ids,
         overwrite_policy,
@@ -377,12 +375,20 @@ def _persist_solver_benchmark_efficiency_metrics(
     overwrite_policy: OverwritePolicy,
 ) -> None:
     for metric_name, metric_value, metric_unit in (
-        (MetricId.WALL_TIME, measurement.wall_time_seconds, MetricUnit("seconds")), # TODO: should be enum instead of hardcoded string
-        (MetricId.PEAK_HOST_RSS, measurement.peak_host_rss_mib, MetricUnit("mib")), # TODO: should be enum instead of hardcoded string
+        (
+            MetricId.WALL_TIME,
+            measurement.wall_time_seconds,
+            MetricUnit.SECONDS,
+        ),
+        (
+            MetricId.PEAK_HOST_RSS,
+            measurement.peak_host_rss_mib,
+            MetricUnit.MEBIBYTES,
+        ),
         (
             MetricId.PEAK_CUDA_ALLOCATED_BYTES,
             float(measurement.peak_cuda_allocated_bytes),
-            MetricUnit("bytes"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.BYTES,
         ),
     ):
         persist_synthetic_benchmark_metric(
@@ -415,7 +421,7 @@ def _score_exact_sparse_solver_benchmark_cell(
     methods: tuple[MethodName, ...],
     overwrite_policy: OverwritePolicy,
 ) -> None:
-    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),) # TODO: should be enum instead of hardcoded string
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
     solver_config = active_config().solvers.exact_sparse
     if TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER in methods:
         with measure_efficiency() as efficiency:
@@ -461,7 +467,7 @@ def _score_exact_sparse_solver_benchmark_cell(
             seed,
             MetricId.ACTIVE_IMAGE_CANDIDATES,
             float(outcome.active_image_candidates),
-            MetricUnit("count"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.COUNT,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,
@@ -476,7 +482,7 @@ def _score_exact_sparse_solver_benchmark_cell(
             seed,
             MetricId.LAP_CALLS,
             float(outcome.lap_calls),
-            MetricUnit("count"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.COUNT,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,
@@ -506,7 +512,7 @@ def _score_exact_sparse_solver_benchmark_cell(
             seed,
             MetricId.TIMEOUT_INDICATOR,
             1.0 if qap_result.terminal_state == TerminalState.TIME_LIMIT else 0.0,
-            MetricUnit("boolean"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.BOOLEAN,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,
@@ -561,7 +567,7 @@ def _score_exact_sparse_solver_benchmark_cell(
                 seed,
                 metric_name,
                 float(metric_value),
-                MetricUnit("score"), # TODO: should be enum instead of hardcoded string
+                MetricUnit.SCORE,
                 MetricDirection.DESCRIPTIVE,
                 input_artifact_ids,
                 overwrite_policy,
@@ -595,7 +601,7 @@ def execute_exact_sparse_solver_benchmark(
     for node_count in k_values:
         for pattern in config.block_patterns:
             for support in config.supports:
-                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}") # TODO: should be enum instead of hardcoded string
+                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
                 for seed in confirmatory_seeds:
                     try:
                         problem, action, blocks = synthetic_solver_instance(
@@ -637,7 +643,7 @@ def execute_scalability_and_efficiency(
     for node_count in config.k_values:
         for pattern in config.block_patterns:
             for support in config.exact_qap_supports:
-                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}") # TODO: should be enum instead of hardcoded string
+                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
                 for seed in confirmatory_seeds:
                     try:
                         problem, action, blocks = synthetic_solver_instance(
@@ -650,7 +656,7 @@ def execute_scalability_and_efficiency(
                         * max(blocks.total_padded_nodes, 1)
                     )
                     logger.event(
-                        "solver_cell_start", # TODO: should be enum
+                        ExecutionEventName.SOLVER_CELL_START,
                         experiment=request.experiment.value,
                         k=node_count,
                         pattern=pattern.value,
@@ -666,7 +672,7 @@ def execute_scalability_and_efficiency(
                         seed,
                         MetricId.PREDICTED_WORK_COORDINATE,
                         work,
-                        MetricUnit("count"), # TODO: should be enum instead of hardcoded string
+                        MetricUnit.COUNT,
                         MetricDirection.DESCRIPTIVE,
                         (),
                         request.overwrite_policy,
@@ -684,7 +690,7 @@ def execute_scalability_and_efficiency(
                         exact_methods,
                         request.overwrite_policy,
                     )
-            dense_condition = EvaluationConditionName(f"k{node_count}-{pattern.value}-dense") # TODO: should be enum instead of hardcoded string
+            dense_condition = EvaluationConditionName(f"k{node_count}-{pattern.value}-dense")
             dense_support = config.exact_qap_supports[0]
             for seed in confirmatory_seeds:
                 try:
@@ -713,9 +719,7 @@ def execute_scalability_and_efficiency(
         TransferMethod.GENERIC_EXACT_QAP,
         TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
     )
-    device = torch.device("cuda" # TODO: should be enum instead of hardcoded string
-                          if torch.cuda.is_available() else
-                          "cpu") # TODO: should be enum instead of hardcoded string
+    device = execution_device()
     principal_support = active_config().scientific.action.principal_sparse_support
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -739,9 +743,9 @@ def execute_scalability_and_efficiency(
             )
             if assembly is None:
                 continue
-            condition = EvaluationConditionName(f"real-{source.value}-to-{target.value}") # TODO: should be enum instead of hardcoded string
+            condition = EvaluationConditionName(f"real-{source.value}-to-{target.value}")
             logger.event(
-                "real_timing_cell", # TODO: should be enum
+                ExecutionEventName.REAL_TIMING_CELL,
                 experiment=request.experiment.value,
                 source=source.value,
                 target=target.value,
@@ -775,9 +779,9 @@ def _persist_work_structure_spearman(
     from fedorbit.experiments.synthesis import completed_experiment_metric_records_with_support
 
     records = completed_experiment_metric_records_with_support(store, request.experiment)
-    grouped: OrderedDict[tuple[str, int | None], list[tuple[float, float]]] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    work_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    runtime_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    grouped: OrderedDict[tuple[str, int | None], list[tuple[float, float]]] = OrderedDict()
+    work_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
+    runtime_by_key: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
     for record, support in records:
         if record.method != TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER:
             continue
@@ -805,11 +809,11 @@ def _persist_work_structure_spearman(
         store,
         layout,
         request.experiment,
-        EvaluationConditionName("work-structure"), # TODO: should be enum instead of hardcoded string
+        EvaluationCondition(EvaluationConditionKind.WORK_STRUCTURE).name,
         active_config().scientific.randomness.confirmatory_seeds[0],
         MetricId.WORK_STRUCTURE_SPEARMAN,
         correlation,
-        MetricUnit("correlation"), # TODO: should be enum instead of hardcoded string
+        MetricUnit.CORRELATION,
         MetricDirection.DESCRIPTIVE,
         (),
         request.overwrite_policy,
@@ -823,7 +827,7 @@ def persist_synthetic_diagnostic_metric(
     condition: EvaluationConditionName,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    metric_value: float,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -833,7 +837,7 @@ def persist_synthetic_diagnostic_metric(
     cell = SemanticCell(
         experiment=experiment,
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-        condition=ExperimentCondition(condition),
+        condition=condition,
         seed=ExperimentSeed(seed),
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -844,7 +848,7 @@ def persist_synthetic_diagnostic_metric(
             relevance,
             (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-            _MODULE_NAME,
+            __name__,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -853,7 +857,7 @@ def persist_synthetic_diagnostic_metric(
             return existing
     metric = MetricRecord(
         experiment=experiment,
-        pair=DirectedPairName("synthetic"), # TODO: should be enum instead of hardcoded string
+        pair=SYNTHETIC_DIRECTED_PAIR,
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         condition=condition,
         seed=seed,
@@ -872,9 +876,9 @@ def persist_synthetic_diagnostic_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" # TODO: should be enum instead of hardcoded string
-        / "derived" # TODO: should be enum instead of hardcoded string
-        / f"metric.{condition}.{seed}.{metric_name.value}.json" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"metric.{condition}.{seed}.{metric_name.value}.json"
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
     atomic_write_json(payload_path, payload)
@@ -882,7 +886,7 @@ def persist_synthetic_diagnostic_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
     completion = build_completion_manifest(
         coordinates,
@@ -896,9 +900,7 @@ def persist_synthetic_diagnostic_metric(
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
-            artifact_id=artifact_id(
-                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
-            ),
+            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
             artifact_type=ArtifactType.PREDICTION,
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
@@ -909,7 +911,7 @@ def persist_synthetic_diagnostic_metric(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version=ArtifactSchemaVersion.V1,
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -947,8 +949,8 @@ def _persist_map_world_metrics(
     world: UnresolvedMapWorld,
     overwrite_policy: OverwritePolicy,
 ) -> None:
-    condition = EvaluationConditionName(f"{world_kind.value}-{fixture_index}") # TODO: should be enum instead of hardcoded string
-    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),) # TODO: should be enum instead of hardcoded string
+    condition = EvaluationConditionName(f"{world_kind.value}-{fixture_index}")
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
     for metric_name, metric_value in (
         (MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, world.certified_robust_value),
         (MetricId.EXACT_MAP_ACTION_VALUE, world.diagnostics.exact_map_action_value),
@@ -962,7 +964,7 @@ def _persist_map_world_metrics(
             seed,
             metric_name,
             float(metric_value),
-            MetricUnit("score"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.SCORE,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,
@@ -1086,7 +1088,7 @@ def _persist_coupling_mechanism_metrics(
     hull: RectangularHull,
     overwrite_policy: OverwritePolicy,
 ) -> None:
-    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),) # TODO: should be enum instead of hardcoded string
+    input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
     candidates = (alpha, zero_action(problem))
     for metric_name, metric_value in (
         (
@@ -1112,7 +1114,7 @@ def _persist_coupling_mechanism_metrics(
             seed,
             metric_name,
             float(metric_value),
-            MetricUnit("score"), # TODO: should be enum instead of hardcoded string
+            MetricUnit.SCORE,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,

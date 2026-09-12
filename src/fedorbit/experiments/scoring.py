@@ -40,9 +40,8 @@ from fedorbit.datasets.materialization import (
     transfer_concept_groups,
 )
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
-from fedorbit.experiments.catalogue import method_resource_manifest
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest, method_resource_manifest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
     ExecutionError,
@@ -136,19 +135,23 @@ from fedorbit.response.packet import (
     SourcePacket,
 )
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
+    ArtifactDirectorySegment,
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactIdentifiers,
     ArtifactPath,
+    ArtifactSchemaVersion,
     ArtifactStage,
     ArtifactState,
     ArtifactType,
-    ArtifactTypeName,
     CheckpointDirectorySegment,
+    CheckpointFileName,
     ClassCount,
     ClassIndex,
     ClientRole,
     CoarseGroup,
+    CompletionValidationState,
     ConfigurationSection,
     ContrastCoordinates,
     CorrespondenceBlockId,
@@ -157,7 +160,6 @@ from fedorbit.types import (
     DirectedPairName,
     Estimate,
     EvaluationConditionName,
-    ExperimentCondition,
     ExperimentName,
     ExperimentSeed,
     FilesystemSlug,
@@ -168,7 +170,6 @@ from fedorbit.types import (
     MutableCell,
     OracleTransferConcept,
     OverwritePolicy,
-    ProducerModuleName,
     SampleCount,
     ScaleFactor,
     Score,
@@ -181,13 +182,12 @@ from fedorbit.types import (
     SourceClientName,
     Split,
     StableJsonPayload,
+    StorageLayoutSegment,
     SupportCount,
     TerminalState,
     TransferMethod,
     stable_json,
 )
-
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.scoring")
 
 
 def build_completion_manifest(
@@ -203,7 +203,7 @@ def build_completion_manifest(
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(
-            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version=ArtifactSchemaVersion.V1,
             semantic_experiment_coordinates=coordinates,
             producer_stage=stage,
             terminal_state=TerminalState.COMPLETED,
@@ -215,7 +215,7 @@ def build_completion_manifest(
             relevant_code_sha256=code_sha256,
             material_runtime_sha256=runtime_sha256,
             upstream_lineage=stable_json(OrderedDict[str, StableJsonPayload]()),
-            completion_validation_state="validated", # TODO: should be enum
+            completion_validation_state=CompletionValidationState.VALIDATED,
             completion_written_last=True,
             completion_manifest_sha256="",
         )
@@ -248,7 +248,6 @@ def latest_completed_manifest(
     )
 
 
-_PRINCIPAL_CONDITION = EvaluationConditionName("principal") # TODO: use enum, not hardcoded string
 _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.MODELS, ConfigurationSection.METRICS}
 )
@@ -262,11 +261,11 @@ def _target_confirmatory_checkpoint_path(
 ) -> Path:
     return (
         experiment_workspace(layout, checkpoint_source_experiment)
-        / "checkpoints" # TODO: use enum, not hardcoded string
+        / StorageLayoutSegment.CHECKPOINTS
         / CheckpointDirectorySegment.TRAINING
         / target.value
         / f"seed-{seed}"
-        / "checkpoint.pt" # TODO: use enum, not hardcoded string
+        / CheckpointFileName.CHECKPOINT
     )
 
 
@@ -347,12 +346,12 @@ def persist_primary_transfer_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    metric_value: float | None,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
-    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
+    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
     valid: bool = True,
     invalid_reason: InvalidReason | None = None,
 ) -> ReusableArtifactManifest | None:
@@ -361,7 +360,7 @@ def persist_primary_transfer_metric(
         experiment=experiment,
         directed_pair=DirectedPair(source=directed_pair_source, target=directed_pair_target),
         method=method,
-        condition=ExperimentCondition(condition),
+        condition=condition,
         seed=ExperimentSeed(seed),
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -372,7 +371,7 @@ def persist_primary_transfer_metric(
             relevance,
             (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
             _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
-            _MODULE_NAME,
+            __name__,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -400,11 +399,11 @@ def persist_primary_transfer_metric(
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" # TODO: use enum, not hardcoded string
-        / "derived" # TODO: use enum, not hardcoded string
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
         / (
             f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
-            f".{method.value}.{condition}.{seed}.{metric_name.value}.json" # TODO: should be enum
+            f".{method.value}.{condition}.{seed}.{metric_name.value}.json"
         )
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
@@ -413,7 +412,7 @@ def persist_primary_transfer_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
     completion = build_completion_manifest(
         coordinates,
@@ -427,9 +426,7 @@ def persist_primary_transfer_metric(
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
-            artifact_id=artifact_id(
-                ArtifactTypeName(ArtifactType.PREDICTION.value), payload, Sha256Digest(fingerprint)
-            ),
+            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
             artifact_type=ArtifactType.PREDICTION,
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
@@ -440,7 +437,7 @@ def persist_primary_transfer_metric(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version=ArtifactSchemaVersion.V1,
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -462,7 +459,7 @@ def persist_ineligible_transfer_cell(
     method: TransferMethod,
     seed: RandomSeed,
     overwrite_policy: OverwritePolicy,
-    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
+    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
 ) -> ReusableArtifactManifest | None:
     return persist_primary_transfer_metric(
         store,
@@ -475,13 +472,13 @@ def persist_ineligible_transfer_cell(
         seed,
         MetricId.ABSTENTION_INDICATOR,
         None,
-        MetricUnit("boolean"), # TODO: use enum, not hardcoded string
+        MetricUnit.BOOLEAN,
         MetricDirection.DESCRIPTIVE,
-        (ArtifactIdentifier("ineligible-cell"),), # TODO: use enum, not hardcoded string
+        (ArtifactIdentifier("ineligible-cell"),),
         overwrite_policy,
         condition,
         valid=False,
-        invalid_reason=InvalidReason("INELIGIBLE/ABSTAIN"), # TODO: use enum, not hardcoded string
+        invalid_reason=InvalidReason("INELIGIBLE/ABSTAIN"),
     )
 
 
@@ -497,26 +494,26 @@ def persist_primary_transfer_cell_metrics(
     score: ScoreArtifact,
     n_classes: ClassCount,
     input_artifact_ids: tuple[ArtifactIdentifier, ...],
-    condition: EvaluationConditionName = _PRINCIPAL_CONDITION,
+    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
 ) -> None:
     f1_set, recall_set = class_metric_sets(score, n_classes)
     for metric_name, metric_value, metric_unit, direction in (
         (
             MetricId.MACRO_CROSS_ENTROPY,
             float(score.macro_cross_entropy.value),
-            MetricUnit("nats"), # TODO: use enum, not hardcoded string
+            MetricUnit.NATS,
             MetricDirection.LOWER_IS_BETTER,
         ),
         (
             MetricId.MACRO_F1,
             float(macro_f1(f1_set).value),
-            MetricUnit("fraction"), # TODO: use enum, not hardcoded string
+            MetricUnit.FRACTION,
             MetricDirection.HIGHER_IS_BETTER,
         ),
         (
             MetricId.BALANCED_ACCURACY,
             float(balanced_accuracy(recall_set).value),
-            MetricUnit("fraction"), # TODO: use enum, not hardcoded string
+            MetricUnit.FRACTION,
             MetricDirection.HIGHER_IS_BETTER,
         ),
     ):
@@ -560,7 +557,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
                 float(certified_value),
-                MetricUnit("score"), # TODO: use enum, not hardcoded string
+                MetricUnit.SCORE,
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -570,7 +567,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.ABSTENTION_INDICATOR,
                 abstained,
-                MetricUnit("boolean"), # TODO: use enum, not hardcoded string
+                MetricUnit.BOOLEAN,
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -580,7 +577,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.NULL_NODE_COUNT,
                 null_node_count,
-                MetricUnit("count"), # TODO: use enum, not hardcoded string
+                MetricUnit.COUNT,
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -588,7 +585,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.ORBIT_SIZE,
                 float(action.problem.blocks.orbit_size),
-                MetricUnit("count"), # TODO: use enum, not hardcoded string
+                MetricUnit.COUNT,
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -597,7 +594,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.PROPOSAL_ACCEPTANCE_RATE,
                 1.0 if confirmation_accepted else 0.0,
-                MetricUnit("fraction"), # TODO: use enum, not hardcoded string
+                MetricUnit.FRACTION,
                 MetricDirection.HIGHER_IS_BETTER,
             )
         )
@@ -649,8 +646,8 @@ def load_dataset_source_packet(
 ) -> SourcePacket | None:
     path = (
         experiment_workspace(layout, ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
-        / "artifacts" # TODO: use enum, not hardcoded string
-        / "packets" # TODO: use enum, not hardcoded string
+        / StorageLayoutSegment.ARTIFACTS
+        / ArtifactDirectorySegment.PACKETS
         / target.value
         / f"seed-{seed}"
         / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
@@ -922,7 +919,7 @@ def score_local_sir_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{target.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"), # TODO: use enum, not hardcoded string
+            condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
@@ -1183,7 +1180,7 @@ def score_matched_resource_rectangular_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"), # TODO: use enum, not hardcoded string
+            condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
@@ -1303,7 +1300,7 @@ def score_point_correspondence_commitment_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"), # TODO: use enum, not hardcoded string
+            condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(
@@ -1607,7 +1604,7 @@ def score_robust_action_cell(
     assimilation_coordinates = AssimilationCoordinates(
         target_client=SourceClientName(target.value),
         directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-        condition=EvaluationConditionName("principal"), # TODO: use enum, not hardcoded string
+        condition=PRINCIPAL_EVALUATION_CONDITION.name,
         seed=seed,
         clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
         source_packet_artifact_id=assembly.first_packet_artifact_id,
@@ -1702,7 +1699,7 @@ def score_fedorbit_exact_sparse_solver_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-exact-sparse-solver"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("fedorbit-exact-sparse-solver"),
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
     )
@@ -1780,7 +1777,7 @@ def score_fedorbit_without_confirmation_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-without-confirmation"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("fedorbit-without-confirmation"),
         TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
         solve_fedorbit_exact_sparse_action,
         _settle_without_confirmation_and_score,
@@ -1806,7 +1803,7 @@ def score_generic_exact_qap_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("generic-exact-qap"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("generic-exact-qap"),
         TransferMethod.GENERIC_EXACT_QAP,
         _solve_generic_exact_qap_action,
     )
@@ -1831,7 +1828,7 @@ def score_exact_map_oracle_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("exact-map-oracle"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("exact-map-oracle"),
         TransferMethod.EXACT_MAP_ORACLE,
         solve_exact_map_oracle_action,
     )
@@ -1903,7 +1900,7 @@ def score_coarse_block_mean_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coarse-block-mean"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("coarse-block-mean"),
         TransferMethod.COARSE_BLOCK_MEAN,
         solve_coarse_block_mean_action,
     )
@@ -1928,7 +1925,7 @@ def score_coarse_block_min_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coarse-block-min"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("coarse-block-min"),
         TransferMethod.COARSE_BLOCK_MIN,
         solve_coarse_block_min_action,
     )
@@ -1953,7 +1950,7 @@ def score_orbit_mean_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("orbit-mean"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("orbit-mean"),
         TransferMethod.ORBIT_MEAN,
         solve_orbit_mean_action,
     )
@@ -1978,7 +1975,7 @@ def score_coupling_destroyed_fedorbit_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coupling-destroyed-fedorbit"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("coupling-destroyed-fedorbit"),
         TransferMethod.COUPLING_DESTROYED_FEDORBIT,
         solve_coupling_destroyed_action,
     )
@@ -2110,7 +2107,7 @@ def score_fedorbit_with_confirmation_verdict_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-exact-sparse-solver"), # TODO: use enum, not hardcoded string
+        FilesystemSlug("fedorbit-exact-sparse-solver"),
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
         _confirm_assimilate_score_capturing_verdict(verdicts),
@@ -2192,22 +2189,23 @@ _SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
 
 
 def semantic_partition_bucket_of(
-    partition: str | tuple[str, ...],# TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    partition: str | tuple[str, ...],
 ) -> Mapping[CoarseGroup, CoarseGroup] | None:
     if partition == SemanticPartitionId.PRINCIPAL_THREE_COARSE_GROUPS:
         return _SEMANTIC_PARTITION_PRINCIPAL
     if partition == SemanticPartitionId.ONE_ATTACK_SUPERGROUP:
         return _SEMANTIC_PARTITION_SUPERGROUP
     if isinstance(partition, tuple) and set(partition) == {
-        "Disruption or Exploitation", # TODO: should be enum
-        "Access and Discovery", # TODO: should be enum
+        "Disruption or Exploitation",
+        "Access and Discovery",
     }:
         return _SEMANTIC_PARTITION_MERGE
     return None
 
 
-def semantic_partition_label(partition: str | tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                             ) -> EvaluationConditionName:
+def semantic_partition_label(
+    partition: str | tuple[str, ...],
+) -> EvaluationConditionName:
     text = partition if isinstance(partition, str) else "|".join(partition)
     return EvaluationConditionName(text)
 
@@ -2229,7 +2227,7 @@ def response_scale_perturbation(
 
 
 def ci_half_width_perturbation(
-    multiplier: float, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    multiplier: float,
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]:
@@ -2245,7 +2243,7 @@ def ci_half_width_perturbation(
 
 
 def response_heterogeneity_perturbation(
-    multiplier: float, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    multiplier: float,
 ) -> Callable[
     [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
 ]:

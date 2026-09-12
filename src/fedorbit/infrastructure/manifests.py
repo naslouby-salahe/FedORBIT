@@ -9,6 +9,7 @@ from typing import cast
 from pydantic import Field
 
 from fedorbit.config.models import FrozenModel
+from fedorbit.datasets.common import FieldRole
 from fedorbit.types import (
     AnonymousNodeDisplayId,
     ArtifactIdentifier,
@@ -19,9 +20,9 @@ from fedorbit.types import (
     ArtifactStage,
     ArtifactState,
     ArtifactType,
-    ArtifactTypeName,
     ClientComponentName,
     CoarseGroup,
+    CompletionValidationState,
     DatasetId,
     DatasetPreprocessingState,
     DirectedPairName,
@@ -32,7 +33,6 @@ from fedorbit.types import (
     FineLabel,
     GitRevision,
     Index,
-    ManifestValidationState,
     OracleTransferConcept,
     RandomSeed,
     RawDatasetPath,
@@ -50,8 +50,8 @@ from fedorbit.types import (
     stable_json,
 )
 
-NATIVE_CLASS_IDS_FIELD = "native_local_class_ids" # TODO: should be enum
-FINE_CONCEPT_FIELD = "fine_concept" # TODO: should be enum
+NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
+FINE_CONCEPT_FIELD = "fine_concept"
 
 
 class CompletionManifest(FrozenModel):
@@ -67,7 +67,7 @@ class CompletionManifest(FrozenModel):
     relevant_code_sha256: Sha256Digest
     material_runtime_sha256: Sha256Digest
     upstream_lineage: ArtifactLineage
-    completion_validation_state: ManifestValidationState
+    completion_validation_state: CompletionValidationState
     completion_written_last: bool
     completion_manifest_sha256: Sha256Digest
 
@@ -109,15 +109,15 @@ class DatasetManifest(FrozenModel):
         serialization_alias="schema", validation_alias="schema"
     )
     adapter_feature_order: TabularColumns
-    adapter_feature_roles: Mapping[TabularColumnName, str] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    adapter_feature_roles: Mapping[TabularColumnName, FieldRole]
     accepted_schema_aliases: tuple[TabularColumnName, ...]
     adapter_adaptations: tuple[FieldDescription, ...]
     timestamp_field: TabularColumnName
     timestamp_range: TimestampRange
-    duplicate_counts: Mapping[str, Index] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    conflicting_duplicate_counts: Mapping[str, Index] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    local_class_counts: Mapping[str, Index] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    transfer_candidate_counts: Mapping[str, SampleCount] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    duplicate_counts: Mapping[str, Index]
+    conflicting_duplicate_counts: Mapping[str, Index]
+    local_class_counts: Mapping[FineLabel, Index]
+    transfer_candidate_counts: Mapping[OracleTransferConcept, SampleCount]
     feature_quality: FeatureQualityManifest
     preprocessing_state: DatasetPreprocessingState
     dependency_fingerprint_sha256: Sha256Digest
@@ -219,7 +219,7 @@ def dependency_fingerprint(
 
 
 def artifact_id(
-    artifact_type: ArtifactTypeName,
+    artifact_type: ArtifactType,
     coordinates: StableJsonPayload,
     fingerprint_sha256: Sha256Digest,
 ) -> ArtifactIdentifier:

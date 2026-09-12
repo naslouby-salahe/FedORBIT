@@ -12,8 +12,8 @@ from torch import nn
 
 from fedorbit.config.loading import active_config
 from fedorbit.experiments.audit import execute_map_availability_applicability_audit
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.classification import execute_evidence_classification
-from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.solvers import (
     execute_common_action_under_unidentified_map,
     execute_exact_map_value_bound_validation,
@@ -90,11 +90,12 @@ from fedorbit.types import (
     AnonymousNodeDisplayId,
     ArtifactState,
     ElapsedSeconds,
+    ExecutionEventName,
     ExperimentName,
     ExposedCoarseGroupId,
+    FieldDescription,
     InfrastructureLogCoordinate,
     OverwritePolicy,
-    ReuseDecision,
     Rfc3339UtcTimestamp,
     ScalabilityBlockPattern,
     SemanticCoordinates,
@@ -130,13 +131,13 @@ def run_smoke_validation(
     )
     packet = build_source_packet(
         estimate,
-        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),), # TODO: should be enum
-        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"), # TODO: should be enum
+        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),),
+        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"),
         per_node_train_support=(1,),
         per_node_meta_support=(1,),
         per_node_effective_replicate_count=(1,),
-        source_checkpoint_sha256=Sha256Digest("0" * 64), # TODO: should be enum
-        response_configuration_sha256=Sha256Digest("1" * 64), # TODO: should be enum
+        source_checkpoint_sha256=Sha256Digest("0" * 64),
+        response_configuration_sha256=Sha256Digest("1" * 64),
         creation_timestamp=Rfc3339UtcTimestamp(
             datetime.now(UTC).isoformat().replace("+00:00", "Z")
         ),
@@ -244,7 +245,7 @@ def _execute_producer_with_retry(
                     cell_coordinates=SemanticCoordinates(InfrastructureLogCoordinate.RETRY),
                     artifact_id=None,
                     state=ArtifactState.RUNNING if decision.retry else ArtifactState.FAILED,
-                    reuse_decision=ReuseDecision(
+                    reuse_note=FieldDescription(
                         f"attempt {attempt + 1}: {type(error).__name__}: {error} -> "
                         f"{'retry' if decision.retry else 'exhausted'}"
                     ),
@@ -353,7 +354,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     RecoveryBoundary(store).discard_interrupted_staging()
     logger = execution_logger()
     logger.event(
-        "experiment_start", # TODO: should be enum
+        ExecutionEventName.EXPERIMENT_START,
         experiment=request.experiment.value,
         classification=request.definition.classification.value,
         planned_cells=int(request.definition.derived_planned_cells),
@@ -369,7 +370,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     _execute_producer_with_retry(producer, store, layout, request.experiment)
     elapsed: ElapsedSeconds = time.perf_counter() - started_at
     logger.event(
-        "experiment_end", # TODO: should be enum
+        ExecutionEventName.EXPERIMENT_END,
         experiment=request.experiment.value,
         elapsed_seconds=elapsed,
         state=ArtifactState.COMPLETED.value,

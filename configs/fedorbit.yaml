@@ -136,6 +136,7 @@ scientific:
     label_smoothing: 0.0
     dataloader_workers: 0
   base_model_pilot:
+    reference_learning_rate: 0.001
     learning_rates: [0.0003, 0.001, 0.003]
     weight_decays: [0.0, 0.0001]
     dropouts: [0.0, 0.1]
@@ -429,6 +430,7 @@ experiments:
 runtime:
   failure_handling:
     retries_after_initial_infrastructure_failure: 2
+  execution_device: cuda
   reference_model_gpu: "NVIDIA GeForce RTX 5060 Ti 16 GB"
   solver_cpu_worker_ceiling: 4
   host_ram_ceiling_gib_for_registered_efficiency_runs: 16
@@ -547,21 +549,6 @@ runtime:
       project_configuration_reproducibility: configuration
       project_execution_reproducibility: execution
 
-environment:
-  python: "3.13.12"
-  pytorch: "2.13.0"
-  numpy: "2.5.2"
-  scipy: "1.18.0"
-  scikit_learn: "1.9.0"
-  pandas: "3.0.5"
-  pyarrow: "25.0.1"
-  highspy_highs: "1.15.1"
-  pyscipopt: "6.2.1"
-  pydantic: "2.13.4"
-  typer: "0.27.1"
-  psutil: "7.2.2"
-  pytest: "9.1.1"
-  pytest_cov: "7.1.0"
 reporting:
   precision:
     scientific_metric_decimals: 4

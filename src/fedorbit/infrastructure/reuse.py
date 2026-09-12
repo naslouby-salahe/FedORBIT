@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,11 +13,12 @@ from fedorbit.infrastructure.manifests import (
     completion_manifest_self_hash,
 )
 from fedorbit.infrastructure.provenance import STAGE_DEPENDENCIES
-from fedorbit.infrastructure.runtime import ExecutionLogEvent, ReuseDecision, execution_logger
+from fedorbit.infrastructure.runtime import ExecutionLogEvent, execution_logger
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
     ArtifactState,
+    ExecutionAction,
     ExecutionCell,
     OverwritePolicy,
     SemanticCoordinates,
@@ -31,12 +31,6 @@ if TYPE_CHECKING:
 
 class ReuseError(ValueError):
     pass
-
-
-class ExecutionAction(StrEnum):
-    EXECUTE = "execute"
-    REUSE = "reuse"
-    OVERWRITE = "overwrite"
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,7 +115,7 @@ class ExecutionReuse:
                     if decision.manifest is not None
                     else None,
                     state=ArtifactState.RUNNING,
-                    reuse_decision=ReuseDecision(decision.action.value),
+                    reuse_action=decision.action,
                 )
             )
         return tuple(decisions)

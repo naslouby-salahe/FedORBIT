@@ -10,7 +10,7 @@ from typing import cast
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
     ArtifactStage,
-    ProducerModuleName,
+    ConfigurationSection,
     SemanticCell,
     SemanticCoordinate,
     Sha256Digest,
@@ -58,7 +58,7 @@ STAGE_DEPENDENCIES: Mapping[ArtifactStage, tuple[ArtifactStage, ...]] = OrderedD
     )
 )
 
-RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict(
     (
         (ArtifactStage.RAW, ("numpy", "pandas")),
         (ArtifactStage.PREPROCESSING, ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn")),
@@ -84,16 +84,16 @@ class ProvenanceError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class RuntimeFingerprint:
-    components: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    versions: tuple[tuple[str, str], ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    digest: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    components: tuple[str, ...]
+    versions: tuple[tuple[str, str], ...]
+    digest: Sha256Digest
 
     @property
-    def sha256(self) -> str: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    def sha256(self) -> Sha256Digest:
         return self.digest
 
 
-def implementation_fingerprint(producer_module: ProducerModuleName) -> Sha256Digest:
+def implementation_fingerprint(producer_module: str) -> Sha256Digest:
     if not producer_module.startswith("fedorbit"):
         raise ProvenanceError(f"producer must be a fedorbit module: {producer_module}")
     return Sha256Digest(hashlib.sha256(producer_module.encode("utf-8")).hexdigest())
@@ -105,10 +105,10 @@ def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     components = RUNTIME_COMPONENTS[stage]
     versions: list[tuple[str, str]] = []
     for distribution in components:
-        if distribution == "torch-cuda": # TODO: should be enum
+        if distribution == "torch-cuda":
             import torch
 
-            versions.append(("torch-cuda", torch.version.cuda or "unknown")) # TODO: should be enum
+            versions.append(("torch-cuda", torch.version.cuda or "unknown"))
             continue
         try:
             versions.append((distribution, importlib.metadata.version(distribution)))
@@ -120,45 +120,62 @@ def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     return RuntimeFingerprint(
         components=components,
         versions=tuple(versions),
-        digest=hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+        digest=Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest()),
     )
 
 
-def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _section_extractors() -> Mapping[ConfigurationSection, Callable[[], JsonValue]]:
     config = active_config()
     scientific = config.scientific
     return OrderedDict(
-        generators=lambda: config.generators.model_dump(mode="json"),
-        action=lambda: scientific.action.model_dump(mode="json"),
-        models=lambda: OrderedDict(
-            training=scientific.training.model_dump(mode="json"),
-            base_model_pilot=scientific.base_model_pilot.model_dump(mode="json"),
-        ),
-        response=lambda: OrderedDict(
-            source_response_pilot=scientific.source_response_pilot.model_dump(mode="json"),
-            source_response_final=scientific.source_response_final.model_dump(mode="json"),
-            target_response_diagnostic=scientific.target_response_diagnostic.model_dump(
-                mode="json"
+        (
+            (
+                ConfigurationSection.ACTION,
+                lambda: scientific.action.model_dump(mode="json"),
             ),
-        ),
-        confirmation=lambda: scientific.confirmation.model_dump(mode="json"),
-        evaluation=lambda: OrderedDict(
-            metrics=scientific.metrics.model_dump(mode="json"),
-            statistics=scientific.statistics.model_dump(mode="json"),
-        ),
-        statistics=lambda: scientific.statistics.model_dump(mode="json"),
-        experiments=lambda: config.experiments.model_dump(mode="json"),
-        simplification_rules=lambda: scientific.simplification_rules.model_dump(mode="json"),
+            (
+                ConfigurationSection.GENERATORS,
+                lambda: config.generators.model_dump(mode="json"),
+            ),
+            (
+                ConfigurationSection.METRICS,
+                lambda: OrderedDict(
+                    metrics=scientific.metrics.model_dump(mode="json"),
+                    statistics=scientific.statistics.model_dump(mode="json"),
+                ),
+            ),
+            (
+                ConfigurationSection.MODELS,
+                lambda: OrderedDict(
+                    training=scientific.training.model_dump(mode="json"),
+                    base_model_pilot=scientific.base_model_pilot.model_dump(mode="json"),
+                ),
+            ),
+            (
+                ConfigurationSection.RESPONSE,
+                lambda: OrderedDict(
+                    source_response_pilot=scientific.source_response_pilot.model_dump(mode="json"),
+                    source_response_final=scientific.source_response_final.model_dump(mode="json"),
+                    target_response_diagnostic=scientific.target_response_diagnostic.model_dump(
+                        mode="json"
+                    ),
+                ),
+            ),
+            (
+                ConfigurationSection.SOLVERS,
+                lambda: config.solvers.model_dump(mode="json"),
+            ),
+        )
     )
 
 
-def configuration_subset_digest(relevant_sections: frozenset[str]) -> str: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def configuration_subset_digest(
+    relevant_sections: frozenset[ConfigurationSection],
+) -> str:
     extractors = _section_extractors()
-    values: OrderedDict[str, JsonValue] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    values: OrderedDict[ConfigurationSection, JsonValue] = OrderedDict()
     for section in sorted(relevant_sections):
-        extractor = extractors.get(section)
-        if extractor is not None:
-            values[section] = extractor()
+        values[section] = extractors[section]()
     return hashlib.sha256(stable_json(values).encode("utf-8")).hexdigest()
 
 
@@ -166,9 +183,9 @@ def stage_dependency_fingerprint(
     stage: ArtifactStage,
     cell: SemanticCell,
     relevance: frozenset[SemanticCoordinate],
-    upstream_artifact_ids: tuple[str, ...], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    config_sections: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    producer_module: ProducerModuleName,
+    upstream_artifact_ids: tuple[str, ...],
+    config_sections: frozenset[ConfigurationSection],
+    producer_module: str,
 ) -> Sha256Digest:
     del producer_module
     payload = stable_json(

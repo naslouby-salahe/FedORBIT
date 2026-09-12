@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from fedorbit.config.loading import active_config
-from fedorbit.datasets.common import AdapterContract, DatasetAdapter
+from fedorbit.datasets.common import AdapterContract, DatasetAdapter, KnownDatasetField
 from fedorbit.types import DatasetId, TabularColumnName
 
-EDGE_EXCLUSIONS = frozenset( # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+EDGE_EXCLUSIONS = frozenset(
     {
         "frame.time",
         "ip.src_host",
@@ -23,7 +23,7 @@ EDGE_EXCLUSIONS = frozenset( # TODO: should be retrieved from yml and accessed t
         "mqtt.msg",
     }
 )
-EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset( # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset(
     {
         "http.request.method",
         "http.referer",
@@ -34,8 +34,6 @@ EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset( # TODO: should be retrieved from 
         "mqtt.topic",
     }
 )
-EDGE_MULTICLASS_LABEL = "Attack_type" # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-EDGE_BINARY_LABEL = "Attack_label" # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
 
 
 def edge_iiotset_adapter() -> DatasetAdapter:
@@ -47,8 +45,8 @@ def edge_iiotset_adapter() -> DatasetAdapter:
         AdapterContract(
             DatasetId.EDGE_IIOTSET_NETWORK,
             (TabularColumnName(expected_timestamp),),
-            (TabularColumnName(EDGE_MULTICLASS_LABEL),),
-            (TabularColumnName(EDGE_BINARY_LABEL),),
+            (TabularColumnName(KnownDatasetField.EDGE_MULTICLASS_LABEL),),
+            (TabularColumnName(KnownDatasetField.EDGE_BINARY_LABEL),),
             frozenset(
                 TabularColumnName(column)
                 for column in EDGE_EXCLUSIONS | EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS

@@ -16,28 +16,40 @@ from fedorbit.interface import (
     validate_resource_manifest_equality,
     validate_static_leakage_scan,
 )
-from fedorbit.types import ClientRole
+from fedorbit.types import ClientRole, FeatureName, TabularColumnName
 
 
 def test_disjoint_feature_namespaces() -> None:
-    validate_disjoint_feature_namespaces(frozenset({"a", "b"}), frozenset({"c", "d"}))
+    validate_disjoint_feature_namespaces(
+        frozenset({FeatureName("a"), FeatureName("b")}),
+        frozenset({FeatureName("c"), FeatureName("d")}),
+    )
     with pytest.raises(StrictResourceViolationError):
-        validate_disjoint_feature_namespaces(frozenset({"a", "b"}), frozenset({"b", "c"}))
+        validate_disjoint_feature_namespaces(
+            frozenset({FeatureName("a"), FeatureName("b")}),
+            frozenset({FeatureName("b"), FeatureName("c")}),
+        )
 
 
 def test_no_cross_client_entity_ids() -> None:
-    validate_no_cross_client_entity_ids(frozenset({"e1"}), frozenset({"e2"}))
+    validate_no_cross_client_entity_ids(
+        frozenset({TabularColumnName("e1")}), frozenset({TabularColumnName("e2")})
+    )
     with pytest.raises(StrictResourceViolationError):
-        validate_no_cross_client_entity_ids(frozenset({"e1"}), frozenset({"e1"}))
+        validate_no_cross_client_entity_ids(
+            frozenset({TabularColumnName("e1")}), frozenset({TabularColumnName("e1")})
+        )
 
 
 def test_no_cross_client_timestamp_pairing() -> None:
     validate_no_cross_client_timestamp_pairing(
-        frozenset({"2024-01-01T00:00:00Z"}), frozenset({"2024-01-02T00:00:00Z"})
+        frozenset({TabularColumnName("2024-01-01T00:00:00Z")}),
+        frozenset({TabularColumnName("2024-01-02T00:00:00Z")}),
     )
     with pytest.raises(StrictResourceViolationError):
         validate_no_cross_client_timestamp_pairing(
-            frozenset({"2024-01-01T00:00:00Z"}), frozenset({"2024-01-01T00:00:00Z"})
+            frozenset({TabularColumnName("2024-01-01T00:00:00Z")}),
+            frozenset({TabularColumnName("2024-01-01T00:00:00Z")}),
         )
 
 

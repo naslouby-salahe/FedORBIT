@@ -23,22 +23,21 @@ from fedorbit.infrastructure.evidence import VerifiedEvidenceWriter as VerifiedE
 from fedorbit.infrastructure.manifests import DatasetManifest
 from fedorbit.types import (
     ClientRole,
+    DatasetId,
+    DatasetModality,
+    DirectedPairName,
     FedorbitConfigSection,
+    Index,
     MetricId,
     ReportAxisLabel,
     ReportColumnName,
     ReportColumns,
     ReportSeriesName,
-    RiskReductionColumn,
     TransferMethod,
 )
 
 
-def _report_columns(columns: Sequence[str]) -> ReportColumns: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    return tuple(ReportColumnName(column) for column in columns)
-
-
-def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]:
     if isinstance(value, Mapping):
         rows: list[tuple[str, str]] = []
         for key, item in value.items():
@@ -72,25 +71,25 @@ def numerical_constants_and_seeds_table(
         )
     )
     return EvidenceTable(
-        columns=_report_columns(("configuration_path", "value")), # TODO: should be enum
+        columns=(ReportColumnName.CONFIGURATION_PATH, ReportColumnName.VALUE),
         rows=tuple((path, value) for path, value in rows),
     )
 
 
 def experiment_matrix_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "experiment", # TODO: should be enum
-            "classification", # TODO: should be enum
-            "datasets_or_pairs", # TODO: should be enum
-            "methods", # TODO: should be enum
-            "registered_seeds", # TODO: should be enum
-            "conditions", # TODO: should be enum
-            "derived_planned_cells", # TODO: should be enum
-            "prerequisites", # TODO: should be enum
-            "evidence_relationship", # TODO: should be enum
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.CLASSIFICATION,
+            ReportColumnName.DATASETS_OR_PAIRS,
+            ReportColumnName.METHODS,
+            ReportColumnName.REGISTERED_SEEDS,
+            ReportColumnName.CONDITIONS,
+            ReportColumnName.DERIVED_PLANNED_CELLS,
+            ReportColumnName.PREREQUISITES,
+            ReportColumnName.EVIDENCE_RELATIONSHIP,
         ),
         rows,
     )
@@ -98,48 +97,48 @@ def experiment_matrix_table(
 
 def dataset_and_client_protocol_table(
     manifests: Sequence[DatasetManifest],
-    modality_by_dataset: Mapping[str, str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    role_by_dataset: Mapping[str, ClientRole], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    excluded_class_counts: Mapping[str, int], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    modality_by_dataset: Mapping[DatasetId, DatasetModality],
+    role_by_dataset: Mapping[DatasetId, ClientRole],
+    excluded_class_counts: Mapping[DatasetId, Index],
 ) -> EvidenceTable:
     columns = (
-        "dataset_component", # TODO: should be enum
-        "modality", # TODO: should be enum
-        "observed_raw_rows", # TODO: should be enum
-        "retained_rows", # TODO: should be enum
-        "timestamp_range", # TODO: should be enum
-        "local_prediction_classes", # TODO: should be enum
-        "feature_count", # TODO: should be enum
-        "transfer_candidates", # TODO: should be enum
-        "exclusions", # TODO: should be enum
-        "scientific_role", # TODO: should be enum
-        "raw_manifest_hash", # TODO: should be enum
+        ReportColumnName.DATASET_COMPONENT,
+        ReportColumnName.MODALITY,
+        ReportColumnName.OBSERVED_RAW_ROWS,
+        ReportColumnName.RETAINED_ROWS,
+        ReportColumnName.TIMESTAMP_RANGE,
+        ReportColumnName.LOCAL_PREDICTION_CLASSES,
+        ReportColumnName.FEATURE_COUNT,
+        ReportColumnName.TRANSFER_CANDIDATES,
+        ReportColumnName.EXCLUSIONS,
+        ReportColumnName.SCIENTIFIC_ROLE,
+        ReportColumnName.RAW_MANIFEST_HASH,
     )
     rows = tuple(
         (
             manifest.component,
-            modality_by_dataset.get(manifest.dataset.value, ""),
+            modality_by_dataset[manifest.dataset],
             sum(manifest.raw_counts.values()),
             sum(manifest.local_class_counts.values()),
             f"{manifest.timestamp_range[0]}..{manifest.timestamp_range[1]}",
             len(manifest.local_class_counts),
             len(manifest.adapter_feature_order),
             len(manifest.transfer_candidate_counts),
-            excluded_class_counts.get(manifest.dataset.value, 0),
-            role_by_dataset.get(manifest.dataset.value, ClientRole.PRIMARY).value,
+            excluded_class_counts.get(manifest.dataset, 0),
+            role_by_dataset.get(manifest.dataset, ClientRole.PRIMARY),
             manifest.raw_sha256,
         )
         for manifest in manifests
     )
-    return EvidenceTable(columns=_report_columns(columns), rows=rows)
+    return EvidenceTable(columns=columns, rows=rows)
 
 
 def _metric_value(
     records: Sequence[MetricRecord],
-    pair: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    pair: DirectedPairName,
     method: TransferMethod,
     metric_name: MetricId,
-) -> float | None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> float | None:
     matches = [
         record
         for record in records
@@ -160,19 +159,19 @@ def primary_strict_transfer_results_table(
     comparison_records: Sequence[PairedComparisonRecord],
 ) -> EvidenceTable:
     columns = (
-        "pair", # TODO: should be enum
-        "method", # TODO: should be enum
-        "valid_seeds", # TODO: should be enum
-        "test_macro_ce", # TODO: should be enum
-        "macro_f1", # TODO: should be enum
-        "balanced_accuracy", # TODO: should be enum
-        "gain_vs_local", # TODO: should be enum
-        "bca_ci_low", # TODO: should be enum
-        "bca_ci_high", # TODO: should be enum
-        "raw_p", # TODO: should be enum
-        "holm_p", # TODO: should be enum
-        "strict_validity", # TODO: should be enum
-        "confirmation_coverage", # TODO: should be enum
+        ReportColumnName.PAIR,
+        ReportColumnName.METHOD,
+        ReportColumnName.VALID_SEEDS,
+        ReportColumnName.TEST_MACRO_CE,
+        ReportColumnName.MACRO_F1,
+        ReportColumnName.BALANCED_ACCURACY,
+        ReportColumnName.GAIN_VS_LOCAL,
+        ReportColumnName.BCA_CI_LOW,
+        ReportColumnName.BCA_CI_HIGH,
+        ReportColumnName.RAW_P,
+        ReportColumnName.HOLM_P,
+        ReportColumnName.STRICT_VALIDITY,
+        ReportColumnName.CONFIRMATION_COVERAGE,
     )
     pairs = sorted({record.pair for record in metric_records})
     method_order = (
@@ -212,52 +211,53 @@ def primary_strict_transfer_results_table(
                     _metric_value(metric_records, pair, method, MetricId.COVERAGE_CONFIRM),
                 )
             )
-    return EvidenceTable(columns=_report_columns(columns), rows=tuple(rows))
+    return EvidenceTable(columns=columns, rows=tuple(rows))
 
 
 def _rows_table(
-    columns: tuple[str, ...], rows: Sequence[Mapping[str, TableScalar]] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    columns: ReportColumns,
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return EvidenceTable(
-        columns=_report_columns(columns),
+        columns=columns,
         rows=tuple(tuple(row[column] for column in columns) for row in rows),
     )
 
 
 def transfer_ontology_and_null_padding_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "candidate_concept", # TODO: should be enum
-            "pair", # TODO: should be enum
-            "coarse_group", # TODO: should be enum
-            "source_real_or_null", # TODO: should be enum
-            "target_real_or_null", # TODO: should be enum
-            "support_counts", # TODO: should be enum
-            "action_eligibility", # TODO: should be enum
-            "null_reason", # TODO: should be enum
+            ReportColumnName.CANDIDATE_CONCEPT,
+            ReportColumnName.PAIR,
+            ReportColumnName.COARSE_GROUP,
+            ReportColumnName.SOURCE_REAL_OR_NULL,
+            ReportColumnName.TARGET_REAL_OR_NULL,
+            ReportColumnName.SUPPORT_COUNTS,
+            ReportColumnName.ACTION_ELIGIBILITY,
+            ReportColumnName.NULL_REASON,
         ),
         rows,
     )
 
 
 def model_and_training_protocol_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "model", # TODO: should be enum
-            "architecture", # TODO: should be enum
-            "normalization", # TODO: should be enum
-            "activation", # TODO: should be enum
-            "initialization", # TODO: should be enum
-            "optimizer", # TODO: should be enum
-            "batch", # TODO: should be enum
-            "selected_learning_rate", # TODO: should be enum
-            "selected_weight_decay", # TODO: should be enum
-            "selected_dropout", # TODO: should be enum
-            "stopping_rule", # TODO: should be enum
+            ReportColumnName.MODEL,
+            ReportColumnName.ARCHITECTURE,
+            ReportColumnName.NORMALIZATION,
+            ReportColumnName.ACTIVATION,
+            ReportColumnName.INITIALIZATION,
+            ReportColumnName.OPTIMIZER,
+            ReportColumnName.BATCH,
+            ReportColumnName.SELECTED_LEARNING_RATE,
+            ReportColumnName.SELECTED_WEIGHT_DECAY,
+            ReportColumnName.SELECTED_DROPOUT,
+            ReportColumnName.STOPPING_RULE,
         ),
         rows,
     )
@@ -265,17 +265,17 @@ def model_and_training_protocol_table(
 
 def information_resource_matrix_table() -> EvidenceTable:
     columns = (
-        "method", # TODO: should be enum
-        "target_raw_data", # TODO: should be enum
-        "anonymous_source_nodes", # TODO: should be enum
-        "coarse_groups", # TODO: should be enum
-        "source_response", # TODO: should be enum
-        "target_local_response", # TODO: should be enum
-        "fine_names", # TODO: should be enum
-        "exact_map", # TODO: should be enum
-        "confirmation", # TODO: should be enum
-        "predecision_test_access", # TODO: should be enum
-        "strict_compatibility", # TODO: should be enum
+        ReportColumnName.METHOD,
+        ReportColumnName.TARGET_RAW_DATA,
+        ReportColumnName.ANONYMOUS_SOURCE_NODES,
+        ReportColumnName.COARSE_GROUPS,
+        ReportColumnName.SOURCE_RESPONSE,
+        ReportColumnName.TARGET_LOCAL_RESPONSE,
+        ReportColumnName.FINE_NAMES,
+        ReportColumnName.EXACT_MAP,
+        ReportColumnName.CONFIRMATION,
+        ReportColumnName.PREDECISION_TEST_ACCESS,
+        ReportColumnName.STRICT_COMPATIBILITY,
     )
     rows = tuple(
         (
@@ -293,202 +293,202 @@ def information_resource_matrix_table() -> EvidenceTable:
         )
         for method, facts in information_resource_catalogue().items()
     )
-    return EvidenceTable(columns=_report_columns(columns), rows=rows)
+    return EvidenceTable(columns=columns, rows=rows)
 
 
 def coupling_mechanism_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "condition_or_pair", # TODO: should be enum
-            "valid_units", # TODO: should be enum
-            "fixed_action_gap", # TODO: should be enum
-            "robust_coupling_gap", # TODO: should be enum
-            "fraction_above_materiality", # TODO: should be enum
-            "ci", # TODO: should be enum
-            "holm_p", # TODO: should be enum
-            "coupling_destruction_retained_gain_fraction", # TODO: should be enum
+            ReportColumnName.CONDITION_OR_PAIR,
+            ReportColumnName.VALID_UNITS,
+            ReportColumnName.FIXED_ACTION_GAP,
+            ReportColumnName.ROBUST_COUPLING_GAP,
+            ReportColumnName.FRACTION_ABOVE_MATERIALITY,
+            ReportColumnName.CI,
+            ReportColumnName.HOLM_P,
+            ReportColumnName.COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION,
         ),
         rows,
     )
 
 
 def exact_solver_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "k", # TODO: should be enum
-            "block_pattern", # TODO: should be enum
-            "support", # TODO: should be enum
-            "truth_availability", # TODO: should be enum
-            "exact_mismatches", # TODO: should be enum
-            "maximum_absolute_error", # TODO: should be enum
-            "runtime_median", # TODO: should be enum
-            "runtime_p95", # TODO: should be enum
-            "qap_runtime", # TODO: should be enum
-            "dense_runtime", # TODO: should be enum
-            "timeouts", # TODO: should be enum
-            "memory", # TODO: should be enum
-            "active_images", # TODO: should be enum
-            "lap_calls", # TODO: should be enum
+            ReportColumnName.K,
+            ReportColumnName.BLOCK_PATTERN,
+            ReportColumnName.SUPPORT,
+            ReportColumnName.TRUTH_AVAILABILITY,
+            ReportColumnName.EXACT_MISMATCHES,
+            ReportColumnName.MAXIMUM_ABSOLUTE_ERROR,
+            ReportColumnName.RUNTIME_MEDIAN,
+            ReportColumnName.RUNTIME_P95,
+            ReportColumnName.QAP_RUNTIME,
+            ReportColumnName.DENSE_RUNTIME,
+            ReportColumnName.TIMEOUTS,
+            ReportColumnName.MEMORY,
+            ReportColumnName.ACTIVE_IMAGES,
+            ReportColumnName.LAP_CALLS,
         ),
         rows,
     )
 
 
 def ablation_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "ablation", # TODO: should be enum
-            "pair", # TODO: should be enum
-            "realized_gain", # TODO: should be enum
-            "difference_vs_full", # TODO: should be enum
-            "equivalence", # TODO: should be enum
-            "retained_gain", # TODO: should be enum
-            "confirmation_safety", # TODO: should be enum
+            ReportColumnName.ABLATION,
+            ReportColumnName.PAIR,
+            ReportColumnName.REALIZED_GAIN,
+            ReportColumnName.DIFFERENCE_VS_FULL,
+            ReportColumnName.EQUIVALENCE,
+            ReportColumnName.RETAINED_GAIN,
+            ReportColumnName.CONFIRMATION_SAFETY,
         ),
         rows,
     )
 
 
 def sparsity_and_dense_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "support_or_dense_condition", # TODO: should be enum
-            "pair", # TODO: should be enum
-            "realized_gain", # TODO: should be enum
-            "certified_value", # TODO: should be enum
-            "runtime", # TODO: should be enum
-            "memory", # TODO: should be enum
-            "confirmation_coverage", # TODO: should be enum
-            "dense_minus_sparse_difference", # TODO: should be enum
+            ReportColumnName.SUPPORT_OR_DENSE_CONDITION,
+            ReportColumnName.PAIR,
+            ReportColumnName.REALIZED_GAIN,
+            ReportColumnName.CERTIFIED_VALUE,
+            ReportColumnName.RUNTIME,
+            ReportColumnName.MEMORY,
+            ReportColumnName.CONFIRMATION_COVERAGE,
+            ReportColumnName.DENSE_MINUS_SPARSE_DIFFERENCE,
         ),
         rows,
     )
 
 
 def evidence_status_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "question", # TODO: should be enum
-            "final_state", # TODO: should be enum
-            "materiality_result", # TODO: should be enum
-            "statistical_result", # TODO: should be enum
-            "evidence_completeness", # TODO: should be enum
-            "scope", # TODO: should be enum
-            "supporting_table", # TODO: should be enum
-            "supporting_figure", # TODO: should be enum
-            "forbidden_wording", # TODO: should be enum
+            ReportColumnName.QUESTION,
+            ReportColumnName.FINAL_STATE,
+            ReportColumnName.MATERIALITY_RESULT,
+            ReportColumnName.STATISTICAL_RESULT,
+            ReportColumnName.EVIDENCE_COMPLETENESS,
+            ReportColumnName.SCOPE,
+            ReportColumnName.SUPPORTING_TABLE,
+            ReportColumnName.SUPPORTING_FIGURE,
+            ReportColumnName.FORBIDDEN_WORDING,
         ),
         rows,
     )
 
 
 def confirmation_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "pair", # TODO: should be enum
-            "proposals", # TODO: should be enum
-            "accepted", # TODO: should be enum
-            "harmful_accepted_rate", # TODO: should be enum
-            "useful_accepted_rate", # TODO: should be enum
-            "beneficial_rejected_rate", # TODO: should be enum
-            "coverage", # TODO: should be enum
-            "no_confirm_harmful_rate", # TODO: should be enum
-            RiskReductionColumn.ABSOLUTE_RISK_REDUCTION,
-            RiskReductionColumn.RELATIVE_RISK_REDUCTION,
-            "ci", # TODO: should be enum
-            "p", # TODO: should be enum
+            ReportColumnName.PAIR,
+            ReportColumnName.PROPOSALS,
+            ReportColumnName.ACCEPTED,
+            ReportColumnName.HARMFUL_ACCEPTED_RATE,
+            ReportColumnName.USEFUL_ACCEPTED_RATE,
+            ReportColumnName.BENEFICIAL_REJECTED_RATE,
+            ReportColumnName.COVERAGE,
+            ReportColumnName.NO_CONFIRM_HARMFUL_RATE,
+            ReportColumnName.ARR,
+            ReportColumnName.RRR,
+            ReportColumnName.CI,
+            ReportColumnName.P,
         ),
         rows,
     )
 
 
 def generalization_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "pair", # TODO: should be enum
-            "method", # TODO: should be enum
-            "valid_seeds", # TODO: should be enum
-            "test_macro_ce", # TODO: should be enum
-            "macro_f1", # TODO: should be enum
-            "balanced_accuracy", # TODO: should be enum
-            "gain_vs_local", # TODO: should be enum
-            "bca_ci_low", # TODO: should be enum
-            "bca_ci_high", # TODO: should be enum
-            "raw_p", # TODO: should be enum
-            "holm_p", # TODO: should be enum
-            "strict_validity", # TODO: should be enum
-            "confirmation_coverage", # TODO: should be enum
-            "is_secondary_pair", # TODO: should be enum
+            ReportColumnName.PAIR,
+            ReportColumnName.METHOD,
+            ReportColumnName.VALID_SEEDS,
+            ReportColumnName.TEST_MACRO_CE,
+            ReportColumnName.MACRO_F1,
+            ReportColumnName.BALANCED_ACCURACY,
+            ReportColumnName.GAIN_VS_LOCAL,
+            ReportColumnName.BCA_CI_LOW,
+            ReportColumnName.BCA_CI_HIGH,
+            ReportColumnName.RAW_P,
+            ReportColumnName.HOLM_P,
+            ReportColumnName.STRICT_VALIDITY,
+            ReportColumnName.CONFIRMATION_COVERAGE,
+            ReportColumnName.IS_SECONDARY_PAIR,
         ),
         rows,
     )
 
 
 def failure_boundary_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "boundary_dimension", # TODO: should be enum
-            "setting", # TODO: should be enum
-            "pair", # TODO: should be enum
-            "method", # TODO: should be enum
-            "certified_value", # TODO: should be enum
-            "realized_gain", # TODO: should be enum
-            "abstention", # TODO: should be enum
-            "null_node_count", # TODO: should be enum
-            "confirmation_coverage", # TODO: should be enum
-            "state", # TODO: should be enum
+            ReportColumnName.BOUNDARY_DIMENSION,
+            ReportColumnName.SETTING,
+            ReportColumnName.PAIR,
+            ReportColumnName.METHOD,
+            ReportColumnName.CERTIFIED_VALUE,
+            ReportColumnName.REALIZED_GAIN,
+            ReportColumnName.ABSTENTION,
+            ReportColumnName.NULL_NODE_COUNT,
+            ReportColumnName.CONFIRMATION_COVERAGE,
+            ReportColumnName.STATE,
         ),
         rows,
     )
 
 
 def scalability_results_table(
-    rows: Sequence[Mapping[str, TableScalar]], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "k", # TODO: should be enum
-            "block", # TODO: should be enum
-            "support", # TODO: should be enum
-            "method", # TODO: should be enum
-            "n_s", # TODO: should be enum
-            "lap_calls", # TODO: should be enum
-            "cuts", # TODO: should be enum
-            "runtime_median", # TODO: should be enum
-            "runtime_p95", # TODO: should be enum
-            "rss", # TODO: should be enum
-            "cuda_memory", # TODO: should be enum
-            "timeout", # TODO: should be enum
-            "exactness_status", # TODO: should be enum
-            "predicted_work", # TODO: should be enum
+            ReportColumnName.K,
+            ReportColumnName.BLOCK,
+            ReportColumnName.SUPPORT,
+            ReportColumnName.METHOD,
+            ReportColumnName.N_S,
+            ReportColumnName.LAP_CALLS,
+            ReportColumnName.CUTS,
+            ReportColumnName.RUNTIME_MEDIAN,
+            ReportColumnName.RUNTIME_P95,
+            ReportColumnName.RSS,
+            ReportColumnName.CUDA_MEMORY,
+            ReportColumnName.TIMEOUT,
+            ReportColumnName.EXACTNESS_STATUS,
+            ReportColumnName.PREDICTED_WORK,
         ),
         rows,
     )
 
 
 def _figure(
-    x_label: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    y_label: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    x_label: str,
+    y_label: str,
     series: Sequence[FigureSeries],
     *,
-    vertical_reference_lines: tuple[float, ...] = (), # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    horizontal_reference_lines: tuple[float, ...] = (), # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    vertical_reference_lines: tuple[float, ...] = (),
+    horizontal_reference_lines: tuple[float, ...] = (),
     log_x: bool = False,
     log_y: bool = False,
     draw_unit_diagonal: bool = False,
@@ -527,7 +527,7 @@ def baseline_paired_difference_plot(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "seed", # TODO: should be enum
+        "seed",
         "seed-level paired difference",
         series,
         horizontal_reference_lines=(0.0,),

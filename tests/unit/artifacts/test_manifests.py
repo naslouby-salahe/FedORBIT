@@ -25,13 +25,13 @@ from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
     ArtifactState,
-    ArtifactTypeName,
+    ArtifactType,
     Sha256Digest,
     TerminalState,
 )
 
-_PREPARED_SPLIT = ArtifactTypeName("prepared_split")
-_CHECKPOINT = ArtifactTypeName("checkpoint")
+_PREPARED_SPLIT = ArtifactType.PREPARED_SPLIT
+_CHECKPOINT = ArtifactType.CHECKPOINT
 
 COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",

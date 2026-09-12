@@ -9,6 +9,7 @@ from tests.unit.config.config_contract_checks import (
 )
 
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.types import GpuName
 
 
 def _validate_raw(config: ConfigDocument) -> FedorbitConfig:
@@ -147,7 +148,7 @@ def test_project_summary_subdirectories_locked(fedorbit_config: FedorbitConfig) 
 
 def test_runtime_layout_values_locked(fedorbit_config: FedorbitConfig) -> None:
     runtime = fedorbit_config.runtime
-    assert runtime.reference_model_gpu == "NVIDIA GeForce RTX 5060 Ti 16 GB"
+    assert runtime.reference_model_gpu == GpuName("NVIDIA GeForce RTX 5060 Ti 16 GB")
     assert runtime.solver_cpu_worker_ceiling == 4
     assert runtime.host_ram_ceiling_gib_for_registered_efficiency_runs == 16
     assert runtime.deterministic_kernel_warmups == 3

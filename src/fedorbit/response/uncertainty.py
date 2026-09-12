@@ -8,6 +8,7 @@ from typing import cast
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import (
@@ -119,8 +120,8 @@ def max_t_critical_value(
         )
     )
     rng = torch.Generator().manual_seed(bootstrap_seed)
-    derivatives = np.asarray(entry_derivatives, dtype=np.float64)
-    bootstrap_indices = torch.randint(
+    derivatives: NDArray[np.float64] = np.asarray(entry_derivatives, dtype=np.float64)
+    bootstrap_indices: NDArray[np.int64] = torch.randint(
         0,
         replicate_count,
         (resample_count, replicate_count),
@@ -133,9 +134,10 @@ def max_t_critical_value(
         bootstrap_standard_errors,
         se_floor,
     )
-    maxima = np.max(studentized, axis=0)
+    maxima: NDArray[np.float64] = np.max(studentized, axis=0)
     quantile_probability = float(level)
-    critical_value: Estimate = float(np.quantile(maxima, quantile_probability, method="higher"))
+    quantile_value = np.quantile(maxima, quantile_probability, method="higher")
+    critical_value: Estimate = float(quantile_value)
     return critical_value
 
 
@@ -158,7 +160,7 @@ def estimate_final_response(
         replicate_count=final.paired_replicates_per_intervention,
         bootstrap_resamples=final.max_t_bootstrap_resamples,
         confidence_level=final.simultaneous_confidence_level,
-        seed_stage=ResponseSeedStage("final-source-response"), # TODO: should be enum instead of hardcoded string
+        seed_stage=ResponseSeedStage.FINAL_SOURCE_RESPONSE,
     )
 
 

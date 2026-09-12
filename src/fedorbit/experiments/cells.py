@@ -4,7 +4,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fedorbit.types import ExperimentCondition, ExperimentName, Index, SemanticCoordinate
+from fedorbit.types import EvaluationConditionName, ExperimentName, Index, SemanticCoordinate
 
 
 def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordinate]:
@@ -277,7 +277,7 @@ def experiment_relevance(experiment: ExperimentName) -> frozenset[SemanticCoordi
     return by_experiment.get(experiment, common)
 
 
-ConditionLabel = ExperimentCondition
+ConditionLabel = EvaluationConditionName
 
 
 @dataclass(frozen=True, slots=True)

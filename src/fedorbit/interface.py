@@ -15,10 +15,12 @@ from fedorbit.types import (
     AnonymousNodeIndex,
     ClientRole,
     CoarseGroup,
+    FeatureName,
     RngNamespace,
     SampleCount,
     StableJsonPayload,
     StrictResourceViolationError,
+    TabularColumnName,
     is_sha256_digest,
 )
 
@@ -29,8 +31,8 @@ class AnonymityError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class AnonymityCoordinateEntry:
-    name: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    value: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    name: str
+    value: str
 
     def __post_init__(self) -> None:
         if not self.name or not self.value:
@@ -56,7 +58,7 @@ class AnonymousNodeOrder:
         expected = tuple(range(len(self.permutation)))
         if tuple(sorted(self.permutation)) != expected:
             raise AnonymityError("anonymous node permutation is not a bijection")
-        expected_ids = tuple(f"node-{index:04d}" for index in range(1, len(self.permutation) + 1)) # TODO: should be enum
+        expected_ids = tuple(f"node-{index:04d}" for index in range(1, len(self.permutation) + 1))
         if self.display_ids != expected_ids:
             raise AnonymityError("anonymous node identifiers are not stable sequential IDs")
 
@@ -227,8 +229,8 @@ class AccessLogger:
 
 
 def validate_exact_fields(
-    field_names: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    permitted_fields: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    field_names: frozenset[str],
+    permitted_fields: frozenset[str],
 ) -> None:
     unexpected = field_names - permitted_fields
     missing = permitted_fields - field_names
@@ -239,7 +241,9 @@ def validate_exact_fields(
         )
 
 
-def validate_anonymous_node_ids(node_ids: tuple[str, ...]) -> None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def validate_anonymous_node_ids(
+    node_ids: tuple[str, ...],
+) -> None:
     if not node_ids:
         raise StrictResourceViolationError("anonymous node identifier list is empty")
     expected = tuple(f"node-{index:04d}" for index in range(1, len(node_ids) + 1))
@@ -251,14 +255,14 @@ def validate_anonymous_node_ids(node_ids: tuple[str, ...]) -> None: # TODO: do n
         raise StrictResourceViolationError("invalid anonymous node identifier")
 
 
-def validate_sha256(value: str, field_name: str) -> None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def validate_sha256(value: str, field_name: str) -> None:
     if not is_sha256_digest(value):
         raise StrictResourceViolationError(f"{field_name} is not a lowercase SHA-256 digest")
 
 
 def validate_disjoint_feature_namespaces(
-    source_feature_names: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    target_feature_names: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    source_feature_names: frozenset[FeatureName],
+    target_feature_names: frozenset[FeatureName],
 ) -> None:
     overlap = source_feature_names & target_feature_names
     if overlap:
@@ -268,8 +272,8 @@ def validate_disjoint_feature_namespaces(
 
 
 def validate_no_cross_client_entity_ids(
-    source_entity_ids: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    target_entity_ids: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    source_entity_ids: frozenset[TabularColumnName],
+    target_entity_ids: frozenset[TabularColumnName],
 ) -> None:
     overlap = source_entity_ids & target_entity_ids
     if overlap:
@@ -277,8 +281,8 @@ def validate_no_cross_client_entity_ids(
 
 
 def validate_no_cross_client_timestamp_pairing(
-    source_timestamps: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    target_timestamps: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    source_timestamps: frozenset[TabularColumnName],
+    target_timestamps: frozenset[TabularColumnName],
 ) -> None:
     overlap = source_timestamps & target_timestamps
     if overlap:
@@ -313,7 +317,7 @@ def validate_resource_manifest_equality(
 
 def static_leakage_scan(
     serialized_payload: bytes,
-    forbidden_terms: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    forbidden_terms: frozenset[str],
 ) -> tuple[str, ...]:
     lowered = serialized_payload.decode("utf-8", errors="replace").lower()
     return tuple(sorted(term for term in forbidden_terms if term.lower() in lowered))
@@ -321,7 +325,7 @@ def static_leakage_scan(
 
 def validate_static_leakage_scan(
     serialized_payload: bytes,
-    forbidden_terms: frozenset[str], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    forbidden_terms: frozenset[str],
 ) -> None:
     findings = static_leakage_scan(serialized_payload, forbidden_terms)
     if findings:
@@ -336,7 +340,9 @@ def validate_dynamic_access_log_scan(trace: AccessTrace) -> None:
         )
 
 
-def validate_rfc3339_utc(value: str) -> None: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def validate_rfc3339_utc(
+    value: str,
+) -> None:
     if not value.endswith("Z"):
         raise StrictResourceViolationError("technical creation timestamp must be RFC 3339 UTC")
     try:

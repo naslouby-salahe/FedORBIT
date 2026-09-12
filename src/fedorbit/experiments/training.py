@@ -5,7 +5,7 @@ import json
 import time
 from collections import OrderedDict
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -26,8 +26,8 @@ from fedorbit.datasets.materialization import (
     transfer_concept_groups,
 )
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.protocol import ExperimentExecutionRequest
 from fedorbit.experiments.scoring import build_completion_manifest
 from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import (
@@ -59,6 +59,7 @@ from fedorbit.infrastructure.runtime import (
     ExecutionLogger,
     RandomSeed,
     current_code_revision,
+    execution_device,
     execution_logger,
     measure_efficiency,
     principal_determinism,
@@ -69,6 +70,10 @@ from fedorbit.infrastructure.workspace import (
     experiment_workspace,
 )
 from fedorbit.learning.checkpoints import load_base_checkpoint, save_base_checkpoint
+from fedorbit.learning.models import (
+    HOST_MODEL_ARCHITECTURE_FACTS,
+    NETWORK_MODEL_ARCHITECTURE_FACTS,
+)
 from fedorbit.learning.pilot import (
     HOST_DATASETS,
     NETWORK_DATASETS,
@@ -96,23 +101,25 @@ from fedorbit.response.pilot import (
 from fedorbit.response.pilot import PilotData as ResponsePilotData
 from fedorbit.types import (
     AnonymousNodeDisplayId,
+    ArtifactDirectorySegment,
     ArtifactFingerprint,
     ArtifactPath,
+    ArtifactSchemaVersion,
     ArtifactStage,
     ArtifactState,
     ArtifactType,
-    ArtifactTypeName,
     CheckpointDirectorySegment,
+    CheckpointFileName,
     CoarseGroup,
     ConfigurationSection,
     DatasetId,
-    ExecutionStageName,
+    ExecutionAction,
     ExperimentName,
     ExperimentSeed,
+    FieldDescription,
     InvalidReason,
     OverwritePolicy,
-    ProducerModuleName,
-    ReuseDecision,
+    ReportColumnName,
     Rfc3339UtcTimestamp,
     SemanticCell,
     SemanticCoordinate,
@@ -121,9 +128,8 @@ from fedorbit.types import (
     Sha256Digest,
     Split,
     StableJsonPayload,
+    StorageLayoutSegment,
 )
-
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.training")
 
 
 def execute_base_model_pilot(
@@ -135,7 +141,7 @@ def execute_base_model_pilot(
     relevance = experiment_relevance(experiment)
     raw_root = raw_dataset_root()
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
-    device = torch.device("cuda") # TODO: should be configurable, not hardcoded
+    device = execution_device()
     logger = execution_logger()
     for dataset in active_config().scientific.datasets.clients:
         logger.record(
@@ -144,7 +150,7 @@ def execute_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                 artifact_id=None,
                 state=ArtifactState.RUNNING,
-                stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                stage=ArtifactStage.PREPROCESSING,
                 experiment=experiment,
                 dataset=dataset,
             )
@@ -161,7 +167,7 @@ def execute_base_model_pilot(
                     cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                     artifact_id=None,
                     state=ArtifactState.INVALID,
-                    stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                    stage=ArtifactStage.PREPROCESSING,
                     experiment=experiment,
                     dataset=dataset,
                     elapsed_seconds=time.monotonic() - materialize_started_at,
@@ -174,7 +180,7 @@ def execute_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}"),
                 artifact_id=None,
                 state=ArtifactState.COMPLETED,
-                stage=ExecutionStageName(ArtifactStage.PREPROCESSING.value),
+                stage=ArtifactStage.PREPROCESSING,
                 experiment=experiment,
                 dataset=dataset,
                 elapsed_seconds=time.monotonic() - materialize_started_at,
@@ -213,7 +219,7 @@ def execute_source_response_estimator_pilot(
         seed,
         lambda fingerprint: _source_response_estimator_payload(layout, request, fingerprint),
         _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
-        _MODULE_NAME,
+        __name__,
         "source-response-pilot",
     )
 
@@ -233,13 +239,13 @@ def _execute_final_source_response_band_validation(
     raw_root = raw_dataset_root()
     selected_root = (
         experiment_workspace(layout, ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
-        / "artifacts" # TODO: should be enum
-        / "fitted" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / ArtifactDirectorySegment.FITTED
     )
     checkpoint_root = (
         experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
-        / "checkpoints" # TODO: should be enum
-        / "training" # TODO: should be enum
+        / StorageLayoutSegment.CHECKPOINTS
+        / CheckpointDirectorySegment.TRAINING
     )
     for dataset in active_config().scientific.datasets.clients:
         try:
@@ -247,20 +253,22 @@ def _execute_final_source_response_band_validation(
         except MaterializationError as error:
             persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             continue
-        selected_path = selected_root / f"{dataset.value}.json" # TODO: should be enum
+        selected_path = selected_root / f"{dataset.value}.json"
         if not selected_path.is_file():
             raise ExecutionError(f"missing selected response configuration: {selected_path}")
         selected_payload = json.loads(selected_path.read_text(encoding="utf-8"))
         candidate = ResponseCandidate(
-            selected_payload["intervention_magnitude"], # TODO: should be enum
-            selected_payload["optimizer_step_horizon"], # TODO: should be enum
+            selected_payload["intervention_magnitude"],
+            selected_payload["optimizer_step_horizon"],
         )
         eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
         for group in transfer_concept_groups(dataset, materialized):
             if group.source_eligible:
                 eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
         for seed in active_config().scientific.randomness.confirmatory_seeds:
-            checkpoint_path = checkpoint_root / dataset.value / f"seed-{seed}" / "checkpoint.pt" # TODO: should be enum
+            checkpoint_path = (
+                checkpoint_root / dataset.value / f"seed-{seed}" / CheckpointFileName.CHECKPOINT
+            )
             if not checkpoint_path.is_file():
                 raise ExecutionError(f"missing confirmatory checkpoint: {checkpoint_path}")
             checkpoint = load_base_checkpoint(checkpoint_path)
@@ -301,8 +309,8 @@ def _execute_final_source_response_band_validation(
                 ).packet
                 destination = (
                     experiment_workspace(layout, request.experiment)
-                    / "artifacts" # TODO: should be enum
-                    / "packets" # TODO: should be enum
+                    / StorageLayoutSegment.ARTIFACTS
+                    / ArtifactDirectorySegment.PACKETS
                     / dataset.value
                     / f"seed-{seed}"
                     / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
@@ -318,10 +326,15 @@ def _source_response_estimator_client_results(
     raw_root = raw_dataset_root()
     pilot_seeds = active_config().scientific.randomness.pilot_seeds
     base_workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
-    destination = experiment_workspace(layout, request.experiment) / "artifacts" # TODO: should be enum
-    destination = destination / "fitted" # TODO: should be enum
+    destination = (
+        experiment_workspace(layout, request.experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / ArtifactDirectorySegment.FITTED
+    )
     diagnostics_destination = (
-        experiment_workspace(layout, request.experiment) / "artifacts" / "derived" # TODO: should be enum
+        experiment_workspace(layout, request.experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
     )
     client_results: list[StableJsonPayload] = []
     for dataset in active_config().scientific.datasets.clients:
@@ -343,7 +356,7 @@ def _source_response_estimator_client_results(
                 layout,
                 request.experiment,
                 dataset,
-                InvalidReason("fewer than two eligible source transfer concepts"), # TODO: should be enum
+                InvalidReason("fewer than two eligible source transfer concepts"),
             )
             client_results.append(
                 cast(
@@ -356,11 +369,11 @@ def _source_response_estimator_client_results(
         for seed in pilot_seeds:
             path = (
                 base_workspace
-                / "checkpoints" # TODO: should be enum
-                / "pilot" # TODO: should be enum
+                / StorageLayoutSegment.CHECKPOINTS
+                / CheckpointDirectorySegment.PILOT
                 / dataset.value
                 / f"seed-{seed}"
-                / "checkpoint.pt" # TODO: should be enum
+                / CheckpointFileName.CHECKPOINT
             )
             if not path.is_file():
                 raise ExecutionError(f"missing selected pilot checkpoint: {path}")
@@ -389,7 +402,7 @@ def _source_response_estimator_client_results(
         results = run_pooled_source_response_pilot(tuple(checkpoints), data, intervention_classes)
         selected = select_response_configuration(results)
         atomic_write_json(
-            diagnostics_destination / f"{dataset.value}-candidates.json", # TODO: should be enum
+            diagnostics_destination / f"{dataset.value}-candidates.json",
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -400,7 +413,7 @@ def _source_response_estimator_client_results(
             ),
         )
         atomic_write_json(
-            destination / f"{dataset.value}.json", # TODO: should be enum
+            destination / f"{dataset.value}.json",
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -457,31 +470,9 @@ def execute_final_source_response_band_validation(
             ),
         ),
         frozenset({ConfigurationSection.RESPONSE, ConfigurationSection.MODELS}),
-        _MODULE_NAME,
+        __name__,
         "source-response-band-validation",
     )
-
-
-@dataclass(frozen=True, slots=True)
-class _ModelArchitectureFacts: # TODO: move to learning/models
-    architecture: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    normalization: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    activation: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    initialization: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-
-
-_NETWORK_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( # TODO: move to learning/models
-    architecture="256-128-64 MLP (NetworkFlowClassifier)",
-    normalization="LayerNorm",
-    activation="GELU",
-    initialization="Xavier uniform",
-)
-_HOST_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( # TODO: move to learning/models
-    architecture="192-96-48 MLP (HostClassifier)",
-    normalization="BatchNorm1d",
-    activation="ReLU",
-    initialization="Kaiming uniform",
-)
 
 
 def _pilot_selected_hyperparameters(
@@ -510,20 +501,22 @@ def _pilot_selected_hyperparameters(
 
 def training_protocol_rows(
     store: ArtifactStore,
-) -> tuple[Mapping[str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                   TableScalar], ...]:
+) -> tuple[
+    Mapping[ReportColumnName, TableScalar],
+    ...,
+]:
     training = active_config().scientific.training
     stopping_rule = (
         f"early stop after {training.early_stopping.patience_completed_epochs} epochs without "
         f">= {training.early_stopping.minimum_improvement} macro-CE improvement "
         f"(maximum {training.maximum_epochs} epochs)"
     )
-    rows: list[Mapping[str, TableScalar]] = []
+    rows: list[Mapping[ReportColumnName, TableScalar]] = []
     for dataset in active_config().scientific.datasets.clients:
         if dataset in NETWORK_DATASETS:
-            facts = _NETWORK_MODEL_ARCHITECTURE_FACTS
+            facts = NETWORK_MODEL_ARCHITECTURE_FACTS
         elif dataset in HOST_DATASETS:
-            facts = _HOST_MODEL_ARCHITECTURE_FACTS
+            facts = HOST_MODEL_ARCHITECTURE_FACTS
         else:
             continue
         selected = _pilot_selected_hyperparameters(store, dataset)
@@ -531,17 +524,52 @@ def training_protocol_rows(
             continue
         rows.append(
             OrderedDict(
-                model=dataset.value,
-                architecture=facts.architecture,
-                normalization=facts.normalization,
-                activation=facts.activation,
-                initialization=facts.initialization,
-                optimizer="AdamW",
-                batch=training.batch_size,
-                selected_learning_rate=selected.learning_rate,
-                selected_weight_decay=selected.weight_decay,
-                selected_dropout=selected.dropout_probability,
-                stopping_rule=stopping_rule,
+                (
+                    (
+                        ReportColumnName.MODEL,
+                        dataset.value,
+                    ),
+                    (
+                        ReportColumnName.ARCHITECTURE,
+                        facts.architecture,
+                    ),
+                    (
+                        ReportColumnName.NORMALIZATION,
+                        facts.normalization,
+                    ),
+                    (
+                        ReportColumnName.ACTIVATION,
+                        facts.activation,
+                    ),
+                    (
+                        ReportColumnName.INITIALIZATION,
+                        facts.initialization,
+                    ),
+                    (
+                        ReportColumnName.OPTIMIZER,
+                        "AdamW",
+                    ),
+                    (
+                        ReportColumnName.BATCH,
+                        training.batch_size,
+                    ),
+                    (
+                        ReportColumnName.SELECTED_LEARNING_RATE,
+                        selected.learning_rate,
+                    ),
+                    (
+                        ReportColumnName.SELECTED_WEIGHT_DECAY,
+                        selected.weight_decay,
+                    ),
+                    (
+                        ReportColumnName.SELECTED_DROPOUT,
+                        selected.dropout_probability,
+                    ),
+                    (
+                        ReportColumnName.STOPPING_RULE,
+                        stopping_rule,
+                    ),
+                )
             )
         )
     return tuple(rows)
@@ -572,7 +600,7 @@ def execute_client_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
                 artifact_id=None,
                 state=ArtifactState.RUNNING,
-                stage=ExecutionStageName(ArtifactStage.PILOT_SELECTION.value),
+                stage=ArtifactStage.PILOT_SELECTION,
                 experiment=experiment,
                 dataset=dataset,
             )
@@ -585,7 +613,7 @@ def execute_client_base_model_pilot(
                 cell_coordinates=SemanticCoordinates(f"{experiment.value}:{dataset.value}:pilot"),
                 artifact_id=None,
                 state=ArtifactState.COMPLETED,
-                stage=ExecutionStageName(ArtifactStage.PILOT_SELECTION.value),
+                stage=ArtifactStage.PILOT_SELECTION,
                 experiment=experiment,
                 dataset=dataset,
                 elapsed_seconds=time.monotonic() - pilot_started_at,
@@ -622,7 +650,7 @@ def execute_client_base_model_pilot(
                 relevance,
                 (),
                 BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-                _MODULE_NAME,
+                __name__,
             )
             if overwrite_policy == OverwritePolicy.REUSE:
                 existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -633,11 +661,11 @@ def execute_client_base_model_pilot(
                             cell_coordinates=checkpoint_coordinates,
                             artifact_id=existing.artifact_id,
                             state=ArtifactState.COMPLETED,
-                            stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                            stage=ArtifactStage.TRAINING,
                             experiment=experiment,
                             dataset=dataset,
                             seed=seed,
-                            reuse_decision=ReuseDecision("reused"),
+                            reuse_action=ExecutionAction.REUSE,
                         )
                     )
                     continue
@@ -647,11 +675,11 @@ def execute_client_base_model_pilot(
                     cell_coordinates=checkpoint_coordinates,
                     artifact_id=None,
                     state=ArtifactState.RUNNING,
-                    stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                    stage=ArtifactStage.TRAINING,
                     experiment=experiment,
                     dataset=dataset,
                     seed=seed,
-                    reuse_decision=ReuseDecision(
+                    reuse_note=FieldDescription(
                         f"{seed_index + 1}/{len(confirmatory_seeds)} confirmatory checkpoints"
                     ),
                 )
@@ -695,7 +723,7 @@ def execute_client_base_model_pilot(
                     cell_coordinates=checkpoint_coordinates,
                     artifact_id=None,
                     state=ArtifactState.COMPLETED,
-                    stage=ExecutionStageName(ArtifactStage.TRAINING.value),
+                    stage=ArtifactStage.TRAINING,
                     experiment=experiment,
                     dataset=dataset,
                     seed=seed,
@@ -724,9 +752,9 @@ def _persist_training_efficiency(
     )
     destination = (
         experiment_workspace(layout, experiment)
-        / "artifacts" # TODO: should be enum
-        / "derived" # TODO: should be enum
-        / f"training-efficiency.{dataset.value}.{seed}.json" # TODO: should be enum
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"training-efficiency.{dataset.value}.{seed}.json"
     )
     atomic_write_json(destination, OrderedDict[str, StableJsonPayload](asdict(record)))
     return destination
@@ -758,7 +786,7 @@ def _persist_base_checkpoint(
             relevance,
             (),
             BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-            _MODULE_NAME,
+            __name__,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -767,18 +795,18 @@ def _persist_base_checkpoint(
             return
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "checkpoints" # TODO: should be enum
+        / StorageLayoutSegment.CHECKPOINTS
         / directory_segment
         / dataset.value
         / f"seed-{seed}"
-        / "checkpoint.pt" # TODO: should be enum
+        / CheckpointFileName.CHECKPOINT
     )
     save_base_checkpoint(checkpoint, payload_path)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(_MODULE_NAME))
+    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
     runtime_sha256 = Sha256Digest(runtime_fingerprint(stage).sha256)
     completion = build_completion_manifest(
         coordinates,
@@ -793,7 +821,7 @@ def _persist_base_checkpoint(
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
             artifact_id=artifact_id(
-                ArtifactTypeName(ArtifactType.CHECKPOINT.value),
+                ArtifactType.CHECKPOINT,
                 cast(
                     StableJsonPayload,
                     OrderedDict(coordinates=coordinates, payload_sha256=payload_sha256),
@@ -810,7 +838,7 @@ def _persist_base_checkpoint(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version=ArtifactSchemaVersion.V1,
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,

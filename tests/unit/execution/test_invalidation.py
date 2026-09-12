@@ -15,7 +15,7 @@ from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
     ArtifactState,
-    ArtifactTypeName,
+    ArtifactType,
     ExecutionCell,
     SemanticCoordinates,
     Sha256Digest,
@@ -40,7 +40,7 @@ def _manifest(
     return ReusableArtifactManifest.model_validate(
         {
             "artifact_id": artifact_id(
-                ArtifactTypeName(artifact_type), COORDINATES, Sha256Digest(fingerprint)
+                ArtifactType(artifact_type), COORDINATES, Sha256Digest(fingerprint)
             ),
             "artifact_type": artifact_type,
             "semantic_producer_coordinates": "{}",

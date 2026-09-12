@@ -35,7 +35,6 @@ from fedorbit.types import (
     WeightDecay,
 )
 
-PILOT_REFERENCE_LEARNING_RATE: LearningRate = 1.0e-3 # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
 NETWORK_DATASETS = frozenset({DatasetId.EDGE_IIOTSET_NETWORK, DatasetId.TON_IOT_NETWORK})
 HOST_DATASETS = frozenset({DatasetId.TON_IOT_WINDOWS10_HOST, DatasetId.TON_IOT_LINUX_PROCESS_HOST})
 
@@ -87,8 +86,6 @@ def pilot_grid() -> tuple[PilotConfiguration, ...]:
             pilot.dropouts,
         )
     )
-    if len(configurations) != 12: # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-        raise PilotError("base-model pilot grid must contain exactly 12 configurations")
     return configurations
 
 
@@ -98,8 +95,6 @@ def run_base_model_pilot(
     device: torch.device | None = None,
 ) -> tuple[PilotFitResult, ...]:
     seeds = active_config().scientific.randomness.pilot_seeds
-    if len(seeds) != 3: # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-        raise PilotError("base-model pilot requires exactly three pilot seeds")
     class_weights = ClassWeights.from_targets(data.train_targets, data.n_classes)
     results: list[PilotFitResult] = []
     with principal_determinism():
@@ -124,12 +119,12 @@ def run_base_model_pilot(
                     candidate.hyperparameters(),
                 )
                 results.append(PilotFitResult(candidate, seed, outcome))
-    if len(results) != 36: # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-        raise PilotError("base-model pilot must produce exactly 36 fits per client")
     return tuple(results)
 
 
 def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSelection:
+    registered_seed_count = len(active_config().scientific.randomness.pilot_seeds)
+    registered_configuration_count = len(pilot_grid())
     grouped: defaultdict[PilotConfiguration, list[Score]] = defaultdict(list)
     for result in results:
         grouped.setdefault(result.configuration, []).append(
@@ -137,8 +132,8 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
         )
     candidates: list[PilotSelection] = []
     for configuration, values in grouped.items():
-        if len(values) != 3: # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-            raise PilotError("every pilot configuration must have exactly three seed results")
+        if len(values) != registered_seed_count:
+            raise PilotError("every pilot configuration must have one result per pilot seed")
         candidates.append(
             PilotSelection(
                 configuration,
@@ -146,15 +141,16 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
                 statistics.pstdev(values),
             )
         )
-    if len(candidates) != 12: # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
-        raise PilotError("pilot selection requires all 12 registered configurations")
+    if len(candidates) != registered_configuration_count:
+        raise PilotError("pilot selection requires every registered pilot configuration")
     return min(candidates, key=_pilot_selection_sort_key)
 
 
 def _pilot_selection_sort_key(
     item: PilotSelection,
 ) -> tuple[Score, StandardError, float, WeightDecay, Fraction]:
-    learning_rate_distance = abs(item.configuration.learning_rate - PILOT_REFERENCE_LEARNING_RATE)
+    reference_learning_rate = active_config().scientific.base_model_pilot.reference_learning_rate
+    learning_rate_distance = abs(item.configuration.learning_rate - reference_learning_rate)
     return (
         item.median_valid_macro_cross_entropy,
         item.valid_macro_cross_entropy_standard_deviation,

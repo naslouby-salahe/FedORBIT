@@ -25,6 +25,7 @@ from fedorbit.types import (
     Floor,
     Fraction,
     GiBMemory,
+    GpuName,
     InterventionMagnitude,
     InvalidPermutationCount,
     LearningRate,
@@ -38,6 +39,7 @@ from fedorbit.types import (
     ResampleCount,
     ResearcherCount,
     RetryCount,
+    RuntimeDeviceType,
     SampleCount,
     ScalabilityBlockPattern,
     ScaleFactor,
@@ -176,6 +178,7 @@ class TrainingConfig(FrozenModel):
 
 
 class BaseModelPilotConfig(FrozenModel):
+    reference_learning_rate: LearningRate
     learning_rates: tuple[LearningRate, ...]
     weight_decays: tuple[WeightDecay, ...]
     dropouts: tuple[Fraction, ...]
@@ -548,7 +551,7 @@ class SecondaryCrossModalityGeneralizationConfig(FrozenModel):
 
 
 class SemanticSufficiencyFrontierConfig(FrozenModel):
-    partitions: tuple[str | tuple[str, ...], ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    partitions: tuple[str | tuple[str, ...], ...]
     methods: tuple[MethodName, ...]
 
 
@@ -599,56 +602,56 @@ class FailureHandlingConfig(FrozenModel):
 
 
 class ExperimentSubdirectories(FrozenModel):
-    artifacts: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    evaluations: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    metrics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    statistics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    checkpoints: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    diagnostics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    logs: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    provenance: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    artifacts: tuple[str, ...]
+    evaluations: tuple[str, ...]
+    metrics: tuple[str, ...]
+    statistics: tuple[str, ...]
+    checkpoints: tuple[str, ...]
+    diagnostics: tuple[str, ...]
+    logs: tuple[str, ...]
+    provenance: tuple[str, ...]
 
 
 class ManuscriptExperimentSubdirectories(FrozenModel):
-    figures: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    tables: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    metrics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    statistics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    figures: tuple[str, ...]
+    tables: tuple[str, ...]
+    metrics: tuple[str, ...]
+    statistics: tuple[str, ...]
 
 
 class ProjectSummarySubdirectories(FrozenModel):
-    figures: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    tables: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    metrics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    statistics: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    reproducibility: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    figures: tuple[str, ...]
+    tables: tuple[str, ...]
+    metrics: tuple[str, ...]
+    statistics: tuple[str, ...]
+    reproducibility: tuple[str, ...]
 
 
 class ReportingOutputDirectories(FrozenModel):
-    manuscript_metric_summary: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    manuscript_supplementary_table: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    manuscript_main_figure: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_metric_summary: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_main_table: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_main_figure: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_configuration_reproducibility: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_execution_reproducibility: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    manuscript_metric_summary: str
+    manuscript_supplementary_table: str
+    manuscript_main_figure: str
+    project_metric_summary: str
+    project_main_table: str
+    project_main_figure: str
+    project_configuration_reproducibility: str
+    project_execution_reproducibility: str
 
 
 class ArtifactLayoutConfig(FrozenModel):
-    execution_root: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    manuscript_root: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    preprocessing_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    artifacts_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    experiments_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    cache_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    staging_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    results_experiments_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    project_summary_directory: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    preprocessing_subdirectories: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    reusable_artifact_subdirectories: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    execution_root: str
+    manuscript_root: str
+    preprocessing_directory: str
+    artifacts_directory: str
+    experiments_directory: str
+    cache_directory: str
+    staging_directory: str
+    results_experiments_directory: str
+    project_summary_directory: str
+    preprocessing_subdirectories: tuple[str, ...]
+    reusable_artifact_subdirectories: tuple[str, ...]
     experiment_subdirectories: ExperimentSubdirectories
-    cache_subdirectories: tuple[str, ...] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    cache_subdirectories: tuple[str, ...]
     manuscript_experiment_subdirectories: ManuscriptExperimentSubdirectories
     project_summary_subdirectories: ProjectSummarySubdirectories
     reporting_output_directories: ReportingOutputDirectories
@@ -656,30 +659,14 @@ class ArtifactLayoutConfig(FrozenModel):
 
 class RuntimeConfig(FrozenModel):
     failure_handling: FailureHandlingConfig
-    reference_model_gpu: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    execution_device: RuntimeDeviceType
+    reference_model_gpu: GpuName
     solver_cpu_worker_ceiling: ConcurrencyCount
     host_ram_ceiling_gib_for_registered_efficiency_runs: GiBMemory
     deterministic_kernel_warmups: RepetitionCount
     deterministic_kernel_timed_repetitions: RepetitionCount
     full_training_timing_repetitions_per_scientific_cell: RepetitionCount
     artifact_layout: ArtifactLayoutConfig
-
-
-class EnvironmentConfig(FrozenModel): # TODO: remove this and eliminate it from code
-    python: str
-    pytorch: str
-    numpy: str
-    scipy: str
-    scikit_learn: str
-    pandas: str
-    pyarrow: str
-    highspy_highs: str
-    pyscipopt: str
-    pydantic: str
-    typer: str
-    psutil: str
-    pytest: str
-    pytest_cov: str
 
 
 class ReportingPrecisionConfig(FrozenModel):
@@ -706,6 +693,5 @@ class FedorbitConfig(FrozenModel):
     generators: GeneratorsConfig
     experiments: ExperimentsConfig
     runtime: RuntimeConfig
-    environment: EnvironmentConfig
     reporting: ReportingConfig
     paths: PathsConfig

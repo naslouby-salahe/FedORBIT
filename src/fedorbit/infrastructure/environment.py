@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.metadata
 import platform
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -21,32 +20,6 @@ from fedorbit.types import (
     stable_json,
 )
 
-DEPENDENCY_SPECS = ( # TODO: Delete this
-    ("pytorch", "torch"),
-    ("numpy", "numpy"),
-    ("scipy", "scipy"),
-    ("scikit_learn", "scikit-learn"),
-    ("pandas", "pandas"),
-    ("pyarrow", "pyarrow"),
-    ("highspy_highs", "highspy"),
-    ("pyscipopt", "pyscipopt"),
-    ("pydantic", "pydantic"),
-    ("typer", "typer"),
-    ("psutil", "psutil"),
-)
-
-
-@dataclass(frozen=True, slots=True)
-class DependencyVersion: # TODO: Delete this
-    configured_key: str
-    distribution: str
-    configured: str
-    observed: str
-
-    @property
-    def matches(self) -> bool:
-        return self.configured == self.observed
-
 
 @dataclass(frozen=True, slots=True)
 class HardwareIdentity:
@@ -63,29 +36,12 @@ class HardwareIdentity:
 @dataclass(frozen=True, slots=True)
 class EnvironmentSnapshot:
     python_version: PythonVersion
-    dependencies: tuple[DependencyVersion, ...]
     hardware: HardwareIdentity
     fingerprint_sha256: Sha256Digest
 
 
 def observed_python_version() -> PythonVersion:
     return PythonVersion(platform.python_version())
-
-
-def observed_dependencies() -> tuple[DependencyVersion, ...]:
-    environment = active_config().environment
-    observed: list[DependencyVersion] = []
-    for configured_key, distribution in DEPENDENCY_SPECS:
-        configured = getattr(environment, configured_key)
-        observed.append(
-            DependencyVersion(
-                configured_key=configured_key,
-                distribution=distribution,
-                configured=configured,
-                observed=importlib.metadata.version(distribution),
-            )
-        )
-    return tuple(observed)
 
 
 def observed_hardware() -> HardwareIdentity:
@@ -113,11 +69,10 @@ def observed_hardware() -> HardwareIdentity:
 
 
 def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
-    dependencies = OrderedDict(
-        (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
-    )
-    hardware: OrderedDict[str, str | int | bool | None # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-                          ] = OrderedDict(
+    hardware: OrderedDict[
+        str,
+        str | int | bool | None,
+    ] = OrderedDict(
         gpu_name=snapshot.hardware.gpu_name,
         gpu_memory_bytes=snapshot.hardware.gpu_memory_bytes,
         cuda_available=snapshot.hardware.cuda_available,
@@ -128,11 +83,10 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
         os_release=snapshot.hardware.os_release,
     )
     payload: OrderedDict[
-        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str | OrderedDict[str, str] | OrderedDict[str, str | int | bool | None], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str,
+        str | OrderedDict[str, str | int | bool | None],
     ] = OrderedDict(
         python_version=snapshot.python_version,
-        dependencies=dependencies,
         hardware=hardware,
     )
     stable = stable_json(payload)
@@ -140,18 +94,15 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
 
 
 def environment_snapshot() -> EnvironmentSnapshot:
-    dependencies = observed_dependencies()
     hardware = observed_hardware()
     python_version = observed_python_version()
     snapshot = EnvironmentSnapshot(
         python_version=python_version,
-        dependencies=dependencies,
         hardware=hardware,
-        fingerprint_sha256=Sha256Digest("0" * 64), # TODO: should be enum
+        fingerprint_sha256=Sha256Digest("0" * 64),
     )
     return EnvironmentSnapshot(
         python_version=python_version,
-        dependencies=dependencies,
         hardware=hardware,
         fingerprint_sha256=_fingerprint(snapshot),
     )

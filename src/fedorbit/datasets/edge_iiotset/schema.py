@@ -4,7 +4,7 @@ from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import AdapterContract, DatasetAdapter
 from fedorbit.types import DatasetId, TabularColumnName
 
-EDGE_EXCLUSIONS = frozenset(
+EDGE_EXCLUSIONS = frozenset( #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
     {
         "frame.time",
         "ip.src_host",
@@ -23,7 +23,7 @@ EDGE_EXCLUSIONS = frozenset(
         "mqtt.msg",
     }
 )
-EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset(
+EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset( #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
     {
         "http.request.method",
         "http.referer",
@@ -34,8 +34,8 @@ EDGE_LEAKAGE_SAFEGUARD_EXCLUSIONS = frozenset(
         "mqtt.topic",
     }
 )
-EDGE_MULTICLASS_LABEL = "Attack_type"
-EDGE_BINARY_LABEL = "Attack_label"
+EDGE_MULTICLASS_LABEL = "Attack_type" #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+EDGE_BINARY_LABEL = "Attack_label" #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
 
 
 def edge_iiotset_adapter() -> DatasetAdapter:

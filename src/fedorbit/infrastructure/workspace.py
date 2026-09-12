@@ -52,7 +52,7 @@ class WorkspaceLayout:
     project_summary: Path
 
 
-def safe_slug(value: str) -> FilesystemSlug:
+def safe_slug(value: str) -> FilesystemSlug: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     normalized = unicodedata.normalize("NFC", value).casefold()
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
     if not slug:
@@ -166,9 +166,9 @@ class RawDuplicateReportRequest:
     preprocessing_root: Path
 
 
-def promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path:
+def promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     target = destination / filename
-    with FileLock(str(destination / f"{filename}.lock")):
+    with FileLock(str(destination / f"{filename}.lock")): #TODO: should be enums not hardcoded strings
         descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
         os.close(descriptor)
         temporary = Path(temporary_name)
@@ -215,14 +215,14 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
             columns=[list(entry.columns) for entry in request.inventory.files],
         )
     )
-    promote_parquet(frame, destination, "files.parquet")
+    promote_parquet(frame, destination, "files.parquet") #TODO: should be enums not hardcoded strings
     return destination / RawInventoryArtifact.MANIFEST_JSON
 
 
 def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
-    destination = request.preprocessing_root / "validation" / request.dataset.value
+    destination = request.preprocessing_root / "validation" / request.dataset.value #TODO: should be enums not hardcoded strings
     destination.mkdir(parents=True, exist_ok=True)
-    occurrence_counts: Counter[str] = Counter()
+    occurrence_counts: Counter[str] = Counter() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for source in _selected_raw_paths(request.dataset, request.raw_root):
         with source.open("rb") as handle:
             if not handle.readline().strip():
@@ -243,7 +243,7 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
             DuplicateReportColumn.DUPLICATE_ROW_COUNT,
         ),
     )
-    return promote_parquet(frame, destination, "duplicates.parquet")
+    return promote_parquet(frame, destination, "duplicates.parquet") #TODO: should be enums not hardcoded strings
 
 
 def _selected_raw_paths(dataset: DatasetId, raw_root: Path) -> tuple[Path, ...]:

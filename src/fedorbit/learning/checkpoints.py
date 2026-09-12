@@ -16,7 +16,7 @@ from fedorbit.learning.training import (
 )
 from fedorbit.types import EpochCount, Fraction, LearningRate, Score, WeightDecay
 
-type SerializedNamedTensor = tuple[str, torch.Tensor]
+type SerializedNamedTensor = tuple[str, torch.Tensor] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 @dataclass(frozen=True, slots=True)

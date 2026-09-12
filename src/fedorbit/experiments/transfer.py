@@ -135,7 +135,7 @@ from fedorbit.types import (
 )
 
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.transfer")
-_PRINCIPAL_CONDITION = EvaluationConditionName("principal")
+_PRINCIPAL_CONDITION = EvaluationConditionName("principal") #TODO: should be enums not hardcoded strings
 
 
 def _persist_ineligible_methods(
@@ -428,7 +428,7 @@ def execute_mechanism_ablations(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
     materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -590,7 +590,7 @@ def _persist_confirmation_safety_indicators(
             seed,
             metric_name,
             metric_value,
-            MetricUnit("fraction"),
+            MetricUnit("fraction"), #TODO: should be enums not hardcoded strings
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             request.overwrite_policy,
@@ -603,7 +603,7 @@ def execute_target_confirmation_and_portability(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     directed_pairs = (
         *active_config().scientific.datasets.primary_directed_pairs,
@@ -686,7 +686,7 @@ def execute_target_confirmation_and_portability(
                         seed,
                         MetricId.PROPOSAL_ACCEPTANCE_RATE,
                         1.0 if verdict.accepted else 0.0,
-                        MetricUnit("fraction"),
+                        MetricUnit("fraction"), #TODO: should be enums not hardcoded strings
                         MetricDirection.DESCRIPTIVE,
                         input_artifact_ids,
                         request.overwrite_policy,
@@ -739,7 +739,7 @@ def execute_secondary_cross_modality_generalization(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     secondary_pairs = active_config().scientific.datasets.secondary_directed_pairs
     materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -806,7 +806,7 @@ def execute_sparsity_and_dense_fallback(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
     materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -821,28 +821,28 @@ def execute_sparsity_and_dense_fallback(
 
     conditions: tuple[
         tuple[
-            str, #TODO: should be enums not hardcoded strings
+            str,
             TransferMethod,
             Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
         ],
         ...,
     ] = (
         (
-            "exact sparse s=1",
+            "exact sparse s=1", #TODO: should be enums not hardcoded strings
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             solve_fedorbit_exact_sparse_action_at_support(1),
         ),
         (
-            "exact sparse s=2",
+            "exact sparse s=2", #TODO: should be enums not hardcoded strings
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             solve_fedorbit_exact_sparse_action_at_support(2),
         ),
         (
-            "exact sparse s=3",
+            "exact sparse s=3", #TODO: should be enums not hardcoded strings
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             solve_fedorbit_exact_sparse_action_at_support(3),
         ),
-        ("dense CCP", TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, solve_dense_ccp_fallback_action),
+        ("dense CCP", TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, solve_dense_ccp_fallback_action), #TODO: should be enums not hardcoded strings
     )
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -861,7 +861,7 @@ def execute_sparsity_and_dense_fallback(
                     target,
                     seed,
                     (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
-                    EvaluationConditionName("exact sparse s=2"),
+                    EvaluationConditionName("exact sparse s=2"), #TODO: should be enums not hardcoded strings
                 )
             continue
         principal_support = active_config().scientific.action.principal_sparse_support
@@ -869,7 +869,7 @@ def execute_sparsity_and_dense_fallback(
             for condition_label, method, solve_action in conditions:
                 if (
                     method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
-                    and condition_label == f"exact sparse s={principal_support}"
+                    and condition_label == f"exact sparse s={principal_support}" #TODO: should be enums not hardcoded strings
                     and _reuse_principal_transfer_metrics(
                         store,
                         layout,
@@ -892,7 +892,7 @@ def execute_sparsity_and_dense_fallback(
                     target_materialized,
                     seed,
                     device,
-                    FilesystemSlug("sparsity-and-dense-fallback"),
+                    FilesystemSlug("sparsity-and-dense-fallback"), #TODO: should be enums not hardcoded strings
                     method,
                     solve_action,
                 )
@@ -921,7 +921,7 @@ def execute_real_packet_coupling_mechanism_validation(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
     materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -999,7 +999,7 @@ def execute_real_packet_coupling_mechanism_validation(
                     seed,
                     metric_name,
                     float(metric_value),
-                    MetricUnit("score"),
+                    MetricUnit("score"), #TODO: should be enums not hardcoded strings
                     MetricDirection.DESCRIPTIVE,
                     assembly.input_artifact_ids,
                     request.overwrite_policy,
@@ -1112,7 +1112,7 @@ def execute_multi_source_selection_validation(
                         AssimilationCoordinates(
                             target_client=SourceClientName(target.value),
                             directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-                            condition=EvaluationConditionName("principal"),
+                            condition=EvaluationConditionName("principal"), #TODO: should be enums not hardcoded strings
                             seed=seed,
                             clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
                             source_packet_artifact_id=assembly.first_packet_artifact_id,
@@ -1142,7 +1142,7 @@ def execute_multi_source_selection_validation(
                 seed,
                 MetricId.PROPOSAL_ACCEPTANCE_RATE,
                 1.0 if decision.accepted_proposal is not None else 0.0,
-                MetricUnit("fraction"),
+                MetricUnit("fraction"), #TODO: should be enums not hardcoded strings
                 MetricDirection.DESCRIPTIVE,
                 input_artifact_ids,
                 request.overwrite_policy,
@@ -1155,7 +1155,7 @@ def execute_semantic_sufficiency_frontier(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     config = active_config().experiments.semantic_sufficiency_frontier
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
@@ -1202,7 +1202,7 @@ def execute_semantic_sufficiency_frontier(
                         target_materialized,
                         seed,
                         device,
-                        FilesystemSlug("semantic-sufficiency-frontier"),
+                        FilesystemSlug("semantic-sufficiency-frontier"), #TODO: should be enums not hardcoded strings
                         method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
@@ -1251,7 +1251,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
     request: ExperimentExecutionRequest,
 ) -> None:
     raw_root = raw_dataset_root()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     config = active_config().experiments.weak_signal_support_and_heterogeneity_boundaries
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
@@ -1265,23 +1265,23 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 )
         return materialized_by_dataset.get(dataset)
 
-    conditions: list[tuple[str, WeakSignalPerturbation | None, SupportCount | None]] = []
+    conditions: list[tuple[str, WeakSignalPerturbation | None, SupportCount | None]] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for scale in config.response_scales:
-        conditions.append((f"response-scale-{scale}", response_scale_perturbation(scale), None))
+        conditions.append((f"response-scale-{scale}", response_scale_perturbation(scale), None)) #TODO: should be enums not hardcoded strings
     for multiplier in config.ci_half_width_multipliers:
         conditions.append(
-            (f"ci-half-width-{multiplier}", ci_half_width_perturbation(multiplier), None)
+            (f"ci-half-width-{multiplier}", ci_half_width_perturbation(multiplier), None) #TODO: should be enums not hardcoded strings
         )
     for multiplier in config.response_heterogeneity_multipliers:
         conditions.append(
             (
-                f"response-heterogeneity-{multiplier}",
+                f"response-heterogeneity-{multiplier}", #TODO: should be enums not hardcoded strings
                 response_heterogeneity_perturbation(multiplier),
                 None,
             )
         )
     for support in config.support_budgets:
-        conditions.append((f"support-budget-{support}", None, support))
+        conditions.append((f"support-budget-{support}", None, support)) #TODO: should be enums not hardcoded strings
 
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -1328,7 +1328,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         target_materialized,
                         seed,
                         device,
-                        FilesystemSlug("weak-signal-boundaries"),
+                        FilesystemSlug("weak-signal-boundaries"), #TODO: should be enums not hardcoded strings
                         method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,
@@ -1399,7 +1399,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                     )
 
     for fraction in config.target_usable_support_fractions:
-        condition = EvaluationConditionName(f"target-usable-support-fraction-{fraction}")
+        condition = EvaluationConditionName(f"target-usable-support-fraction-{fraction}") #TODO: should be enums not hardcoded strings
         for directed_pair in primary_pairs:
             source = directed_pair.source
             target = directed_pair.target
@@ -1459,7 +1459,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         subsampled_target,
                         seed,
                         device,
-                        FilesystemSlug("weak-signal-boundaries"),
+                        FilesystemSlug("weak-signal-boundaries"), #TODO: should be enums not hardcoded strings
                         method,
                         functools.partial(solve_action, certified_value_sink=certified_value_sink),
                         None,

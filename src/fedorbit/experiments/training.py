@@ -247,7 +247,7 @@ def _execute_final_source_response_band_validation(
         except MaterializationError as error:
             persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             continue
-        selected_path = selected_root / f"{dataset.value}.json"
+        selected_path = selected_root / f"{dataset.value}.json" #TODO: should be enums not hardcoded strings
         if not selected_path.is_file():
             raise ExecutionError(f"missing selected response configuration: {selected_path}")
         selected_payload = json.loads(selected_path.read_text(encoding="utf-8"))
@@ -343,7 +343,7 @@ def _source_response_estimator_client_results(
                 layout,
                 request.experiment,
                 dataset,
-                InvalidReason("fewer than two eligible source transfer concepts"),
+                InvalidReason("fewer than two eligible source transfer concepts"), #TODO: should be enums not hardcoded strings
             )
             client_results.append(
                 cast(
@@ -389,7 +389,7 @@ def _source_response_estimator_client_results(
         results = run_pooled_source_response_pilot(tuple(checkpoints), data, intervention_classes)
         selected = select_response_configuration(results)
         atomic_write_json(
-            diagnostics_destination / f"{dataset.value}-candidates.json",
+            diagnostics_destination / f"{dataset.value}-candidates.json", #TODO: should be enums not hardcoded strings
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -400,7 +400,7 @@ def _source_response_estimator_client_results(
             ),
         )
         atomic_write_json(
-            destination / f"{dataset.value}.json",
+            destination / f"{dataset.value}.json", #TODO: should be enums not hardcoded strings
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -726,7 +726,7 @@ def _persist_training_efficiency(
         experiment_workspace(layout, experiment)
         / "artifacts" #TODO: should be enums not hardcoded strings
         / "derived" #TODO: should be enums not hardcoded strings
-        / f"training-efficiency.{dataset.value}.{seed}.json"
+        / f"training-efficiency.{dataset.value}.{seed}.json" #TODO: should be enums not hardcoded strings
     )
     atomic_write_json(destination, OrderedDict[str, StableJsonPayload](asdict(record)))
     return destination
@@ -810,7 +810,7 @@ def _persist_base_checkpoint(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,

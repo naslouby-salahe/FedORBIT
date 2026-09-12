@@ -298,7 +298,7 @@ def confirmation_coverage(
     return coverage
 
 
-def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None:
+def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
     if eligible_decisions == 0:
         return None
     full_coverage: Fraction = 1.0

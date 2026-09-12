@@ -103,9 +103,9 @@ def run_pooled_source_response_pilot(
     data: PilotData,
     intervention_classes: NativeClassSets,
 ) -> tuple[CandidateResult, ...]:
-    if len(pilot_checkpoints) != 3:
+    if len(pilot_checkpoints) != 3: #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         raise ResponsePilotError("source-response pilot requires exactly three checkpoints")
-    if len({checkpoint.seed for checkpoint in pilot_checkpoints}) != 3:
+    if len({checkpoint.seed for checkpoint in pilot_checkpoints}) != 3: #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         raise ResponsePilotError("source-response pilot checkpoint seeds must be distinct")
     pilot = active_config().scientific.source_response_pilot
     return tuple(
@@ -305,23 +305,23 @@ def _eligibility_reasons(
     pilot = active_config().scientific.source_response_pilot
     reasons: list[IneligibilityReason] = []
     if not all_finite:
-        reasons.append(IneligibilityReason("non-finite shadow state or loss"))
+        reasons.append(IneligibilityReason("non-finite shadow state or loss")) #TODO: should be enum, not hardcoded string
     useful_entries = tuple(entry for entry in entries if entry.useful)
     if not useful_entries:
-        reasons.append(IneligibilityReason("no useful entries"))
+        reasons.append(IneligibilityReason("no useful entries")) #TODO: should be enum, not hardcoded string
         return reasons
     if (
         statistics.median(tuple(entry.derivative_discrepancy for entry in useful_entries))
         > pilot.relative_derivative_discrepancy_ceiling
     ):
-        reasons.append(IneligibilityReason("median derivative discrepancy above ceiling"))
+        reasons.append(IneligibilityReason("median derivative discrepancy above ceiling")) #TODO: should be enum, not hardcoded string
     if (
         statistics.median(tuple(entry.sign_agreement for entry in useful_entries))
         < pilot.sign_agreement_minimum
     ):
-        reasons.append(IneligibilityReason("median sign agreement below minimum"))
+        reasons.append(IneligibilityReason("median sign agreement below minimum")) #TODO: should be enum, not hardcoded string
     if len(useful_columns) < pilot.minimum_useful_intervention_columns:
-        reasons.append(IneligibilityReason("too few useful intervention columns"))
+        reasons.append(IneligibilityReason("too few useful intervention columns")) #TODO: should be enum, not hardcoded string
     return reasons
 
 

@@ -366,7 +366,7 @@ def apply_accepted_assimilation(
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")
     total_steps = config.scientific.confirmation.accepted_live_assimilation_steps
-    coordinates_payload: OrderedDict[str, str | int] = OrderedDict()
+    coordinates_payload: OrderedDict[str, str | int] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for key in ASSIMILATION_COORDINATE_KEYS:
         value = getattr(assimilation_coordinates, key.value)
         coordinates_payload[key.value] = (

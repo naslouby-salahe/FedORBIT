@@ -142,7 +142,7 @@ class ArtifactResolver(Protocol):
     def resolve(self, artifact_id: ArtifactIdentifier) -> ReusableArtifactManifest: ...
 
 
-def _metric_tabular_values(metric: MetricRecord) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _metric_tabular_values(metric: MetricRecord) -> tuple[tuple[str, ...], tuple[str, ...]]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     serialized = metric.model_dump(mode="json")
     return tuple(serialized), tuple(str(value) for value in serialized.values())
 
@@ -392,59 +392,59 @@ class VerifiedEvidenceWriter:
         return payload.metric_record
 
 
-def _tabular_frame(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> pd.DataFrame:
+def _tabular_frame(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> pd.DataFrame: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return pd.DataFrame(rows, columns=columns)
 
 
-def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes:
+def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return _tabular_frame(columns, rows).to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
-def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes:
+def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return _tabular_frame(columns, rows).to_latex(index=False, escape=True).encode("utf-8")
 
 
-def _experiment_metric_summary_directory() -> str:
+def _experiment_metric_summary_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     directories = active_config().runtime.artifact_layout.reporting_output_directories
     return directories.manuscript_metric_summary
 
 
-def _project_metric_summary_directory() -> str:
+def _project_metric_summary_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return (
         active_config().runtime.artifact_layout.reporting_output_directories.project_metric_summary
     )
 
 
-def _experiment_supplementary_table_directory() -> str:
+def _experiment_supplementary_table_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     directories = active_config().runtime.artifact_layout.reporting_output_directories
     return directories.manuscript_supplementary_table
 
 
-def _experiment_main_figure_directory() -> str:
+def _experiment_main_figure_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return (
         active_config().runtime.artifact_layout.reporting_output_directories.manuscript_main_figure
     )
 
 
-def _project_main_table_directory() -> str:
+def _project_main_table_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return active_config().runtime.artifact_layout.reporting_output_directories.project_main_table
 
 
-def _project_main_figure_directory() -> str:
+def _project_main_figure_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return active_config().runtime.artifact_layout.reporting_output_directories.project_main_figure
 
 
-def _project_configuration_reproducibility_directory() -> str:
+def _project_configuration_reproducibility_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     directories = active_config().runtime.artifact_layout.reporting_output_directories
     return directories.project_configuration_reproducibility
 
 
-def _project_execution_reproducibility_directory() -> str:
+def _project_execution_reproducibility_directory() -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     directories = active_config().runtime.artifact_layout.reporting_output_directories
     return directories.project_execution_reproducibility
 
 
-def _metric_svg_bytes(label: str, value: float) -> bytes:
+def _metric_svg_bytes(label: str, value: float) -> bytes: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     figure = Figure(
         figsize=(REPORT_FIGURE_WIDTH / 72, REPORT_FIGURE_HEIGHT / 72),
         dpi=72,
@@ -519,7 +519,7 @@ def _style_axes(axes: Axes, figure: EvidenceFigure, series_group: tuple[FigureSe
 def _panel_groups(
     series: tuple[FigureSeries, ...],
 ) -> tuple[tuple[str, tuple[FigureSeries, ...]], ...]:
-    grouped: OrderedDict[str, list[FigureSeries]] = OrderedDict()
+    grouped: OrderedDict[str, list[FigureSeries]] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for item in series:
         key = str(item.panel) if item.panel is not None else str(item.name)
         grouped.setdefault(key, []).append(item)
@@ -552,7 +552,7 @@ def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
     return buffer.getvalue()
 
 
-def _metric_pdf_bytes(label: str, value: float) -> bytes:
+def _metric_pdf_bytes(label: str, value: float) -> bytes: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     bar_width = min(
         float(REPORT_FIGURE_WIDTH - 80),
         max(0.0, abs(value) * (REPORT_FIGURE_WIDTH - 80) / REPORT_METRIC_SCALE),

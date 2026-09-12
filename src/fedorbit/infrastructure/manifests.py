@@ -50,8 +50,8 @@ from fedorbit.types import (
     stable_json,
 )
 
-NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
-FINE_CONCEPT_FIELD = "fine_concept"
+NATIVE_CLASS_IDS_FIELD = "native_local_class_ids" #TODO: should be enums not hardcoded strings
+FINE_CONCEPT_FIELD = "fine_concept" #TODO: should be enums not hardcoded strings
 
 
 class CompletionManifest(FrozenModel):
@@ -109,15 +109,15 @@ class DatasetManifest(FrozenModel):
         serialization_alias="schema", validation_alias="schema"
     )
     adapter_feature_order: TabularColumns
-    adapter_feature_roles: Mapping[TabularColumnName, str]
+    adapter_feature_roles: Mapping[TabularColumnName, str] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     accepted_schema_aliases: tuple[TabularColumnName, ...]
     adapter_adaptations: tuple[FieldDescription, ...]
     timestamp_field: TabularColumnName
     timestamp_range: TimestampRange
-    duplicate_counts: Mapping[str, Index]
-    conflicting_duplicate_counts: Mapping[str, Index]
-    local_class_counts: Mapping[str, Index]
-    transfer_candidate_counts: Mapping[str, SampleCount]
+    duplicate_counts: Mapping[str, Index] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    conflicting_duplicate_counts: Mapping[str, Index] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    local_class_counts: Mapping[str, Index] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    transfer_candidate_counts: Mapping[str, SampleCount] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     feature_quality: FeatureQualityManifest
     preprocessing_state: DatasetPreprocessingState
     dependency_fingerprint_sha256: Sha256Digest

@@ -116,7 +116,7 @@ def deterministic_smallest_hash_subsample_indices(
     keep = max(1, round(fraction * len(class_row_indices)))
     ranked: list[tuple[int, Index]] = []
     for row_index in class_row_indices:
-        payload = f"FedORBIT|weak-signal-support-subsample|{seed}|{coordinates_text}|{row_index}"
+        payload = f"FedORBIT|weak-signal-support-subsample|{seed}|{coordinates_text}|{row_index}" #TODO: should be enums not hardcoded strings
         digest_int = int.from_bytes(
             hashlib.sha256(payload.encode("utf-8")).digest(), byteorder="big"
         )

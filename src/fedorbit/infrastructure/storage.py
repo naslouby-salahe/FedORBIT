@@ -16,7 +16,7 @@ class StorageError(ValueError):
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with FileLock(str(path) + ".lock"):
+    with FileLock(str(path) + ".lock"): #TODO: use enum instead of hardcoded strings
         descriptor, temporary_name = tempfile.mkstemp(
             dir=path.parent, prefix=StorageLayoutSegment.TEMPORARY_FILE_PREFIX
         )

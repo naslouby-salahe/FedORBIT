@@ -130,13 +130,13 @@ def run_smoke_validation(
     )
     packet = build_source_packet(
         estimate,
-        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),),
-        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"),
+        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),), #TODO: should be enum not hardcoded string
+        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"), #TODO: should be enum not hardcoded string
         per_node_train_support=(1,),
         per_node_meta_support=(1,),
         per_node_effective_replicate_count=(1,),
-        source_checkpoint_sha256=Sha256Digest("0" * 64),
-        response_configuration_sha256=Sha256Digest("1" * 64),
+        source_checkpoint_sha256=Sha256Digest("0" * 64), #TODO: should be enums not hardcoded strings
+        response_configuration_sha256=Sha256Digest("1" * 64), #TODO: should be enums not hardcoded strings
         creation_timestamp=Rfc3339UtcTimestamp(
             datetime.now(UTC).isoformat().replace("+00:00", "Z")
         ),

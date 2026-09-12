@@ -164,7 +164,7 @@ def file_sha256(path: Path) -> Sha256Digest:
             and entry.get("size") == stat.st_size #TODO: use enum instead of hardcoded strings
             and entry.get("mtime_ns") == stat.st_mtime_ns #TODO: use enum instead of hardcoded strings
         ):
-            return Sha256Digest(cast(str, entry["sha256"]))
+            return Sha256Digest(cast(str, entry["sha256"])) #TODO: use enum instead of hardcoded strings
         digest = _hash_file_contents(path)
         cache[resolved] = OrderedDict(
             size=stat.st_size,

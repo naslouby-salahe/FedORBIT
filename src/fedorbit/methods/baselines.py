@@ -64,7 +64,7 @@ def _block_pair_permutation(
         SeedDerivationRequest(
             seed,
             RngNamespace.COUPLING_DESTRUCTION,
-            OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index),
+            OrderedDict[str, str | int](coordinates=coordinates, block_pair=block_pair_index), #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         )
     )
     generator = np.random.default_rng(rng_seed)

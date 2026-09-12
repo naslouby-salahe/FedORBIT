@@ -95,8 +95,8 @@ RESPONSE_PACKET_SCHEMA = ResponsePacketSchema.V1
 PACKET_PERMITTED_FIELDS = frozenset(field.value for field in PacketField)
 
 
-def _fine_semantic_label_terms() -> frozenset[str]:
-    terms: set[str] = set()
+def _fine_semantic_label_terms() -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    terms: set[str] = set() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for _, edge_labels, ton_labels in TRANSFER_ONTOLOGY.values():
         terms.update(str(label) for label in edge_labels)
         terms.update(str(label) for label in ton_labels)
@@ -209,8 +209,8 @@ class SourcePacket:
             document.per_node_effective_replicate_count,
         )
         if any(
-            array.dtype != "float64"
-            or array.order != "C"
+            array.dtype != "float64" #TODO: should be enums not hardcoded strings
+            or array.order != "C" #TODO: should be enums not hardcoded strings
             or len(array.shape) != 1
             or array.shape[0] != len(array.data)
             for array in arrays
@@ -341,7 +341,7 @@ class SourcePacket:
         node_count = len(self.anonymous_fine_node_ids)
         if len(entries) != node_count * node_count:
             raise PacketError("packet response entries do not form a square node matrix")
-        return np.asarray(entries, dtype=np.float64).reshape((node_count, node_count), order="C")
+        return np.asarray(entries, dtype=np.float64).reshape((node_count, node_count), order="C") #TODO: should be enums not hardcoded strings
 
 
 @dataclass(frozen=True, slots=True)
@@ -435,11 +435,11 @@ def construct_source_packet(
         AnonymityCoordinate(
             (
                 AnonymityCoordinateEntry(
-                    "source_checkpoint_sha256",
+                    "source_checkpoint_sha256", #TODO: should be enums not hardcoded strings
                     context.source_checkpoint_sha256,
                 ),
                 AnonymityCoordinateEntry(
-                    "response_configuration_sha256",
+                    "response_configuration_sha256", #TODO: should be enums not hardcoded strings
                     context.response_configuration_sha256,
                 ),
             )
@@ -545,10 +545,10 @@ def _validate_context(context: PacketConstructionContext) -> None:
 
 
 def _float64_array(values: tuple[Index | Estimate, ...]) -> Float64ArrayPayload:
-    array = np.asarray(values, dtype=np.float64, order="C")
+    array = np.asarray(values, dtype=np.float64, order="C") #TODO: should be enums not hardcoded strings
     return Float64ArrayPayload(
         dtype=PacketArrayDtype.FLOAT64,
         order=PacketArrayOrder.C,
         shape=tuple(int(size) for size in array.shape),
-        data=tuple(float(value) for value in array.ravel(order="C")),
+        data=tuple(float(value) for value in array.ravel(order="C")), #TODO: should be enums not hardcoded strings
     )

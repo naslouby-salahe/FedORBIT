@@ -158,7 +158,7 @@ def estimate_final_response(
         replicate_count=final.paired_replicates_per_intervention,
         bootstrap_resamples=final.max_t_bootstrap_resamples,
         confidence_level=final.simultaneous_confidence_level,
-        seed_stage=ResponseSeedStage("final-source-response"),
+        seed_stage=ResponseSeedStage("final-source-response"), #TODO: should be enum instead of hardcoded string
     )
 
 

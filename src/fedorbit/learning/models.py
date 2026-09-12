@@ -5,9 +5,9 @@ from torch import nn
 
 from fedorbit.types import ConceptCount, FeatureCount, Fraction
 
-HOST_BLOCK_WIDTHS = (192, 96, 48)
-HOST_BATCH_NORM_EPSILON = 1e-5
-HOST_BATCH_NORM_MOMENTUM = 0.1
+HOST_BLOCK_WIDTHS = (192, 96, 48) #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+HOST_BATCH_NORM_EPSILON = 1e-5 #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+HOST_BATCH_NORM_MOMENTUM = 0.1 #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
 
 
 class NetworkFlowClassifier(nn.Module):
@@ -21,19 +21,19 @@ class NetworkFlowClassifier(nn.Module):
             raise ValueError("dropout probability must be in [0, 1)")
         self.dropout_probability = dropout_probability
         self.block1 = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.LayerNorm(256, eps=1e-5, elementwise_affine=True),
+            nn.Linear(input_dim, 256), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            nn.LayerNorm(256, eps=1e-5, elementwise_affine=True), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             nn.GELU(approximate="none"),
             nn.Dropout(dropout_probability),
         )
         self.block2 = nn.Sequential(
-            nn.Linear(256, 128),
-            nn.LayerNorm(128, eps=1e-5, elementwise_affine=True),
+            nn.Linear(256, 128), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            nn.LayerNorm(128, eps=1e-5, elementwise_affine=True), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             nn.GELU(approximate="none"),
             nn.Dropout(dropout_probability),
         )
         self.block3 = nn.Sequential(nn.Linear(128, 64), nn.GELU(approximate="none"))
-        self.classifier = nn.Linear(64, n_classes)
+        self.classifier = nn.Linear(64, n_classes) #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         self.to(dtype=torch.float32)
 
     def initialize(self, generator: torch.Generator) -> None:
@@ -78,7 +78,7 @@ class HostClassifier(nn.Module):
             nn.Dropout(dropout_probability),
         )
         self.block3 = nn.Sequential(nn.Linear(second_width, third_width), nn.ReLU(inplace=False))
-        self.classifier = nn.Linear(third_width, n_classes)
+        self.classifier = nn.Linear(third_width, n_classes) #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         self.to(dtype=torch.float32)
 
     def initialize(self, generator: torch.Generator) -> None:

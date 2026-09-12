@@ -58,7 +58,7 @@ STAGE_DEPENDENCIES: Mapping[ArtifactStage, tuple[ArtifactStage, ...]] = OrderedD
     )
 )
 
-RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict(
+RUNTIME_COMPONENTS: Mapping[ArtifactStage, tuple[str, ...]] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     (
         (ArtifactStage.RAW, ("numpy", "pandas")),
         (ArtifactStage.PREPROCESSING, ("numpy", "pandas", "pyarrow", "scipy", "scikit-learn")),
@@ -84,12 +84,12 @@ class ProvenanceError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class RuntimeFingerprint:
-    components: tuple[str, ...]
-    versions: tuple[tuple[str, str], ...]
-    digest: str
+    components: tuple[str, ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    versions: tuple[tuple[str, str], ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    digest: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     @property
-    def sha256(self) -> str:
+    def sha256(self) -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         return self.digest
 
 
@@ -105,10 +105,10 @@ def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     components = RUNTIME_COMPONENTS[stage]
     versions: list[tuple[str, str]] = []
     for distribution in components:
-        if distribution == "torch-cuda":
+        if distribution == "torch-cuda": #TODO: should be enums not hardcoded strings
             import torch
 
-            versions.append(("torch-cuda", torch.version.cuda or "unknown"))
+            versions.append(("torch-cuda", torch.version.cuda or "unknown")) #TODO: should be enums not hardcoded strings
             continue
         try:
             versions.append((distribution, importlib.metadata.version(distribution)))
@@ -124,7 +124,7 @@ def runtime_fingerprint(stage: ArtifactStage) -> RuntimeFingerprint:
     )
 
 
-def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]:
+def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     config = active_config()
     scientific = config.scientific
     return OrderedDict(
@@ -152,9 +152,9 @@ def _section_extractors() -> Mapping[str, Callable[[], JsonValue]]:
     )
 
 
-def configuration_subset_digest(relevant_sections: frozenset[str]) -> str:
+def configuration_subset_digest(relevant_sections: frozenset[str]) -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     extractors = _section_extractors()
-    values: OrderedDict[str, JsonValue] = OrderedDict()
+    values: OrderedDict[str, JsonValue] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for section in sorted(relevant_sections):
         extractor = extractors.get(section)
         if extractor is not None:
@@ -166,8 +166,8 @@ def stage_dependency_fingerprint(
     stage: ArtifactStage,
     cell: SemanticCell,
     relevance: frozenset[SemanticCoordinate],
-    upstream_artifact_ids: tuple[str, ...],
-    config_sections: frozenset[str],
+    upstream_artifact_ids: tuple[str, ...], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    config_sections: frozenset[str], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     producer_module: ProducerModuleName,
 ) -> Sha256Digest:
     del producer_module

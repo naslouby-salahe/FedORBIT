@@ -39,20 +39,20 @@ class ArtifactStore:
         self._completions = root / StorageLayoutSegment.COMPLETIONS
         self._staging = root / StorageLayoutSegment.STAGING
         self._index_path = self._root / "fingerprint-index.json" #TODO: should be enums not hardcoded strings
-        self._manifest_cache: OrderedDict[str, ReusableArtifactManifest] | None = None
+        self._manifest_cache: OrderedDict[str, ReusableArtifactManifest] | None = None #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
     @property
     def root(self) -> Path:
         return self._root
 
     def manifest_path(self, artifact_id: ArtifactIdentifier) -> Path:
-        return self._manifests / f"{artifact_id.value}.json"
+        return self._manifests / f"{artifact_id.value}.json" #TODO: should be enums not hardcoded strings
 
     def manifest_dir(self) -> Path:
         return self._manifests
 
     def completion_path(self, artifact_id: ArtifactIdentifier) -> Path:
-        return self._completions / f"{artifact_id.value}.json"
+        return self._completions / f"{artifact_id.value}.json" #TODO: should be enums not hardcoded strings
 
     def staging_dir(self) -> Path:
         return self._staging
@@ -177,7 +177,7 @@ class ArtifactStore:
     def _load_manifest_cache(self) -> OrderedDict[str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
                                                   ReusableArtifactManifest]:
         if self._manifest_cache is None:
-            cache: OrderedDict[str, ReusableArtifactManifest] = OrderedDict()
+            cache: OrderedDict[str, ReusableArtifactManifest] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             if self._manifests.is_dir():
                 for path in sorted(self._manifests.glob(StorageLayoutSegment.MANIFEST_GLOB)):
                     if path.name == self._index_path.name:

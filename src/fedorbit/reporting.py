@@ -34,11 +34,11 @@ from fedorbit.types import (
 )
 
 
-def _report_columns(columns: Sequence[str]) -> ReportColumns:
+def _report_columns(columns: Sequence[str]) -> ReportColumns: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return tuple(ReportColumnName(column) for column in columns)
 
 
-def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]:
+def _leaf_scalars(prefix: str, value: JsonValue) -> tuple[tuple[str, str], ...]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     if isinstance(value, Mapping):
         rows: list[tuple[str, str]] = []
         for key, item in value.items():
@@ -72,25 +72,25 @@ def numerical_constants_and_seeds_table(
         )
     )
     return EvidenceTable(
-        columns=_report_columns(("configuration_path", "value")),
+        columns=_report_columns(("configuration_path", "value")), #TODO: should be enums not hardcoded strings
         rows=tuple((path, value) for path, value in rows),
     )
 
 
 def experiment_matrix_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "experiment",
-            "classification",
-            "datasets_or_pairs",
-            "methods",
-            "registered_seeds",
-            "conditions",
-            "derived_planned_cells",
-            "prerequisites",
-            "evidence_relationship",
+            "experiment", #TODO: should be enums not hardcoded strings
+            "classification", #TODO: should be enums not hardcoded strings
+            "datasets_or_pairs", #TODO: should be enums not hardcoded strings
+            "methods", #TODO: should be enums not hardcoded strings
+            "registered_seeds", #TODO: should be enums not hardcoded strings
+            "conditions", #TODO: should be enums not hardcoded strings
+            "derived_planned_cells", #TODO: should be enums not hardcoded strings
+            "prerequisites", #TODO: should be enums not hardcoded strings
+            "evidence_relationship", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
@@ -98,22 +98,22 @@ def experiment_matrix_table(
 
 def dataset_and_client_protocol_table(
     manifests: Sequence[DatasetManifest],
-    modality_by_dataset: Mapping[str, str],
-    role_by_dataset: Mapping[str, ClientRole],
-    excluded_class_counts: Mapping[str, int],
+    modality_by_dataset: Mapping[str, str], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    role_by_dataset: Mapping[str, ClientRole], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    excluded_class_counts: Mapping[str, int], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     columns = (
-        "dataset_component",
-        "modality",
-        "observed_raw_rows",
-        "retained_rows",
-        "timestamp_range",
-        "local_prediction_classes",
-        "feature_count",
-        "transfer_candidates",
-        "exclusions",
-        "scientific_role",
-        "raw_manifest_hash",
+        "dataset_component", #TODO: should be enums not hardcoded strings
+        "modality", #TODO: should be enums not hardcoded strings
+        "observed_raw_rows", #TODO: should be enums not hardcoded strings
+        "retained_rows", #TODO: should be enums not hardcoded strings
+        "timestamp_range", #TODO: should be enums not hardcoded strings
+        "local_prediction_classes", #TODO: should be enums not hardcoded strings
+        "feature_count", #TODO: should be enums not hardcoded strings
+        "transfer_candidates", #TODO: should be enums not hardcoded strings
+        "exclusions", #TODO: should be enums not hardcoded strings
+        "scientific_role", #TODO: should be enums not hardcoded strings
+        "raw_manifest_hash", #TODO: should be enums not hardcoded strings
     )
     rows = tuple(
         (
@@ -136,10 +136,10 @@ def dataset_and_client_protocol_table(
 
 def _metric_value(
     records: Sequence[MetricRecord],
-    pair: str,
+    pair: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     method: TransferMethod,
     metric_name: MetricId,
-) -> float | None:
+) -> float | None: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     matches = [
         record
         for record in records
@@ -160,19 +160,19 @@ def primary_strict_transfer_results_table(
     comparison_records: Sequence[PairedComparisonRecord],
 ) -> EvidenceTable:
     columns = (
-        "pair",
-        "method",
-        "valid_seeds",
-        "test_macro_ce",
-        "macro_f1",
-        "balanced_accuracy",
-        "gain_vs_local",
-        "bca_ci_low",
-        "bca_ci_high",
-        "raw_p",
-        "holm_p",
-        "strict_validity",
-        "confirmation_coverage",
+        "pair", #TODO: should be enums not hardcoded strings
+        "method", #TODO: should be enums not hardcoded strings
+        "valid_seeds", #TODO: should be enums not hardcoded strings
+        "test_macro_ce", #TODO: should be enums not hardcoded strings
+        "macro_f1", #TODO: should be enums not hardcoded strings
+        "balanced_accuracy", #TODO: should be enums not hardcoded strings
+        "gain_vs_local", #TODO: should be enums not hardcoded strings
+        "bca_ci_low", #TODO: should be enums not hardcoded strings
+        "bca_ci_high", #TODO: should be enums not hardcoded strings
+        "raw_p", #TODO: should be enums not hardcoded strings
+        "holm_p", #TODO: should be enums not hardcoded strings
+        "strict_validity", #TODO: should be enums not hardcoded strings
+        "confirmation_coverage", #TODO: should be enums not hardcoded strings
     )
     pairs = sorted({record.pair for record in metric_records})
     method_order = (
@@ -216,7 +216,7 @@ def primary_strict_transfer_results_table(
 
 
 def _rows_table(
-    columns: tuple[str, ...], rows: Sequence[Mapping[str, TableScalar]]
+    columns: tuple[str, ...], rows: Sequence[Mapping[str, TableScalar]] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return EvidenceTable(
         columns=_report_columns(columns),
@@ -225,39 +225,39 @@ def _rows_table(
 
 
 def transfer_ontology_and_null_padding_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "candidate_concept",
-            "pair",
-            "coarse_group",
-            "source_real_or_null",
-            "target_real_or_null",
-            "support_counts",
-            "action_eligibility",
-            "null_reason",
+            "candidate_concept", #TODO: should be enums not hardcoded strings
+            "pair", #TODO: should be enums not hardcoded strings
+            "coarse_group", #TODO: should be enums not hardcoded strings
+            "source_real_or_null", #TODO: should be enums not hardcoded strings
+            "target_real_or_null", #TODO: should be enums not hardcoded strings
+            "support_counts", #TODO: should be enums not hardcoded strings
+            "action_eligibility", #TODO: should be enums not hardcoded strings
+            "null_reason", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def model_and_training_protocol_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "model",
-            "architecture",
-            "normalization",
-            "activation",
-            "initialization",
-            "optimizer",
-            "batch",
-            "selected_learning_rate",
-            "selected_weight_decay",
-            "selected_dropout",
-            "stopping_rule",
+            "model", #TODO: should be enums not hardcoded strings
+            "architecture", #TODO: should be enums not hardcoded strings
+            "normalization", #TODO: should be enums not hardcoded strings
+            "activation", #TODO: should be enums not hardcoded strings
+            "initialization", #TODO: should be enums not hardcoded strings
+            "optimizer", #TODO: should be enums not hardcoded strings
+            "batch", #TODO: should be enums not hardcoded strings
+            "selected_learning_rate", #TODO: should be enums not hardcoded strings
+            "selected_weight_decay", #TODO: should be enums not hardcoded strings
+            "selected_dropout", #TODO: should be enums not hardcoded strings
+            "stopping_rule", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
@@ -265,17 +265,17 @@ def model_and_training_protocol_table(
 
 def information_resource_matrix_table() -> EvidenceTable:
     columns = (
-        "method",
-        "target_raw_data",
-        "anonymous_source_nodes",
-        "coarse_groups",
-        "source_response",
-        "target_local_response",
-        "fine_names",
-        "exact_map",
-        "confirmation",
-        "predecision_test_access",
-        "strict_compatibility",
+        "method", #TODO: should be enums not hardcoded strings
+        "target_raw_data", #TODO: should be enums not hardcoded strings
+        "anonymous_source_nodes", #TODO: should be enums not hardcoded strings
+        "coarse_groups", #TODO: should be enums not hardcoded strings
+        "source_response", #TODO: should be enums not hardcoded strings
+        "target_local_response", #TODO: should be enums not hardcoded strings
+        "fine_names", #TODO: should be enums not hardcoded strings
+        "exact_map", #TODO: should be enums not hardcoded strings
+        "confirmation", #TODO: should be enums not hardcoded strings
+        "predecision_test_access", #TODO: should be enums not hardcoded strings
+        "strict_compatibility", #TODO: should be enums not hardcoded strings
     )
     rows = tuple(
         (
@@ -297,198 +297,198 @@ def information_resource_matrix_table() -> EvidenceTable:
 
 
 def coupling_mechanism_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "condition_or_pair",
-            "valid_units",
-            "fixed_action_gap",
-            "robust_coupling_gap",
-            "fraction_above_materiality",
-            "ci",
-            "holm_p",
-            "coupling_destruction_retained_gain_fraction",
+            "condition_or_pair", #TODO: should be enums not hardcoded strings
+            "valid_units", #TODO: should be enums not hardcoded strings
+            "fixed_action_gap", #TODO: should be enums not hardcoded strings
+            "robust_coupling_gap", #TODO: should be enums not hardcoded strings
+            "fraction_above_materiality", #TODO: should be enums not hardcoded strings
+            "ci", #TODO: should be enums not hardcoded strings
+            "holm_p", #TODO: should be enums not hardcoded strings
+            "coupling_destruction_retained_gain_fraction", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def exact_solver_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "k",
-            "block_pattern",
-            "support",
-            "truth_availability",
-            "exact_mismatches",
-            "maximum_absolute_error",
-            "runtime_median",
-            "runtime_p95",
-            "qap_runtime",
-            "dense_runtime",
-            "timeouts",
-            "memory",
-            "active_images",
-            "lap_calls",
+            "k", #TODO: should be enums not hardcoded strings
+            "block_pattern", #TODO: should be enums not hardcoded strings
+            "support", #TODO: should be enums not hardcoded strings
+            "truth_availability", #TODO: should be enums not hardcoded strings
+            "exact_mismatches", #TODO: should be enums not hardcoded strings
+            "maximum_absolute_error", #TODO: should be enums not hardcoded strings
+            "runtime_median", #TODO: should be enums not hardcoded strings
+            "runtime_p95", #TODO: should be enums not hardcoded strings
+            "qap_runtime", #TODO: should be enums not hardcoded strings
+            "dense_runtime", #TODO: should be enums not hardcoded strings
+            "timeouts", #TODO: should be enums not hardcoded strings
+            "memory", #TODO: should be enums not hardcoded strings
+            "active_images", #TODO: should be enums not hardcoded strings
+            "lap_calls", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def ablation_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "ablation",
-            "pair",
-            "realized_gain",
-            "difference_vs_full",
-            "equivalence",
-            "retained_gain",
-            "confirmation_safety",
+            "ablation", #TODO: should be enums not hardcoded strings
+            "pair", #TODO: should be enums not hardcoded strings
+            "realized_gain", #TODO: should be enums not hardcoded strings
+            "difference_vs_full", #TODO: should be enums not hardcoded strings
+            "equivalence", #TODO: should be enums not hardcoded strings
+            "retained_gain", #TODO: should be enums not hardcoded strings
+            "confirmation_safety", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def sparsity_and_dense_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "support_or_dense_condition",
-            "pair",
-            "realized_gain",
-            "certified_value",
-            "runtime",
-            "memory",
-            "confirmation_coverage",
-            "dense_minus_sparse_difference",
+            "support_or_dense_condition", #TODO: should be enums not hardcoded strings
+            "pair", #TODO: should be enums not hardcoded strings
+            "realized_gain", #TODO: should be enums not hardcoded strings
+            "certified_value", #TODO: should be enums not hardcoded strings
+            "runtime", #TODO: should be enums not hardcoded strings
+            "memory", #TODO: should be enums not hardcoded strings
+            "confirmation_coverage", #TODO: should be enums not hardcoded strings
+            "dense_minus_sparse_difference", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def evidence_status_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "question",
-            "final_state",
-            "materiality_result",
-            "statistical_result",
-            "evidence_completeness",
-            "scope",
-            "supporting_table",
-            "supporting_figure",
-            "forbidden_wording",
+            "question", #TODO: should be enums not hardcoded strings
+            "final_state", #TODO: should be enums not hardcoded strings
+            "materiality_result", #TODO: should be enums not hardcoded strings
+            "statistical_result", #TODO: should be enums not hardcoded strings
+            "evidence_completeness", #TODO: should be enums not hardcoded strings
+            "scope", #TODO: should be enums not hardcoded strings
+            "supporting_table", #TODO: should be enums not hardcoded strings
+            "supporting_figure", #TODO: should be enums not hardcoded strings
+            "forbidden_wording", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def confirmation_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "pair",
-            "proposals",
-            "accepted",
-            "harmful_accepted_rate",
-            "useful_accepted_rate",
-            "beneficial_rejected_rate",
-            "coverage",
-            "no_confirm_harmful_rate",
+            "pair", #TODO: should be enums not hardcoded strings
+            "proposals", #TODO: should be enums not hardcoded strings
+            "accepted", #TODO: should be enums not hardcoded strings
+            "harmful_accepted_rate", #TODO: should be enums not hardcoded strings
+            "useful_accepted_rate", #TODO: should be enums not hardcoded strings
+            "beneficial_rejected_rate", #TODO: should be enums not hardcoded strings
+            "coverage", #TODO: should be enums not hardcoded strings
+            "no_confirm_harmful_rate", #TODO: should be enums not hardcoded strings
             RiskReductionColumn.ABSOLUTE_RISK_REDUCTION,
             RiskReductionColumn.RELATIVE_RISK_REDUCTION,
-            "ci",
-            "p",
+            "ci", #TODO: should be enums not hardcoded strings
+            "p", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def generalization_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "pair",
-            "method",
-            "valid_seeds",
-            "test_macro_ce",
-            "macro_f1",
-            "balanced_accuracy",
-            "gain_vs_local",
-            "bca_ci_low",
-            "bca_ci_high",
-            "raw_p",
-            "holm_p",
-            "strict_validity",
-            "confirmation_coverage",
-            "is_secondary_pair",
+            "pair", #TODO: should be enums not hardcoded strings
+            "method", #TODO: should be enums not hardcoded strings
+            "valid_seeds", #TODO: should be enums not hardcoded strings
+            "test_macro_ce", #TODO: should be enums not hardcoded strings
+            "macro_f1", #TODO: should be enums not hardcoded strings
+            "balanced_accuracy", #TODO: should be enums not hardcoded strings
+            "gain_vs_local", #TODO: should be enums not hardcoded strings
+            "bca_ci_low", #TODO: should be enums not hardcoded strings
+            "bca_ci_high", #TODO: should be enums not hardcoded strings
+            "raw_p", #TODO: should be enums not hardcoded strings
+            "holm_p", #TODO: should be enums not hardcoded strings
+            "strict_validity", #TODO: should be enums not hardcoded strings
+            "confirmation_coverage", #TODO: should be enums not hardcoded strings
+            "is_secondary_pair", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def failure_boundary_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "boundary_dimension",
-            "setting",
-            "pair",
-            "method",
-            "certified_value",
-            "realized_gain",
-            "abstention",
-            "null_node_count",
-            "confirmation_coverage",
-            "state",
+            "boundary_dimension", #TODO: should be enums not hardcoded strings
+            "setting", #TODO: should be enums not hardcoded strings
+            "pair", #TODO: should be enums not hardcoded strings
+            "method", #TODO: should be enums not hardcoded strings
+            "certified_value", #TODO: should be enums not hardcoded strings
+            "realized_gain", #TODO: should be enums not hardcoded strings
+            "abstention", #TODO: should be enums not hardcoded strings
+            "null_node_count", #TODO: should be enums not hardcoded strings
+            "confirmation_coverage", #TODO: should be enums not hardcoded strings
+            "state", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def scalability_results_table(
-    rows: Sequence[Mapping[str, TableScalar]],
+    rows: Sequence[Mapping[str, TableScalar]], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> EvidenceTable:
     return _rows_table(
         (
-            "k",
-            "block",
-            "support",
-            "method",
-            "n_s",
-            "lap_calls",
-            "cuts",
-            "runtime_median",
-            "runtime_p95",
-            "rss",
-            "cuda_memory",
-            "timeout",
-            "exactness_status",
-            "predicted_work",
+            "k", #TODO: should be enums not hardcoded strings
+            "block", #TODO: should be enums not hardcoded strings
+            "support", #TODO: should be enums not hardcoded strings
+            "method", #TODO: should be enums not hardcoded strings
+            "n_s", #TODO: should be enums not hardcoded strings
+            "lap_calls", #TODO: should be enums not hardcoded strings
+            "cuts", #TODO: should be enums not hardcoded strings
+            "runtime_median", #TODO: should be enums not hardcoded strings
+            "runtime_p95", #TODO: should be enums not hardcoded strings
+            "rss", #TODO: should be enums not hardcoded strings
+            "cuda_memory", #TODO: should be enums not hardcoded strings
+            "timeout", #TODO: should be enums not hardcoded strings
+            "exactness_status", #TODO: should be enums not hardcoded strings
+            "predicted_work", #TODO: should be enums not hardcoded strings
         ),
         rows,
     )
 
 
 def _figure(
-    x_label: str,
-    y_label: str,
+    x_label: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    y_label: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     series: Sequence[FigureSeries],
     *,
-    vertical_reference_lines: tuple[float, ...] = (),
-    horizontal_reference_lines: tuple[float, ...] = (),
+    vertical_reference_lines: tuple[float, ...] = (), #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    horizontal_reference_lines: tuple[float, ...] = (), #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     log_x: bool = False,
     log_y: bool = False,
     draw_unit_diagonal: bool = False,
@@ -527,7 +527,7 @@ def baseline_paired_difference_plot(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "seed",
+        "seed", #TODO: should be enums not hardcoded strings
         "seed-level paired difference",
         series,
         horizontal_reference_lines=(0.0,),

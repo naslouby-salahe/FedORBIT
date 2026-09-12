@@ -71,8 +71,8 @@ from fedorbit.types import (
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.audit") #TODO: why is this needed? And not used
 
 
-def _human_audit_researcher_id(index: Index) -> str:
-    return f"researcher-{index + 1}"
+def _human_audit_researcher_id(index: Index) -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    return f"researcher-{index + 1}" #TODO: should be from enum
 
 
 def _human_audit_directory(
@@ -181,7 +181,7 @@ def execute_map_availability_applicability_audit(
                     seed,
                     MetricId.PACKET_ONLY_RECOVERY_ACCURACY,
                     1.0 if recovered else 0.0,
-                    MetricUnit("boolean"),
+                    MetricUnit("boolean"), #TODO: should be from enum
                     MetricDirection.HIGHER_IS_BETTER,
                     input_artifact_ids,
                     request.overwrite_policy,
@@ -193,11 +193,11 @@ def execute_map_availability_applicability_audit(
             directory = _human_audit_directory(
                 layout, request.experiment, source, target, researcher_id
             )
-            submission_path = directory / "submission.json"
+            submission_path = directory / "submission.json" #TODO: should be from enum
             if not submission_path.is_file():
                 template = blank_audit_template(researcher_id, domain_pair)
                 atomic_write_json(
-                    directory / "template.json",
+                    directory / "template.json", #TODO: should be from enum
                     cast(StableJsonPayload, template.model_dump(mode="json")),
                 )
                 continue

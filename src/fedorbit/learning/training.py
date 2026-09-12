@@ -280,7 +280,7 @@ def _seed_training_rng(epoch_seed: RandomSeed, device: torch.device) -> None:
     if device.type != RuntimeDeviceType.CUDA:
         return
     states = [
-        torch.Generator(device=torch.device("cuda", index)).manual_seed(epoch_seed).get_state()
+        torch.Generator(device=torch.device("cuda", index)).manual_seed(epoch_seed).get_state() #TODO: this is duplicated all over the project. Find them and fix them and centralize in runtime or something
         for index in range(torch.cuda.device_count())
     ]
     torch.cuda.set_rng_state_all(states)
@@ -329,7 +329,7 @@ def train_base_model(
             SeedDerivationRequest(
                 seed,
                 RngNamespace.TRAIN_EPOCH_SHUFFLE,
-                cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)),
+                cast(StableJsonPayload, OrderedDict(stage="base-training", epoch=epoch)), #TODO: should be enums not hardcoded strings
             )
         )
         generator = torch.Generator().manual_seed(epoch_seed)

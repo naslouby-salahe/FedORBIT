@@ -109,7 +109,7 @@ from fedorbit.types import (
 )
 
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.synthesis")
-_PRINCIPAL_CONDITION = EvaluationConditionName("principal")
+_PRINCIPAL_CONDITION = EvaluationConditionName("principal") #TODO: should be enum instead of hardcoded string
 
 
 def _concept_split_support(
@@ -142,7 +142,7 @@ def transfer_ontology_null_padding_rows(
             source_train, source_meta, target_meta, target_confirm, target_test
         )
         action_eligible = eligibility.source_eligible and eligibility.target_eligible
-        null_reason: str | None = None
+        null_reason: str | None = None #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         if not source_real:
             null_reason = f"{concept.value} absent from source dataset"
         elif not target_real:
@@ -223,10 +223,10 @@ def completed_experiment_metric_records_with_support(
     store: ArtifactStore, experiment: ExperimentName
 ) -> tuple[tuple[MetricRecord, SupportCount | None], ...]:
     results: list[tuple[MetricRecord, SupportCount | None]] = []
-    for manifest, payload in _iter_completed_json_payloads(store, experiment, "metric_record"):
+    for manifest, payload in _iter_completed_json_payloads(store, experiment, "metric_record"): #TODO: should be enum instead of hardcoded string
         record = MetricRecord.model_validate(payload)
         coordinates = json.loads(manifest.semantic_producer_coordinates)
-        support = coordinates.get("support")
+        support = coordinates.get("support") #TODO: should be enum instead of hardcoded string
         results.append((record, support))
     return tuple(results)
 
@@ -245,9 +245,9 @@ def transfer_ontology_and_null_padding_rows(
         return ()
     payload = cast(Mapping[str, object], json.loads(payload_path.read_text(encoding="utf-8")))
     rows: list[Mapping[str, TableScalar]] = []
-    for pair_entry in cast(list[Mapping[str, object]], payload.get("primary_pairs", [])):
+    for pair_entry in cast(list[Mapping[str, object]], payload.get("primary_pairs", [])): #TODO: should be enum instead of hardcoded string
         for ontology_row in cast(
-            list[Mapping[str, object]], pair_entry.get("transfer_ontology", [])
+            list[Mapping[str, object]], pair_entry.get("transfer_ontology", []) #TODO: should be enum instead of hardcoded string
         ):
             support = cast(
                 Mapping[str, object],
@@ -262,11 +262,11 @@ def transfer_ontology_and_null_padding_rows(
                     source_real_or_null="real" if ontology_row.get("source_real") else "null", #TODO: should be enum instead of hardcoded string
                     target_real_or_null="real" if ontology_row.get("target_real") else "null", #TODO: should be enum instead of hardcoded string
                     support_counts=(
-                        f"source_train={support.get('source_train')},"
-                        f"source_meta={support.get('source_meta')},"
-                        f"target_meta={support.get('target_meta')},"
-                        f"target_confirm={support.get('target_confirm')},"
-                        f"target_test={support.get('target_test')}"
+                        f"source_train={support.get('source_train')}," #TODO: should be enum instead of hardcoded string
+                        f"source_meta={support.get('source_meta')}," #TODO: should be enum instead of hardcoded string
+                        f"target_meta={support.get('target_meta')}," #TODO: should be enum instead of hardcoded string
+                        f"target_confirm={support.get('target_confirm')}," #TODO: should be enum instead of hardcoded string
+                        f"target_test={support.get('target_test')}" #TODO: should be enum instead of hardcoded string
                     ),
                     action_eligibility=cast(bool | None, ontology_row.get("action_eligibility")), #TODO: should be enum instead of hardcoded string
                     null_reason=cast(str | None, ontology_row.get("null_reason")), #TODO: should be enum instead of hardcoded string
@@ -420,7 +420,7 @@ def persist_primary_transfer_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -445,8 +445,8 @@ def execute_statistical_synthesis(
     )
     statistics_config = active_config().scientific.statistics
     for method in methods:
-        raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
-        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict()
+        raw_p_by_pair: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         contrasts: OrderedDict[
             str,
             tuple[
@@ -683,7 +683,7 @@ def execute_statistical_synthesis(
             resolved_coupling_comparison = store.resolve(coupling_comparison_manifest.artifact_id)
             coupling_comparison_record = PairedComparisonRecord.model_validate(
                 json.loads(Path(resolved_coupling_comparison.payload_paths[0]).read_text())[
-                    "comparison_record"
+                    "comparison_record" #TODO: should be enum instead of hardcoded string
                 ]
             )
             coupling_nonzero_count, coupling_metadata_seed = coupling_metadata_inputs[pair]
@@ -717,7 +717,7 @@ def execute_statistical_synthesis(
     external_source_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            Index, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            Index,
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
@@ -905,12 +905,12 @@ def execute_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
             )
             key = (
-                "superiority"
+                "superiority" #TODO: should be enum instead of hardcoded string
                 if statistic == ComparisonStatistic.SIGN_FLIP_SUPERIORITY
-                else "equivalence"
+                else "equivalence" #TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -937,7 +937,7 @@ def execute_statistical_synthesis(
     point_correspondence_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            Index, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            Index,
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
@@ -1124,7 +1124,7 @@ def execute_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
             )
             key = (
                 "difference" #TODO: Use a proper enum instead of a raw string
@@ -1170,7 +1170,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
     ablation_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            Index, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            Index,
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
@@ -1353,12 +1353,12 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
             )
             key = (
-                "difference"
+                "difference" #TODO: should be enum instead of hardcoded string
                 if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
-                else "equivalence"
+                else "equivalence" #TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -1413,7 +1413,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
     sparsity_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            Index, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            Index,
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
@@ -1559,7 +1559,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -1595,7 +1595,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
     confirmation_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            Index, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            Index,
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
@@ -1768,7 +1768,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             continue
         resolved = store.resolve(manifest.artifact_id)
         comparison_record = PairedComparisonRecord.model_validate(
-            json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
+            json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
         )
         persist_statistical_metadata(
             store,
@@ -1796,7 +1796,7 @@ def _completed_condition_macro_ce(
         tuple[DirectedPairName, TransferMethod, EvaluationConditionName, RandomSeed], _SeedMetric
     ] = OrderedDict()
     for resolved, record_payload in _iter_completed_json_payloads(
-        store, experiment, "metric_record"
+        store, experiment, "metric_record" #TODO: should be enum instead of hardcoded string
     ):
         record = MetricRecord.model_validate(record_payload)
         if (
@@ -1816,7 +1816,7 @@ def _completed_real_packet_coupling_gap(
 ) -> Mapping[tuple[DirectedPairName, RandomSeed], _SeedMetric]:
     result: OrderedDict[tuple[DirectedPairName, RandomSeed], _SeedMetric] = OrderedDict()
     for resolved, record_payload in _iter_completed_json_payloads(
-        store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION, "metric_record"
+        store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION, "metric_record" #TODO: should be enum instead of hardcoded string
     ):
         record = MetricRecord.model_validate(record_payload)
         if (
@@ -1936,7 +1936,7 @@ def persist_coupling_mechanism_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -2059,7 +2059,7 @@ def persist_baseline_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -2139,7 +2139,7 @@ def persist_statistical_metadata(
         / "derived" #TODO: should be enums not hardcoded strings
         / (
             f"statistical-metadata.{pair.replace(' -> ', '-to-')}.{method.value}"
-            f".{safe_slug(comparison_statistic.value)}.json"
+            f".{safe_slug(comparison_statistic.value)}.json" #TODO: should be enums not hardcoded strings
         )
     )
     payload = cast(
@@ -2178,7 +2178,7 @@ def persist_statistical_metadata(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,

@@ -147,7 +147,7 @@ def environment_snapshot() -> EnvironmentSnapshot:
         python_version=python_version,
         dependencies=dependencies,
         hardware=hardware,
-        fingerprint_sha256=Sha256Digest("0" * 64),
+        fingerprint_sha256=Sha256Digest("0" * 64), #TODO: should be enums not hardcoded strings
     )
     return EnvironmentSnapshot(
         python_version=python_version,

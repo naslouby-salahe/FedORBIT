@@ -66,7 +66,7 @@ class ScientificAlgorithmicFailureError(RuntimeError):
     pass
 
 
-class SparseMasterNonConvergenceError(ScientificAlgorithmicFailureError):
+class SparseMasterNonConvergenceError(ScientificAlgorithmicFailureError): #TODO: move to optimization/exact_sparse
     pass
 
 

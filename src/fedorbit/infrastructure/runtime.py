@@ -244,7 +244,7 @@ class ExecutionLogger:
             reuse_decision=event.reuse_decision,
         )
 
-    def event(self, event_name: str #TODO: should be enum not hardcoded string
+    def event(self, event_name: str
               , **fields: object) -> None:
         self._logger.info(event_name, **fields)
 
@@ -274,7 +274,7 @@ def _git_head() -> GitRevision:
         timeout=30,
     )
     if result.returncode != 0:
-        return GitRevision("no-git")
+        return GitRevision("no-git") #TODO: should be enum not hardcoded string
     return GitRevision(result.stdout.strip())
 
 
@@ -467,7 +467,7 @@ class TorchGeneratorStream:
 
 
 def torch_generator(request: TorchGeneratorRequest) -> TorchGeneratorStream:
-    generator = torch.Generator(device="cpu")
+    generator = torch.Generator(device="cpu") #TODO: should be enum instead of hardcoded string
     generator.manual_seed(request.seed)
     return TorchGeneratorStream(generator)
 

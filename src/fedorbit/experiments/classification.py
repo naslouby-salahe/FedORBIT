@@ -199,7 +199,7 @@ def _local_reference_dominant_pairs(
     holm_maximum: float, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     threshold = active_config().scientific.materiality.realized_relative_macro_ce
-    dominant: set[str] = set()
+    dominant: set[str] = set() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for record in records:
         if record.decision == ComparisonDecision.EQUIVALENT:
             dominant.add(record.pair)
@@ -239,7 +239,7 @@ def utility_family_status(
         if len(dominant) >= required_pairs:
             return _not_supported(
                 "local reference sufficient", "equivalence or superiority kill fired"
-            ) #TODO: should be enum. Not hardcoded string
+            )
     analyzable = len({record.pair for record in records})
     if (
         analyzable == 3
@@ -729,7 +729,7 @@ def execute_evidence_classification(
     comparisons = completed_primary_transfer_comparison_records(store)
     logger = execution_logger()
     logger.event(
-        "evidence_classification_start",
+        "evidence_classification_start", #TODO: should be enum not hardcoded string
         synthesis_present=synthesis is not None,
         comparison_rows=len(comparisons),
     )
@@ -806,5 +806,5 @@ def completed_evidence_status_rows(store: ArtifactStore) -> tuple[EvidenceStatus
         return ()
     latest = max(candidates, key=lambda item: item.payload_paths[0])
     payload = json.loads(Path(latest.payload_paths[0]).read_text(encoding="utf-8"))
-    rows = payload.get("statuses", ())
+    rows = payload.get("statuses", ()) #TODO: should be enum, not hardcoded string
     return tuple(EvidenceStatusRow.model_validate(row) for row in rows if isinstance(row, dict))

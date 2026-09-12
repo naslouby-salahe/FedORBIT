@@ -185,7 +185,7 @@ def build_catalogue() -> ExperimentCatalogue:
         (),
         (),
         (ConditionLabel(CatalogueCondition.HAND_FIXTURES),),
-        (0,),
+        (0,), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         0,
         (CataloguePrerequisite.PRIMITIVE_IMPLEMENTATION,),
     )
@@ -193,7 +193,7 @@ def build_catalogue() -> ExperimentCatalogue:
     block_patterns = config.generators.exact_separator_theorem.block_patterns
     theorem_generator = config.generators.exact_separator_theorem
     instances_per_cell = theorem_generator.generated_instances_per_block_pattern_support_seed_cell
-    feasible_support_cells = sum(min(sum(pattern), 3) for pattern in block_patterns)
+    feasible_support_cells = sum(min(sum(pattern), 3) for pattern in block_patterns) #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
     theorem_cells = feasible_support_cells * len(confirmatory_seeds) * instances_per_cell
     catalogue[ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION] = definition(
         ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION,

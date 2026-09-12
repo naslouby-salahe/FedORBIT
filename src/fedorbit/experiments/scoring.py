@@ -203,7 +203,7 @@ def build_completion_manifest(
 ) -> CompletionManifest:
     completion = CompletionManifest.model_validate(
         OrderedDict(
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             semantic_experiment_coordinates=coordinates,
             producer_stage=stage,
             terminal_state=TerminalState.COMPLETED,
@@ -248,7 +248,7 @@ def latest_completed_manifest(
     )
 
 
-_PRINCIPAL_CONDITION = EvaluationConditionName("principal")
+_PRINCIPAL_CONDITION = EvaluationConditionName("principal") #TODO: use enum, not hardcoded string
 _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.MODELS, ConfigurationSection.METRICS}
 )
@@ -404,7 +404,7 @@ def persist_primary_transfer_metric(
         / "derived" #TODO: use enum, not hardcoded string
         / (
             f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
-            f".{method.value}.{condition}.{seed}.{metric_name.value}.json"
+            f".{method.value}.{condition}.{seed}.{metric_name.value}.json" #TODO: should be enums not hardcoded strings
         )
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
@@ -440,7 +440,7 @@ def persist_primary_transfer_metric(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -475,13 +475,13 @@ def persist_ineligible_transfer_cell(
         seed,
         MetricId.ABSTENTION_INDICATOR,
         None,
-        MetricUnit("boolean"),
+        MetricUnit("boolean"), #TODO: use enum, not hardcoded string
         MetricDirection.DESCRIPTIVE,
-        (ArtifactIdentifier("ineligible-cell"),),
+        (ArtifactIdentifier("ineligible-cell"),), #TODO: use enum, not hardcoded string
         overwrite_policy,
         condition,
         valid=False,
-        invalid_reason=InvalidReason("INELIGIBLE/ABSTAIN"),
+        invalid_reason=InvalidReason("INELIGIBLE/ABSTAIN"), #TODO: use enum, not hardcoded string
     )
 
 
@@ -504,19 +504,19 @@ def persist_primary_transfer_cell_metrics(
         (
             MetricId.MACRO_CROSS_ENTROPY,
             float(score.macro_cross_entropy.value),
-            MetricUnit("nats"),
+            MetricUnit("nats"), #TODO: use enum, not hardcoded string
             MetricDirection.LOWER_IS_BETTER,
         ),
         (
             MetricId.MACRO_F1,
             float(macro_f1(f1_set).value),
-            MetricUnit("fraction"),
+            MetricUnit("fraction"), #TODO: use enum, not hardcoded string
             MetricDirection.HIGHER_IS_BETTER,
         ),
         (
             MetricId.BALANCED_ACCURACY,
             float(balanced_accuracy(recall_set).value),
-            MetricUnit("fraction"),
+            MetricUnit("fraction"), #TODO: use enum, not hardcoded string
             MetricDirection.HIGHER_IS_BETTER,
         ),
     ):
@@ -560,7 +560,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
                 float(certified_value),
-                MetricUnit("score"),
+                MetricUnit("score"), #TODO: use enum, not hardcoded string
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -570,7 +570,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.ABSTENTION_INDICATOR,
                 abstained,
-                MetricUnit("boolean"),
+                MetricUnit("boolean"), #TODO: use enum, not hardcoded string
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -580,7 +580,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.NULL_NODE_COUNT,
                 null_node_count,
-                MetricUnit("count"),
+                MetricUnit("count"), #TODO: use enum, not hardcoded string
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -588,7 +588,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.ORBIT_SIZE,
                 float(action.problem.blocks.orbit_size),
-                MetricUnit("count"),
+                MetricUnit("count"), #TODO: use enum, not hardcoded string
                 MetricDirection.DESCRIPTIVE,
             )
         )
@@ -597,7 +597,7 @@ def persist_boundary_diagnostic_metrics(
             (
                 MetricId.PROPOSAL_ACCEPTANCE_RATE,
                 1.0 if confirmation_accepted else 0.0,
-                MetricUnit("fraction"),
+                MetricUnit("fraction"), #TODO: use enum, not hardcoded string
                 MetricDirection.HIGHER_IS_BETTER,
             )
         )
@@ -922,7 +922,7 @@ def score_local_sir_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{target.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"),
+            condition=EvaluationConditionName("principal"), #TODO: use enum, not hardcoded string
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
@@ -1183,7 +1183,7 @@ def score_matched_resource_rectangular_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"),
+            condition=EvaluationConditionName("principal"), #TODO: use enum, not hardcoded string
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
@@ -1303,7 +1303,7 @@ def score_point_correspondence_commitment_cell(
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
             directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-            condition=EvaluationConditionName("principal"),
+            condition=EvaluationConditionName("principal"), #TODO: use enum, not hardcoded string
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
             source_packet_artifact_id=ArtifactIdentifier(
@@ -1607,7 +1607,7 @@ def score_robust_action_cell(
     assimilation_coordinates = AssimilationCoordinates(
         target_client=SourceClientName(target.value),
         directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
-        condition=EvaluationConditionName("principal"),
+        condition=EvaluationConditionName("principal"), #TODO: use enum, not hardcoded string
         seed=seed,
         clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
         source_packet_artifact_id=assembly.first_packet_artifact_id,
@@ -1702,7 +1702,7 @@ def score_fedorbit_exact_sparse_solver_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-exact-sparse-solver"),
+        FilesystemSlug("fedorbit-exact-sparse-solver"), #TODO: use enum, not hardcoded string
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
     )
@@ -1780,7 +1780,7 @@ def score_fedorbit_without_confirmation_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-without-confirmation"),
+        FilesystemSlug("fedorbit-without-confirmation"), #TODO: use enum, not hardcoded string
         TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
         solve_fedorbit_exact_sparse_action,
         _settle_without_confirmation_and_score,
@@ -1806,7 +1806,7 @@ def score_generic_exact_qap_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("generic-exact-qap"),
+        FilesystemSlug("generic-exact-qap"), #TODO: use enum, not hardcoded string
         TransferMethod.GENERIC_EXACT_QAP,
         _solve_generic_exact_qap_action,
     )
@@ -1831,7 +1831,7 @@ def score_exact_map_oracle_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("exact-map-oracle"),
+        FilesystemSlug("exact-map-oracle"), #TODO: use enum, not hardcoded string
         TransferMethod.EXACT_MAP_ORACLE,
         solve_exact_map_oracle_action,
     )
@@ -1903,7 +1903,7 @@ def score_coarse_block_mean_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coarse-block-mean"),
+        FilesystemSlug("coarse-block-mean"), #TODO: use enum, not hardcoded string
         TransferMethod.COARSE_BLOCK_MEAN,
         solve_coarse_block_mean_action,
     )
@@ -1928,7 +1928,7 @@ def score_coarse_block_min_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coarse-block-min"),
+        FilesystemSlug("coarse-block-min"), #TODO: use enum, not hardcoded string
         TransferMethod.COARSE_BLOCK_MIN,
         solve_coarse_block_min_action,
     )
@@ -1953,7 +1953,7 @@ def score_orbit_mean_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("orbit-mean"),
+        FilesystemSlug("orbit-mean"), #TODO: use enum, not hardcoded string
         TransferMethod.ORBIT_MEAN,
         solve_orbit_mean_action,
     )
@@ -1978,7 +1978,7 @@ def score_coupling_destroyed_fedorbit_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("coupling-destroyed-fedorbit"),
+        FilesystemSlug("coupling-destroyed-fedorbit"), #TODO: use enum, not hardcoded string
         TransferMethod.COUPLING_DESTROYED_FEDORBIT,
         solve_coupling_destroyed_action,
     )
@@ -2110,7 +2110,7 @@ def score_fedorbit_with_confirmation_verdict_cell(
         target_materialized,
         seed,
         device,
-        FilesystemSlug("fedorbit-exact-sparse-solver"),
+        FilesystemSlug("fedorbit-exact-sparse-solver"), #TODO: use enum, not hardcoded string
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
         _confirm_assimilate_score_capturing_verdict(verdicts),
@@ -2199,8 +2199,8 @@ def semantic_partition_bucket_of(
     if partition == SemanticPartitionId.ONE_ATTACK_SUPERGROUP:
         return _SEMANTIC_PARTITION_SUPERGROUP
     if isinstance(partition, tuple) and set(partition) == {
-        "Disruption or Exploitation",
-        "Access and Discovery",
+        "Disruption or Exploitation", #TODO: should be enums not hardcoded strings
+        "Access and Discovery", #TODO: should be enums not hardcoded strings
     }:
         return _SEMANTIC_PARTITION_MERGE
     return None

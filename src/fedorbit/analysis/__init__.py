@@ -45,5 +45,5 @@ __all__ = [
     "paired_bca_interval",
     "sign_flip_p_value",
     "statistical_bootstrap_seed",
-    "tost_equivalence",
+    "tost_equivalence", #TODO: should be enum, not hardcoded string
 ]

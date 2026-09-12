@@ -26,32 +26,32 @@ class MapAvailabilityAuditError(ValueError):
 
 
 class ProposedMappingEntry(DomainModel):
-    source_public_label: str
-    target_public_label: str
+    source_public_label: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    target_public_label: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     exposed_coarse_group: ExposedCoarseGroupId
 
 
 class UnresolvedAlternativeEntry(DomainModel):
-    affected_public_label: str
-    alternatives_considered: tuple[str, ...]
+    affected_public_label: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    alternatives_considered: tuple[str, ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 class MapAvailabilityAuditSubmission(DomainModel):
-    researcher_id: str
+    researcher_id: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     directed_pair: DirectedPair
     session_start_utc: Rfc3339UtcTimestamp
     session_end_utc: Rfc3339UtcTimestamp
-    resources_consulted: tuple[str, ...]
+    resources_consulted: tuple[str, ...] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     proposed_mapping: tuple[ProposedMappingEntry, ...]
     unresolved_alternatives: tuple[UnresolvedAlternativeEntry, ...]
-    rationale: str
+    rationale: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 _BLANK_SESSION_TIMESTAMP = Rfc3339UtcTimestamp("1970-01-01T00:00:00Z")
 
 
 def blank_audit_template(
-    researcher_id: str, directed_pair: DirectedPair
+    researcher_id: str, directed_pair: DirectedPair #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> MapAvailabilityAuditSubmission:
     return MapAvailabilityAuditSubmission(
         researcher_id=researcher_id,
@@ -65,7 +65,7 @@ def blank_audit_template(
     )
 
 
-def stable_submission_payload(submission: MapAvailabilityAuditSubmission) -> str:
+def stable_submission_payload(submission: MapAvailabilityAuditSubmission) -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     ordered_mapping = sorted(
         submission.proposed_mapping,
         key=lambda entry: (
@@ -118,8 +118,8 @@ def submission_sha256(submission: MapAvailabilityAuditSubmission) -> Sha256Diges
     )
 
 
-def documented_public_labels() -> frozenset[str]:
-    labels: set[str] = set()
+def documented_public_labels() -> frozenset[str]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    labels: set[str] = set() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     for _, (_, edge_labels, ton_labels) in TRANSFER_ONTOLOGY.items():
         labels.update(str(label) for label in edge_labels)
         labels.update(str(label) for label in ton_labels)
@@ -137,7 +137,7 @@ class SubmissionValidationFailure(StrEnum):
 def validate_submission(
     submission: MapAvailabilityAuditSubmission,
     minutes_limit: DurationMinutes,
-    public_labels: frozenset[str],
+    public_labels: frozenset[str], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> tuple[SubmissionValidationFailure, ...]:
     failures: list[SubmissionValidationFailure] = []
     try:
@@ -159,7 +159,7 @@ def validate_submission(
     for resource in submission.resources_consulted:
         if (
             any(token in resource.casefold() for token in oracle_tokens)
-            or "oracle" in resource.casefold()
+            or "oracle" in resource.casefold() #TODO: should be enum, not hardcoded string
         ):
             failures.append(SubmissionValidationFailure.ORACLE_ARTIFACT_REFERENCED)
             break
@@ -173,7 +173,7 @@ def distinct_researcher_ids(
 
 
 def _public_label_to_oracle_concept(
-    edge_or_ton_label: str,
+    edge_or_ton_label: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> OracleTransferConcept | None:
     for concept, (_, edge_labels, ton_labels) in TRANSFER_ONTOLOGY.items():
         if edge_or_ton_label in {str(label) for label in edge_labels} or edge_or_ton_label in {
@@ -197,7 +197,7 @@ def submission_is_complete_one_to_one(
     )
 
 
-def oracle_correspondence_accuracy(submission: MapAvailabilityAuditSubmission) -> float:
+def oracle_correspondence_accuracy(submission: MapAvailabilityAuditSubmission) -> float: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     if not submission.proposed_mapping:
         return 0.0
     correct = 0

@@ -291,7 +291,7 @@ def _persist_blocked_experiment(
         OrderedDict(
             experiment=request.experiment.value,
             state=ArtifactState.BLOCKED.value,
-            reason="chronological preprocessing prerequisite is unsatisfied",
+            reason="chronological preprocessing prerequisite is unsatisfied", #TODO: should be enums not hardcoded strings
             blocked_datasets=reasons,
         ),
     )
@@ -338,7 +338,7 @@ def persist_synthetic_experiment_payload(
         experiment_workspace(layout, request.experiment)
         / StorageLayoutSegment.ARTIFACTS
         / StorageLayoutSegment.DERIVED
-        / f"{artifact_name}.{fingerprint[:16]}.json"
+        / f"{artifact_name}.{fingerprint[:16]}.json" #TODO: should be enums not hardcoded strings
     )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
@@ -369,7 +369,7 @@ def persist_synthetic_experiment_payload(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -447,9 +447,9 @@ def execute_exact_sparse_theorem_exhaustive_validation(
                         _instance_payload,
                         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
                         _MODULE_NAME,
-                        f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}",
+                        f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}", #TODO: should be enums not hardcoded strings
                         ExperimentCondition(
-                            f"pattern-{pattern_key}-seed{seed}-instance{instance_index}"
+                            f"pattern-{pattern_key}-seed{seed}-instance{instance_index}" #TODO: should be enums not hardcoded strings
                         ),
                         SupportSize(support),
                     )
@@ -616,13 +616,13 @@ def execute_coupling_and_map_bound_validation(
                                 _cell_payload,
                                 _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
                                 _MODULE_NAME,
-                                f"coupling-validation.{condition_label}.s{support}",
+                                f"coupling-validation.{condition_label}.s{support}", #TODO: should be enums not hardcoded strings
                                 ExperimentCondition(condition_label),
                                 SupportSize(support),
                             )
                             cell_artifact_ids.append(manifest.artifact_id.value)
                             payload = json.loads(Path(manifest.payload_paths[0]).read_text())
-                            cell = payload["cell"]
+                            cell = payload["cell"] #TODO: should be enums not hardcoded strings
                             total_generated += int(cell["generated"]) #TODO: should be enums not hardcoded strings
                             total_generation_failures += int(cell["generation_failures"]) #TODO: should be enums not hardcoded strings
                             total_incompatible_gap_failures += int(
@@ -800,13 +800,13 @@ def execute_baseline_and_oracle_correctness_validation(
             store,
             layout,
             request.experiment,
-            EvaluationConditionName(f"deterministic-replay-k{tractable_k}"),
+            EvaluationConditionName(f"deterministic-replay-k{tractable_k}"), #TODO: should be enums not hardcoded strings
             seed,
             MetricId.DETERMINISTIC_REPLAY_CONSISTENCY,
             1.0 if replay_consistent else 0.0,
-            MetricUnit("boolean"),
+            MetricUnit("boolean"), #TODO: should be enums not hardcoded strings
             MetricDirection.HIGHER_IS_BETTER,
-            (ArtifactIdentifier("synthetic-generator"),),
+            (ArtifactIdentifier("synthetic-generator"),), #TODO: should be enums not hardcoded strings
             request.overwrite_policy,
         )
         problem, action, blocks = synthetic_solver_instance(
@@ -822,13 +822,13 @@ def execute_baseline_and_oracle_correctness_validation(
                     store,
                     layout,
                     request.experiment,
-                    EvaluationConditionName(f"generic-qap-vs-exhaustive-truth-k{tractable_k}"),
+                    EvaluationConditionName(f"generic-qap-vs-exhaustive-truth-k{tractable_k}"), #TODO: should be enums not hardcoded strings
                     seed,
                     MetricId.ABSOLUTE_OBJECTIVE_ERROR,
                     float(abs(qap_result.objective_value - exhaustive_truth)),
-                    MetricUnit("score"),
+                    MetricUnit("score"), #TODO: should be enums not hardcoded strings
                     MetricDirection.LOWER_IS_BETTER,
-                    (ArtifactIdentifier("synthetic-generator"),),
+                    (ArtifactIdentifier("synthetic-generator"),), #TODO: should be enums not hardcoded strings
                     request.overwrite_policy,
                 )
             source_matrix = problem.lower_response_matrix
@@ -850,13 +850,13 @@ def execute_baseline_and_oracle_correctness_validation(
                     store,
                     layout,
                     request.experiment,
-                    EvaluationConditionName(f"point-map-qap-correctness-k{tractable_k}"),
+                    EvaluationConditionName(f"point-map-qap-correctness-k{tractable_k}"), #TODO: should be enums not hardcoded strings
                     seed,
                     MetricId.ABSOLUTE_OBJECTIVE_ERROR,
                     float(abs(pc_result.objective_value - pc_truth)),
-                    MetricUnit("score"),
+                    MetricUnit("score"), #TODO: should be enums not hardcoded strings
                     MetricDirection.LOWER_IS_BETTER,
-                    (ArtifactIdentifier("synthetic-generator"),),
+                    (ArtifactIdentifier("synthetic-generator"),), #TODO: should be enums not hardcoded strings
                     request.overwrite_policy,
                 )
             exhaustive_hull = build_rectangular_hull(blocks, source_matrix, source_matrix)
@@ -873,13 +873,13 @@ def execute_baseline_and_oracle_correctness_validation(
                 store,
                 layout,
                 request.experiment,
-                EvaluationConditionName(f"rectangular-baseline-vs-analytical-k{tractable_k}"),
+                EvaluationConditionName(f"rectangular-baseline-vs-analytical-k{tractable_k}"), #TODO: should be enums not hardcoded strings
                 seed,
                 MetricId.ABSOLUTE_OBJECTIVE_ERROR,
                 hull_max_error,
-                MetricUnit("score"),
+                MetricUnit("score"), #TODO: should be enums not hardcoded strings
                 MetricDirection.LOWER_IS_BETTER,
-                (ArtifactIdentifier("synthetic-generator"),),
+                (ArtifactIdentifier("synthetic-generator"),), #TODO: should be enums not hardcoded strings
                 request.overwrite_policy,
             )
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
@@ -932,7 +932,7 @@ def execute_baseline_and_oracle_correctness_validation(
             valid = True
         except StrictResourceViolationError:
             valid = False
-        input_artifact_ids = (ArtifactIdentifier("materialized-client-schema"),)
+        input_artifact_ids = (ArtifactIdentifier("materialized-client-schema"),) #TODO: should be enums not hardcoded strings
         for seed in validation_seeds:
             persist_primary_transfer_metric(
                 store,
@@ -945,7 +945,7 @@ def execute_baseline_and_oracle_correctness_validation(
                 seed,
                 MetricId.STRICT_RESOURCE_VALIDITY,
                 1.0 if valid else 0.0,
-                MetricUnit("boolean"),
+                MetricUnit("boolean"), #TODO: should be enums not hardcoded strings
                 MetricDirection.HIGHER_IS_BETTER,
                 input_artifact_ids,
                 request.overwrite_policy,
@@ -1023,7 +1023,7 @@ def execute_primitive_validation(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0",
+            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -1040,7 +1040,7 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: Sha256Digest) -> Path:
         experiment_workspace(layout, _EXPERIMENT)
         / "artifacts" #TODO: should be enums not hardcoded strings
         / "derived" #TODO: should be enums not hardcoded strings
-        / f"primitive-validation.{fingerprint[:16]}.json"
+        / f"primitive-validation.{fingerprint[:16]}.json" #TODO: should be enums not hardcoded strings
     )
 
 

@@ -15,69 +15,69 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
-def is_sha256_digest(value: str) -> bool:
+def is_sha256_digest(value: str) -> bool: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     return SHA256_HEX.fullmatch(value) is not None
 
 
-ClientComponentName = NewType("ClientComponentName", str)
+ClientComponentName = NewType("ClientComponentName", str) #TODO: convert to enum
 DatasetRelativePath = NewType("DatasetRelativePath", str)
 RawDatasetPath = NewType("RawDatasetPath", str)
 DuplicateGroupIdentifier = NewType("DuplicateGroupIdentifier", str)
 Sha256Digest = NewType("Sha256Digest", str)
-TabularColumnName = NewType("TabularColumnName", str)
-ValidationReason = NewType("ValidationReason", str)
-ModelParameterName = NewType("ModelParameterName", str)
+TabularColumnName = NewType("TabularColumnName", str) #TODO: convert to enum
+ValidationReason = NewType("ValidationReason", str) #TODO: convert to enum
+ModelParameterName = NewType("ModelParameterName", str) #TODO: convert to enum
 DirectedPairName = NewType("DirectedPairName", str) #TODO: convert to enum
 EvaluationConditionName = NewType("EvaluationConditionName", str) #TODO: convert to enum
 MetricUnit = NewType("MetricUnit", str) #TODO: convert to enum
 InvalidReason = NewType("InvalidReason", str) #TODO: convert to enum
 ContrastName = NewType("ContrastName", str) #TODO: convert to enum
-StatisticalTestName = NewType("StatisticalTestName", str)
+StatisticalTestName = NewType("StatisticalTestName", str) #TODO: convert to enum
 FieldDescription = NewType("FieldDescription", str)
-FailureReason = NewType("FailureReason", str)
-SupportRecordIdentifier = NewType("SupportRecordIdentifier", str)
-CutMasterCounterName = NewType("CutMasterCounterName", str)
-AvailabilityReason = NewType("AvailabilityReason", str)
-ResourceLimitReason = NewType("ResourceLimitReason", str)
+FailureReason = NewType("FailureReason", str) #TODO: convert to enum
+SupportRecordIdentifier = NewType("SupportRecordIdentifier", str) #TODO: convert to enum
+CutMasterCounterName = NewType("CutMasterCounterName", str) #TODO: convert to enum
+AvailabilityReason = NewType("AvailabilityReason", str) #TODO: convert to enum
+ResourceLimitReason = NewType("ResourceLimitReason", str) #TODO: convert to enum
 StrictResourceValidity = NewType("StrictResourceValidity", bool)
-PValueName = NewType("PValueName", str)
+PValueName = NewType("PValueName", str) #TODO: convert to enum
 BootstrapPurpose = NewType("BootstrapPurpose", str) #TODO: convert to enum
 BootstrapDegeneracy = NewType("BootstrapDegeneracy", bool)
 ArrayAxis = NewType("ArrayAxis", int)
 ClassIndex = NewType("ClassIndex", int)
-ContrastCoordinates = NewType("ContrastCoordinates", str)
-SourceClientName = NewType("SourceClientName", str)
-IneligibilityReason = NewType("IneligibilityReason", str)
-ResponseSeedStage = NewType("ResponseSeedStage", str)
+ContrastCoordinates = NewType("ContrastCoordinates", str) #TODO: convert to enum
+SourceClientName = NewType("SourceClientName", str) #TODO: convert to enum
+IneligibilityReason = NewType("IneligibilityReason", str) #TODO: convert to enum
+ResponseSeedStage = NewType("ResponseSeedStage", str) #TODO: convert to enum
 Rfc3339UtcTimestamp = NewType("Rfc3339UtcTimestamp", str)
 SerializedPacket = NewType("SerializedPacket", str)
-ExposedCoarseGroupId = NewType("ExposedCoarseGroupId", str)
+ExposedCoarseGroupId = NewType("ExposedCoarseGroupId", str) #TODO: convert to enum
 GpuName = NewType("GpuName", str)
 CudaVersion = NewType("CudaVersion", str)
 CpuName = NewType("CpuName", str)
 OperatingSystemRelease = NewType("OperatingSystemRelease", str)
 PythonVersion = NewType("PythonVersion", str)
 FilesystemSlug = NewType("FilesystemSlug", str) #TODO: convert to enum
-ArtifactFileSuffix = NewType("ArtifactFileSuffix", str)
-ArtifactSchemaVersion = NewType("ArtifactSchemaVersion", str)
-ArtifactTypeName = NewType("ArtifactTypeName", str)
+ArtifactFileSuffix = NewType("ArtifactFileSuffix", str) #TODO: convert to enum
+ArtifactSchemaVersion = NewType("ArtifactSchemaVersion", str) #TODO: convert to enum
+ArtifactTypeName = NewType("ArtifactTypeName", str) #TODO: convert to enum
 ArtifactPathText = NewType("ArtifactPathText", str)
-ManifestValidationState = NewType("ManifestValidationState", str)
-ArtifactLineage = NewType("ArtifactLineage", str)
+ManifestValidationState = NewType("ManifestValidationState", str) #TODO: convert to enum
+ArtifactLineage = NewType("ArtifactLineage", str) #TODO: convert to enum
 SemanticCoordinateText = NewType("SemanticCoordinateText", str)
-SolverVariablePrefix = NewType("SolverVariablePrefix", str)
+SolverVariablePrefix = NewType("SolverVariablePrefix", str) #TODO: convert to enum
 MonotonicDeadline = NewType("MonotonicDeadline", float)
-SolverStatus = NewType("SolverStatus", str)
-TorchPrecision = NewType("TorchPrecision", str)
-ExecutionStageName = NewType("ExecutionStageName", str)
-ReuseDecision = NewType("ReuseDecision", str)
+SolverStatus = NewType("SolverStatus", str) #TODO: convert to enum
+TorchPrecision = NewType("TorchPrecision", str) #TODO: convert to enum
+ExecutionStageName = NewType("ExecutionStageName", str) #TODO: convert to enum
+ReuseDecision = NewType("ReuseDecision", str) #TODO: convert to enum
 GitRevision = NewType("GitRevision", str)
-ReportSeriesName = NewType("ReportSeriesName", str)
-ReportAxisLabel = NewType("ReportAxisLabel", str)
-ReportColumnName = NewType("ReportColumnName", str)
-ReportArtifactName = NewType("ReportArtifactName", str)
+ReportSeriesName = NewType("ReportSeriesName", str) #TODO: convert to enum
+ReportAxisLabel = NewType("ReportAxisLabel", str) #TODO: convert to enum
+ReportColumnName = NewType("ReportColumnName", str) #TODO: convert to enum
+ReportArtifactName = NewType("ReportArtifactName", str) #TODO: convert to enum
 ProducerModuleName = NewType("ProducerModuleName", str) #TODO: why is this needed? unless really used and wired and needed. I prefer removing it. and using a more dynamic way
-CorrespondenceBlockId = NewType("CorrespondenceBlockId", str)
+CorrespondenceBlockId = NewType("CorrespondenceBlockId", str) #TODO: convert to enum
 
 
 class StorageLayoutSegment(StrEnum):
@@ -158,9 +158,9 @@ class ReportingPathSegment(StrEnum):
     EXECUTION_JSON = "execution.json"
 
 
-TimestampFieldName = NewType("TimestampFieldName", str)
-DatasetLabel = NewType("DatasetLabel", str)
-FineLabel = NewType("FineLabel", str)
+TimestampFieldName = NewType("TimestampFieldName", str) #TODO: convert to enum
+DatasetLabel = NewType("DatasetLabel", str) #TODO: convert to enum
+FineLabel = NewType("FineLabel", str) #TODO: convert to enum
 type DatasetIdentifierText = str
 type ExperimentIdentifierText = str
 
@@ -205,7 +205,7 @@ type CutMasterCounters = tuple[CutMasterCounter, ...]
 ByteCount = NonNegativeInt
 RetryCount = NonNegativeInt
 AnonymousNodeIndex = Index
-AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str)
+AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str) #TODO: convert to enum
 type NodeIndices = tuple[Index, ...]
 type NodeIndexList = list[Index]
 type NodeImageMap = Mapping[Index, Index]
@@ -237,7 +237,7 @@ type ReportCoordinates = tuple[Coefficient, ...]
 type ReportColumns = tuple[ReportColumnName, ...]
 type RawCellValue = str | int | float | None
 RawCellText = NewType("RawCellText", str)
-CategoryName = NewType("CategoryName", str)
+CategoryName = NewType("CategoryName", str) #TODO: convert to enum
 type RawNumericCellValue = str | int | float
 type RawCellSamples = tuple[RawCellValue, ...]
 type TabularColumns = tuple[TabularColumnName, ...]
@@ -249,7 +249,7 @@ type NativeLabels = tuple[FineLabel, ...]
 type NativeLabelSet = frozenset[FineLabel]
 type LocalClassNames = tuple[FineLabel, ...]
 type ExcludedLocalClasses = tuple[tuple[FineLabel, NonNegativeInt], ...]
-FeatureName = NewType("FeatureName", str)
+FeatureName = NewType("FeatureName", str) #TODO: convert to enum
 NumericFeatureValue = NewType("NumericFeatureValue", float)
 type FeatureNames = tuple[FeatureName, ...]
 type RawTabularRow = dict[TabularColumnName, RawCellText]
@@ -454,9 +454,9 @@ class EvidenceStatus(StrEnum):
 @dataclass(frozen=True, slots=True)
 class EvidenceAdjudication:
     status: EvidenceStatus
-    materiality: str
-    statistical: str
-    completeness: str
+    materiality: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    statistical: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    completeness: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 class SimplificationRuleState(StrEnum):
@@ -669,7 +669,7 @@ class DomainModel(BaseModel):
     )
 
 
-def _nonempty_text(value: str, label: str) -> None:
+def _nonempty_text(value: str, label: str) -> None: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     if not value:
         raise ValueError(f"{label} must not be empty")
 
@@ -763,7 +763,7 @@ class SemanticCell:
     seed: ExperimentSeed | None = None
 
     def identity_json(self, relevance: frozenset[SemanticCoordinate]) -> str:
-        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
+        present: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             dataset=self.dataset.value if self.dataset is not None else None,
             source_client=self.source_client.value if self.source_client is not None else None,
             method=self.method.value if self.method is not None else None,
@@ -772,11 +772,11 @@ class SemanticCell:
             seed=self.seed.value if self.seed is not None else None,
         )
         if self.directed_pair is not None:
-            present["directed_pair"] = [
+            present["directed_pair"] = [ #TODO: should be enums not hardcoded strings
                 self.directed_pair.source.value,
                 self.directed_pair.target.value,
             ]
-        values: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict(
+        values: OrderedDict[str, str | int | float | list[str] | None] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             experiment=self.experiment.value
         )
         for coordinate in relevance:

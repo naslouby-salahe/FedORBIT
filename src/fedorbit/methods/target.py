@@ -138,7 +138,7 @@ def estimate_target_response_diagnostic(
         replicate_count=diagnostic.paired_replicates,
         bootstrap_resamples=diagnostic.simultaneous_bootstrap_resamples,
         confidence_level=diagnostic.confidence_level,
-        seed_stage=ResponseSeedStage("target-local-diagnostic"),
+        seed_stage=ResponseSeedStage("target-local-diagnostic"), #TODO: should be enum instead of hardcoded string
     )
 
 
@@ -323,7 +323,7 @@ class TargetOptimizerStepLedger:
         budget = config.scientific.target_optimizer_budget
         diagnostic = config.scientific.target_response_diagnostic
         expected_diagnostic_reserve = (
-            8 * diagnostic.paired_replicates * 2 * diagnostic.shadow_optimizer_steps
+            8 * diagnostic.paired_replicates * 2 * diagnostic.shadow_optimizer_steps #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
         )
         if budget.reserved.target_response_diagnostic != expected_diagnostic_reserve:
             raise OptimizerBudgetError(

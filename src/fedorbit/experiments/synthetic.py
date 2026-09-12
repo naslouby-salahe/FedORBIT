@@ -190,7 +190,7 @@ def generate_unresolved_map_world(request: UnresolvedMapWorldRequest) -> Unresol
         coordinates = cast(
             StableJsonPayload,
             OrderedDict(
-                generator="unresolved_map_world",
+                generator="unresolved_map_world", #TODO: should be enum, not hardcoded string
                 world_kind=request.world_kind.value,
                 attempt=attempt,
             ),
@@ -390,7 +390,7 @@ def generate_scalability_instance(request: ScalabilityInstanceRequest) -> Scalab
     coordinates = cast(
         StableJsonPayload,
         OrderedDict(
-            generator="scalability",
+            generator="scalability", #TODO: should be enum, not hardcoded string
             node_count=request.node_count,
             block_pattern=request.block_pattern.value,
             support_size=request.support_size,
@@ -452,9 +452,9 @@ class CouplingInstance:
 def _coupling_coordinates(
     request: CouplingInstanceRequest,
     attempt: Index | None,
-) -> OrderedDict[str, StableJsonPayload]:
-    fields: OrderedDict[str, StableJsonPayload] = OrderedDict(
-        generator="coupling_structure",
+) -> OrderedDict[str, StableJsonPayload]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    fields: OrderedDict[str, StableJsonPayload] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        generator="coupling_structure", #TODO: should be enum, not hardcoded string
         compatibility=request.compatibility.value,
         response_heterogeneity=request.response_heterogeneity,
         directed_asymmetry=request.directed_asymmetry,
@@ -464,7 +464,7 @@ def _coupling_coordinates(
         instance_index=request.instance_index,
     )
     if attempt is not None:
-        fields["attempt"] = attempt
+        fields["attempt"] = attempt #TODO: should be enum, not hardcoded string
     return fields
 
 

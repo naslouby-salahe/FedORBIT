@@ -140,7 +140,7 @@ def _build_assignment_structure(
         sources = list(blocks.block_index_range(block_index))
         for target in targets:
             variables = [
-                model.addVar(vtype="B", name=f"{prefix}_p_{source}_{target}") for source in sources
+                model.addVar(vtype="B", name=f"{prefix}_p_{source}_{target}") for source in sources #TODO: should be enums not hardcoded strings
             ]
             for source, variable in zip(sources, variables, strict=True):
                 assignment_variables[(source, target)] = variable
@@ -169,7 +169,7 @@ def _add_mccormick_products(
             continue
         p_ak = assignment_variables[(source_a, target_k)]
         p_bj = assignment_variables[(source_b, target_j)]
-        y: Expr = model.addVar(vtype="C", lb=0.0, ub=1.0, name=f"y_{prefix}_{key}")
+        y: Expr = model.addVar(vtype="C", lb=0.0, ub=1.0, name=f"y_{prefix}_{key}") #TODO: should be enums not hardcoded strings
         model.addCons(y <= p_ak, name=f"mc1_{prefix}_{key}")
         model.addCons(y <= p_bj, name=f"mc2_{prefix}_{key}")
         model.addCons(y >= p_ak + p_bj - 1.0, name=f"mc3_{prefix}_{key}")
@@ -232,13 +232,13 @@ def fixed_action_worst_correspondence_qap(
     deadline = MonotonicDeadline(
         time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     )
-    model = Model("qap_fixed_action")
+    model = Model("qap_fixed_action") #TODO: should be enums not hardcoded strings
     _configure_model(model, deadline)
     assignment_variables = _build_assignment_structure(model, blocks, SolverVariablePrefix("fa"))
     objective_terms = _add_mccormick_products(
         model, assignment_variables, coefficients, SolverVariablePrefix("fa")
     )
-    model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
+    model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize") #TODO: should be enums not hardcoded strings
     model.optimize()
     status = SolverStatus(model.getStatus())
     if status != ScipStatus.OPTIMAL:
@@ -279,13 +279,13 @@ def point_correspondence_commitment(
     deadline = MonotonicDeadline(
         time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     )
-    model = Model("qap_point_correspondence")
+    model = Model("qap_point_correspondence") #TODO: should be enums not hardcoded strings
     _configure_model(model, deadline)
     assignment_variables = _build_assignment_structure(model, blocks, SolverVariablePrefix("pc"))
     objective_terms = _add_mccormick_products(
         model, assignment_variables, coefficients, SolverVariablePrefix("pc")
     )
-    model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
+    model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize") #TODO: should be enums not hardcoded strings
     model.optimize()
     status = SolverStatus(model.getStatus())
     limit_state = _terminal_state_for(status)

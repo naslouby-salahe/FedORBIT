@@ -60,6 +60,16 @@ StrictResourceValidity = NewType("StrictResourceValidity", bool)
 PValueName = NewType("PValueName", str)
 
 
+class ContrastPValueSuffix(StrEnum):
+    SUPERIORITY = "superiority"
+    DIFFERENCE = "difference"
+    EQUIVALENCE = "equivalence"
+
+
+def contrast_p_value_name(pair: DirectedPairName, suffix: ContrastPValueSuffix) -> PValueName:
+    return PValueName(f"{pair}|{suffix}")
+
+
 class BootstrapPurpose(StrEnum):
     PRIMARY_TRANSFER_GAIN = "primary-transfer-gain"
     COUPLING_MECHANISM_GAP = "coupling-mechanism-gap"

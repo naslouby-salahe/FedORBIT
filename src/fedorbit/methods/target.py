@@ -18,8 +18,10 @@ from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_respon
 from fedorbit.types import (
     ClassIndex,
     Coefficient,
+    ConceptCount,
     Index,
     RandomSeed,
+    RepetitionCount,
     ResponseSeedStage,
     Score,
     SourceClientName,
@@ -311,6 +313,10 @@ class OptimizerStepAllocation:
         )
 
 
+TARGET_DIAGNOSTIC_INTERVENTION_CLASSES: ConceptCount = 8
+SHADOW_PAIR_DIRECTIONS: RepetitionCount = 2
+
+
 @dataclass(frozen=True, slots=True)
 class TargetOptimizerStepLedger:
     maximum_total_steps: StepCount
@@ -323,7 +329,10 @@ class TargetOptimizerStepLedger:
         budget = config.scientific.target_optimizer_budget
         diagnostic = config.scientific.target_response_diagnostic
         expected_diagnostic_reserve = (
-            8 * diagnostic.paired_replicates * 2 * diagnostic.shadow_optimizer_steps
+            TARGET_DIAGNOSTIC_INTERVENTION_CLASSES
+            * diagnostic.paired_replicates
+            * SHADOW_PAIR_DIRECTIONS
+            * diagnostic.shadow_optimizer_steps
         )
         if budget.reserved.target_response_diagnostic != expected_diagnostic_reserve:
             raise OptimizerBudgetError(

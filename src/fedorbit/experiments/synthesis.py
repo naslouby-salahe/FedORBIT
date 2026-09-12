@@ -80,6 +80,7 @@ from fedorbit.types import (
     ComparisonStatistic,
     ConfigurationSection,
     ContrastName,
+    ContrastPValueSuffix,
     DatasetId,
     DirectedPair,
     DirectedPairName,
@@ -110,6 +111,7 @@ from fedorbit.types import (
     SupportCount,
     SupportSize,
     TransferMethod,
+    contrast_p_value_name,
 )
 
 
@@ -481,8 +483,8 @@ def execute_statistical_synthesis(
     )
     statistics_config = active_config().scientific.statistics
     for method in methods:
-        raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
-        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict()
+        raw_p_by_pair: OrderedDict[DirectedPairName, float] = OrderedDict()
+        metadata_inputs: OrderedDict[DirectedPairName, tuple[Index, RandomSeed]] = OrderedDict()
         contrasts: OrderedDict[
             str,
             tuple[
@@ -613,8 +615,10 @@ def execute_statistical_synthesis(
                 )
     gap_metrics = _completed_real_packet_coupling_gap(store)
     coupling_pairs = sorted({pair for pair, _ in gap_metrics})
-    coupling_raw_p_by_pair: OrderedDict[str, float] = OrderedDict()
-    coupling_metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict()
+    coupling_raw_p_by_pair: OrderedDict[DirectedPairName, float] = OrderedDict()
+    coupling_metadata_inputs: OrderedDict[DirectedPairName, tuple[Index, RandomSeed]] = (
+        OrderedDict()
+    )
     coupling_contrasts: OrderedDict[
         str,
         tuple[
@@ -749,7 +753,7 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    external_source_raw_p: OrderedDict[str, float] = OrderedDict()
+    external_source_raw_p: OrderedDict[PValueName, float] = OrderedDict()
     external_source_contrasts: OrderedDict[
         str,
         tuple[
@@ -813,8 +817,12 @@ def execute_statistical_synthesis(
         bca = paired_bca_interval(local_sir_values, fedorbit_values, bootstrap_seed)
         sign_flip = exact_sign_flip_test(local_sir_values, fedorbit_values)
         tost = tost_equivalence(fedorbit_values, local_sir_values)
-        external_source_raw_p[f"{pair}|superiority"] = sign_flip.p_value
-        external_source_raw_p[f"{pair}|equivalence"] = tost.p_equiv
+        external_source_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.SUPERIORITY)
+        ] = sign_flip.p_value
+        external_source_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
+        ] = tost.p_equiv
         external_source_contrasts[pair] = (
             paired_seed_count,
             float(sign_flip.mean_difference),
@@ -855,9 +863,15 @@ def execute_statistical_synthesis(
             holm_p = None
             equivalence_holm_p = None
         else:
-            raw_p = external_source_raw_p[f"{pair}|superiority"]
-            holm_p = external_source_holm.value_of(PValueName(f"{pair}|superiority"))
-            equivalence_holm_p = external_source_holm.value_of(PValueName(f"{pair}|equivalence"))
+            raw_p = external_source_raw_p[
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.SUPERIORITY)
+            ]
+            holm_p = external_source_holm.value_of(
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.SUPERIORITY)
+            )
+            equivalence_holm_p = external_source_holm.value_of(
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
+            )
             if bca_low is None:
                 superiority_decision = ComparisonDecision.DEGENERATE
             elif (
@@ -943,10 +957,10 @@ def execute_statistical_synthesis(
             comparison_record = PairedComparisonRecord.model_validate(
                 json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
             )
-            key = (
-                "superiority"
+            suffix = (
+                ContrastPValueSuffix.SUPERIORITY
                 if statistic == ComparisonStatistic.SIGN_FLIP_SUPERIORITY
-                else "equivalence"
+                else ContrastPValueSuffix.EQUIVALENCE
             )
             persist_statistical_metadata(
                 store,
@@ -958,7 +972,10 @@ def execute_statistical_synthesis(
                 statistic,
                 nonzero_count,
                 seed_value,
-                _holm_rank(external_source_raw_p, f"{pair}|{key}"),
+                _holm_rank(
+                    external_source_raw_p,
+                    contrast_p_value_name(DirectedPairName(pair), suffix),
+                ),
                 family_size,
                 request.overwrite_policy,
             )
@@ -969,7 +986,7 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    point_correspondence_raw_p: OrderedDict[str, float] = OrderedDict()
+    point_correspondence_raw_p: OrderedDict[PValueName, float] = OrderedDict()
     point_correspondence_contrasts: OrderedDict[
         str,
         tuple[
@@ -1034,8 +1051,12 @@ def execute_statistical_synthesis(
         bca = paired_bca_interval(commitment_values, fedorbit_values, bootstrap_seed)
         sign_flip = exact_sign_flip_test(commitment_values, fedorbit_values)
         tost = tost_equivalence(fedorbit_values, commitment_values)
-        point_correspondence_raw_p[f"{pair}|difference"] = sign_flip.p_value
-        point_correspondence_raw_p[f"{pair}|equivalence"] = tost.p_equiv
+        point_correspondence_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+        ] = sign_flip.p_value
+        point_correspondence_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
+        ] = tost.p_equiv
         point_correspondence_contrasts[pair] = (
             paired_seed_count,
             float(sign_flip.mean_difference),
@@ -1076,10 +1097,14 @@ def execute_statistical_synthesis(
             holm_p = None
             equivalence_holm_p = None
         else:
-            raw_p = point_correspondence_raw_p[f"{pair}|difference"]
-            holm_p = point_correspondence_holm.value_of(PValueName(f"{pair}|difference"))
+            raw_p = point_correspondence_raw_p[
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+            ]
+            holm_p = point_correspondence_holm.value_of(
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+            )
             equivalence_holm_p = point_correspondence_holm.value_of(
-                PValueName(f"{pair}|equivalence")
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
             )
             difference_decision = (
                 ComparisonDecision.DEGENERATE
@@ -1162,10 +1187,10 @@ def execute_statistical_synthesis(
             comparison_record = PairedComparisonRecord.model_validate(
                 json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
             )
-            key = (
-                "difference"
+            suffix = (
+                ContrastPValueSuffix.DIFFERENCE
                 if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
-                else "equivalence"
+                else ContrastPValueSuffix.EQUIVALENCE
             )
             persist_statistical_metadata(
                 store,
@@ -1177,7 +1202,10 @@ def execute_statistical_synthesis(
                 statistic,
                 nonzero_count,
                 seed_value,
-                _holm_rank(point_correspondence_raw_p, f"{pair}|{key}"),
+                _holm_rank(
+                    point_correspondence_raw_p,
+                    contrast_p_value_name(DirectedPairName(pair), suffix),
+                ),
                 point_correspondence_family_size,
                 request.overwrite_policy,
             )
@@ -1202,7 +1230,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == PRINCIPAL_EVALUATION_CONDITION.name
         }
     )
-    ablation_raw_p: OrderedDict[str, float] = OrderedDict()
+    ablation_raw_p: OrderedDict[PValueName, float] = OrderedDict()
     ablation_contrasts: OrderedDict[
         str,
         tuple[
@@ -1266,8 +1294,12 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
         bca = paired_bca_interval(destroyed_values, full_values, bootstrap_seed)
         sign_flip = exact_sign_flip_test(destroyed_values, full_values)
         tost = tost_equivalence(full_values, destroyed_values)
-        ablation_raw_p[f"{pair}|difference"] = sign_flip.p_value
-        ablation_raw_p[f"{pair}|equivalence"] = tost.p_equiv
+        ablation_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+        ] = sign_flip.p_value
+        ablation_raw_p[
+            contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
+        ] = tost.p_equiv
         ablation_contrasts[pair] = (
             paired_seed_count,
             float(sign_flip.mean_difference),
@@ -1307,9 +1339,15 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             holm_p = None
             equivalence_holm_p = None
         else:
-            raw_p = ablation_raw_p[f"{pair}|difference"]
-            holm_p = ablation_holm.value_of(PValueName(f"{pair}|difference"))
-            equivalence_holm_p = ablation_holm.value_of(PValueName(f"{pair}|equivalence"))
+            raw_p = ablation_raw_p[
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+            ]
+            holm_p = ablation_holm.value_of(
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.DIFFERENCE)
+            )
+            equivalence_holm_p = ablation_holm.value_of(
+                contrast_p_value_name(DirectedPairName(pair), ContrastPValueSuffix.EQUIVALENCE)
+            )
             difference_decision = (
                 ComparisonDecision.DEGENERATE
                 if bca_low is None
@@ -1391,10 +1429,10 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             comparison_record = PairedComparisonRecord.model_validate(
                 json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"]
             )
-            key = (
-                "difference"
+            suffix = (
+                ContrastPValueSuffix.DIFFERENCE
                 if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
-                else "equivalence"
+                else ContrastPValueSuffix.EQUIVALENCE
             )
             persist_statistical_metadata(
                 store,
@@ -1406,7 +1444,10 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 statistic,
                 nonzero_count,
                 seed_value,
-                _holm_rank(ablation_raw_p, f"{pair}|{key}"),
+                _holm_rank(
+                    ablation_raw_p,
+                    contrast_p_value_name(DirectedPairName(pair), suffix),
+                ),
                 ablation_family_size,
                 request.overwrite_policy,
             )
@@ -1449,7 +1490,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             ),
         )
     )
-    sparsity_raw_p: OrderedDict[str, float] = OrderedDict()
+    sparsity_raw_p: OrderedDict[PValueName, float] = OrderedDict()
     sparsity_contrasts: OrderedDict[
         str,
         tuple[
@@ -1470,7 +1511,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             if candidate_pair == pair and method == TransferMethod.LOCAL_ONLY
         )
         for condition_a, condition_b in condition_pairs:
-            contrast_key = f"{pair}|{condition_a}|{condition_b}"
+            contrast_key = PValueName(f"{pair}|{condition_a}|{condition_b}")
             seeds_a = OrderedDict(
                 (seed, entry)
                 for (candidate_pair, _, condition, seed), entry in sparsity_metrics.items()
@@ -1544,7 +1585,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
     sparsity_family_size: SampleCount = len(sparsity_raw_p)
     for pair in sparsity_pairs:
         for condition_a, condition_b in condition_pairs:
-            contrast_key = f"{pair}|{condition_a}|{condition_b}"
+            contrast_key = PValueName(f"{pair}|{condition_a}|{condition_b}")
             if contrast_key not in sparsity_contrasts:
                 continue
             (
@@ -1565,7 +1606,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 holm_p = None
             else:
                 raw_p = sparsity_raw_p[contrast_key]
-                holm_p = sparsity_holm.value_of(PValueName(contrast_key))
+                holm_p = sparsity_holm.value_of(contrast_key)
                 decision = (
                     ComparisonDecision.DEGENERATE
                     if bca_low is None
@@ -1631,7 +1672,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == PRINCIPAL_EVALUATION_CONDITION.name
         }
     )
-    confirmation_raw_p: OrderedDict[str, float] = OrderedDict()
+    confirmation_raw_p: OrderedDict[DirectedPairName, float] = OrderedDict()
     confirmation_contrasts: OrderedDict[
         str,
         tuple[
@@ -2111,12 +2152,12 @@ def persist_baseline_comparison(
     return manifest
 
 
-def _holm_rank(
-    raw_p_by_pair: Mapping[str, float],
-    pair: str,
+def _holm_rank[Name: str](
+    raw_p_by_name: Mapping[Name, float],
+    name: Name,
 ) -> Index:
-    ordered = sorted(raw_p_by_pair.items(), key=lambda item: (item[1], item[0]))
-    rank: Index = next(index for index, (name, _) in enumerate(ordered, start=1) if name == pair)
+    ordered = sorted(raw_p_by_name.items(), key=lambda item: (item[1], item[0]))
+    rank: Index = next(index for index, (key, _) in enumerate(ordered, start=1) if key == name)
     return rank
 
 

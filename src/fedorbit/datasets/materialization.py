@@ -111,12 +111,12 @@ def deterministic_smallest_hash_subsample_indices(
     class_row_indices: tuple[Index, ...],
     fraction: Fraction,
     seed: RandomSeed,
-    coordinates_text: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    coordinates_text: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> tuple[Index, ...]:
     keep = max(1, round(fraction * len(class_row_indices)))
     ranked: list[tuple[int, Index]] = []
     for row_index in class_row_indices:
-        payload = f"FedORBIT|weak-signal-support-subsample|{seed}|{coordinates_text}|{row_index}" #TODO: should be enums not hardcoded strings
+        payload = f"FedORBIT|weak-signal-support-subsample|{seed}|{coordinates_text}|{row_index}" # TODO: should be enum
         digest_int = int.from_bytes(
             hashlib.sha256(payload.encode("utf-8")).digest(), byteorder="big"
         )
@@ -129,7 +129,7 @@ def subsample_split_tensors(
     split: SplitTensors,
     fraction: Fraction,
     seed: RandomSeed,
-    coordinates_text: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    coordinates_text: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> SplitTensors:
     target_values: list[int] = split.targets.tolist()
     keep_indices: list[int] = []

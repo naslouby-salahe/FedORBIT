@@ -135,7 +135,7 @@ def execute_base_model_pilot(
     relevance = experiment_relevance(experiment)
     raw_root = raw_dataset_root()
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
-    device = torch.device("cuda") #TODO: should be configurable, not hardcoded
+    device = torch.device("cuda") # TODO: should be configurable, not hardcoded
     logger = execution_logger()
     for dataset in active_config().scientific.datasets.clients:
         logger.record(
@@ -233,13 +233,13 @@ def _execute_final_source_response_band_validation(
     raw_root = raw_dataset_root()
     selected_root = (
         experiment_workspace(layout, ExperimentName.SOURCE_RESPONSE_ESTIMATOR_PILOT)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "fitted" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "fitted" # TODO: should be enum
     )
     checkpoint_root = (
         experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
-        / "checkpoints" #TODO: should be enums not hardcoded strings
-        / "training" #TODO: should be enums not hardcoded strings
+        / "checkpoints" # TODO: should be enum
+        / "training" # TODO: should be enum
     )
     for dataset in active_config().scientific.datasets.clients:
         try:
@@ -247,20 +247,20 @@ def _execute_final_source_response_band_validation(
         except MaterializationError as error:
             persist_client_invalid(layout, request.experiment, dataset, InvalidReason(str(error)))
             continue
-        selected_path = selected_root / f"{dataset.value}.json" #TODO: should be enums not hardcoded strings
+        selected_path = selected_root / f"{dataset.value}.json" # TODO: should be enum
         if not selected_path.is_file():
             raise ExecutionError(f"missing selected response configuration: {selected_path}")
         selected_payload = json.loads(selected_path.read_text(encoding="utf-8"))
         candidate = ResponseCandidate(
-            selected_payload["intervention_magnitude"], #TODO: should be enums not hardcoded strings
-            selected_payload["optimizer_step_horizon"], #TODO: should be enums not hardcoded strings
+            selected_payload["intervention_magnitude"], # TODO: should be enum
+            selected_payload["optimizer_step_horizon"], # TODO: should be enum
         )
         eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
         for group in transfer_concept_groups(dataset, materialized):
             if group.source_eligible:
                 eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
         for seed in active_config().scientific.randomness.confirmatory_seeds:
-            checkpoint_path = checkpoint_root / dataset.value / f"seed-{seed}" / "checkpoint.pt" #TODO: should be enums not hardcoded strings
+            checkpoint_path = checkpoint_root / dataset.value / f"seed-{seed}" / "checkpoint.pt" # TODO: should be enum
             if not checkpoint_path.is_file():
                 raise ExecutionError(f"missing confirmatory checkpoint: {checkpoint_path}")
             checkpoint = load_base_checkpoint(checkpoint_path)
@@ -301,8 +301,8 @@ def _execute_final_source_response_band_validation(
                 ).packet
                 destination = (
                     experiment_workspace(layout, request.experiment)
-                    / "artifacts" #TODO: should be enums not hardcoded strings
-                    / "packets" #TODO: should be enums not hardcoded strings
+                    / "artifacts" # TODO: should be enum
+                    / "packets" # TODO: should be enum
                     / dataset.value
                     / f"seed-{seed}"
                     / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
@@ -318,10 +318,10 @@ def _source_response_estimator_client_results(
     raw_root = raw_dataset_root()
     pilot_seeds = active_config().scientific.randomness.pilot_seeds
     base_workspace = experiment_workspace(layout, ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT)
-    destination = experiment_workspace(layout, request.experiment) / "artifacts" #TODO: should be enums not hardcoded strings
-    destination = destination / "fitted" #TODO: should be enums not hardcoded strings
+    destination = experiment_workspace(layout, request.experiment) / "artifacts" # TODO: should be enum
+    destination = destination / "fitted" # TODO: should be enum
     diagnostics_destination = (
-        experiment_workspace(layout, request.experiment) / "artifacts" / "derived" #TODO: should be enums not hardcoded strings
+        experiment_workspace(layout, request.experiment) / "artifacts" / "derived" # TODO: should be enum
     )
     client_results: list[StableJsonPayload] = []
     for dataset in active_config().scientific.datasets.clients:
@@ -343,7 +343,7 @@ def _source_response_estimator_client_results(
                 layout,
                 request.experiment,
                 dataset,
-                InvalidReason("fewer than two eligible source transfer concepts"), #TODO: should be enums not hardcoded strings
+                InvalidReason("fewer than two eligible source transfer concepts"), # TODO: should be enum
             )
             client_results.append(
                 cast(
@@ -356,11 +356,11 @@ def _source_response_estimator_client_results(
         for seed in pilot_seeds:
             path = (
                 base_workspace
-                / "checkpoints" #TODO: should be enums not hardcoded strings
-                / "pilot" #TODO: should be enums not hardcoded strings
+                / "checkpoints" # TODO: should be enum
+                / "pilot" # TODO: should be enum
                 / dataset.value
                 / f"seed-{seed}"
-                / "checkpoint.pt" #TODO: should be enums not hardcoded strings
+                / "checkpoint.pt" # TODO: should be enum
             )
             if not path.is_file():
                 raise ExecutionError(f"missing selected pilot checkpoint: {path}")
@@ -389,7 +389,7 @@ def _source_response_estimator_client_results(
         results = run_pooled_source_response_pilot(tuple(checkpoints), data, intervention_classes)
         selected = select_response_configuration(results)
         atomic_write_json(
-            diagnostics_destination / f"{dataset.value}-candidates.json", #TODO: should be enums not hardcoded strings
+            diagnostics_destination / f"{dataset.value}-candidates.json", # TODO: should be enum
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -400,7 +400,7 @@ def _source_response_estimator_client_results(
             ),
         )
         atomic_write_json(
-            destination / f"{dataset.value}.json", #TODO: should be enums not hardcoded strings
+            destination / f"{dataset.value}.json", # TODO: should be enum
             cast(
                 StableJsonPayload,
                 OrderedDict(
@@ -463,20 +463,20 @@ def execute_final_source_response_band_validation(
 
 
 @dataclass(frozen=True, slots=True)
-class _ModelArchitectureFacts: #TODO: move to learning/models
-    architecture: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    normalization: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    activation: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    initialization: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+class _ModelArchitectureFacts: # TODO: move to learning/models
+    architecture: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    normalization: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    activation: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    initialization: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
-_NETWORK_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( #TODO: move to learning/models
+_NETWORK_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( # TODO: move to learning/models
     architecture="256-128-64 MLP (NetworkFlowClassifier)",
     normalization="LayerNorm",
     activation="GELU",
     initialization="Xavier uniform",
 )
-_HOST_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( #TODO: move to learning/models
+_HOST_MODEL_ARCHITECTURE_FACTS = _ModelArchitectureFacts( # TODO: move to learning/models
     architecture="192-96-48 MLP (HostClassifier)",
     normalization="BatchNorm1d",
     activation="ReLU",
@@ -510,7 +510,7 @@ def _pilot_selected_hyperparameters(
 
 def training_protocol_rows(
     store: ArtifactStore,
-) -> tuple[Mapping[str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
                    TableScalar], ...]:
     training = active_config().scientific.training
     stopping_rule = (
@@ -724,9 +724,9 @@ def _persist_training_efficiency(
     )
     destination = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "derived" #TODO: should be enums not hardcoded strings
-        / f"training-efficiency.{dataset.value}.{seed}.json" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "derived" # TODO: should be enum
+        / f"training-efficiency.{dataset.value}.{seed}.json" # TODO: should be enum
     )
     atomic_write_json(destination, OrderedDict[str, StableJsonPayload](asdict(record)))
     return destination
@@ -767,11 +767,11 @@ def _persist_base_checkpoint(
             return
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "checkpoints" #TODO: should be enums not hardcoded strings
+        / "checkpoints" # TODO: should be enum
         / directory_segment
         / dataset.value
         / f"seed-{seed}"
-        / "checkpoint.pt" #TODO: should be enums not hardcoded strings
+        / "checkpoint.pt" # TODO: should be enum
     )
     save_base_checkpoint(checkpoint, payload_path)
     payload_sha256 = file_sha256(payload_path)
@@ -810,7 +810,7 @@ def _persist_base_checkpoint(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,

@@ -130,13 +130,13 @@ def run_smoke_validation(
     )
     packet = build_source_packet(
         estimate,
-        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),), #TODO: should be enum not hardcoded string
-        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"), #TODO: should be enum not hardcoded string
+        anonymous_fine_node_ids=(AnonymousNodeDisplayId("node-0001"),), # TODO: should be enum
+        exposed_coarse_group_id=ExposedCoarseGroupId("smoke"), # TODO: should be enum
         per_node_train_support=(1,),
         per_node_meta_support=(1,),
         per_node_effective_replicate_count=(1,),
-        source_checkpoint_sha256=Sha256Digest("0" * 64), #TODO: should be enums not hardcoded strings
-        response_configuration_sha256=Sha256Digest("1" * 64), #TODO: should be enums not hardcoded strings
+        source_checkpoint_sha256=Sha256Digest("0" * 64), # TODO: should be enum
+        response_configuration_sha256=Sha256Digest("1" * 64), # TODO: should be enum
         creation_timestamp=Rfc3339UtcTimestamp(
             datetime.now(UTC).isoformat().replace("+00:00", "Z")
         ),
@@ -353,7 +353,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     RecoveryBoundary(store).discard_interrupted_staging()
     logger = execution_logger()
     logger.event(
-        "experiment_start", #TODO: should be enum not hardcoded string
+        "experiment_start", # TODO: should be enum
         experiment=request.experiment.value,
         classification=request.definition.classification.value,
         planned_cells=int(request.definition.derived_planned_cells),
@@ -369,7 +369,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
     _execute_producer_with_retry(producer, store, layout, request.experiment)
     elapsed: ElapsedSeconds = time.perf_counter() - started_at
     logger.event(
-        "experiment_end", #TODO: should be enum not hardcoded string
+        "experiment_end", # TODO: should be enum
         experiment=request.experiment.value,
         elapsed_seconds=elapsed,
         state=ArtifactState.COMPLETED.value,

@@ -210,27 +210,27 @@ def confusion_counts(
     )
 
 
-def certified_robust_predicted_value(certified_objective: Score) -> Score: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
+def certified_robust_predicted_value(certified_objective: Score) -> Score: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
     return certified_objective
 
 
-def fixed_action_rectangularization_gap_metric(gap: Score) -> Score :#TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
+def fixed_action_rectangularization_gap_metric(gap: Score) -> Score :# TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
     return gap
 
 
-def robust_coupling_value_gap_metric(gap: Score) -> Score: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
+def robust_coupling_value_gap_metric(gap: Score) -> Score: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
     return gap
 
 
-def coupling_upper_bound_diagnostic_metric(value: Score) -> Score: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
+def coupling_upper_bound_diagnostic_metric(value: Score) -> Score: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
     return value
 
 
-def exact_map_action_value_metric(delta_map: Score) -> Score: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
+def exact_map_action_value_metric(delta_map: Score) -> Score: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly
     return delta_map
 
 
-def absolute_objective_error(objective_value: Score, truth_value: Score) -> Score: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
+def absolute_objective_error(objective_value: Score, truth_value: Score) -> Score: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
     return abs(objective_value - truth_value)
 
 
@@ -298,7 +298,7 @@ def confirmation_coverage(
     return coverage
 
 
-def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None: #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
+def no_confirmation_coverage(eligible_decisions: Index) -> Fraction | None: # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
     if eligible_decisions == 0:
         return None
     full_coverage: Fraction = 1.0
@@ -376,14 +376,14 @@ def equal_pair_mean(
     return mean
 
 
-def equal_pair_absolute_risk_reduction( #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
+def equal_pair_absolute_risk_reduction( # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
     equal_pair_harm_no_confirm: Fraction | None,
     equal_pair_harm_confirm: Fraction | None,
 ) -> RelativeGain | None:
     return absolute_risk_reduction(equal_pair_harm_no_confirm, equal_pair_harm_confirm)
 
 
-def equal_pair_relative_risk_reduction( #TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
+def equal_pair_relative_risk_reduction( # TODO: what's the point of this? Does it need more code or better wiring? Analyze properly. Or should it be inlined
     equal_pair_harm_no_confirm: Fraction | None,
     equal_pair_risk_reduction: RelativeGain | None,
 ) -> RelativeGain | None:

@@ -21,7 +21,7 @@ from fedorbit.types import (
     stable_json,
 )
 
-DEPENDENCY_SPECS = ( #TODO: Delete this
+DEPENDENCY_SPECS = ( # TODO: Delete this
     ("pytorch", "torch"),
     ("numpy", "numpy"),
     ("scipy", "scipy"),
@@ -37,7 +37,7 @@ DEPENDENCY_SPECS = ( #TODO: Delete this
 
 
 @dataclass(frozen=True, slots=True)
-class DependencyVersion: #TODO: Delete this
+class DependencyVersion: # TODO: Delete this
     configured_key: str
     distribution: str
     configured: str
@@ -116,7 +116,7 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
     dependencies = OrderedDict(
         (dependency.configured_key, dependency.observed) for dependency in snapshot.dependencies
     )
-    hardware: OrderedDict[str, str | int | bool | None #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    hardware: OrderedDict[str, str | int | bool | None # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
                           ] = OrderedDict(
         gpu_name=snapshot.hardware.gpu_name,
         gpu_memory_bytes=snapshot.hardware.gpu_memory_bytes,
@@ -128,8 +128,8 @@ def _fingerprint(snapshot: EnvironmentSnapshot) -> Sha256Digest:
         os_release=snapshot.hardware.os_release,
     )
     payload: OrderedDict[
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str | OrderedDict[str, str] | OrderedDict[str, str | int | bool | None], #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str | OrderedDict[str, str] | OrderedDict[str, str | int | bool | None], # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     ] = OrderedDict(
         python_version=snapshot.python_version,
         dependencies=dependencies,
@@ -147,7 +147,7 @@ def environment_snapshot() -> EnvironmentSnapshot:
         python_version=python_version,
         dependencies=dependencies,
         hardware=hardware,
-        fingerprint_sha256=Sha256Digest("0" * 64), #TODO: should be enums not hardcoded strings
+        fingerprint_sha256=Sha256Digest("0" * 64), # TODO: should be enum
     )
     return EnvironmentSnapshot(
         python_version=python_version,

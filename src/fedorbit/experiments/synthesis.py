@@ -109,7 +109,7 @@ from fedorbit.types import (
 )
 
 _MODULE_NAME = ProducerModuleName("fedorbit.experiments.synthesis")
-_PRINCIPAL_CONDITION = EvaluationConditionName("principal") #TODO: should be enum instead of hardcoded string
+_PRINCIPAL_CONDITION = EvaluationConditionName("principal") # TODO: should be enum instead of hardcoded string
 
 
 def _concept_split_support(
@@ -142,7 +142,7 @@ def transfer_ontology_null_padding_rows(
             source_train, source_meta, target_meta, target_confirm, target_test
         )
         action_eligible = eligibility.source_eligible and eligibility.target_eligible
-        null_reason: str | None = None #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        null_reason: str | None = None # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         if not source_real:
             null_reason = f"{concept.value} absent from source dataset"
         elif not target_real:
@@ -181,15 +181,15 @@ _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.
 
 @dataclass(frozen=True, slots=True)
 class _SeedMetric:
-    value: float #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    value: float # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     artifact_id: ArtifactIdentifier
 
 
 def _iter_completed_json_payloads(
     store: ArtifactStore, experiment: ExperimentName,
-    payload_key: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    payload_key: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Iterator[tuple[ReusableArtifactManifest,
-                    Mapping[str, StableJsonPayload]]]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+                    Mapping[str, StableJsonPayload]]]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     experiment_value = experiment.value
     for manifest in store.all_manifests():
         if experiment_value not in manifest.semantic_producer_coordinates:
@@ -215,7 +215,7 @@ def completed_experiment_metric_records(
 ) -> tuple[MetricRecord, ...]:
     return tuple(
         MetricRecord.model_validate(payload)
-        for _, payload in _iter_completed_json_payloads(store, experiment, "metric_record") #TODO: should be enum instead of hardcoded string
+        for _, payload in _iter_completed_json_payloads(store, experiment, "metric_record") # TODO: should be enum instead of hardcoded string
     )
 
 
@@ -223,17 +223,17 @@ def completed_experiment_metric_records_with_support(
     store: ArtifactStore, experiment: ExperimentName
 ) -> tuple[tuple[MetricRecord, SupportCount | None], ...]:
     results: list[tuple[MetricRecord, SupportCount | None]] = []
-    for manifest, payload in _iter_completed_json_payloads(store, experiment, "metric_record"): #TODO: should be enum instead of hardcoded string
+    for manifest, payload in _iter_completed_json_payloads(store, experiment, "metric_record"): # TODO: should be enum instead of hardcoded string
         record = MetricRecord.model_validate(payload)
         coordinates = json.loads(manifest.semantic_producer_coordinates)
-        support = coordinates.get("support") #TODO: should be enum instead of hardcoded string
+        support = coordinates.get("support") # TODO: should be enum instead of hardcoded string
         results.append((record, support))
     return tuple(results)
 
 
 def transfer_ontology_and_null_padding_rows(
     store: ArtifactStore,
-) -> tuple[Mapping[str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+) -> tuple[Mapping[str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
                    TableScalar], ...]:
     manifest = latest_completed_manifest(
         store, ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION
@@ -245,31 +245,31 @@ def transfer_ontology_and_null_padding_rows(
         return ()
     payload = cast(Mapping[str, object], json.loads(payload_path.read_text(encoding="utf-8")))
     rows: list[Mapping[str, TableScalar]] = []
-    for pair_entry in cast(list[Mapping[str, object]], payload.get("primary_pairs", [])): #TODO: should be enum instead of hardcoded string
+    for pair_entry in cast(list[Mapping[str, object]], payload.get("primary_pairs", [])): # TODO: should be enum instead of hardcoded string
         for ontology_row in cast(
-            list[Mapping[str, object]], pair_entry.get("transfer_ontology", []) #TODO: should be enum instead of hardcoded string
+            list[Mapping[str, object]], pair_entry.get("transfer_ontology", []) # TODO: should be enum instead of hardcoded string
         ):
             support = cast(
                 Mapping[str, object],
-                ontology_row.get("support_counts" #TODO: should be enum instead of hardcoded string
+                ontology_row.get("support_counts" # TODO: should be enum instead of hardcoded string
                                  , OrderedDict[str, object]()),
             )
             rows.append(
                 OrderedDict(
-                    candidate_concept=cast(str | None, ontology_row.get("candidate_concept")), #TODO: should be enum instead of hardcoded string
-                    pair=cast(str | None, ontology_row.get("pair")), #TODO: should be enum instead of hardcoded string
-                    coarse_group=cast(str | None, ontology_row.get("coarse_group")), #TODO: should be enum instead of hardcoded string
-                    source_real_or_null="real" if ontology_row.get("source_real") else "null", #TODO: should be enum instead of hardcoded string
-                    target_real_or_null="real" if ontology_row.get("target_real") else "null", #TODO: should be enum instead of hardcoded string
+                    candidate_concept=cast(str | None, ontology_row.get("candidate_concept")), # TODO: should be enum instead of hardcoded string
+                    pair=cast(str | None, ontology_row.get("pair")), # TODO: should be enum instead of hardcoded string
+                    coarse_group=cast(str | None, ontology_row.get("coarse_group")), # TODO: should be enum instead of hardcoded string
+                    source_real_or_null="real" if ontology_row.get("source_real") else "null", # TODO: should be enum instead of hardcoded string
+                    target_real_or_null="real" if ontology_row.get("target_real") else "null", # TODO: should be enum instead of hardcoded string
                     support_counts=(
-                        f"source_train={support.get('source_train')}," #TODO: should be enum instead of hardcoded string
-                        f"source_meta={support.get('source_meta')}," #TODO: should be enum instead of hardcoded string
-                        f"target_meta={support.get('target_meta')}," #TODO: should be enum instead of hardcoded string
-                        f"target_confirm={support.get('target_confirm')}," #TODO: should be enum instead of hardcoded string
-                        f"target_test={support.get('target_test')}" #TODO: should be enum instead of hardcoded string
+                        f"source_train={support.get('source_train')}," # TODO: should be enum instead of hardcoded string
+                        f"source_meta={support.get('source_meta')}," # TODO: should be enum instead of hardcoded string
+                        f"target_meta={support.get('target_meta')}," # TODO: should be enum instead of hardcoded string
+                        f"target_confirm={support.get('target_confirm')}," # TODO: should be enum instead of hardcoded string
+                        f"target_test={support.get('target_test')}" # TODO: should be enum instead of hardcoded string
                     ),
-                    action_eligibility=cast(bool | None, ontology_row.get("action_eligibility")), #TODO: should be enum instead of hardcoded string
-                    null_reason=cast(str | None, ontology_row.get("null_reason")), #TODO: should be enum instead of hardcoded string
+                    action_eligibility=cast(bool | None, ontology_row.get("action_eligibility")), # TODO: should be enum instead of hardcoded string
+                    null_reason=cast(str | None, ontology_row.get("null_reason")), # TODO: should be enum instead of hardcoded string
                 )
             )
     return tuple(rows)
@@ -279,7 +279,7 @@ def completed_primary_transfer_metric_records(store: ArtifactStore) -> tuple[Met
     return tuple(
         MetricRecord.model_validate(payload)
         for _, payload in _iter_completed_json_payloads(
-            store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record" #TODO: should be enum instead of hardcoded string
+            store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record" # TODO: should be enum instead of hardcoded string
         )
     )
 
@@ -290,7 +290,7 @@ def completed_primary_transfer_comparison_records(
     return tuple(
         PairedComparisonRecord.model_validate(payload)
         for _, payload in _iter_completed_json_payloads(
-            store, ExperimentName.STATISTICAL_SYNTHESIS, "comparison_record" #TODO: should be enum instead of hardcoded string
+            store, ExperimentName.STATISTICAL_SYNTHESIS, "comparison_record" # TODO: should be enum instead of hardcoded string
         )
     )
 
@@ -302,7 +302,7 @@ def _completed_primary_transfer_macro_ce(
         OrderedDict()
     )
     for resolved, record_payload in _iter_completed_json_payloads(
-        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record" #TODO: should be enum instead of hardcoded string
+        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER, "metric_record" # TODO: should be enum instead of hardcoded string
     ):
         record = MetricRecord.model_validate(record_payload)
         if (
@@ -324,12 +324,12 @@ def persist_primary_transfer_comparison(
     pair: DirectedPairName,
     method: TransferMethod,
     paired_seed_count: Index,
-    mean_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    median_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_low: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_high: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    raw_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    holm_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    mean_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    median_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_low: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_high: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    raw_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    holm_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     decision: ComparisonDecision,
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
@@ -380,8 +380,8 @@ def persist_primary_transfer_comparison(
     )
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enum instead of hardcoded string
-        / "derived" #TODO: should be enum instead of hardcoded string
+        / "artifacts" # TODO: should be enum instead of hardcoded string
+        / "derived" # TODO: should be enum instead of hardcoded string
         / f"comparison.{pair.replace(' -> ', '-to-')}.{method.value}.json"
     )
     payload = cast(
@@ -420,7 +420,7 @@ def persist_primary_transfer_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -445,8 +445,8 @@ def execute_statistical_synthesis(
     )
     statistics_config = active_config().scientific.statistics
     for method in methods:
-        raw_p_by_pair: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        raw_p_by_pair: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         contrasts: OrderedDict[
             str,
             tuple[
@@ -556,7 +556,7 @@ def execute_statistical_synthesis(
                 resolved_comparison = store.resolve(comparison_manifest.artifact_id)
                 comparison_record = PairedComparisonRecord.model_validate(
                     json.loads(Path(resolved_comparison.payload_paths[0]).read_text())[
-                        "comparison_record" #TODO: should be enum instead of hardcoded string
+                        "comparison_record" # TODO: should be enum instead of hardcoded string
                     ]
                 )
                 nonzero_count, bootstrap_seed = metadata_inputs[pair]
@@ -577,16 +577,16 @@ def execute_statistical_synthesis(
                 )
     gap_metrics = _completed_real_packet_coupling_gap(store)
     coupling_pairs = sorted({pair for pair, _ in gap_metrics})
-    coupling_raw_p_by_pair: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    coupling_metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    coupling_raw_p_by_pair: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    coupling_metadata_inputs: OrderedDict[str, tuple[Index, RandomSeed]] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     coupling_contrasts: OrderedDict[
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         tuple[
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
         ],
     ] = OrderedDict()
@@ -683,7 +683,7 @@ def execute_statistical_synthesis(
             resolved_coupling_comparison = store.resolve(coupling_comparison_manifest.artifact_id)
             coupling_comparison_record = PairedComparisonRecord.model_validate(
                 json.loads(Path(resolved_coupling_comparison.payload_paths[0]).read_text())[
-                    "comparison_record" #TODO: should be enum instead of hardcoded string
+                    "comparison_record" # TODO: should be enum instead of hardcoded string
                 ]
             )
             coupling_nonzero_count, coupling_metadata_seed = coupling_metadata_inputs[pair]
@@ -713,16 +713,16 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    external_source_raw_p: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    external_source_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    external_source_raw_p: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    external_source_contrasts: OrderedDict[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        tuple[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
             Index,
             RandomSeed,
@@ -905,12 +905,12 @@ def execute_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] # TODO: should be enum instead of hardcoded string
             )
             key = (
-                "superiority" #TODO: should be enum instead of hardcoded string
+                "superiority" # TODO: should be enum instead of hardcoded string
                 if statistic == ComparisonStatistic.SIGN_FLIP_SUPERIORITY
-                else "equivalence" #TODO: should be enum instead of hardcoded string
+                else "equivalence" # TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -933,16 +933,16 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    point_correspondence_raw_p: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    point_correspondence_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    point_correspondence_raw_p: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    point_correspondence_contrasts: OrderedDict[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        tuple[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
             Index,
             RandomSeed,
@@ -1124,12 +1124,12 @@ def execute_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] # TODO: should be enum instead of hardcoded string
             )
             key = (
-                "difference" #TODO: Use a proper enum instead of a raw string
+                "difference" # TODO: Use a proper enum instead of a raw string
                 if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
-                else "equivalence" #TODO: Use a proper enum instead of a raw string
+                else "equivalence" # TODO: Use a proper enum instead of a raw string
             )
             persist_statistical_metadata(
                 store,
@@ -1166,16 +1166,16 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == _PRINCIPAL_CONDITION
         }
     )
-    ablation_raw_p: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    ablation_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    ablation_raw_p: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    ablation_contrasts: OrderedDict[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        tuple[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
             Index,
             RandomSeed,
@@ -1353,12 +1353,12 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] # TODO: should be enum instead of hardcoded string
             )
             key = (
-                "difference" #TODO: should be enum instead of hardcoded string
+                "difference" # TODO: should be enum instead of hardcoded string
                 if statistic == ComparisonStatistic.SIGN_FLIP_DIFFERENCE_COMMON_REFERENCE
-                else "equivalence" #TODO: should be enum instead of hardcoded string
+                else "equivalence" # TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -1381,43 +1381,43 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
     sparsity_pairs = sorted({pair for pair, _, _, _ in sparsity_metrics})
     condition_pairs: tuple[tuple[EvaluationConditionName, EvaluationConditionName], ...] = (
         (
-            EvaluationConditionName("exact sparse s=1"), #TODO: should be enum not hardcoded strings
-            EvaluationConditionName("exact sparse s=2"), #TODO: should be enum not hardcoded strings
+            EvaluationConditionName("exact sparse s=1"), # TODO: should be enums
+            EvaluationConditionName("exact sparse s=2"), # TODO: should be enums
         ),
         (
-            EvaluationConditionName("exact sparse s=3"), #TODO: should be enum not hardcoded strings
-            EvaluationConditionName("exact sparse s=2"), #TODO: should be enum not hardcoded strings
+            EvaluationConditionName("exact sparse s=3"), # TODO: should be enums
+            EvaluationConditionName("exact sparse s=2"), # TODO: should be enums
         ),
-        (EvaluationConditionName("dense CCP"), #TODO: should be enum not hardcoded strings
-         EvaluationConditionName("exact sparse s=2")), #TODO: should be enum not hardcoded strings
+        (EvaluationConditionName("dense CCP"), # TODO: should be enums
+         EvaluationConditionName("exact sparse s=2")), # TODO: should be enums
     )
     sparsity_condition_method: Mapping[EvaluationConditionName, MethodName] = OrderedDict(
         (
             (
-                EvaluationConditionName("exact sparse s=1"), #TODO: should be enum not hardcoded strings
+                EvaluationConditionName("exact sparse s=1"), # TODO: should be enums
                 ExperimentLocalMethod.EXACT_SPARSE_SUPPORT_ONE,
             ),
             (
-                EvaluationConditionName("exact sparse s=2"), #TODO: should be enum not hardcoded strings
+                EvaluationConditionName("exact sparse s=2"), # TODO: should be enums
                 ExperimentLocalMethod.EXACT_SPARSE_SUPPORT_TWO,
             ),
             (
-                EvaluationConditionName("exact sparse s=3"), #TODO: should be enum not hardcoded strings
+                EvaluationConditionName("exact sparse s=3"), # TODO: should be enums
                 ExperimentLocalMethod.EXACT_SPARSE_SUPPORT_THREE,
             ),
-            (EvaluationConditionName("dense CCP"),  #TODO: should be enum not hardcoded strings
+            (EvaluationConditionName("dense CCP"),  # TODO: should be enums
              TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK),
         )
     )
-    sparsity_raw_p: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    sparsity_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    sparsity_raw_p: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    sparsity_contrasts: OrderedDict[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        tuple[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
             Index,
             RandomSeed,
@@ -1559,7 +1559,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 continue
             resolved = store.resolve(manifest.artifact_id)
             comparison_record = PairedComparisonRecord.model_validate(
-                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
+                json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] # TODO: should be enum instead of hardcoded string
             )
             persist_statistical_metadata(
                 store,
@@ -1591,17 +1591,17 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == _PRINCIPAL_CONDITION
         }
     )
-    confirmation_raw_p: OrderedDict[str, float] = OrderedDict() #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    confirmation_contrasts: OrderedDict[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        tuple[ #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    confirmation_raw_p: OrderedDict[str, float] = OrderedDict() # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    confirmation_contrasts: OrderedDict[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        tuple[ # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             tuple[ArtifactIdentifier, ...],
-            float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+            float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
             Index,
             RandomSeed,
         ],
@@ -1654,14 +1654,14 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 confirmation_placeholder_seed,
             )
             continue
-        harmful_with_values: list[float] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        harmful_with_values: list[float] = [] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         for seed in shared_seeds:
             gain: RelativeGain = (
                 local_only_seeds[seed].value - with_confirm_seeds[seed].value
             ) / local_only_seeds[seed].value
             harmful_with_values.append(1.0 if harm_indicator(gain, harmful_threshold) else 0.0)
         harmful_with = tuple(harmful_with_values)
-        harmful_without_values: list[float] = [] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        harmful_without_values: list[float] = [] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         for seed in shared_seeds:
             gain: RelativeGain = (
                 local_only_seeds[seed].value - without_confirm_seeds[seed].value
@@ -1768,7 +1768,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             continue
         resolved = store.resolve(manifest.artifact_id)
         comparison_record = PairedComparisonRecord.model_validate(
-            json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] #TODO: should be enum instead of hardcoded string
+            json.loads(Path(resolved.payload_paths[0]).read_text())["comparison_record"] # TODO: should be enum instead of hardcoded string
         )
         persist_statistical_metadata(
             store,
@@ -1796,7 +1796,7 @@ def _completed_condition_macro_ce(
         tuple[DirectedPairName, TransferMethod, EvaluationConditionName, RandomSeed], _SeedMetric
     ] = OrderedDict()
     for resolved, record_payload in _iter_completed_json_payloads(
-        store, experiment, "metric_record" #TODO: should be enum instead of hardcoded string
+        store, experiment, "metric_record" # TODO: should be enum instead of hardcoded string
     ):
         record = MetricRecord.model_validate(record_payload)
         if (
@@ -1816,7 +1816,7 @@ def _completed_real_packet_coupling_gap(
 ) -> Mapping[tuple[DirectedPairName, RandomSeed], _SeedMetric]:
     result: OrderedDict[tuple[DirectedPairName, RandomSeed], _SeedMetric] = OrderedDict()
     for resolved, record_payload in _iter_completed_json_payloads(
-        store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION, "metric_record" #TODO: should be enum instead of hardcoded string
+        store, ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION, "metric_record" # TODO: should be enum instead of hardcoded string
     ):
         record = MetricRecord.model_validate(record_payload)
         if (
@@ -1838,12 +1838,12 @@ def persist_coupling_mechanism_comparison(
     experiment: ExperimentName,
     pair: DirectedPairName,
     paired_seed_count: Index,
-    mean_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    median_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_low: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_high: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    raw_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    holm_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    mean_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    median_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_low: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_high: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    raw_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    holm_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     decision: ComparisonDecision,
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
@@ -1896,8 +1896,8 @@ def persist_coupling_mechanism_comparison(
     )
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "derived" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "derived" # TODO: should be enum
         / f"coupling-comparison.{pair.replace(' -> ', '-to-')}.json"
     )
     payload = cast(
@@ -1936,7 +1936,7 @@ def persist_coupling_mechanism_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -1960,15 +1960,15 @@ def persist_baseline_comparison(
     contrast_name: ContrastName,
     materiality_threshold: RelativeGain | None,
     paired_seed_count: Index,
-    mean_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    median_difference: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_low: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    bca_ci_high: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    raw_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    holm_p: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    mean_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    median_difference: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_low: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    bca_ci_high: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    raw_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    holm_p: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     decision: ComparisonDecision,
-    equivalence_margin_low: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    equivalence_margin_high: float | None, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    equivalence_margin_low: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    equivalence_margin_high: float | None, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
 ) -> ReusableArtifactManifest | None:
@@ -2019,8 +2019,8 @@ def persist_baseline_comparison(
     )
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "derived" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "derived" # TODO: should be enum
         / (f"baseline-comparison.{pair.replace(' -> ', '-to-')}.{safe_slug(contrast_name)}.json")
     )
     payload = cast(
@@ -2059,7 +2059,7 @@ def persist_baseline_comparison(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,
@@ -2071,8 +2071,8 @@ def persist_baseline_comparison(
     return manifest
 
 
-def _holm_rank(raw_p_by_pair: Mapping[str, float] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-               , pair: str #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+def _holm_rank(raw_p_by_pair: Mapping[str, float] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+               , pair: str # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
                ) -> Index:
     ordered = sorted(raw_p_by_pair.items(), key=lambda item: (item[1], item[0]))
     rank: Index = next(index for index, (name, _) in enumerate(ordered, start=1) if name == pair)
@@ -2135,11 +2135,11 @@ def persist_statistical_metadata(
     validate_comparison_metadata(comparison, metadata)
     payload_path = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "derived" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "derived" # TODO: should be enum
         / (
             f"statistical-metadata.{pair.replace(' -> ', '-to-')}.{method.value}"
-            f".{safe_slug(comparison_statistic.value)}.json" #TODO: should be enums not hardcoded strings
+            f".{safe_slug(comparison_statistic.value)}.json" # TODO: should be enum
         )
     )
     payload = cast(
@@ -2178,7 +2178,7 @@ def persist_statistical_metadata(
             material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
-            schema_version="1.0", #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema_version="1.0", # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             created_git_commit=current_code_revision().commit,
             created_environment_sha256=environment_snapshot().fingerprint_sha256,
             state=ArtifactState.COMPLETED,

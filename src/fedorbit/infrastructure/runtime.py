@@ -274,7 +274,7 @@ def _git_head() -> GitRevision:
         timeout=30,
     )
     if result.returncode != 0:
-        return GitRevision("no-git") #TODO: should be enum not hardcoded string
+        return GitRevision("no-git") # TODO: should be enum
     return GitRevision(result.stdout.strip())
 
 
@@ -467,7 +467,7 @@ class TorchGeneratorStream:
 
 
 def torch_generator(request: TorchGeneratorRequest) -> TorchGeneratorStream:
-    generator = torch.Generator(device="cpu") #TODO: should be enum instead of hardcoded string
+    generator = torch.Generator(device="cpu") # TODO: should be enum instead of hardcoded string
     generator.manual_seed(request.seed)
     return TorchGeneratorStream(generator)
 

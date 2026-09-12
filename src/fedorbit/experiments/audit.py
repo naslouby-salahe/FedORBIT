@@ -68,11 +68,11 @@ from fedorbit.types import (
     TransferMethod,
 )
 
-_MODULE_NAME = ProducerModuleName("fedorbit.experiments.audit") #TODO: why is this needed? And not used
+_MODULE_NAME = ProducerModuleName("fedorbit.experiments.audit") # TODO: why is this needed? And not used
 
 
-def _human_audit_researcher_id(index: Index) -> str: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    return f"researcher-{index + 1}" #TODO: should be from enum
+def _human_audit_researcher_id(index: Index) -> str: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    return f"researcher-{index + 1}" # TODO: should be from enum
 
 
 def _human_audit_directory(
@@ -80,13 +80,13 @@ def _human_audit_directory(
     experiment: ExperimentName,
     source: DatasetId,
     target: DatasetId,
-    researcher_id: str, #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    researcher_id: str, # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 ) -> Path:
     return (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be from enum
-        / "fitted" #TODO: should be from enum
-        / "human_audit" #TODO: should be from enum
+        / "artifacts" # TODO: should be from enum
+        / "fitted" # TODO: should be from enum
+        / "human_audit" # TODO: should be from enum
         / f"{source.value}-to-{target.value}"
         / researcher_id
     )
@@ -181,7 +181,7 @@ def execute_map_availability_applicability_audit(
                     seed,
                     MetricId.PACKET_ONLY_RECOVERY_ACCURACY,
                     1.0 if recovered else 0.0,
-                    MetricUnit("boolean"), #TODO: should be from enum
+                    MetricUnit("boolean"), # TODO: should be from enum
                     MetricDirection.HIGHER_IS_BETTER,
                     input_artifact_ids,
                     request.overwrite_policy,
@@ -193,11 +193,11 @@ def execute_map_availability_applicability_audit(
             directory = _human_audit_directory(
                 layout, request.experiment, source, target, researcher_id
             )
-            submission_path = directory / "submission.json" #TODO: should be from enum
+            submission_path = directory / "submission.json" # TODO: should be from enum
             if not submission_path.is_file():
                 template = blank_audit_template(researcher_id, domain_pair)
                 atomic_write_json(
-                    directory / "template.json", #TODO: should be from enum
+                    directory / "template.json", # TODO: should be from enum
                     cast(StableJsonPayload, template.model_dump(mode="json")),
                 )
                 continue
@@ -219,7 +219,7 @@ def execute_map_availability_applicability_audit(
                 _human_audit_directory(
                     layout, request.experiment, source, target, submission.researcher_id
                 )
-                / "validated.sha256.json", #TODO: should be from enum
+                / "validated.sha256.json", # TODO: should be from enum
                 cast(
                     StableJsonPayload,
                     OrderedDict(sha256=submission_sha256(submission)),

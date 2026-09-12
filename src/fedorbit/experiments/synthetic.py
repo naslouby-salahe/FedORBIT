@@ -111,7 +111,7 @@ def generate_exact_separator_instance(
     coordinates = cast(
         StableJsonPayload,
         OrderedDict(
-            generator="exact_separator_theorem", #TODO: should be enum, not hardcoded string
+            generator="exact_separator_theorem", # TODO: should be enum
             block_pattern=list(request.block_pattern),
             active_support_size=request.active_support_size,
             instance_index=request.instance_index,
@@ -190,7 +190,7 @@ def generate_unresolved_map_world(request: UnresolvedMapWorldRequest) -> Unresol
         coordinates = cast(
             StableJsonPayload,
             OrderedDict(
-                generator="unresolved_map_world", #TODO: should be enum, not hardcoded string
+                generator="unresolved_map_world", # TODO: should be enum
                 world_kind=request.world_kind.value,
                 attempt=attempt,
             ),
@@ -390,7 +390,7 @@ def generate_scalability_instance(request: ScalabilityInstanceRequest) -> Scalab
     coordinates = cast(
         StableJsonPayload,
         OrderedDict(
-            generator="scalability", #TODO: should be enum, not hardcoded string
+            generator="scalability", # TODO: should be enum
             node_count=request.node_count,
             block_pattern=request.block_pattern.value,
             support_size=request.support_size,
@@ -452,9 +452,9 @@ class CouplingInstance:
 def _coupling_coordinates(
     request: CouplingInstanceRequest,
     attempt: Index | None,
-) -> OrderedDict[str, StableJsonPayload]: #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-    fields: OrderedDict[str, StableJsonPayload] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
-        generator="coupling_structure", #TODO: should be enum, not hardcoded string
+) -> OrderedDict[str, StableJsonPayload]: # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    fields: OrderedDict[str, StableJsonPayload] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+        generator="coupling_structure", # TODO: should be enum
         compatibility=request.compatibility.value,
         response_heterogeneity=request.response_heterogeneity,
         directed_asymmetry=request.directed_asymmetry,
@@ -464,7 +464,7 @@ def _coupling_coordinates(
         instance_index=request.instance_index,
     )
     if attempt is not None:
-        fields["attempt"] = attempt #TODO: should be enum, not hardcoded string
+        fields["attempt"] = attempt # TODO: should be enum
     return fields
 
 
@@ -514,7 +514,7 @@ def _apply_deterministic_sparsity(
     return result
 
 
-_CorrespondenceImageMinimizerSet = frozenset[tuple[int, ...]] #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+_CorrespondenceImageMinimizerSet = frozenset[tuple[int, ...]] # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
 
 
 def _active_term_minimizer_sets(
@@ -539,7 +539,7 @@ def _active_term_minimizer_sets(
     return tuple(minimizer_sets)
 
 
-MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION: SupportCount = 2 #TODO: move to constants
+MINIMUM_SUPPORT_SIZE_FOR_INCOMPATIBLE_CLASSIFICATION: SupportCount = 2 # TODO: move to constants
 
 
 def eligible_coupling_support_sizes(
@@ -554,7 +554,7 @@ def eligible_coupling_support_sizes(
     return registered_support_sizes
 
 
-_JOINT_REALIZABILITY_MAX_ITERATIONS: RepetitionCount = 100 #TODO: move to constants
+_JOINT_REALIZABILITY_MAX_ITERATIONS: RepetitionCount = 100 # TODO: move to constants
 
 
 def _joint_realizability_column_shift(

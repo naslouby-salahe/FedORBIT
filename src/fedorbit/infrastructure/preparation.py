@@ -98,7 +98,7 @@ class DatasetPreparationResult:
 def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparationResult:
     logger = execution_logger()
     logger.event(
-        "preprocess_start", #TODO: should be enum not hardcoded string
+        "preprocess_start", # TODO: should be enum
         datasets=[dataset.value for dataset in request.datasets],
         overwrite_policy=request.overwrite_policy.value,
     )
@@ -159,7 +159,7 @@ def preprocess_datasets(request: DatasetPreparationRequest) -> DatasetPreparatio
             ) from error
         persist_materialized_client(layout, materialized, request.overwrite_policy)
     logger.event(
-        "preprocess_end", #TODO: should be enum not hardcoded string
+        "preprocess_end", # TODO: should be enum
         datasets=[dataset.value for dataset in request.datasets],
         blocked=len(resource_blocked),
     )
@@ -192,7 +192,7 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
     local_class_counts = OrderedDict(
         (label, sum(counts.values())) for label, counts in materialized.class_row_counts.items()
     )
-    transfer_candidate_counts: Mapping[str, SampleCount] = OrderedDict( #TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
+    transfer_candidate_counts: Mapping[str, SampleCount] = OrderedDict( # TODO: do not use primitives. Fix by introducing a proper error type or message class and identify and fix why architecture tests didn't catch this
         (str(group.concept.value), group.train_support)
         for group in transfer_concept_groups(materialized.dataset, materialized)
     )
@@ -216,7 +216,7 @@ def build_dataset_manifest(materialized: MaterializedClient) -> DatasetManifest:
             raw_files=raw_files,
             raw_sha256=raw_sha256,
             raw_counts=raw_counts,
-            schema=ArtifactSchemaVersion("1.0"), #TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
+            schema=ArtifactSchemaVersion("1.0"), # TODO: should be retrieved from yml and accessed through config. Identify any similar issues and fix it
             adapter_feature_order=materialized.schema.feature_order,
             adapter_feature_roles=adapter_feature_roles,
             accepted_schema_aliases=(provenance.accepted_timestamp_column,),
@@ -247,9 +247,9 @@ def persist_dataset_manifest(
 ) -> Path:
     destination = (
         experiment_workspace(layout, experiment)
-        / "artifacts" #TODO: should be enums not hardcoded strings
-        / "derived" #TODO: should be enums not hardcoded strings
-        / f"dataset-manifest.{dataset.value}.json" #TODO: should be enums not hardcoded strings
+        / "artifacts" # TODO: should be enum
+        / "derived" # TODO: should be enum
+        / f"dataset-manifest.{dataset.value}.json" # TODO: should be enum
     )
     atomic_write_json(destination, manifest.model_dump(mode="json"))
     return destination
@@ -263,7 +263,7 @@ def persist_materialized_client(
     dataset = materialized.dataset
     split_paths: list[Path] = []
     for split, tensors in materialized.splits.items():
-        destination = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet" #TODO: should be enums not hardcoded strings
+        destination = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet" # TODO: should be enum
         if overwrite_policy == OverwritePolicy.REUSE and destination.is_file():
             split_paths.append(destination)
             continue
@@ -271,13 +271,13 @@ def persist_materialized_client(
             tensors.features.detach().cpu().numpy(),
             columns=materialized.feature_names,
         )
-        frame.insert(len(frame.columns), "target", tensors.targets.detach().cpu().numpy()) #TODO: should be enums not hardcoded strings
+        frame.insert(len(frame.columns), "target", tensors.targets.detach().cpu().numpy()) # TODO: should be enum
         destination.parent.mkdir(parents=True, exist_ok=True)
         promote_parquet(frame, destination.parent, destination.name)
         split_paths.append(destination)
     manifest = build_dataset_manifest(materialized)
     atomic_write_json(
-        layout.preprocessing / "prepared" / dataset.value / "data.json", #TODO: should be enums not hardcoded strings
+        layout.preprocessing / "prepared" / dataset.value / "data.json", # TODO: should be enum
         manifest.model_dump(mode="json"),
     )
     eligibility = tuple(
@@ -294,7 +294,7 @@ def persist_materialized_client(
         for group in transfer_concept_groups(dataset, materialized)
     )
     atomic_write_json(
-        layout.preprocessing / "features" / dataset.value / "data.json", #TODO: should be enums not hardcoded strings
+        layout.preprocessing / "features" / dataset.value / "data.json", # TODO: should be enum
         cast(
             StableJsonPayload,
             OrderedDict(
@@ -307,7 +307,7 @@ def persist_materialized_client(
     )
     torch.save(
         materialized,
-        layout.preprocessing / "prepared" / dataset.value / "client.pt", #TODO: should be enums not hardcoded strings
+        layout.preprocessing / "prepared" / dataset.value / "client.pt", # TODO: should be enum
     )
     return tuple(split_paths)
 
@@ -318,7 +318,7 @@ def persist_client_invalid(
     dataset: DatasetId,
     reason: InvalidReason,
 ) -> None:
-    destination = experiment_workspace(layout, experiment) / "artifacts" / "derived" #TODO: should be enums not hardcoded strings
+    destination = experiment_workspace(layout, experiment) / "artifacts" / "derived" # TODO: should be enum
     payload = cast(
         StableJsonPayload,
         OrderedDict(
@@ -328,23 +328,23 @@ def persist_client_invalid(
             reason=reason,
         ),
     )
-    atomic_write_json(destination / f"{dataset.value}-invalid.json", payload) #TODO: should be enums not hardcoded strings
+    atomic_write_json(destination / f"{dataset.value}-invalid.json", payload) # TODO: should be enum
 
 
 def load_or_materialize_client(
     dataset: DatasetId, raw_root: Path, layout: WorkspaceLayout
 ) -> MaterializedClient:
-    prepared = layout.preprocessing / "prepared" / dataset.value / "client.pt" #TODO: should be enums not hardcoded strings
+    prepared = layout.preprocessing / "prepared" / dataset.value / "client.pt" # TODO: should be enum
     if prepared.is_file():
         loaded = torch.load(prepared, map_location="cpu", weights_only=False)
         if isinstance(loaded, MaterializedClient):
             execution_logger().event(
-                "prepared_client_load", #TODO: should be enum not hardcoded string
+                "prepared_client_load", # TODO: should be enum
                 dataset=dataset.value,
                 artifact_path=str(prepared),
             )
             return loaded
-    execution_logger().event("prepared_client_miss", dataset=dataset.value) #TODO: should be enum not hardcoded string
+    execution_logger().event("prepared_client_miss", dataset=dataset.value) # TODO: should be enum
     materialized = materialize_client(dataset, raw_root)
     if materialized.feature_quality.candidate_count_before_filtering > 0:
         persist_materialized_client(layout, materialized, OverwritePolicy.REUSE)

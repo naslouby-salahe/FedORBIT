@@ -375,10 +375,6 @@ class DuplicateGroups:
                 )
             seen.add(group_sha256)
 
-    @property
-    def group_count(self) -> Index:
-        return len(self.groups)
-
     def members_of(self, group_sha256: Sha256Digest) -> tuple[NormalizedRow, ...] | None:
         for candidate_sha256, members in self.groups:
             if candidate_sha256 == group_sha256:

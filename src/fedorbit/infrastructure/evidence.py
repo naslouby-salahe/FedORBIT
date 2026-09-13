@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -15,12 +17,22 @@ from reportlab.pdfgen.canvas import Canvas
 
 from fedorbit.analysis.records import MetricRecord
 from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import ReusableArtifactManifest
+from fedorbit.infrastructure.runtime import (
+    CodeRevision,
+    GitRevision,
+    ReproducibilityIdentity,
+    build_reproducibility_identity,
+    deterministic_backend_state,
+    reject_incompatible,
+)
 from fedorbit.infrastructure.storage import atomic_write_bytes, atomic_write_json
 from fedorbit.infrastructure.workspace import WorkspaceLayout, results_workspace
 from fedorbit.types import (
     ArtifactIdentifier,
     ExperimentName,
+    JsonValue,
     ReportArtifactName,
     ReportAxisLabel,
     ReportColumnName,
@@ -28,6 +40,7 @@ from fedorbit.types import (
     ReportCoordinates,
     ReportingPathSegment,
     ReportSeriesName,
+    Sha256Digest,
     StableJsonPayload,
     stable_json,
 )
@@ -321,6 +334,7 @@ class VerifiedEvidenceWriter:
             / _project_execution_reproducibility_directory()
             / ReportingPathSegment.EXECUTION_JSON
         )
+        identity = build_reproducibility_identity(environment_snapshot())
         atomic_write_json(
             execution,
             cast(
@@ -330,6 +344,8 @@ class VerifiedEvidenceWriter:
                     dependency_fingerprints=tuple(
                         manifest.dependency_fingerprint_sha256 for manifest in manifests
                     ),
+                    reproducibility_identity=_identity_payload(identity),
+                    deterministic_backend=deterministic_backend_state(),
                 ),
             ),
         )
@@ -574,3 +590,42 @@ def _metric_pdf_bytes(label: str, value: float) -> bytes:
     document.line(40, 70, REPORT_FIGURE_WIDTH - 40, 70)
     document.save()
     return buffer.getvalue()
+
+
+def _identity_payload(identity: ReproducibilityIdentity) -> OrderedDict[str, JsonValue]:
+    return OrderedDict(
+        config_digest=identity.config_digest,
+        seed_digest=identity.seed_digest,
+        environment_fingerprint=identity.environment_fingerprint,
+        code_revision=identity.code_revision.commit,
+        statistical_identity_digest=identity.statistical_identity_digest,
+    )
+
+
+def recorded_execution_identity(layout: WorkspaceLayout) -> ReproducibilityIdentity | None:
+    execution = (
+        layout.project_summary
+        / ReportingPathSegment.REPRODUCIBILITY
+        / _project_execution_reproducibility_directory()
+        / ReportingPathSegment.EXECUTION_JSON
+    )
+    if not execution.is_file():
+        return None
+    payload = cast(Mapping[str, JsonValue], json.loads(execution.read_text(encoding="utf-8")))
+    recorded = payload.get("reproducibility_identity")
+    if not isinstance(recorded, Mapping):
+        return None
+    return ReproducibilityIdentity(
+        config_digest=Sha256Digest(str(recorded["config_digest"])),
+        seed_digest=Sha256Digest(str(recorded["seed_digest"])),
+        environment_fingerprint=Sha256Digest(str(recorded["environment_fingerprint"])),
+        code_revision=CodeRevision(GitRevision(str(recorded["code_revision"]))),
+        statistical_identity_digest=Sha256Digest(str(recorded["statistical_identity_digest"])),
+    )
+
+
+def assert_recorded_execution_identity_compatible(layout: WorkspaceLayout) -> None:
+    recorded = recorded_execution_identity(layout)
+    if recorded is None:
+        return
+    reject_incompatible(build_reproducibility_identity(environment_snapshot()), recorded)

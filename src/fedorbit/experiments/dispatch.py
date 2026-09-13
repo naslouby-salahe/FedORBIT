@@ -64,9 +64,14 @@ from fedorbit.infrastructure.artifacts import (
 )
 from fedorbit.infrastructure.evidence import VerifiedEvidenceWriter
 from fedorbit.infrastructure.failures import (
+    ExecutionOutcome,
+    FailureClassification,
     InfrastructureFailureError,
     RetryPolicy,
     classify_failure,
+    infrastructure_exhausted_outcome,
+    scientific_algorithmic_failure_outcome,
+    validation_failure_outcome,
 )
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
@@ -93,7 +98,9 @@ from fedorbit.types import (
     ExecutionEventName,
     ExperimentName,
     ExposedCoarseGroupId,
+    FailureCategory,
     FailureHandlingLogCoordinate,
+    FailureReason,
     FieldDescription,
     OverwritePolicy,
     Rfc3339UtcTimestamp,
@@ -240,6 +247,7 @@ def _execute_producer_with_retry(
         except (InfrastructureFailureError, ScientificAlgorithmicFailureError) as error:
             classification = classify_failure(error)
             decision = policy.decide(attempt, classification)
+            outcome = _terminal_outcome(classification, error)
             logger.record(
                 ExecutionLogEvent(
                     occurred_at=datetime.now(UTC),
@@ -255,6 +263,7 @@ def _execute_producer_with_retry(
                         f"{type(error).__name__}: {error} -> "
                         f"{'retry' if decision.retry else 'terminal'}"
                     ),
+                    terminal_outcome=outcome,
                 )
             )
             if not decision.retry:
@@ -379,3 +388,15 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         elapsed_seconds=elapsed,
         state=ArtifactState.COMPLETED.value,
     )
+
+
+def _terminal_outcome(
+    classification: FailureClassification,
+    error: BaseException,
+) -> ExecutionOutcome:
+    reason = FailureReason(f"{type(error).__name__}: {error}")
+    if classification.category is FailureCategory.INFRASTRUCTURE:
+        return infrastructure_exhausted_outcome()
+    if classification.category is FailureCategory.SCIENTIFIC_ALGORITHMIC:
+        return scientific_algorithmic_failure_outcome(reason, False, (), ())
+    return validation_failure_outcome(reason, invalid=False)

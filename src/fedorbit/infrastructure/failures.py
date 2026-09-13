@@ -201,24 +201,3 @@ def scientific_algorithmic_failure_outcome(
         proceeded_to_assimilation=False,
         proceeded_to_test_scoring=False,
     )
-
-
-def scientific_null_outcome() -> ExecutionOutcome:
-    return ExecutionOutcome(
-        terminal_state=TerminalState.COMPLETED,
-        failure_category=FailureCategory.SCIENTIFIC_NULL,
-    )
-
-
-def failure_boundary_outcome() -> ExecutionOutcome:
-    return ExecutionOutcome(
-        terminal_state=TerminalState.COMPLETED,
-        failure_category=FailureCategory.SCIENTIFIC_BOUNDARY,
-    )
-
-
-def solver_limit_outcome(time_limit: bool, resource_limit: bool) -> ExecutionOutcome:
-    return ExecutionOutcome(
-        terminal_state=TerminalState.COMPLETED,
-        method_outcome=MethodOutcome(time_limit=time_limit, resource_limit=resource_limit),
-    )

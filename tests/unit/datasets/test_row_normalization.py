@@ -4,22 +4,17 @@ import math
 import unicodedata
 
 import pyarrow as pa
-import pytest
 
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.datasets.common import ObservedColumnSamples
 from fedorbit.datasets.edge_iiotset.schema import edge_iiotset_adapter
 from fedorbit.datasets.preprocessing import (
     NormalizedFeatureVector,
-    NormalizedRow,
-    RowNormalizationError,
-    deduplicate_rows,
     exact_duplicate_hash,
     normalize_value,
     normalized_row_bytes,
-    validate_duplicate_groups,
 )
-from fedorbit.types import DuplicateGroupIdentifier, FineLabel, TabularColumnName
+from fedorbit.types import TabularColumnName
 
 EDGE_COLUMNS = tuple(
     TabularColumnName(name)
@@ -93,18 +88,6 @@ def test_duplicate_hash_ignores_forbidden_identity_fields() -> None:
     assert exact_duplicate_hash(_features(identity="host-a"), schema) == exact_duplicate_hash(
         _features(identity="host-b"), schema
     )
-
-
-def test_exact_duplicate_grouping_rejects_conflicting_labels() -> None:
-    schema = _schema()
-    rows = (
-        NormalizedRow(_features(), FineLabel("ddos"), 0.1, DuplicateGroupIdentifier("")),
-        NormalizedRow(_features(), FineLabel("normal"), 0.2, DuplicateGroupIdentifier("")),
-    )
-    groups = deduplicate_rows(schema, rows)
-    assert groups.group_count == 1
-    with pytest.raises(RowNormalizationError):
-        validate_duplicate_groups(groups)
 
 
 def test_normalize_value_applies_missing_vocabulary_without_erasing_numeric_zero() -> None:

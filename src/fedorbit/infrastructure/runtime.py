@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import cast
 
-import numpy as np
 import psutil
 import structlog
 import torch
@@ -19,6 +18,7 @@ from structlog.typing import FilteringBoundLogger
 
 from fedorbit.config.loading import active_config, repository_root
 from fedorbit.infrastructure.environment import EnvironmentSnapshot
+from fedorbit.infrastructure.failures import ExecutionOutcome
 from fedorbit.types import (
     ArtifactIdentifier,
     ArtifactStage,
@@ -142,12 +142,6 @@ def principal_determinism() -> Generator[None]:
     yield
 
 
-@contextmanager
-def test_determinism() -> Generator[None]:
-    apply_deterministic_backend(require_cuda_device=False)
-    yield
-
-
 @dataclass(slots=True)
 class EfficiencyMeasurement:
     wall_time_seconds: ElapsedSeconds = 0.0
@@ -170,10 +164,12 @@ def measure_efficiency() -> Generator[_EfficiencyMeasurementHandle]:
     handle = _EfficiencyMeasurementHandle()
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
+    synchronize_cuda()
     started_at = time.monotonic()
     try:
         yield handle
     finally:
+        synchronize_cuda()
         handle.result.wall_time_seconds = time.monotonic() - started_at
         handle.result.peak_host_rss_mib = _peak_host_rss_mib()
         if torch.cuda.is_available():
@@ -240,6 +236,7 @@ class ExecutionLogEvent:
     elapsed_seconds: ElapsedSeconds | None = None
     reuse_action: ExecutionAction | None = None
     reuse_note: FieldDescription | None = None
+    terminal_outcome: ExecutionOutcome | None = None
 
 
 class ExecutionLogger:
@@ -423,12 +420,6 @@ class SeedPlan:
     coordinates_json: SerializedPacket
     streams: tuple[SeedStream, ...]
 
-    def seed_for(self, namespace: RngNamespace) -> DerivedSeed:
-        for stream in self.streams:
-            if stream.namespace == namespace:
-                return stream.seed
-        raise SeedDerivationError(f"namespace not in plan: {namespace}")
-
 
 @dataclass(frozen=True, slots=True)
 class SeedStream:
@@ -442,37 +433,6 @@ class SeedPlanRequest:
     coordinates: StableJsonPayload
 
 
-def seed_plan(request: SeedPlanRequest) -> SeedPlan:
-    coordinates_json_value = stable_json(request.coordinates)
-    return SeedPlan(
-        base_seed=request.base_seed,
-        coordinates_json=SerializedPacket(coordinates_json_value),
-        streams=tuple(
-            SeedStream(
-                namespace,
-                derive_seed32(
-                    SeedDerivationRequest(request.base_seed, namespace, request.coordinates)
-                ),
-            )
-            for namespace in RngNamespace
-        ),
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class NumpyGeneratorRequest:
-    seed: DerivedSeed
-
-
-@dataclass(frozen=True, slots=True)
-class NumpyGeneratorStream:
-    generator: np.random.Generator
-
-
-def numpy_generator(request: NumpyGeneratorRequest) -> NumpyGeneratorStream:
-    return NumpyGeneratorStream(np.random.default_rng(request.seed))
-
-
 @dataclass(frozen=True, slots=True)
 class TorchGeneratorRequest:
     seed: DerivedSeed
@@ -483,24 +443,7 @@ class TorchGeneratorStream:
     generator: torch.Generator
 
 
-def torch_generator(request: TorchGeneratorRequest) -> TorchGeneratorStream:
-    generator = torch.Generator(device=RuntimeDeviceType.CPU)
-    generator.manual_seed(request.seed)
-    return TorchGeneratorStream(generator)
-
-
 @dataclass(frozen=True, slots=True)
 class StatisticalBootstrapRequest:
     statistical_seed: RandomSeed
     contrast_coordinates: StableJsonPayload
-
-
-def statistical_bootstrap_stream(request: StatisticalBootstrapRequest) -> NumpyGeneratorStream:
-    stream_seed = derive_seed32(
-        SeedDerivationRequest(
-            request.statistical_seed,
-            RngNamespace.STATISTICAL_BOOTSTRAP,
-            request.contrast_coordinates,
-        )
-    )
-    return numpy_generator(NumpyGeneratorRequest(stream_seed))

@@ -70,10 +70,6 @@ class PaddedBlockStructure:
         )
 
     @property
-    def padded_sizes(self) -> BlockNodeCounts:
-        return BlockNodeCounts(blocks=self, per_block=self.padded_size_tuple)
-
-    @property
     def total_padded_nodes(self) -> SampleCount:
         return sum(self.padded_size_tuple)
 
@@ -97,24 +93,6 @@ class PaddedBlockStructure:
                 return block_index
             cumulative += size
         raise CorrespondenceError(f"node index {node_index} outside padded space")
-
-    def source_null_counts(self) -> BlockNodeCounts:
-        return BlockNodeCounts(
-            blocks=self,
-            per_block=tuple(
-                size - real
-                for size, real in zip(self.padded_size_tuple, self.source_real_counts, strict=True)
-            ),
-        )
-
-    def target_null_counts(self) -> BlockNodeCounts:
-        return BlockNodeCounts(
-            blocks=self,
-            per_block=tuple(
-                size - real
-                for size, real in zip(self.padded_size_tuple, self.target_real_counts, strict=True)
-            ),
-        )
 
 
 def build_padded_block_structure(
@@ -181,13 +159,6 @@ class BlockCorrespondence:
     def ordering_key(self) -> NodePermutation:
         return self.images
 
-    def permutation_matrix(self) -> ResponseMatrix:
-        total = self.blocks.total_padded_nodes
-        matrix = np.zeros((total, total), dtype=np.float64)
-        for target_index, image in enumerate(self.images):
-            matrix[image, target_index] = 1.0
-        return matrix
-
     def permute_response_matrix(self, matrix: ResponseMatrix) -> ResponseMatrix:
         expected = self.blocks.total_padded_nodes
         if matrix.shape != (expected, expected):
@@ -215,19 +186,6 @@ class CorrespondenceOrdering(IntEnum):
     GREATER = 1
 
 
-def compare_correspondences_lexicographically(
-    left: BlockCorrespondence, right: BlockCorrespondence
-) -> CorrespondenceOrdering:
-    for left_value, right_value in zip(left.images, right.images, strict=True):
-        if left_value != right_value:
-            return (
-                CorrespondenceOrdering.LESS
-                if left_value < right_value
-                else CorrespondenceOrdering.GREATER
-            )
-    return CorrespondenceOrdering.EQUAL
-
-
 @dataclass(frozen=True, slots=True)
 class ActiveImageMap:
     blocks: PaddedBlockStructure
@@ -248,29 +206,12 @@ class ActiveImageMap:
                     f"active-image assignment ({target}, {image}) crosses coarse-group boundary"
                 )
 
-    def image_of(self, target_node: Index) -> Index | None:
-        for target, image in self.assignments:
-            if target == target_node:
-                return image
-        return None
-
     def fixed_pairs(self) -> NodeImagePairs:
         return self.assignments
 
 
 def active_support_of_action(alpha: ActionVector) -> tuple[Index, ...]:
     return tuple(int(node) for node in np.flatnonzero(alpha > 0.0))
-
-
-def support_per_block(
-    blocks: PaddedBlockStructure, active_nodes: Sequence[Index]
-) -> BlockNodeCounts:
-    counts = [0] * len(blocks.padded_size_tuple)
-    for node in active_nodes:
-        if node < 0 or node >= blocks.total_padded_nodes:
-            raise CorrespondenceError(f"active node {node} outside padded space")
-        counts[blocks.block_of_node(node)] += 1
-    return BlockNodeCounts(blocks=blocks, per_block=tuple(counts))
 
 
 def falling_factorial(n: Index, r: Index) -> Index:

@@ -111,25 +111,6 @@ def macro_cross_entropy(class_entropies: ClassEntropySet) -> CrossEntropy:
     return CrossEntropy(statistics.fmean(entry.value for entry in class_entropies.values))
 
 
-def relative_macro_ce_gain(
-    reference_macro_ce: Score,
-    method_macro_ce: Score,
-) -> RelativeMacroCeGain:
-    floor = active_config().scientific.metrics.relative_macro_ce_denominator_floor
-    absolute_difference = reference_macro_ce - method_macro_ce
-    if reference_macro_ce < floor:
-        return RelativeMacroCeGain(
-            value=None,
-            absolute_difference=absolute_difference,
-            is_na=True,
-        )
-    return RelativeMacroCeGain(
-        value=absolute_difference / max(reference_macro_ce, floor),
-        absolute_difference=absolute_difference,
-        is_na=False,
-    )
-
-
 def precision_from_counts(true_positives: Index, false_positives: Index) -> Fraction:
     denominator = true_positives + false_positives
     if denominator == 0:
@@ -214,15 +195,6 @@ def absolute_objective_error(objective_value: Score, truth_value: Score) -> Scor
     return abs(objective_value - truth_value)
 
 
-def relative_objective_error(
-    objective_value: Score,
-    truth_value: Score,
-) -> RelativeGain:
-    floor = active_config().scientific.metrics.relative_solver_error_denominator_floor
-    error: RelativeGain = abs(objective_value - truth_value) / max(abs(truth_value), floor)
-    return error
-
-
 @dataclass(frozen=True, slots=True)
 class ProposalOutcomeTally:
     proposed: SampleCount
@@ -249,24 +221,6 @@ class ProposalRates:
     harmful_accepted_rate: Fraction | None
     useful_accepted_rate: Fraction | None
 
-    @property
-    def all_na(self) -> bool:
-        return (
-            self.acceptance_rate is None
-            and self.harmful_accepted_rate is None
-            and self.useful_accepted_rate is None
-        )
-
-
-def proposal_rates(tally: ProposalOutcomeTally) -> ProposalRates:
-    if tally.proposed == 0:
-        return ProposalRates(None, None, None)
-    return ProposalRates(
-        acceptance_rate=tally.accepted / tally.proposed,
-        harmful_accepted_rate=tally.harmful_accepted / tally.proposed,
-        useful_accepted_rate=tally.useful_accepted / tally.proposed,
-    )
-
 
 def confirmation_coverage(
     live_transfer_decisions: Index,
@@ -278,57 +232,8 @@ def confirmation_coverage(
     return coverage
 
 
-def no_confirmation_coverage(
-    eligible_decisions: Index,
-) -> Fraction | None:
-    if eligible_decisions == 0:
-        return None
-    full_coverage: Fraction = 1.0
-    return full_coverage
-
-
-def coverage_loss(
-    coverage_no_confirm: Fraction | None,
-    coverage_confirm: Fraction | None,
-) -> RelativeGain | None:
-    if coverage_no_confirm is None or coverage_confirm is None:
-        return None
-    loss: RelativeGain = coverage_no_confirm - coverage_confirm
-    return loss
-
-
 def harm_indicator(test_gain: RelativeGain, harmful_threshold: Threshold) -> bool:
     return test_gain <= harmful_threshold
-
-
-def seed_harm_rate(
-    decision_gains: tuple[RelativeGain, ...], harmful_threshold: Threshold
-) -> Fraction | None:
-    if not decision_gains:
-        return None
-    indicators = [harm_indicator(gain, harmful_threshold) for gain in decision_gains]
-    rate: Fraction = sum(1 for indicator in indicators if indicator) / len(indicators)
-    return rate
-
-
-def absolute_risk_reduction(
-    harm_rate_no_confirm: Fraction | None,
-    harm_rate_confirm: Fraction | None,
-) -> RelativeGain | None:
-    if harm_rate_no_confirm is None or harm_rate_confirm is None:
-        return None
-    reduction: RelativeGain = harm_rate_no_confirm - harm_rate_confirm
-    return reduction
-
-
-def relative_risk_reduction(
-    harm_rate_no_confirm: Fraction | None,
-    risk_reduction: RelativeGain | None,
-) -> RelativeGain | None:
-    if harm_rate_no_confirm is None or risk_reduction is None or harm_rate_no_confirm <= 0.0:
-        return None
-    reduction: RelativeGain = risk_reduction / harm_rate_no_confirm
-    return reduction
 
 
 def beneficial_rejected_rate(
@@ -339,37 +244,6 @@ def beneficial_rejected_rate(
         return None
     rate: Fraction = rejected_with_counterfactual_gain / proposed
     return rate
-
-
-def pair_mean(values: tuple[RelativeGain, ...]) -> RelativeGain | None:
-    if not values:
-        return None
-    mean: RelativeGain = statistics.fmean(values)
-    return mean
-
-
-def equal_pair_mean(
-    pair_means_values: tuple[RelativeGain | None, ...],
-) -> RelativeGain | None:
-    present = [value for value in pair_means_values if value is not None]
-    if not present:
-        return None
-    mean: RelativeGain = statistics.fmean(present)
-    return mean
-
-
-def equal_pair_absolute_risk_reduction(
-    equal_pair_harm_no_confirm: Fraction | None,
-    equal_pair_harm_confirm: Fraction | None,
-) -> RelativeGain | None:
-    return absolute_risk_reduction(equal_pair_harm_no_confirm, equal_pair_harm_confirm)
-
-
-def equal_pair_relative_risk_reduction(
-    equal_pair_harm_no_confirm: Fraction | None,
-    equal_pair_risk_reduction: RelativeGain | None,
-) -> RelativeGain | None:
-    return relative_risk_reduction(equal_pair_harm_no_confirm, equal_pair_risk_reduction)
 
 
 class EfficiencyError(ValueError):

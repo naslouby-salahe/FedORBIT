@@ -70,9 +70,6 @@ class TargetImportance:
             if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=absolute_tolerance):
                 raise TargetImportanceError("target importance weights must sum to one")
 
-    def weight_of(self, node_index: Index) -> Coefficient:
-        return self.weights_by_node_index[node_index]
-
     def as_vector(self, size: Index) -> NDArray[np.float64]:
         vector = np.zeros(size, dtype=np.float64)
         for node_index, weight in self.weights_by_node_index.items():
@@ -209,10 +206,6 @@ def rank_source_proposals(
 
 def without_confirmation_decision(proposal: SourceProposal) -> bool:
     return proposal.certified_robust_value > 0.0
-
-
-def without_confirmation_selection(ranked: Sequence[RankedProposal]) -> SelectionDecision:
-    return select_source_sequentially(ranked, without_confirmation_decision)
 
 
 def select_source_sequentially(

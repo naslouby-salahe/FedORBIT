@@ -14,7 +14,6 @@ from fedorbit.types import (
     FineLabel,
     LabelText,
     NativeLabels,
-    NativeLabelSet,
     OracleTransferConcept,
     SampleCount,
 )
@@ -158,10 +157,6 @@ class TransferEligibility:
     target_test_support_passes: bool
 
     @property
-    def present_for_source(self) -> bool:
-        return self.source_eligible
-
-    @property
     def present_for_target(self) -> bool:
         return self.target_eligible
 
@@ -177,17 +172,6 @@ def _native_mapping(client: DatasetId, concept: OracleTransferConcept) -> Native
     return edge_labels if client == DatasetId.EDGE_IIOTSET_NETWORK else ton_labels
 
 
-def native_labels_for(client: DatasetId) -> NativeLabelSet:
-    labels = {
-        label for concept in OracleTransferConcept for label in _native_mapping(client, concept)
-    }
-    if client == DatasetId.EDGE_IIOTSET_NETWORK:
-        labels.update(EDGE_ELIGIBLE_LOCAL_CLASSES)
-    else:
-        labels.update(TON_ELIGIBLE_LOCAL_CLASSES)
-    return frozenset(labels)
-
-
 def transfer_concept_for(
     client: DatasetId,
     normalized_label: FineLabel,
@@ -200,11 +184,6 @@ def transfer_concept_for(
     if len(matches) > 1:
         raise OntologyError(f"label maps to multiple transfer concepts: {normalized_label}")
     return matches[0] if matches else None
-
-
-def coarse_group_for(client: DatasetId, normalized_label: FineLabel) -> CoarseGroup | None:
-    concept = transfer_concept_for(client, normalized_label)
-    return None if concept is None else TRANSFER_ONTOLOGY[concept][0]
 
 
 def transfer_eligibility(

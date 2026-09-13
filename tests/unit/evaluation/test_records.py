@@ -11,13 +11,11 @@ from fedorbit.analysis.records import (
     MetricRecordCollection,
     PairedComparisonRecord,
     PredictionRecord,
-    PredictionRecordCollection,
     StatisticalAlternative,
     StatisticalExactness,
     StatisticalMetadataRecord,
     validate_comparison_metadata,
     validate_metric_records,
-    validate_prediction_records,
 )
 from fedorbit.types import (
     ArtifactIdentifier,
@@ -87,17 +85,6 @@ def test_prediction_record_rejects_non_probability_vector() -> None:
 def test_prediction_record_requires_sha256_row_identity() -> None:
     with pytest.raises(ValidationError):
         _prediction("row-1")
-
-
-def test_prediction_semantic_identity_is_unique_per_condition_split_and_row() -> None:
-    first = _prediction()
-    second = first.model_copy(update={"condition": EvaluationConditionName("alternate")})
-    third = first.model_copy(update={"split": Split.VALID})
-    assert validate_prediction_records(
-        PredictionRecordCollection((first, second, third))
-    ) == PredictionRecordCollection((first, second, third))
-    with pytest.raises(EvaluationValidationError):
-        validate_prediction_records(PredictionRecordCollection((first, first)))
 
 
 def _metric(

@@ -13,7 +13,12 @@ from torch.optim.optimizer import StateDict
 from torch.utils.data import DataLoader, TensorDataset
 
 from fedorbit.config.loading import active_config
-from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
+from fedorbit.infrastructure.runtime import (
+    RandomSeed,
+    SeedDerivationRequest,
+    assert_float32_training,
+    derive_seed32,
+)
 from fedorbit.types import (
     ConceptCount,
     EpochCount,
@@ -316,6 +321,7 @@ def train_base_model(
 
     device = next(model.parameters()).device
     model.to(device=device, dtype=torch.float32)
+    assert_float32_training(next(model.parameters()).dtype)
     optimizer = make_adamw(
         model,
         selected_hyperparameters.learning_rate,

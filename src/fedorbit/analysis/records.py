@@ -295,28 +295,6 @@ class MetricRecordCollection:
     records: tuple[MetricRecord, ...]
 
 
-def validate_prediction_records(
-    records: PredictionRecordCollection,
-) -> PredictionRecordCollection:
-    materialized = records.records
-    _require_unique_semantic_identities(
-        tuple(
-            (
-                record.experiment,
-                record.pair,
-                record.method,
-                record.condition,
-                record.seed,
-                record.split,
-                record.row_hash,
-            )
-            for record in materialized
-        ),
-        "duplicate prediction semantic identity",
-    )
-    return PredictionRecordCollection(materialized)
-
-
 def validate_metric_records(records: MetricRecordCollection) -> MetricRecordCollection:
     materialized = records.records
     _require_unique_semantic_identities(

@@ -113,6 +113,7 @@ from fedorbit.optimization.objective import (
     RobustActionProblem,
     zero_action,
 )
+from fedorbit.oracle import authorize_oracle_access
 from fedorbit.types import (
     PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
@@ -123,6 +124,7 @@ from fedorbit.types import (
     EvaluationCondition,
     EvaluationConditionKind,
     EvaluationConditionName,
+    ExperimentLocalMethod,
     ExperimentName,
     FilesystemSlug,
     MetricId,
@@ -1176,6 +1178,14 @@ def execute_semantic_sufficiency_frontier(
                 )
         return materialized_by_dataset.get(dataset)
 
+    authorize_oracle_access(
+        request.experiment,
+        tuple(
+            method
+            for method in request.definition.methods
+            if isinstance(method, (TransferMethod, ExperimentLocalMethod))
+        ),
+    )
     scorers = (
         (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, solve_fedorbit_exact_sparse_action),
         (TransferMethod.MATCHED_RESOURCE_RECTANGULAR, solve_matched_resource_rectangular_action),

@@ -3,25 +3,13 @@ from __future__ import annotations
 import hashlib
 
 import pytest
-import torch
 
 from fedorbit.infrastructure.runtime import (
     SEED32_MODULUS,
-    NumpyGeneratorRequest,
-    SeedDerivationError,
     SeedDerivationRequest,
-    SeedPlan,
-    SeedPlanRequest,
-    SeedStream,
-    StatisticalBootstrapRequest,
-    TorchGeneratorRequest,
     derive_seed32,
-    numpy_generator,
-    seed_plan,
-    statistical_bootstrap_stream,
-    torch_generator,
 )
-from fedorbit.types import RngNamespace, SerializedPacket, StableSerializationError, stable_json
+from fedorbit.types import RngNamespace, StableSerializationError, stable_json
 
 FIXED_COORDINATES = {
     "experiment": "Primary Strict Cross-Telemetry Transfer",
@@ -95,59 +83,3 @@ def test_stable_json_rejects_non_finite_floats() -> None:
 def test_stable_json_encodes_as_utf8() -> None:
     rendered = stable_json({"experiment": "FedORBIT"})
     rendered.encode("utf-8")
-
-
-def test_seed_plan_covers_every_namespace() -> None:
-    plan = seed_plan(SeedPlanRequest(1103, FIXED_COORDINATES))
-    assert len(plan.streams) == len(RngNamespace)
-    for namespace in RngNamespace:
-        assert plan.seed_for(namespace) == derive_seed32(
-            SeedDerivationRequest(1103, namespace, FIXED_COORDINATES)
-        )
-
-
-def test_seed_plan_rejects_unknown_namespace() -> None:
-    partial = SeedPlan(
-        base_seed=1103,
-        coordinates_json=SerializedPacket("{}"),
-        streams=(SeedStream(RngNamespace.SPLIT, 1),),
-    )
-    with pytest.raises(SeedDerivationError):
-        partial.seed_for(RngNamespace.DENSE_START)
-
-
-def test_scoped_numpy_generator_replays_identical_choices() -> None:
-    first = numpy_generator(NumpyGeneratorRequest(42)).generator.integers(0, 2**31, size=8)
-    second = numpy_generator(NumpyGeneratorRequest(42)).generator.integers(0, 2**31, size=8)
-    assert list(first) == list(second)
-    different = numpy_generator(NumpyGeneratorRequest(43)).generator.integers(0, 2**31, size=8)
-    assert list(first) != list(different)
-
-
-def test_scoped_torch_generator_replays_identical_choices() -> None:
-    first = torch.rand(8, generator=torch_generator(TorchGeneratorRequest(42)).generator)
-    second = torch.rand(8, generator=torch_generator(TorchGeneratorRequest(42)).generator)
-    assert torch.equal(first, second)
-    different = torch.rand(8, generator=torch_generator(TorchGeneratorRequest(43)).generator)
-    assert not torch.equal(first, different)
-
-
-def test_statistical_bootstrap_streams_are_contrast_scoped() -> None:
-    first = statistical_bootstrap_stream(
-        StatisticalBootstrapRequest(300, {"contrast": "A", "family": "utility"})
-    ).generator
-    second = statistical_bootstrap_stream(
-        StatisticalBootstrapRequest(300, {"contrast": "A", "family": "utility"})
-    ).generator
-    assert list(first.integers(0, 2**31, size=8)) == list(second.integers(0, 2**31, size=8))
-    other = statistical_bootstrap_stream(
-        StatisticalBootstrapRequest(300, {"contrast": "B", "family": "utility"})
-    ).generator
-    assert list(first.integers(0, 2**31, size=8)) != list(other.integers(0, 2**31, size=8))
-
-
-def test_statistical_seed_is_used_only_for_bootstrap_streams() -> None:
-    plan = seed_plan(SeedPlanRequest(300, FIXED_COORDINATES))
-    bootstrap = plan.seed_for(RngNamespace.STATISTICAL_BOOTSTRAP)
-    split = plan.seed_for(RngNamespace.SPLIT)
-    assert bootstrap != split

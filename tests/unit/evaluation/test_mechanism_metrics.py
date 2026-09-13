@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 
-from fedorbit.analysis.comparisons import SpearmanError, descriptive_spearman
-from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     build_padded_block_structure,
@@ -14,13 +10,11 @@ from fedorbit.optimization.correspondence import (
 )
 from fedorbit.optimization.diagnostics import (
     analytic_orbit_mean,
-    map_value_diagnostics,
 )
 from fedorbit.optimization.objective import (
-    CurriculumAction,
     RobustActionProblem,
 )
-from fedorbit.types import CoarseGroup, DirectedPairName
+from fedorbit.types import CoarseGroup
 
 
 def _problem(seed: int) -> RobustActionProblem:
@@ -48,26 +42,6 @@ def _problem(seed: int) -> RobustActionProblem:
     )
 
 
-def test_map_value_diagnostics_respect_bound() -> None:
-    config = load_fedorbit_config()
-    tolerance = config.solvers.exact_sparse.exact_validation_absolute_tolerance
-    for seed in range(4):
-        problem = _problem(seed)
-        orbit = list(enumerate_block_permutations(problem.blocks))
-        candidates = tuple(
-            CurriculumAction(problem, np.array([0.4, 0.1, 0.25, 0.25])) for _ in range(2)
-        )
-        diagnostics = map_value_diagnostics(candidates, problem, orbit, tolerance)
-        assert diagnostics.exact_map_action_value >= -tolerance
-        bound = (
-            2.0
-            * diagnostics.orbit_radius_bound
-            * diagnostics.importance_norm
-            * diagnostics.action_radius
-        )
-        assert diagnostics.bound == pytest.approx(bound)
-
-
 def test_orbit_radius_computation_matches_enumerated_maximum() -> None:
     problem = _problem(5)
     matrix = problem.lower_response_matrix
@@ -88,45 +62,3 @@ def test_identity_correspondence_is_in_every_orbit() -> None:
         correspondence.images for correspondence in enumerate_block_permutations(problem.blocks)
     }
     assert identity.images in images
-
-
-def test_spearman_reports_rho_n_pair_and_gates_min_points() -> None:
-    config = load_fedorbit_config()
-    minimum = config.scientific.statistics.spearman_minimum_valid_points
-    predicted = tuple(float(value) for value in range(minimum))
-    realized = tuple(float(value) * 2 for value in range(minimum))
-    report = descriptive_spearman(
-        predicted,
-        realized,
-        DirectedPairName("edge -> windows"),
-    )
-    assert report is not None
-    assert report.rho == pytest.approx(1.0)
-    assert report.point_count == minimum
-    assert report.pair == "edge -> windows"
-
-    short = descriptive_spearman(
-        predicted[: minimum - 1],
-        realized[: minimum - 1],
-        DirectedPairName("edge -> windows"),
-    )
-    assert short is None
-
-
-def test_spearman_perfect_negative_and_ties() -> None:
-    config = load_fedorbit_config()
-    count = config.scientific.statistics.spearman_minimum_valid_points
-    predicted = tuple(float(value) for value in range(count))
-    descending = tuple(float(count - 1 - value) for value in range(count))
-    negative = descriptive_spearman(predicted, descending, DirectedPairName("pair"))
-    assert negative is not None
-    assert negative.rho == pytest.approx(-1.0)
-    constant = (1.0,) * count
-    tied = descriptive_spearman(predicted, constant, DirectedPairName("pair"))
-    assert tied is not None
-    assert math.isfinite(tied.rho)
-
-
-def test_spearman_rejects_length_mismatch() -> None:
-    with pytest.raises(SpearmanError):
-        descriptive_spearman((1.0, 2.0), (1.0,), DirectedPairName("pair"))

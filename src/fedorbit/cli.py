@@ -33,6 +33,7 @@ from fedorbit.infrastructure.environment import (
     environment_snapshot,
     reference_gpu_matches,
 )
+from fedorbit.infrastructure.evidence import assert_recorded_execution_identity_compatible
 from fedorbit.infrastructure.failures import validation_failure_outcome
 from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
 from fedorbit.infrastructure.preparation import DatasetPreparationRequest, preprocess_datasets
@@ -146,6 +147,8 @@ def doctor() -> None:
     snapshot = environment_snapshot()
     gpu_ok = reference_gpu_matches()
     raw_root = raw_dataset_root()
+    layout = build_layout()
+    assert_recorded_execution_identity_compatible(layout)
     typer.echo(f"python: {snapshot.python_version}")
     typer.echo(f"reference gpu matches: {gpu_ok}")
     typer.echo(f"raw data root present: {raw_root.is_dir()}")

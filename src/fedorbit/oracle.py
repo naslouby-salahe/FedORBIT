@@ -3,13 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fedorbit.optimization.correspondence import BlockCorrespondence
-from fedorbit.optimization.objective import CurriculumAction, RobustActionProblem
+from fedorbit.optimization.objective import CurriculumAction
 from fedorbit.types import (
     DatasetId,
     ExperimentName,
     MethodName,
     Score,
-    SupportCount,
     TransferMethod,
 )
 
@@ -56,19 +55,3 @@ def authorize_oracle_access(
 class ExactMapActionOutcome:
     selected_action: CurriculumAction
     objective_value: Score
-
-
-def exact_map_action(
-    access: OracleAccessToken,
-    problem: RobustActionProblem,
-    oracle_correspondence: OracleCorrespondence,
-    support_limit: SupportCount | None = None,
-) -> ExactMapActionOutcome:
-    del access
-    from fedorbit.methods.baselines import optimize_against_fixed_matrix
-
-    committed = oracle_correspondence.correspondence.permute_response_matrix(
-        problem.lower_response_matrix
-    )
-    solution = optimize_against_fixed_matrix(problem, committed, support_limit)
-    return ExactMapActionOutcome(solution.selected_action, solution.objective_value)

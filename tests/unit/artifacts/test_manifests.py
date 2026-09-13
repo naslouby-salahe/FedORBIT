@@ -10,14 +10,11 @@ from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     DatasetManifest,
-    EligibilityCopyKind,
     ReusableArtifactManifest,
     SemanticCellManifest,
-    TransferEligibilityManifest,
     artifact_id,
     completion_manifest_self_hash,
     dependency_fingerprint,
-    eligibility_copy,
 )
 from fedorbit.infrastructure.reuse import ArtifactValidationError
 from fedorbit.infrastructure.storage import StorageError
@@ -291,26 +288,6 @@ def test_dataset_manifest_round_trips_with_schema_alias() -> None:
 def test_dataset_manifest_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         DatasetManifest.model_validate({**DATASET_FIELDS, "invented": 1})
-
-
-def test_eligibility_copies_enforce_method_oracle_separation() -> None:
-    manifest = TransferEligibilityManifest.model_validate(ELIGIBILITY_FIELDS)
-    readable = eligibility_copy(manifest, EligibilityCopyKind.METHOD_READABLE)
-    assert readable.native_local_class_ids == ()
-    assert readable.fine_concept is None
-    oracle = eligibility_copy(manifest, EligibilityCopyKind.ORACLE)
-    assert oracle.native_local_class_ids == ()
-    assert oracle.fine_concept == "DDoS"
-    builder = eligibility_copy(manifest, EligibilityCopyKind.BUILDER)
-    assert builder.native_local_class_ids == ("ddos_tcp",)
-
-
-def test_oracle_eligibility_copy_requires_fine_concept() -> None:
-    manifest = TransferEligibilityManifest.model_validate(
-        {**ELIGIBILITY_FIELDS, "fine_concept": None}
-    )
-    with pytest.raises(ValueError):
-        eligibility_copy(manifest, EligibilityCopyKind.ORACLE)
 
 
 def test_semantic_cell_manifest_round_trips() -> None:

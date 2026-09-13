@@ -18,11 +18,8 @@ from fedorbit.infrastructure.failures import (
     StrictResourceViolationError,
     TheoremPrimitiveMismatchError,
     classify_failure,
-    failure_boundary_outcome,
     infrastructure_exhausted_outcome,
     scientific_algorithmic_failure_outcome,
-    scientific_null_outcome,
-    solver_limit_outcome,
     validation_failure_outcome,
 )
 from fedorbit.optimization.exact_sparse import SparseMasterNonConvergenceError
@@ -131,27 +128,6 @@ def test_validation_invalid_vs_failed() -> None:
         FailureReason("schema mismatch in implementation"), invalid=False
     )
     assert failed.terminal_state == TerminalState.FAILED_VALIDATION
-
-
-def test_scientific_null_remains_completed() -> None:
-    outcome = scientific_null_outcome()
-    assert outcome.terminal_state == TerminalState.COMPLETED
-    assert outcome.failure_category == FailureCategory.SCIENTIFIC_NULL
-
-
-def test_failure_boundary_remains_completed() -> None:
-    outcome = failure_boundary_outcome()
-    assert outcome.terminal_state == TerminalState.COMPLETED
-    assert outcome.failure_category == FailureCategory.SCIENTIFIC_BOUNDARY
-
-
-def test_solver_limit_is_completed_with_method_outcome() -> None:
-    outcome = solver_limit_outcome(time_limit=True, resource_limit=False)
-    assert outcome.terminal_state == TerminalState.COMPLETED
-    assert outcome.method_outcome.time_limit
-    assert not outcome.method_outcome.resource_limit
-    resource = solver_limit_outcome(time_limit=False, resource_limit=True)
-    assert resource.method_outcome.resource_limit
 
 
 def test_algorithmic_failure_contract() -> None:

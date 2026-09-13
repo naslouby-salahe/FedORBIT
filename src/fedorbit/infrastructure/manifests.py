@@ -177,21 +177,6 @@ class SemanticCellManifest(FrozenModel):
     state_reason: ValidationReason | None = None
 
 
-def eligibility_copy(
-    manifest: TransferEligibilityManifest,
-    kind: EligibilityCopyKind,
-) -> TransferEligibilityManifest:
-    if kind == EligibilityCopyKind.METHOD_READABLE:
-        return manifest.model_copy(
-            update=OrderedDict(((NATIVE_CLASS_IDS_FIELD, ()), (FINE_CONCEPT_FIELD, None)))
-        )
-    if kind == EligibilityCopyKind.ORACLE:
-        if manifest.fine_concept is None:
-            raise ValueError("oracle eligibility copy requires the fine concept")
-        return manifest.model_copy(update=OrderedDict(((NATIVE_CLASS_IDS_FIELD, ()),)))
-    return manifest
-
-
 def _sha256(payload: SerializedPacket) -> Sha256Digest:
     return Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())
 

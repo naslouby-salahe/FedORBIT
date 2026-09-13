@@ -12,9 +12,6 @@ from fedorbit.infrastructure.runtime import (
     require_cuda,
     synchronize_cuda,
 )
-from fedorbit.infrastructure.runtime import (
-    test_determinism as cpu_test_determinism,
-)
 
 
 def test_apply_deterministic_backend_sets_all_flags() -> None:
@@ -42,12 +39,6 @@ def test_principal_determinism_requires_cuda(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(PrincipalDeterminismError), principal_determinism():
         pass
-
-
-def test_test_determinism_allows_cpu(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    with cpu_test_determinism():
-        assert torch.are_deterministic_algorithms_enabled()
 
 
 def test_principal_determinism_applies_flags(monkeypatch: pytest.MonkeyPatch) -> None:

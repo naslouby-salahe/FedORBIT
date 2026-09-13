@@ -1043,13 +1043,6 @@ class ExperimentSeed:
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionCell:
-    coordinates: SemanticCoordinates
-    artifact_identifier: ArtifactIdentifier
-    dependency_fingerprint: ArtifactFingerprint
-
-
-@dataclass(frozen=True, slots=True)
 class DirectedPair:
     source: DatasetId
     target: DatasetId

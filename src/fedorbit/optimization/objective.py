@@ -146,19 +146,6 @@ def zero_action(problem: RobustActionProblem) -> CurriculumAction:
     return CurriculumAction(problem=problem, coordinates=np.zeros(problem.size, dtype=np.float64))
 
 
-def curriculum_action_from_entries(
-    problem: RobustActionProblem, nonzero_entries: Sequence[tuple[Index, Coefficient]]
-) -> CurriculumAction:
-    vector = np.zeros(problem.size, dtype=np.float64)
-    for node, value in nonzero_entries:
-        if node < 0 or node >= problem.size:
-            raise ActionSpaceError(f"action node {node} outside padded space")
-        if value < 0.0:
-            raise ActionSpaceError("action coordinates must be nonnegative")
-        vector[node] = value
-    return CurriculumAction(problem=problem, coordinates=vector)
-
-
 def evaluate_objective(alpha: CurriculumAction, correspondence: BlockCorrespondence) -> Score:
     permuted = correspondence.permute_response_matrix(alpha.problem.lower_response_matrix)
     response_term = float(alpha.problem.target_importance @ permuted @ alpha.coordinates)

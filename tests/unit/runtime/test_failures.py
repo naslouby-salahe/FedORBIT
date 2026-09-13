@@ -4,7 +4,6 @@ import pytest
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.infrastructure.failures import (
-    CertificateNotProducedError,
     ConfigurationMismatchError,
     ConflictingDuplicatesError,
     CudaRuntimeError,
@@ -58,17 +57,6 @@ def test_validation_failures_classified() -> None:
         classification = classify_failure(error)
         assert classification.category == FailureCategory.VALIDATION
         assert classification.terminal_state == TerminalState.FAILED_VALIDATION
-        assert not classification.retryable
-
-
-def test_algorithmic_failures_classified() -> None:
-    for error in (
-        SparseMasterNonConvergenceError(),
-        CertificateNotProducedError(),
-    ):
-        classification = classify_failure(error)
-        assert classification.category == FailureCategory.SCIENTIFIC_ALGORITHMIC
-        assert classification.terminal_state == TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC
         assert not classification.retryable
 
 

@@ -19,7 +19,6 @@ from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
 from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.types import (
-    ArtifactFileSuffix,
     ByteCount,
     DatasetId,
     DatasetRelativePath,
@@ -28,7 +27,6 @@ from fedorbit.types import (
     RawDatasetDirectory,
     RawInventoryArtifact,
     ReportColumnName,
-    SemanticCoordinates,
     Sha256Digest,
     StableJsonPayload,
     TabularColumnName,
@@ -85,19 +83,6 @@ def experiment_workspace(layout: WorkspaceLayout, experiment: ExperimentName) ->
 
 def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Path:
     return layout.results_experiments / safe_slug(experiment.value)
-
-
-def leaf_path(
-    layout: WorkspaceLayout,
-    workspace: Path,
-    semantic_coordinates: SemanticCoordinates,
-    fingerprint_sha256: Sha256Digest,
-    suffix: ArtifactFileSuffix,
-) -> Path:
-    if not workspace.is_absolute():
-        workspace = layout.execution_root / workspace
-    semantic_slug = safe_slug(semantic_coordinates.value)
-    return workspace / f"{semantic_slug}.{fingerprint_sha256[:16]}{suffix}"
 
 
 class RawInventoryError(ValueError):

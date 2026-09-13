@@ -156,10 +156,6 @@ class TransferEligibility:
     target_confirm_support_passes: bool
     target_test_support_passes: bool
 
-    @property
-    def present_for_target(self) -> bool:
-        return self.target_eligible
-
 
 def normalize_label(raw: LabelText) -> FineLabel:
     normalized = unicodedata.normalize("NFC", raw).strip().casefold()

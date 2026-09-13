@@ -4,7 +4,6 @@ import hashlib
 import math
 from dataclasses import dataclass, fields
 from enum import StrEnum
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -366,12 +365,6 @@ class ConstructedPacket:
 
 class PacketConstructionError(ValueError):
     pass
-
-
-def load_source_packet(source: Path) -> SourcePacket:
-    if not source.is_file():
-        raise PacketError(f"source-response packet does not exist: {source}")
-    return SourcePacket.from_serialized(SerializedPacket(source.read_text(encoding="utf-8")))
 
 
 def construct_source_packet(

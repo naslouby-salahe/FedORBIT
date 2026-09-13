@@ -122,11 +122,6 @@ class DuplicateGroupSplitAssignment:
                 return assignment.split
         return None
 
-    def groups_in_split(self, split: Split) -> tuple[DuplicateGroupId, ...]:
-        return tuple(
-            assignment.group_id for assignment in self.assignments if assignment.split == split
-        )
-
 
 def interval_edges() -> SplitIntervalSchedule:
     interval = active_config().scientific.split.duplicate_safe_chronological_intervals

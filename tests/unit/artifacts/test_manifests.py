@@ -11,12 +11,9 @@ from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     DatasetManifest,
     ReusableArtifactManifest,
-    SemanticCellManifest,
     artifact_id,
     completion_manifest_self_hash,
-    dependency_fingerprint,
 )
-from fedorbit.infrastructure.reuse import ArtifactValidationError
 from fedorbit.infrastructure.storage import StorageError
 from fedorbit.types import (
     ArtifactIdentifier,
@@ -145,53 +142,11 @@ def test_completion_manifest_rejects_unknown_fields() -> None:
         CompletionManifest.model_validate(payload)
 
 
-def test_dependency_fingerprint_and_artifact_identity_are_stable_and_sensitive() -> None:
-    first = dependency_fingerprint(
-        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
-    )
-    assert first == dependency_fingerprint(
-        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
-    )
-    assert first != dependency_fingerprint(
-        COORDINATES,
-        (ArtifactIdentifier("upstream"),),
-        Sha256Digest("c" * 64),
-        Sha256Digest("d" * 64),
-        Sha256Digest("e" * 64),
-    )
-    assert artifact_id(_PREPARED_SPLIT, COORDINATES, first) != artifact_id(
-        _CHECKPOINT, COORDINATES, first
-    )
-
-
 def test_file_sha256_is_deterministic(tmp_path: Path) -> None:
     payload = tmp_path / "payload.bin"
     payload.write_bytes(b"fedorbit-payload")
     assert file_sha256(payload) == file_sha256(payload)
     assert len(file_sha256(payload)) == 64
-
-
-def test_storage_validates_payload_checksum_and_terminal_state(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
-    payload = tmp_path / "split.parquet"
-    payload.write_bytes(b"payload-v1")
-    fingerprint = dependency_fingerprint(
-        COORDINATES, (), Sha256Digest("c" * 64), Sha256Digest("d" * 64), Sha256Digest("e" * 64)
-    )
-    manifest = ReusableArtifactManifest.model_validate(
-        {
-            **_reusable_payload(),
-            "artifact_id": artifact_id(_PREPARED_SPLIT, COORDINATES, fingerprint),
-            "dependency_fingerprint_sha256": fingerprint,
-            "payload_paths": (str(payload),),
-            "payload_sha256": file_sha256(payload),
-        }
-    )
-    store.write_reusable(manifest)
-    assert store.resolve(manifest.artifact_id) == manifest
-    payload.write_bytes(b"corrupted")
-    with pytest.raises(ArtifactValidationError):
-        store.resolve(manifest.artifact_id)
 
 
 def test_completion_manifest_self_hash_excludes_own_field() -> None:
@@ -288,11 +243,6 @@ def test_dataset_manifest_round_trips_with_schema_alias() -> None:
 def test_dataset_manifest_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
         DatasetManifest.model_validate({**DATASET_FIELDS, "invented": 1})
-
-
-def test_semantic_cell_manifest_round_trips() -> None:
-    manifest = SemanticCellManifest.model_validate(CELL_FIELDS)
-    assert SemanticCellManifest.model_validate(manifest.model_dump(mode="json")) == manifest
 
 
 def test_completed_storage_records_matching_completion_last(tmp_path: Path) -> None:

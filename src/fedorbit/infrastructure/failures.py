@@ -63,10 +63,6 @@ class SchemaFailureError(FedorbitValidationError):
     pass
 
 
-class CertificateNotProducedError(ScientificAlgorithmicFailureError):
-    pass
-
-
 @dataclass(frozen=True, slots=True)
 class FailureClassification:
     category: FailureCategory

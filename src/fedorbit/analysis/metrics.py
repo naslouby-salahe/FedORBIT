@@ -90,13 +90,6 @@ class ClassRecallSet:
             raise MetricComputationError("balanced accuracy over an empty evaluation class set")
 
 
-@dataclass(frozen=True, slots=True)
-class RelativeMacroCeGain:
-    value: RelativeGain | None
-    absolute_difference: RelativeGain
-    is_na: bool
-
-
 def class_conditional_cross_entropy(
     true_class_probabilities: TrueClassProbabilities,
 ) -> CrossEntropy:
@@ -193,33 +186,6 @@ def confusion_counts(
 
 def absolute_objective_error(objective_value: Score, truth_value: Score) -> Score:
     return abs(objective_value - truth_value)
-
-
-@dataclass(frozen=True, slots=True)
-class ProposalOutcomeTally:
-    proposed: SampleCount
-    accepted: SampleCount
-    harmful_accepted: SampleCount
-    useful_accepted: SampleCount
-
-    def __post_init__(self) -> None:
-        for name, value in (
-            ("proposed", self.proposed),
-            ("accepted", self.accepted),
-            ("harmful_accepted", self.harmful_accepted),
-            ("useful_accepted", self.useful_accepted),
-        ):
-            if value < 0:
-                raise MetricComputationError(f"negative {name} count")
-        if self.accepted > self.proposed or self.harmful_accepted > self.accepted:
-            raise MetricComputationError("proposal outcome counts are inconsistent")
-
-
-@dataclass(frozen=True, slots=True)
-class ProposalRates:
-    acceptance_rate: Fraction | None
-    harmful_accepted_rate: Fraction | None
-    useful_accepted_rate: Fraction | None
 
 
 def confirmation_coverage(

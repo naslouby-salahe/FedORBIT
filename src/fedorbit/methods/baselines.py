@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from enum import StrEnum
 
 import numpy as np
@@ -9,8 +9,7 @@ from numpy.typing import NDArray
 
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.optimization.certificates import build_rectangular_hull
-from fedorbit.optimization.correspondence import BlockCorrespondence, PaddedBlockStructure
+from fedorbit.optimization.correspondence import PaddedBlockStructure
 from fedorbit.optimization.diagnostics import analytic_orbit_mean
 from fedorbit.optimization.objective import (
     CurriculumAction,
@@ -22,16 +21,11 @@ from fedorbit.optimization.objective import (
     zero_action,
 )
 from fedorbit.types import (
-    ArtifactIdentifier,
-    Budget,
     ContrastCoordinates,
     Index,
     RngNamespace,
     Score,
-    Sha256Digest,
-    StepCount,
     SupportCount,
-    TransferMethod,
 )
 
 type ResponseMatrix = NDArray[np.float64]
@@ -46,12 +40,6 @@ class CouplingDestructionError(ValueError):
 class CouplingDestroyedMatrices:
     lower_response_matrix: NDArray[np.float64]
     upper_response_matrix: NDArray[np.float64]
-
-
-@dataclass(frozen=True, slots=True)
-class CommittedMapAction:
-    correspondence: BlockCorrespondence
-    selected_action: CurriculumAction
 
 
 def _block_pair_permutation(
@@ -105,78 +93,6 @@ def coupling_destroyed_matrices(
             destroyed_upper[np.ix_(rows, columns)] = permuted_upper
             block_pair_index += 1
     return CouplingDestroyedMatrices(destroyed_lower, destroyed_upper)
-
-
-def committed_map_action(
-    problem: RobustActionProblem,
-    source_matrix: ResponseMatrix,
-    target_matrix: ResponseMatrix,
-) -> CommittedMapAction:
-    from fedorbit.methods.baselines import optimize_against_fixed_matrix
-    from fedorbit.optimization.exact_qap import point_correspondence_commitment
-
-    result = point_correspondence_commitment(source_matrix, target_matrix, problem.blocks)
-    correspondence = result.require_certified().correspondence
-    committed = correspondence.permute_response_matrix(problem.lower_response_matrix)
-    solution = optimize_against_fixed_matrix(problem, committed)
-    return CommittedMapAction(correspondence, solution.selected_action)
-
-
-class FairnessViolationError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class ComparatorResources:
-    source_packet_id: ArtifactIdentifier
-    target_checkpoint_artifact_id: ArtifactIdentifier
-    target_importance_vector_sha256: Sha256Digest
-    action_budget_cap: Budget
-    support_cap: SupportCount
-    seed: RandomSeed
-    confirmation_opportunity: bool
-    live_assimilation_step_allowance: StepCount
-    test_access_granted: bool
-    extra_target_labels: bool
-    additional_tuning_seeds: tuple[RandomSeed, ...]
-    local_base_checkpoint_favorable: bool
-
-    def validate_contract(self) -> None:
-        self.__post_init__()
-
-    def __post_init__(self) -> None:
-        if self.test_access_granted:
-            raise FairnessViolationError(
-                "comparator resources must never include pre-decision TEST access"
-            )
-        if self.extra_target_labels:
-            raise FairnessViolationError("comparator resources must never add target labels")
-        if self.additional_tuning_seeds:
-            raise FairnessViolationError("comparator resources must never add tuning seeds")
-        if self.local_base_checkpoint_favorable:
-            raise FairnessViolationError(
-                "comparator resources must never grant a more favorable base checkpoint"
-            )
-
-
-def assert_identical_resources(
-    method_name: TransferMethod,
-    reference: ComparatorResources,
-    candidate: ComparatorResources,
-) -> None:
-    for field in fields(ComparatorResources):
-        if getattr(reference, field.name) != getattr(candidate, field.name):
-            raise FairnessViolationError(
-                f"method {method_name} received different {field.name} from the principal bundle"
-            )
-
-
-REGISTERED_METHOD_NAMES = frozenset(method.value for method in TransferMethod)
-
-
-def assert_registered_method_name(name: TransferMethod) -> None:
-    if name not in REGISTERED_METHOD_NAMES:
-        raise FairnessViolationError(f"unregistered comparator name: {name}")
 
 
 class FixedMatrixOptimizationError(ValueError):
@@ -373,12 +289,3 @@ def orbit_mean_matrix(
     response_matrix: ResponseMatrix,
 ) -> CoarseBlockSummary:
     return CoarseBlockSummary(matrix=analytic_orbit_mean(blocks, response_matrix))
-
-
-def matched_resource_rectangular_lower_bounds(
-    blocks: PaddedBlockStructure,
-    lower_response_matrix: ResponseMatrix,
-    upper_response_matrix: ResponseMatrix,
-) -> CoarseBlockSummary:
-    hull = build_rectangular_hull(blocks, lower_response_matrix, upper_response_matrix)
-    return CoarseBlockSummary(matrix=hull.lower_bounds)

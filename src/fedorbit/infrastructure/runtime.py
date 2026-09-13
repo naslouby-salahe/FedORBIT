@@ -37,7 +37,6 @@ from fedorbit.types import (
     RngNamespace,
     RuntimeDeviceType,
     SemanticCoordinates,
-    SerializedPacket,
     Sha256Digest,
     StableJsonPayload,
     TorchPrecision,
@@ -396,10 +395,6 @@ def reject_incompatible(
 SEED32_MODULUS = 2**32
 
 
-class SeedDerivationError(ValueError):
-    pass
-
-
 @dataclass(frozen=True, slots=True)
 class SeedDerivationRequest:
     base_seed: RandomSeed
@@ -412,38 +407,3 @@ def derive_seed32(request: SeedDerivationRequest) -> DerivedSeed:
     payload = f"FedORBIT|{request.base_seed}|{request.namespace.value}|{coordinates_text}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return int(digest[:8], 16) % SEED32_MODULUS
-
-
-@dataclass(frozen=True, slots=True)
-class SeedPlan:
-    base_seed: RandomSeed
-    coordinates_json: SerializedPacket
-    streams: tuple[SeedStream, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class SeedStream:
-    namespace: RngNamespace
-    seed: DerivedSeed
-
-
-@dataclass(frozen=True, slots=True)
-class SeedPlanRequest:
-    base_seed: RandomSeed
-    coordinates: StableJsonPayload
-
-
-@dataclass(frozen=True, slots=True)
-class TorchGeneratorRequest:
-    seed: DerivedSeed
-
-
-@dataclass(frozen=True, slots=True)
-class TorchGeneratorStream:
-    generator: torch.Generator
-
-
-@dataclass(frozen=True, slots=True)
-class StatisticalBootstrapRequest:
-    statistical_seed: RandomSeed
-    contrast_coordinates: StableJsonPayload

@@ -454,10 +454,6 @@ class PreTestLifecycle:
     def opened(self) -> bool:
         return self._opened
 
-    def require_closed_before(self, phase: PreTestPhase) -> None:
-        if self._opened:
-            raise TestOpeningRuleError(f"TEST already opened before {phase}")
-
     def open_test(self) -> TestAccessGrant:
         missing = [name for name in _PRE_TEST_PHASES if name not in self._completed]
         if missing:

@@ -2,32 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fedorbit.optimization.correspondence import BlockCorrespondence
-from fedorbit.optimization.objective import CurriculumAction
 from fedorbit.types import (
-    DatasetId,
     ExperimentName,
     MethodName,
-    Score,
     TransferMethod,
 )
-
-
-class OracleMappingError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class OracleCorrespondence:
-    source_client: DatasetId
-    target_client: DatasetId
-    correspondence: BlockCorrespondence
-
-    def __post_init__(self) -> None:
-        if self.source_client == self.target_client:
-            raise OracleMappingError(
-                "oracle correspondence requires distinct source and target clients"
-            )
 
 
 class OracleAccessError(RuntimeError):
@@ -49,9 +28,3 @@ def authorize_oracle_access(
     if ORACLE_METHOD not in registered_methods:
         raise OracleAccessError(f"{experiment.value} is not a registered oracle-method experiment")
     return OracleAccessToken(experiment)
-
-
-@dataclass(frozen=True, slots=True)
-class ExactMapActionOutcome:
-    selected_action: CurriculumAction
-    objective_value: Score

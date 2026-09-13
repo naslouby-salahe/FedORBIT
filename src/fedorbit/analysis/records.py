@@ -286,11 +286,6 @@ class EvaluationValidationError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class PredictionRecordCollection:
-    records: tuple[PredictionRecord, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class MetricRecordCollection:
     records: tuple[MetricRecord, ...]
 

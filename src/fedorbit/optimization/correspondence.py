@@ -5,7 +5,6 @@ import math
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from enum import IntEnum
 
 import numpy as np
 from numpy.typing import NDArray
@@ -180,12 +179,6 @@ def enumerate_block_permutations(blocks: PaddedBlockStructure) -> Iterator[Block
         yield BlockCorrespondence(blocks=blocks, images=images)
 
 
-class CorrespondenceOrdering(IntEnum):
-    LESS = -1
-    EQUAL = 0
-    GREATER = 1
-
-
 @dataclass(frozen=True, slots=True)
 class ActiveImageMap:
     blocks: PaddedBlockStructure
@@ -208,10 +201,6 @@ class ActiveImageMap:
 
     def fixed_pairs(self) -> NodeImagePairs:
         return self.assignments
-
-
-def active_support_of_action(alpha: ActionVector) -> tuple[Index, ...]:
-    return tuple(int(node) for node in np.flatnonzero(alpha > 0.0))
 
 
 def falling_factorial(n: Index, r: Index) -> Index:

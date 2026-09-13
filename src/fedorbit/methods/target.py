@@ -4,28 +4,19 @@ import math
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
 
 from fedorbit.config.loading import active_config
-from fedorbit.learning.training import BaseCheckpoint
-from fedorbit.response.estimation import ShadowSettings
-from fedorbit.response.pilot import PilotData
-from fedorbit.response.uncertainty import FinalResponseEstimate, estimate_response_bands
 from fedorbit.types import (
-    ClassIndex,
     Coefficient,
     ConceptCount,
     Index,
-    RandomSeed,
     RepetitionCount,
-    ResponseSeedStage,
     Score,
     SourceClientName,
-    StepCount,
 )
 
 
@@ -78,10 +69,6 @@ class TargetImportance:
             vector[node_index] = weight
         return vector
 
-    @property
-    def actionable_total(self) -> Coefficient:
-        return sum(self.weights_by_node_index.values())
-
 
 def build_target_importance(
     node_risks: tuple[TransferNodeRisk, ...],
@@ -111,34 +98,6 @@ def build_target_importance(
     combined = OrderedDict((*zero_nodes.items(), *weights.items()))
     ordered = OrderedDict((node_index, combined[node_index]) for node_index in sorted(seen))
     return TargetImportance(weights_by_node_index=ordered)
-
-
-def estimate_target_response_diagnostic(
-    model: torch.nn.Module,
-    checkpoint: BaseCheckpoint,
-    data: PilotData,
-    intervention_classes: tuple[ClassIndex, ...],
-    seed: RandomSeed,
-) -> FinalResponseEstimate:
-    diagnostic = active_config().scientific.target_response_diagnostic
-    settings = ShadowSettings(
-        diagnostic.intervention_magnitude,
-        diagnostic.shadow_optimizer_steps,
-        data.learning_rate,
-        data.weight_decay,
-    )
-    return estimate_response_bands(
-        model,
-        checkpoint,
-        data,
-        (intervention_classes,),
-        settings,
-        seed,
-        replicate_count=diagnostic.paired_replicates,
-        bootstrap_resamples=diagnostic.simultaneous_bootstrap_resamples,
-        confidence_level=diagnostic.confidence_level,
-        seed_stage=ResponseSeedStage.TARGET_LOCAL_DIAGNOSTIC,
-    )
 
 
 class SelectionError(ValueError):
@@ -204,10 +163,6 @@ def rank_source_proposals(
     )
 
 
-def without_confirmation_decision(proposal: SourceProposal) -> bool:
-    return proposal.certified_robust_value > 0.0
-
-
 def select_source_sequentially(
     ranked: Sequence[RankedProposal],
     confirmation_decision: Callable[[SourceProposal], bool],
@@ -240,148 +195,8 @@ def select_source_sequentially(
     )
 
 
-class BudgetCategory(StrEnum):
-    TARGET_RESPONSE_DIAGNOSTIC = "target_response_diagnostic"
-    CONFIRMATION_CANDIDATES = "confirmation_candidates"
-    LIVE_ASSIMILATION = "live_assimilation"
-    NONTRANSFERABLE_SAFETY_RESERVE = "nontransferable_safety_reserve"
-
-
-class OptimizerBudgetError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class OptimizerStepAllocation:
-    target_response_diagnostic: StepCount
-    confirmation_candidates: StepCount
-    live_assimilation: StepCount
-    nontransferable_safety_reserve: StepCount
-
-    def for_category(self, category: BudgetCategory) -> StepCount:
-        if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
-            return self.target_response_diagnostic
-        if category == BudgetCategory.CONFIRMATION_CANDIDATES:
-            return self.confirmation_candidates
-        if category == BudgetCategory.LIVE_ASSIMILATION:
-            return self.live_assimilation
-        return self.nontransferable_safety_reserve
-
-    def incremented(self, category: BudgetCategory, steps: StepCount) -> OptimizerStepAllocation:
-        if category == BudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
-            return OptimizerStepAllocation(
-                self.target_response_diagnostic + steps,
-                self.confirmation_candidates,
-                self.live_assimilation,
-                self.nontransferable_safety_reserve,
-            )
-        if category == BudgetCategory.CONFIRMATION_CANDIDATES:
-            return OptimizerStepAllocation(
-                self.target_response_diagnostic,
-                self.confirmation_candidates + steps,
-                self.live_assimilation,
-                self.nontransferable_safety_reserve,
-            )
-        if category == BudgetCategory.LIVE_ASSIMILATION:
-            return OptimizerStepAllocation(
-                self.target_response_diagnostic,
-                self.confirmation_candidates,
-                self.live_assimilation + steps,
-                self.nontransferable_safety_reserve,
-            )
-        return OptimizerStepAllocation(
-            self.target_response_diagnostic,
-            self.confirmation_candidates,
-            self.live_assimilation,
-            self.nontransferable_safety_reserve + steps,
-        )
-
-    @property
-    def total(self) -> StepCount:
-        return (
-            self.target_response_diagnostic
-            + self.confirmation_candidates
-            + self.live_assimilation
-            + self.nontransferable_safety_reserve
-        )
-
-
 TARGET_DIAGNOSTIC_INTERVENTION_CLASSES: ConceptCount = 8
 SHADOW_PAIR_DIRECTIONS: RepetitionCount = 2
-
-
-@dataclass(frozen=True, slots=True)
-class TargetOptimizerStepLedger:
-    maximum_total_steps: StepCount
-    reserved_steps: OptimizerStepAllocation
-    consumed_steps: OptimizerStepAllocation
-
-    @classmethod
-    def from_context(cls) -> TargetOptimizerStepLedger:
-        config = active_config()
-        budget = config.scientific.target_optimizer_budget
-        diagnostic = config.scientific.target_response_diagnostic
-        expected_diagnostic_reserve = (
-            TARGET_DIAGNOSTIC_INTERVENTION_CLASSES
-            * diagnostic.paired_replicates
-            * SHADOW_PAIR_DIRECTIONS
-            * diagnostic.shadow_optimizer_steps
-        )
-        if budget.reserved.target_response_diagnostic != expected_diagnostic_reserve:
-            raise OptimizerBudgetError(
-                "configured target-response reserve "
-                f"{budget.reserved.target_response_diagnostic} does not equal the registered "
-                f"derivation {expected_diagnostic_reserve}"
-            )
-        if (
-            budget.reserved.target_response_diagnostic
-            + budget.reserved.confirmation_candidates
-            + budget.reserved.live_assimilation
-            + budget.reserved.nontransferable_safety_reserve
-            != budget.maximum_steps_per_method_pair_seed_before_test
-        ):
-            raise OptimizerBudgetError("reserved budgets do not sum to the total step cap")
-        reserved = budget.reserved
-        return cls(
-            maximum_total_steps=budget.maximum_steps_per_method_pair_seed_before_test,
-            reserved_steps=OptimizerStepAllocation(
-                target_response_diagnostic=reserved.target_response_diagnostic,
-                confirmation_candidates=reserved.confirmation_candidates,
-                live_assimilation=reserved.live_assimilation,
-                nontransferable_safety_reserve=reserved.nontransferable_safety_reserve,
-            ),
-            consumed_steps=OptimizerStepAllocation(0, 0, 0, 0),
-        )
-
-    def remaining(self, category: BudgetCategory) -> StepCount:
-        return self.reserved_steps.for_category(category) - self.consumed_steps.for_category(
-            category
-        )
-
-    def consume(self, category: BudgetCategory, steps: StepCount) -> TargetOptimizerStepLedger:
-        if steps < 0:
-            raise OptimizerBudgetError("consumed steps must be nonnegative")
-        if steps > self.remaining(category):
-            raise OptimizerBudgetError(
-                f"category {category.value} budget exhausted: requested {steps} steps, "
-                f"remaining {self.remaining(category)}"
-            )
-        return TargetOptimizerStepLedger(
-            maximum_total_steps=self.maximum_total_steps,
-            reserved_steps=self.reserved_steps,
-            consumed_steps=self.consumed_steps.incremented(category, steps),
-        )
-
-    def require_capacity(self, category: BudgetCategory, steps: StepCount) -> None:
-        if steps > self.remaining(category):
-            raise OptimizerBudgetError(
-                f"category {category.value} cannot absorb {steps} steps; "
-                f"remaining {self.remaining(category)}"
-            )
-
-    @property
-    def total_consumed(self) -> StepCount:
-        return self.consumed_steps.total
 
 
 class CurriculumError(ValueError):

@@ -100,10 +100,6 @@ class QapRobustOutcome:
     certified_solution: SupportMasterSolution | None
     terminal_state: TerminalState | None
 
-    @property
-    def is_exact(self) -> bool:
-        return self.certified_solution is not None
-
 
 def _terminal_state_for(status: SolverStatus) -> TerminalState | None:
     if status == ScipStatus.TIME_LIMIT:

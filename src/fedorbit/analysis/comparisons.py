@@ -5,13 +5,11 @@ from dataclasses import dataclass
 
 from fedorbit.types import (
     ArtifactIdentifier,
-    Coefficient,
     ConsumedBudget,
     DirectedPairName,
     Index,
     RandomSeed,
     RelativeGain,
-    SampleCount,
     Score,
     Sha256Digest,
     SignificanceLevel,
@@ -74,14 +72,6 @@ class PairedObservation:
 
 
 @dataclass(frozen=True, slots=True)
-class PairedValues:
-    directed_pair: DirectedPairName
-    seeds: tuple[RandomSeed, ...]
-    method_values: ScoreSeries
-    reference_values: ScoreSeries
-
-
-@dataclass(frozen=True, slots=True)
 class PairContrastEvidence:
     directed_pair: DirectedPairName
     mean_gain: RelativeGain | None
@@ -99,14 +89,3 @@ class PairContrastEvidenceSet:
         names = tuple(entry.directed_pair for entry in self.entries)
         if len(set(names)) != len(names):
             raise ValueError("pair-contrast evidence contains duplicate directed pairs")
-
-
-class SpearmanError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class SpearmanReport:
-    rho: Coefficient
-    point_count: SampleCount
-    pair: DirectedPairName

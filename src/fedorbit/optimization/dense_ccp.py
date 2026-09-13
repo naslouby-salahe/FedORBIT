@@ -128,16 +128,6 @@ class DenseCcpOutcome:
     terminal_state: TerminalState | None
     worst_projected_correspondence: BlockCorrespondence
 
-    @property
-    def is_exact(self) -> bool:
-        return False
-
-
-def assignment_variable_keys(
-    blocks: PaddedBlockStructure,
-) -> AssignmentVariableLayout:
-    return AssignmentVariableLayout.build(blocks)
-
 
 def _collect_block_products_for_target_pair(
     problem: RobustActionProblem,

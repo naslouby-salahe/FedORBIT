@@ -379,21 +379,6 @@ class VerifiedEvidenceWriter:
         atomic_write_bytes(destination, _evidence_figure_svg_bytes(figure))
         return destination
 
-    def write_figure(
-        self,
-        experiment: ExperimentName,
-        artifact_id: ArtifactIdentifier,
-        figure: EvidenceFigure,
-        name: ReportArtifactName,
-    ) -> Path:
-        self._store.resolve(artifact_id)
-        destination = (
-            results_workspace(self._layout, experiment)
-            / f"{name}{ReportingPathSegment.FIGURE_SUFFIX.value}"
-        )
-        atomic_write_bytes(destination, _evidence_figure_svg_bytes(figure))
-        return destination
-
     def metric_record(self, artifact_id: ArtifactIdentifier) -> MetricRecord | None:
         manifest = self._store.resolve(artifact_id)
         if len(manifest.payload_paths) != 1:

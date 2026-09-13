@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 from collections import OrderedDict
 from collections.abc import Mapping
-from enum import StrEnum
 from typing import cast
 
 from pydantic import Field
@@ -11,7 +10,6 @@ from pydantic import Field
 from fedorbit.config.models import FrozenModel
 from fedorbit.datasets.common import FieldRole
 from fedorbit.types import (
-    AnonymousNodeDisplayId,
     ArtifactIdentifier,
     ArtifactIdentifiers,
     ArtifactLineage,
@@ -21,20 +19,15 @@ from fedorbit.types import (
     ArtifactState,
     ArtifactType,
     ClientComponentName,
-    CoarseGroup,
     CompletionValidationState,
     DatasetId,
     DatasetPreprocessingState,
-    DirectedPairName,
-    EvaluationConditionName,
-    ExperimentName,
     FeatureCount,
     FieldDescription,
     FineLabel,
     GitRevision,
     Index,
     OracleTransferConcept,
-    RandomSeed,
     RawDatasetPath,
     SampleCount,
     SemanticCoordinateText,
@@ -45,7 +38,6 @@ from fedorbit.types import (
     TabularColumns,
     TerminalState,
     TimestampRange,
-    TransferMethod,
     ValidationReason,
     stable_json,
 )
@@ -124,83 +116,8 @@ class DatasetManifest(FrozenModel):
     producer_code_sha256: Sha256Digest
 
 
-class EligibilityCopyKind(StrEnum):
-    BUILDER = "builder"
-    METHOD_READABLE = "method_readable"
-    ORACLE = "oracle"
-
-
-class TransferEligibilityManifest(FrozenModel):
-    client: DatasetId
-    seed: RandomSeed
-    coarse_group: CoarseGroup
-    anonymous_node_id: AnonymousNodeDisplayId
-    native_local_class_ids: tuple[FineLabel, ...]
-    present: bool
-    train_count: Index
-    meta_count: Index
-    confirm_count: Index
-    test_count: Index
-    source_eligible: bool
-    target_eligible: bool
-    null_reason: ValidationReason | None = None
-    fine_concept: OracleTransferConcept | None = None
-
-
-class SemanticCellManifest(FrozenModel):
-    experiment: ExperimentName
-    dataset: DatasetId
-    source_client: DatasetId
-    target_client: DatasetId
-    directed_pair: DirectedPairName
-    method: TransferMethod
-    condition: EvaluationConditionName
-    support: Index
-    seed: RandomSeed
-    scientific_configuration_sha256: Sha256Digest
-    dependency_fingerprint_sha256: Sha256Digest
-    producer_stage: ArtifactStage
-    upstream_artifact_ids: ArtifactIdentifiers
-    dataset_manifest_sha256: Sha256Digest
-    split_sha256: Sha256Digest
-    preprocessing_sha256: Sha256Digest
-    source_checkpoint_sha256: Sha256Digest
-    response_packet_sha256: Sha256Digest
-    target_checkpoint_sha256: Sha256Digest
-    importance_vector_sha256: Sha256Digest
-    resource_manifest_sha256: Sha256Digest
-    relevant_code_sha256: Sha256Digest
-    material_runtime_sha256: Sha256Digest
-    git_commit: GitRevision
-    environment_sha256: Sha256Digest
-    state: ArtifactState
-    state_reason: ValidationReason | None = None
-
-
 def _sha256(payload: SerializedPacket) -> Sha256Digest:
     return Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())
-
-
-def dependency_fingerprint(
-    coordinates: StableJsonPayload,
-    upstream_artifact_ids: ArtifactIdentifiers,
-    configuration_sha256: Sha256Digest,
-    code_sha256: Sha256Digest,
-    runtime_sha256: Sha256Digest,
-) -> Sha256Digest:
-    payload = stable_json(
-        cast(
-            StableJsonPayload,
-            OrderedDict(
-                coordinates=coordinates,
-                upstream_artifact_ids=list(upstream_artifact_ids),
-                configuration_sha256=configuration_sha256,
-                code_sha256=code_sha256,
-                runtime_sha256=runtime_sha256,
-            ),
-        )
-    )
-    return _sha256(SerializedPacket(payload))
 
 
 def artifact_id(

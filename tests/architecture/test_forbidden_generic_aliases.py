@@ -14,6 +14,8 @@ FORBIDDEN_GENERIC_ALIASES = {
     "PositiveInt",
     "NonNegativeFloat",
     "PositiveFloat",
+    "UnitInterval",
+    "OpenUnitInterval",
     "FiniteFloat",
     "SignedInt",
 }
@@ -73,3 +75,13 @@ def test_forbidden_alias_scanner_catches_redeclaration() -> None:
     tree = ast.parse(source)
     assert isinstance(tree, ast.Module)
     assert _forbidden_references(source) == ["NonNegativeInt"]
+
+
+def test_forbidden_alias_scanner_catches_unit_interval() -> None:
+    source = "prob: UnitInterval = 0.5\n"
+    assert _forbidden_references(source) == ["UnitInterval"]
+
+
+def test_forbidden_alias_scanner_catches_open_unit_interval() -> None:
+    source = "rate: OpenUnitInterval = 0.1\n"
+    assert _forbidden_references(source) == ["OpenUnitInterval"]

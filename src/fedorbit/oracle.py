@@ -26,5 +26,5 @@ def authorize_oracle_access(
     registered_methods: tuple[MethodName, ...],
 ) -> OracleAccessToken:
     if ORACLE_METHOD not in registered_methods:
-        raise OracleAccessError(f"{experiment.value} is not a registered oracle-method experiment")
+        raise OracleAccessError(f"{experiment} is not a registered oracle-method experiment")
     return OracleAccessToken(experiment)

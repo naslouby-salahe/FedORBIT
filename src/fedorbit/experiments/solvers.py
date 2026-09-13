@@ -117,6 +117,7 @@ from fedorbit.types import (
     ConceptCount,
     ConfigurationSection,
     ContrastCoordinates,
+    Estimate,
     EvaluationCondition,
     EvaluationConditionKind,
     EvaluationConditionName,
@@ -160,7 +161,7 @@ def persist_synthetic_benchmark_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float,
+    metric_value: Estimate,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -180,9 +181,10 @@ def persist_synthetic_benchmark_metric(
             ArtifactStage.EVALUATION,
             cell,
             relevance,
-            (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
+            input_artifact_ids,
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
             __name__,
+            metric_name=metric_name,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -827,7 +829,7 @@ def persist_synthetic_diagnostic_metric(
     condition: EvaluationConditionName,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float,
+    metric_value: Estimate,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -846,9 +848,10 @@ def persist_synthetic_diagnostic_metric(
             ArtifactStage.EVALUATION,
             cell,
             relevance,
-            (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
+            input_artifact_ids,
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
             __name__,
+            metric_name=metric_name,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:

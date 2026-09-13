@@ -75,7 +75,6 @@ IDENTITY_KEYWORDS = (
 )
 
 EXCLUDED_SUBSTRINGS = ("column", "id", "name", "label", "reason", "message", "field", "unit")
-BOUNDARY_PACKAGES = ("reporting", "config")
 
 
 def _violations(source: str) -> list[str]:
@@ -83,8 +82,6 @@ def _violations(source: str) -> list[str]:
     violations: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if node.name.startswith("_"):
             continue
         for argument in node.args.args:
             if argument.arg in ("self", "cls") or argument.annotation is None:
@@ -113,7 +110,7 @@ def _return_violations(source: str) -> list[str]:
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        if node.name.startswith("_") or node.returns is None:
+        if node.returns is None:
             continue
         annotation = ast.unparse(node.returns)
         name = node.name.lower()
@@ -148,14 +145,11 @@ def _field_violations(source: str) -> list[str]:
 def test_domain_public_signatures_use_canonical_domain_types() -> None:
     findings: list[str] = []
     for path in iter_source_files():
-        module = relative_module(path)
-        if any(module.startswith(boundary) for boundary in BOUNDARY_PACKAGES):
+        if relative_module(path) == "types":
             continue
         tree = parse_module(path)
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            if node.name.startswith("_"):
                 continue
             for argument in node.args.args:
                 if argument.arg in ("self", "cls") or argument.annotation is None:
@@ -176,7 +170,13 @@ def test_domain_public_signatures_use_canonical_domain_types() -> None:
                     )
         for violation in _return_violations(path.read_text(encoding="utf-8")):
             findings.append(f"{path}: {violation}")
+        for violation in _field_violations(path.read_text(encoding="utf-8")):
+            findings.append(f"{path}: {violation}")
     assert not findings, "\n".join(findings)
+
+
+def test_checker_catches_private_function_primitive_param() -> None:
+    assert _violations("def _internal_step(seed: int) -> None: ...\n") == ["_internal_step(seed: int)"]
 
 
 def test_checker_catches_primitive_seed_param() -> None:

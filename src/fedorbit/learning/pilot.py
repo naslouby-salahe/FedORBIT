@@ -25,6 +25,7 @@ from fedorbit.learning.training import (
 from fedorbit.types import (
     ConceptCount,
     DatasetId,
+    Discrepancy,
     Fraction,
     Index,
     LearningRate,
@@ -148,7 +149,7 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
 
 def _pilot_selection_sort_key(
     item: PilotSelection,
-) -> tuple[Score, StandardError, float, WeightDecay, Fraction]:
+) -> tuple[Score, StandardError, Discrepancy, WeightDecay, Fraction]:
     reference_learning_rate = active_config().scientific.base_model_pilot.reference_learning_rate
     learning_rate_distance = abs(item.configuration.learning_rate - reference_learning_rate)
     return (

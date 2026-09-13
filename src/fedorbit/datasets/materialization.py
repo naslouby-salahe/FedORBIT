@@ -70,6 +70,7 @@ from fedorbit.types import (
     RawDatasetPath,
     RawTabularColumns,
     RawTabularRows,
+    SampleCount,
     Sha256Digest,
     Split,
     TabularColumnName,
@@ -161,12 +162,13 @@ def _recompute_class_row_counts(
         (fine_label, OrderedDict(per_split)) for fine_label, per_split in original.items()
     )
     for split_name in _SUBSAMPLED_SPLITS:
-        counts: dict[int, int] = OrderedDict()
+        counts: OrderedDict[ClassIndex, SampleCount] = OrderedDict()
         split_target_values: list[int] = subsampled_splits[split_name].targets.tolist()
         for value in split_target_values:
-            counts[value] = counts.get(value, 0) + 1
+            class_key = ClassIndex(value)
+            counts[class_key] = counts.get(class_key, 0) + 1
         for class_index, fine_label in enumerate(class_names):
-            count: Index = counts.get(class_index, 0)
+            count: Index = counts.get(ClassIndex(class_index), 0)
             updated[fine_label][split_name] = count
     return updated
 
@@ -244,7 +246,10 @@ def _read_component_rows(
             encoding="utf-8-sig",
             dtype_backend="numpy_nullable",
         )
-        observed = tuple(TabularColumnName(column) for column in frame.columns)
+        observed = tuple(
+            TabularColumnName(str(column))
+            for column in cast(Sequence[str], frame.columns)
+        )
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
         per_file_columns.append(observed)

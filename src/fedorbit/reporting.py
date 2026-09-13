@@ -29,6 +29,7 @@ from fedorbit.types import (
     FedorbitConfigSection,
     Index,
     MetricId,
+    ReferenceLineCoordinate,
     ReportAxisLabel,
     ReportColumnName,
     ReportColumns,
@@ -483,12 +484,12 @@ def scalability_results_table(
 
 
 def _figure(
-    x_label: str,
-    y_label: str,
+    x_label: ReportAxisLabel,
+    y_label: ReportAxisLabel,
     series: Sequence[FigureSeries],
     *,
-    vertical_reference_lines: tuple[float, ...] = (),
-    horizontal_reference_lines: tuple[float, ...] = (),
+    vertical_reference_lines: tuple[ReferenceLineCoordinate, ...] = (),
+    horizontal_reference_lines: tuple[ReferenceLineCoordinate, ...] = (),
     log_x: bool = False,
     log_y: bool = False,
     draw_unit_diagonal: bool = False,
@@ -496,8 +497,8 @@ def _figure(
     y_tick_labels: tuple[ReportSeriesName, ...] | None = None,
 ) -> EvidenceFigure:
     return EvidenceFigure(
-        x_label=ReportAxisLabel(x_label),
-        y_label=ReportAxisLabel(y_label),
+        x_label=x_label,
+        y_label=y_label,
         series=tuple(series),
         vertical_reference_lines=vertical_reference_lines,
         horizontal_reference_lines=horizontal_reference_lines,
@@ -515,8 +516,8 @@ def real_transfer_gain_forest_plot(
 ) -> EvidenceFigure:
     material = active_config().scientific.materiality.realized_relative_macro_ce
     return _figure(
-        "paired mean relative macro-CE gain vs local",
-        "primary directed pair",
+        ReportAxisLabel("paired mean relative macro-CE gain vs local"),
+        ReportAxisLabel("primary directed pair"),
         series,
         vertical_reference_lines=(0.0, material),
         y_tick_labels=pair_labels or None,
@@ -527,8 +528,8 @@ def baseline_paired_difference_plot(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "seed",
-        "seed-level paired difference",
+        ReportAxisLabel("seed"),
+        ReportAxisLabel("seed-level paired difference"),
         series,
         horizontal_reference_lines=(0.0,),
         separate_panels=True,
@@ -538,39 +539,59 @@ def baseline_paired_difference_plot(
 def coupling_gap_phase_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("coupling factor combination", "predicted structural zero/strict state", series)
+    return _figure(
+        ReportAxisLabel("coupling factor combination"),
+        ReportAxisLabel("predicted structural zero/strict state"),
+        series,
+    )
 
 
 def predicted_vs_realized_transfer_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("certified robust predicted value", "TEST relative macro-CE gain", series)
+    return _figure(
+        ReportAxisLabel("certified robust predicted value"),
+        ReportAxisLabel("TEST relative macro-CE gain"),
+        series,
+    )
 
 
 def sparsity_utility_efficiency_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("runtime", "realized gain", series)
+    return _figure(
+        ReportAxisLabel("runtime"),
+        ReportAxisLabel("realized gain"),
+        series,
+    )
 
 
 def confirmation_safety_coverage_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("confirmation coverage", "harmful accepted rate", series)
+    return _figure(
+        ReportAxisLabel("confirmation coverage"),
+        ReportAxisLabel("harmful accepted rate"),
+        series,
+    )
 
 
 def semantic_sufficiency_frontier_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
-    return _figure("log|orbit|", "realized gain", series)
+    return _figure(
+        ReportAxisLabel("log|orbit|"),
+        ReportAxisLabel("realized gain"),
+        series,
+    )
 
 
 def failure_boundary_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "boundary setting",
-        "certified value / realized gain",
+        ReportAxisLabel("boundary setting"),
+        ReportAxisLabel("certified value / realized gain"),
         series,
         separate_panels=True,
     )
@@ -580,8 +601,8 @@ def scalability_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "N_S * sum(n_g^3) (log scale)",
-        "runtime (log scale)",
+        ReportAxisLabel("N_S * sum(n_g^3) (log scale)"),
+        ReportAxisLabel("runtime (log scale)"),
         series,
         log_x=True,
         log_y=True,
@@ -592,8 +613,8 @@ def map_value_bound_figure(
     series: Sequence[FigureSeries],
 ) -> EvidenceFigure:
     return _figure(
-        "orbit-radius bound",
-        "exact map action value",
+        ReportAxisLabel("orbit-radius bound"),
+        ReportAxisLabel("exact map action value"),
         series,
         draw_unit_diagonal=True,
     )

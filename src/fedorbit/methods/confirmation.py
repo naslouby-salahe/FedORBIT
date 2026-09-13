@@ -66,11 +66,7 @@ def confirmation_schedule(
 def _tensor_mean(values: torch.Tensor) -> Score:
     if values.shape[0] == 0:
         raise ConfirmationError("resampled class has zero examples")
-    total = 0.0
-    for position in range(values.shape[0]):
-        total += float(values[int(position)])
-    mean: Score = total / values.shape[0]
-    return mean
+    return values.mean().item()
 
 
 def _macro_ce_from_losses(

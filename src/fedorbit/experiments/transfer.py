@@ -867,7 +867,7 @@ def execute_sparsity_and_dense_fallback(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair.direction
         if source_materialized is None or target_materialized is None:
             for seed in confirmatory_seeds:
                 _persist_ineligible_methods(
@@ -885,10 +885,10 @@ def execute_sparsity_and_dense_fallback(
         principal_support = active_config().scientific.action.principal_sparse_support
         principal_condition = EvaluationCondition.exact_sparse(SupportSize(principal_support)).name
         for seed in confirmatory_seeds:
-            for condition_label, method, solve_action in conditions:
+            for condition_name, method, solve_action in conditions:
                 if (
                     method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
-                    and condition_label == principal_condition
+                    and condition_name == principal_condition
                     and _reuse_principal_transfer_metrics(
                         store,
                         layout,
@@ -898,7 +898,7 @@ def execute_sparsity_and_dense_fallback(
                         target,
                         method,
                         seed,
-                        EvaluationConditionName(condition_label),
+                        condition_name,
                     )
                 ):
                     continue
@@ -930,7 +930,7 @@ def execute_sparsity_and_dense_fallback(
                     score,
                     n_classes,
                     input_artifact_ids,
-                    EvaluationConditionName(condition_label),
+                    condition_name,
                 )
 
 
@@ -1292,11 +1292,13 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 )
         return materialized_by_dataset.get(dataset)
 
-    conditions: list[tuple[str, WeakSignalPerturbation | None, SupportCount | None]] = []
+    conditions: list[
+        tuple[EvaluationConditionName, WeakSignalPerturbation | None, SupportCount | None]
+    ] = []
     for scale in config.response_scales:
         conditions.append(
             (
-                f"{WeakSignalBoundaryDimension.RESPONSE_SCALE}-{scale}",
+                EvaluationConditionName(f"{WeakSignalBoundaryDimension.RESPONSE_SCALE}-{scale}"),
                 response_scale_perturbation(scale),
                 None,
             )
@@ -1304,7 +1306,9 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
     for multiplier in config.ci_half_width_multipliers:
         conditions.append(
             (
-                f"{WeakSignalBoundaryDimension.CI_HALF_WIDTH}-{multiplier}",
+                EvaluationConditionName(
+                    f"{WeakSignalBoundaryDimension.CI_HALF_WIDTH}-{multiplier}"
+                ),
                 ci_half_width_perturbation(multiplier),
                 None,
             )
@@ -1312,14 +1316,20 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
     for multiplier in config.response_heterogeneity_multipliers:
         conditions.append(
             (
-                f"{WeakSignalBoundaryDimension.RESPONSE_HETEROGENEITY}-{multiplier}",
+                EvaluationConditionName(
+                    f"{WeakSignalBoundaryDimension.RESPONSE_HETEROGENEITY}-{multiplier}"
+                ),
                 response_heterogeneity_perturbation(multiplier),
                 None,
             )
         )
     for support in config.support_budgets:
         conditions.append(
-            (f"{WeakSignalBoundaryDimension.SUPPORT_BUDGET}-{support}", None, support)
+            (
+                EvaluationConditionName(f"{WeakSignalBoundaryDimension.SUPPORT_BUDGET}-{support}"),
+                None,
+                support,
+            )
         )
 
     for directed_pair in primary_pairs:
@@ -1329,7 +1339,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair.direction
         for seed in confirmatory_seeds:
             local_only = score_local_only_cell_adapter(
                 store,
@@ -1341,13 +1351,13 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 seed,
                 device,
             )
-            for condition_label, perturb, support_limit in conditions:
+            for condition_name, perturb, support_limit in conditions:
                 exact_sparse_solve = (
                     solve_fedorbit_exact_sparse_action_at_support(support_limit)
                     if support_limit is not None
                     else solve_fedorbit_exact_sparse_action
                 )
-                condition = EvaluationConditionName(condition_label)
+                condition = condition_name
                 for method, solve_action in (
                     (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, exact_sparse_solve),
                     (

@@ -33,6 +33,7 @@ from fedorbit.types import (
     ArtifactIdentifier,
     ExperimentName,
     JsonValue,
+    ReferenceLineCoordinate,
     ReportArtifactName,
     ReportAxisLabel,
     ReportColumnName,
@@ -96,8 +97,8 @@ class EvidenceFigure:
     x_label: ReportAxisLabel
     y_label: ReportAxisLabel
     series: tuple[FigureSeries, ...]
-    vertical_reference_lines: tuple[float, ...] = ()
-    horizontal_reference_lines: tuple[float, ...] = ()
+    vertical_reference_lines: tuple[ReferenceLineCoordinate, ...] = ()
+    horizontal_reference_lines: tuple[ReferenceLineCoordinate, ...] = ()
     log_x: bool = False
     log_y: bool = False
     draw_unit_diagonal: bool = False

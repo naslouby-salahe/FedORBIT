@@ -121,6 +121,7 @@ from fedorbit.optimization.objective import (
 from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
+    ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
     ArtifactStage,
@@ -227,7 +228,7 @@ def execute_dataset_client_and_resource_validation(
                     state=ArtifactState.COMPLETED.value,
                     shared_transfer_concept_count=len(source_groups & target_groups),
                     transfer_ontology=transfer_ontology_null_padding_rows(
-                        DirectedPairName(f"{pair.source.value} -> {pair.target.value}"),
+                        pair.direction,
                         source,
                         target,
                     ),
@@ -251,7 +252,7 @@ def execute_dataset_client_and_resource_validation(
         ),
         frozenset(),
         __name__,
-        "dataset-client-resource-validation",
+        ArtifactName("dataset-client-resource-validation"),
     )
 
 
@@ -305,7 +306,7 @@ def persist_synthetic_experiment_payload(
     payload_builder: Callable[[Sha256Digest], StableJsonPayload],
     configuration_sections: frozenset[ConfigurationSection],
     producer_module: str,
-    artifact_name: str,
+    artifact_name: ArtifactName,
     condition: EvaluationConditionName | None = None,
     support: SupportSize | None = None,
 ) -> ReusableArtifactManifest:
@@ -443,7 +444,9 @@ def execute_exact_sparse_theorem_exhaustive_validation(
                         _instance_payload,
                         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
                         __name__,
-                        f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}",
+                        ArtifactName(
+                            f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}"
+                        ),
                         EvaluationConditionName(
                             f"pattern-{pattern_key}-seed{seed}-instance{instance_index}"
                         ),
@@ -466,7 +469,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
         ),
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
         __name__,
-        "theorem-exhaustive-validation",
+        ArtifactName("theorem-exhaustive-validation"),
     )
 
 
@@ -612,17 +615,17 @@ def execute_coupling_and_map_bound_validation(
                                 _cell_payload,
                                 _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
                                 __name__,
-                                f"coupling-validation.{condition_label}.s{support}",
+                                ArtifactName(f"coupling-validation.{condition_label}.s{support}"),
                                 EvaluationConditionName(condition_label),
                                 SupportSize(support),
                             )
                             cell_artifact_ids.append(manifest.artifact_id)
                             payload = json.loads(Path(manifest.payload_paths[0]).read_text())
                             cell = payload["cell"]
-                            total_generated += int(cell["generated"])
-                            total_generation_failures += int(cell["generation_failures"])
-                            total_incompatible_gap_failures += int(
-                                cell["incompatible_gap_failures"]
+                            total_generated += cast(int, cell["generated"])
+                            total_generation_failures += cast(int, cell["generation_failures"])
+                            total_incompatible_gap_failures += cast(
+                                int, cell["incompatible_gap_failures"]
                             )
                             logger.record(
                                 ExecutionLogEvent(
@@ -658,7 +661,7 @@ def execute_coupling_and_map_bound_validation(
         ),
         _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
         __name__,
-        "coupling-and-map-bound-validation",
+        ArtifactName("coupling-and-map-bound-validation"),
     )
 
 

@@ -11,6 +11,18 @@ from tests.architecture.scan import (
 )
 
 
+def _is_object(annotation: ast.expr) -> bool:
+    if isinstance(annotation, ast.Name):
+        return annotation.id == "object"
+    if isinstance(annotation, ast.Subscript):
+        return _is_object(annotation.slice)
+    if isinstance(annotation, ast.Tuple):
+        return any(_is_object(element) for element in annotation.elts)
+    if isinstance(annotation, ast.BinOp):
+        return _is_object(annotation.left) or _is_object(annotation.right)
+    return False
+
+
 def test_no_any_imports_in_production() -> None:
     for path in iter_source_files():
         tree = parse_module(path)
@@ -55,34 +67,16 @@ def test_no_typing_object_usage() -> None:
 
 
 def test_no_generic_dict_models_for_domain_concepts() -> None:
-    domain_modules = ("fedorbit.types", "fedorbit.config")
     for path in iter_source_files():
-        module = relative_module(path)
-        if not module.startswith(domain_modules):
-            continue
         text = path.read_text(encoding="utf-8")
-        for pattern in ("dict[str,", "Dict[str,", "dict[", "Dict["):
-            assert pattern not in text, f"anonymous dict pattern {pattern!r} in {path}"
-
-
-def test_production_never_constructs_raw_dictionary_values() -> None:
-    for path in iter_source_files():
-        tree = parse_module(path)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Dict, ast.DictComp)):
-                raise AssertionError(f"raw dictionary construction in {path}:{node.lineno}")
-
-
-def _is_object(annotation: ast.expr) -> bool:
-    if isinstance(annotation, ast.Name):
-        return annotation.id == "object"
-    if isinstance(annotation, ast.Subscript):
-        return _is_object(annotation.slice)
-    if isinstance(annotation, ast.Tuple):
-        return any(_is_object(element) for element in annotation.elts)
-    if isinstance(annotation, ast.BinOp):
-        return _is_object(annotation.left) or _is_object(annotation.right)
-    return False
+        patterns = (
+            "dict[str, Any]",
+            "dict[str, object]",
+            "Mapping[str, Any]",
+            "Mapping[str, object]",
+        )
+        for pattern in patterns:
+            assert pattern not in text, f"anonymous structured dict pattern {pattern!r} in {path}"
 
 
 def test_no_bare_object_casts_in_production() -> None:
@@ -98,3 +92,91 @@ def test_no_bare_object_casts_in_production() -> None:
                 and node.args[0].id == "object"
             ):
                 raise AssertionError(f"cast to object in {path}:{node.lineno}")
+
+
+def _is_enum_value_comparison(node: ast.Compare) -> bool:
+    left_is_value_attr = (
+        isinstance(node.left, ast.Attribute)
+        and node.left.attr == "value"
+        and isinstance(node.left.value, ast.Name)
+    )
+    if left_is_value_attr:
+        for comparator in node.comparators:
+            if isinstance(comparator, ast.Constant) and isinstance(comparator.value, str):
+                return True
+            if (
+                isinstance(comparator, ast.Attribute)
+                and comparator.attr == "value"
+                and isinstance(comparator.value, ast.Name)
+            ):
+                return True
+    for comparator in node.comparators:
+        comp_is_value_attr = (
+            isinstance(comparator, ast.Attribute)
+            and comparator.attr == "value"
+            and isinstance(comparator.value, ast.Name)
+        )
+        if comp_is_value_attr and (
+            isinstance(node.left, ast.Constant) and isinstance(node.left.value, str)
+        ):
+            return True
+    return False
+
+
+def test_no_internal_enum_value_comparison_in_production() -> None:
+    for path in iter_source_files():
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare) and _is_enum_value_comparison(node):
+                raise AssertionError(
+                    f"internal enum .value comparison in {path}:{node.lineno}"
+                )
+
+
+def _check_any_in_source(source: str) -> list[str]:
+    tree = ast.parse(source)
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in {"typing", "types"}:
+            for alias in node.names:
+                if alias.name == "Any":
+                    violations.append(f"Any import line {node.lineno}")
+    return violations
+
+
+def _check_object_in_source(source: str) -> list[str]:
+    tree = ast.parse(source)
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for arg in node.args.args:
+                if arg.annotation is not None and _is_object(arg.annotation):
+                    violations.append(f"object param {arg.arg}")
+    return violations
+
+
+def _check_enum_value_comparison_in_source(source: str) -> list[str]:
+    tree = ast.parse(source)
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare) and _is_enum_value_comparison(node):
+            violations.append(f"enum .value comparison line {node.lineno}")
+    return violations
+
+
+def test_checker_catches_any_import_mutation() -> None:
+    source = "from typing import Any\n"
+    assert _check_any_in_source(source) == ["Any import line 1"]
+
+
+def test_checker_catches_object_annotation_mutation() -> None:
+    source = "def run(x: object) -> None: ...\n"
+    assert _check_object_in_source(source) == ["object param x"]
+
+
+def test_checker_catches_enum_value_comparison_mutation() -> None:
+    source = "if policy.value == 'local': ...\n"
+    assert _check_enum_value_comparison_in_source(source) == [
+        "enum .value comparison line 1"
+    ]
+

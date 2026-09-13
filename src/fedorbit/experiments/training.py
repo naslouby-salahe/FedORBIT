@@ -103,6 +103,7 @@ from fedorbit.types import (
     AnonymousNodeDisplayId,
     ArtifactDirectorySegment,
     ArtifactFingerprint,
+    ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
     ArtifactStage,
@@ -220,7 +221,7 @@ def execute_source_response_estimator_pilot(
         lambda fingerprint: _source_response_estimator_payload(layout, request, fingerprint),
         _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
         __name__,
-        "source-response-pilot",
+        ArtifactName("source-response-pilot"),
     )
 
 
@@ -471,7 +472,7 @@ def execute_final_source_response_band_validation(
         ),
         frozenset({ConfigurationSection.RESPONSE, ConfigurationSection.MODELS}),
         __name__,
-        "source-response-band-validation",
+        ArtifactName("source-response-band-validation"),
     )
 
 

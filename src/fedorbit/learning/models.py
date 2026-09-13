@@ -5,7 +5,15 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from fedorbit.types import ConceptCount, FeatureCount, Fraction
+from fedorbit.types import (
+    ActivationName,
+    ConceptCount,
+    FeatureCount,
+    Fraction,
+    LayerNormalizationName,
+    ModelArchitectureName,
+    WeightInitializationName,
+)
 
 HOST_BLOCK_WIDTHS = (
     192,
@@ -18,23 +26,23 @@ HOST_BATCH_NORM_MOMENTUM = 0.1
 
 @dataclass(frozen=True, slots=True)
 class ModelArchitectureFacts:
-    architecture: str
-    normalization: str
-    activation: str
-    initialization: str
+    architecture: ModelArchitectureName
+    normalization: LayerNormalizationName
+    activation: ActivationName
+    initialization: WeightInitializationName
 
 
 NETWORK_MODEL_ARCHITECTURE_FACTS = ModelArchitectureFacts(
-    architecture="256-128-64 MLP (NetworkFlowClassifier)",
-    normalization="LayerNorm",
-    activation="GELU",
-    initialization="Xavier uniform",
+    architecture=ModelArchitectureName("256-128-64 MLP (NetworkFlowClassifier)"),
+    normalization=LayerNormalizationName("LayerNorm"),
+    activation=ActivationName("GELU"),
+    initialization=WeightInitializationName("Xavier uniform"),
 )
 HOST_MODEL_ARCHITECTURE_FACTS = ModelArchitectureFacts(
-    architecture="192-96-48 MLP (HostClassifier)",
-    normalization="BatchNorm1d",
-    activation="ReLU",
-    initialization="Kaiming uniform",
+    architecture=ModelArchitectureName("192-96-48 MLP (HostClassifier)"),
+    normalization=LayerNormalizationName("BatchNorm1d"),
+    activation=ActivationName("ReLU"),
+    initialization=WeightInitializationName("Kaiming uniform"),
 )
 
 

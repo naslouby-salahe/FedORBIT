@@ -19,6 +19,7 @@ from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.types import (
     ArtifactIdentifier,
+    ArtifactName,
     ArtifactState,
     ConfigurationSection,
     ContrastName,
@@ -298,7 +299,7 @@ def test_evidence_classification_exactness_reflects_theorem_instances(tmp_path: 
         _theorem_instance_payload(True, True),
         frozenset({ConfigurationSection.ACTION}),
         "fedorbit.experiments.validation",
-        "theorem-exhaustive.test-pass",
+        ArtifactName("theorem-exhaustive.test-pass"),
         EvaluationConditionName("pattern-2-seed1103-instance0"),
         SupportSize(1),
     )
@@ -331,7 +332,7 @@ def test_evidence_classification_exactness_fails_on_wrong_minima(tmp_path: Path)
         _theorem_instance_payload(False, True),
         frozenset({ConfigurationSection.ACTION}),
         "fedorbit.experiments.validation",
-        "theorem-exhaustive.test-fail",
+        ArtifactName("theorem-exhaustive.test-fail"),
         EvaluationConditionName("pattern-2-seed1103-instance1"),
         SupportSize(1),
     )

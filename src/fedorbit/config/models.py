@@ -4,6 +4,7 @@ from collections.abc import Mapping
 
 from fedorbit.types import (
     AbsoluteMetric,
+    ArtifactPathText,
     AttemptCount,
     BatchSize,
     Budget,
@@ -19,6 +20,7 @@ from fedorbit.types import (
     DatasetLabel,
     DatasetRelativePath,
     DecimalPrecision,
+    DirectedPairName,
     DomainModel,
     DurationMinutes,
     EpochCount,
@@ -43,6 +45,7 @@ from fedorbit.types import (
     SampleCount,
     ScalabilityBlockPattern,
     ScaleFactor,
+    SemanticPartitionSpecification,
     SignificanceLevel,
     SourceLabel,
     StepCount,
@@ -113,6 +116,10 @@ class TimestampAliasAcceptance(FrozenModel):
 class DirectedPairSpec(FrozenModel):
     source: DatasetId
     target: DatasetId
+
+    @property
+    def direction(self) -> DirectedPairName:
+        return DirectedPairName(f"{self.source.value} -> {self.target.value}")
 
 
 class DatasetsConfig(FrozenModel):
@@ -551,7 +558,7 @@ class SecondaryCrossModalityGeneralizationConfig(FrozenModel):
 
 
 class SemanticSufficiencyFrontierConfig(FrozenModel):
-    partitions: tuple[str | tuple[str, ...], ...]
+    partitions: tuple[SemanticPartitionSpecification, ...]
     methods: tuple[MethodName, ...]
 
 
@@ -602,56 +609,56 @@ class FailureHandlingConfig(FrozenModel):
 
 
 class ExperimentSubdirectories(FrozenModel):
-    artifacts: tuple[str, ...]
-    evaluations: tuple[str, ...]
-    metrics: tuple[str, ...]
-    statistics: tuple[str, ...]
-    checkpoints: tuple[str, ...]
-    diagnostics: tuple[str, ...]
-    logs: tuple[str, ...]
-    provenance: tuple[str, ...]
+    artifacts: tuple[ArtifactPathText, ...]
+    evaluations: tuple[ArtifactPathText, ...]
+    metrics: tuple[ArtifactPathText, ...]
+    statistics: tuple[ArtifactPathText, ...]
+    checkpoints: tuple[ArtifactPathText, ...]
+    diagnostics: tuple[ArtifactPathText, ...]
+    logs: tuple[ArtifactPathText, ...]
+    provenance: tuple[ArtifactPathText, ...]
 
 
 class ManuscriptExperimentSubdirectories(FrozenModel):
-    figures: tuple[str, ...]
-    tables: tuple[str, ...]
-    metrics: tuple[str, ...]
-    statistics: tuple[str, ...]
+    figures: tuple[ArtifactPathText, ...]
+    tables: tuple[ArtifactPathText, ...]
+    metrics: tuple[ArtifactPathText, ...]
+    statistics: tuple[ArtifactPathText, ...]
 
 
 class ProjectSummarySubdirectories(FrozenModel):
-    figures: tuple[str, ...]
-    tables: tuple[str, ...]
-    metrics: tuple[str, ...]
-    statistics: tuple[str, ...]
-    reproducibility: tuple[str, ...]
+    figures: tuple[ArtifactPathText, ...]
+    tables: tuple[ArtifactPathText, ...]
+    metrics: tuple[ArtifactPathText, ...]
+    statistics: tuple[ArtifactPathText, ...]
+    reproducibility: tuple[ArtifactPathText, ...]
 
 
 class ReportingOutputDirectories(FrozenModel):
-    manuscript_metric_summary: str
-    manuscript_supplementary_table: str
-    manuscript_main_figure: str
-    project_metric_summary: str
-    project_main_table: str
-    project_main_figure: str
-    project_configuration_reproducibility: str
-    project_execution_reproducibility: str
+    manuscript_metric_summary: ArtifactPathText
+    manuscript_supplementary_table: ArtifactPathText
+    manuscript_main_figure: ArtifactPathText
+    project_metric_summary: ArtifactPathText
+    project_main_table: ArtifactPathText
+    project_main_figure: ArtifactPathText
+    project_configuration_reproducibility: ArtifactPathText
+    project_execution_reproducibility: ArtifactPathText
 
 
 class ArtifactLayoutConfig(FrozenModel):
-    execution_root: str
-    manuscript_root: str
-    preprocessing_directory: str
-    artifacts_directory: str
-    experiments_directory: str
-    cache_directory: str
-    staging_directory: str
-    results_experiments_directory: str
-    project_summary_directory: str
-    preprocessing_subdirectories: tuple[str, ...]
-    reusable_artifact_subdirectories: tuple[str, ...]
+    execution_root: ArtifactPathText
+    manuscript_root: ArtifactPathText
+    preprocessing_directory: ArtifactPathText
+    artifacts_directory: ArtifactPathText
+    experiments_directory: ArtifactPathText
+    cache_directory: ArtifactPathText
+    staging_directory: ArtifactPathText
+    results_experiments_directory: ArtifactPathText
+    project_summary_directory: ArtifactPathText
+    preprocessing_subdirectories: tuple[ArtifactPathText, ...]
+    reusable_artifact_subdirectories: tuple[ArtifactPathText, ...]
     experiment_subdirectories: ExperimentSubdirectories
-    cache_subdirectories: tuple[str, ...]
+    cache_subdirectories: tuple[ArtifactPathText, ...]
     manuscript_experiment_subdirectories: ManuscriptExperimentSubdirectories
     project_summary_subdirectories: ProjectSummarySubdirectories
     reporting_output_directories: ReportingOutputDirectories

@@ -79,10 +79,14 @@ from fedorbit.types import (
     ArtifactState,
     CliCommand,
     ClientRole,
+    Coefficient,
+    ConceptCount,
+    ConfidenceIntervalText,
     DatasetId,
     DatasetIdentifierText,
     DatasetModality,
     DirectedPairName,
+    Estimate,
     EvaluationConditionName,
     ExitStatus,
     ExperimentIdentifierText,
@@ -98,8 +102,11 @@ from fedorbit.types import (
     ReportArtifactName,
     ReportColumnName,
     ReportSeriesName,
+    ScalabilityBlockPattern,
+    SignificanceLevel,
     StableJsonPayload,
     StorageLayoutSegment,
+    SupportCount,
     TransferMethod,
     WeakSignalBoundaryDimension,
 )
@@ -332,7 +339,7 @@ def _experiment_matrix_rows(
                         ", ".join(str(seed) for seed in definition.seeds),
                     ),
                     (ReportColumnName.CONDITIONS, str(definition.conditions)),
-                    (ReportColumnName.DERIVED_PLANNED_CELLS, int(definition.derived_planned_cells)),
+                    (ReportColumnName.DERIVED_PLANNED_CELLS, definition.derived_planned_cells),
                     (
                         ReportColumnName.PREREQUISITES,
                         ", ".join(str(prerequisite) for prerequisite in definition.prerequisites),
@@ -364,17 +371,17 @@ def _real_transfer_gain_series(
     if not selected:
         return (), ()
     selected.sort(key=lambda record: record.pair)
-    mids: list[float] = []
-    lows: list[float] = []
-    highs: list[float] = []
+    mids: list[Coefficient] = []
+    lows: list[Coefficient] = []
+    highs: list[Coefficient] = []
     pair_labels: list[ReportSeriesName] = []
     for record in selected:
         mid = record.mean_difference
         if mid is None:
             continue
-        mids.append(float(mid))
-        lows.append(float(record.bca_ci_low) if record.bca_ci_low is not None else float(mid))
-        highs.append(float(record.bca_ci_high) if record.bca_ci_high is not None else float(mid))
+        mids.append(mid)
+        lows.append(record.bca_ci_low if record.bca_ci_low is not None else mid)
+        highs.append(record.bca_ci_high if record.bca_ci_high is not None else mid)
         pair_labels.append(ReportSeriesName(record.pair))
     if not mids:
         return (), ()
@@ -394,7 +401,7 @@ def _baseline_paired_difference_series(
     metric_records: Sequence[MetricRecord],
 ) -> tuple[FigureSeries, ...]:
     pairs = sorted({record.pair for record in metric_records})
-    local_only_by_pair_seed: Mapping[tuple[DirectedPairName, RandomSeed], float] = OrderedDict(
+    local_only_by_pair_seed: Mapping[tuple[DirectedPairName, RandomSeed], Estimate] = OrderedDict(
         ((record.pair, record.seed), record.metric_value)
         for record in metric_records
         if record.method == TransferMethod.LOCAL_ONLY
@@ -411,8 +418,8 @@ def _baseline_paired_difference_series(
     series: list[FigureSeries] = []
     for pair in pairs:
         for method in baseline_methods:
-            x_values: list[float] = []
-            y_values: list[float] = []
+            x_values: list[Coefficient] = []
+            y_values: list[Coefficient] = []
             for record in metric_records:
                 if (
                     record.pair != pair
@@ -441,16 +448,16 @@ def _baseline_paired_difference_series(
 
 
 def _median(
-    values: Sequence[float],
-) -> float | None:
+    values: Sequence[Estimate],
+) -> Estimate | None:
     if not values:
         return None
     return statistics.median(values)
 
 
 def _percentile_95(
-    values: Sequence[float],
-) -> float | None:
+    values: Sequence[Estimate],
+) -> Estimate | None:
     if not values:
         return None
     if len(values) == 1:
@@ -460,7 +467,7 @@ def _percentile_95(
 
 def _metric_values(
     records: Sequence[MetricRecord], method: TransferMethod, metric_name: MetricId
-) -> list[float]:
+) -> list[Estimate]:
     return [
         record.metric_value
         for record in records
@@ -473,19 +480,25 @@ def _metric_values(
 
 def _parse_k_pattern_condition(
     condition: EvaluationConditionName,
-) -> tuple[int, str] | None:
+) -> tuple[ConceptCount, ScalabilityBlockPattern] | None:
     if not condition.startswith("k"):
         return None
     k_text, separator, pattern = condition[1:].partition("-")
     if not separator or not k_text.isdigit() or not pattern:
         return None
-    return int(k_text), pattern
+    try:
+        block_pattern = ScalabilityBlockPattern(pattern)
+    except ValueError:
+        return None
+    return int(k_text), block_pattern
 
 
 def _exact_solver_results_rows(
-    records_with_support: Sequence[tuple[MetricRecord, int | None]],
+    records_with_support: Sequence[tuple[MetricRecord, SupportCount | None]],
 ) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
-    groups: OrderedDict[tuple[int, str, int | None], list[MetricRecord]] = OrderedDict()
+    groups: OrderedDict[
+        tuple[ConceptCount, ScalabilityBlockPattern, SupportCount | None], list[MetricRecord]
+    ] = OrderedDict()
     for record, support in records_with_support:
         parsed = _parse_k_pattern_condition(record.condition)
         if parsed is None:
@@ -586,11 +599,12 @@ def _exact_solver_results_rows(
 
 
 def _scalability_results_rows(
-    records_with_support: Sequence[tuple[MetricRecord, int | None]],
+    records_with_support: Sequence[tuple[MetricRecord, SupportCount | None]],
 ) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
-    groups: OrderedDict[tuple[int, str, int | None, TransferMethod], list[MetricRecord]] = (
-        OrderedDict()
-    )
+    groups: OrderedDict[
+        tuple[ConceptCount, ScalabilityBlockPattern, SupportCount | None, TransferMethod],
+        list[MetricRecord],
+    ] = OrderedDict()
     for record, support in records_with_support:
         parsed = _parse_k_pattern_condition(record.condition)
         if parsed is None:
@@ -1029,16 +1043,16 @@ def _confirmation_contrast(
 
 def _confirmation_ci(
     comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
-) -> str | None:
+) -> ConfidenceIntervalText | None:
     record = _confirmation_contrast(comparisons, pair)
     if record is None or record.bca_ci_low is None or record.bca_ci_high is None:
         return None
-    return f"[{record.bca_ci_low}, {record.bca_ci_high}]"
+    return ConfidenceIntervalText(f"[{record.bca_ci_low}, {record.bca_ci_high}]")
 
 
 def _confirmation_p(
     comparisons: Sequence[PairedComparisonRecord], pair: DirectedPairName
-) -> float | None:
+) -> SignificanceLevel | None:
     record = _confirmation_contrast(comparisons, pair)
     if record is None:
         return None
@@ -1046,11 +1060,11 @@ def _confirmation_p(
 
 
 def _coupling_gap_row(
-    condition_or_pair: str,
-    gap_values: Sequence[float],
-    fixed_action_values: Sequence[float],
-    ci: str | None,
-    holm_p: float | None,
+    condition_or_pair: DirectedPairName | EvaluationConditionName | str,
+    gap_values: Sequence[Estimate],
+    fixed_action_values: Sequence[Estimate],
+    ci: ConfidenceIntervalText | None,
+    holm_p: SignificanceLevel | None,
 ) -> Mapping[ReportColumnName, TableScalar]:
     materiality = active_config().scientific.materiality.coupling_objective_units
     above_materiality = sum(1 for value in gap_values if value > materiality)
@@ -1151,7 +1165,9 @@ def _coupling_mechanism_results_rows(
             continue
         comparison = comparisons_by_pair.get(DirectedPairName(pair))
         ci = (
-            f"[{comparison.bca_ci_low:.4g}, {comparison.bca_ci_high:.4g}]"
+            ConfidenceIntervalText(
+                f"[{comparison.bca_ci_low:.4g}, {comparison.bca_ci_high:.4g}]"
+            )
             if comparison is not None
             and comparison.bca_ci_low is not None
             and comparison.bca_ci_high is not None
@@ -1289,8 +1305,8 @@ def _numeric_row_series(
     x_key: ReportColumnName,
     y_key: ReportColumnName,
 ) -> tuple[FigureSeries, ...]:
-    xs: list[float] = []
-    ys: list[float] = []
+    xs: list[Coefficient] = []
+    ys: list[Coefficient] = []
     for index, row in enumerate(rows):
         y_value = row.get(y_key)
         if not isinstance(y_value, int | float):
@@ -1306,9 +1322,9 @@ def _numeric_row_series(
 def _sparsity_figure_series(
     rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    xs: list[float] = []
-    ys: list[float] = []
-    sizes: list[float] = []
+    xs: list[Coefficient] = []
+    ys: list[Coefficient] = []
+    sizes: list[Coefficient] = []
     for row in rows:
         runtime = row.get(ReportColumnName.RUNTIME)
         gain = row.get(ReportColumnName.REALIZED_GAIN)
@@ -1333,10 +1349,10 @@ def _sparsity_figure_series(
 def _confirmation_figure_series(
     rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    starts_x: list[float] = []
-    starts_y: list[float] = []
-    ends_x: list[float] = []
-    ends_y: list[float] = []
+    starts_x: list[Coefficient] = []
+    starts_y: list[Coefficient] = []
+    ends_x: list[Coefficient] = []
+    ends_y: list[Coefficient] = []
     for row in rows:
         coverage = row.get(ReportColumnName.COVERAGE)
         harm = row.get(ReportColumnName.HARMFUL_ACCEPTED_RATE)
@@ -1365,13 +1381,15 @@ def _confirmation_figure_series(
 def _semantic_sufficiency_series(
     records: Sequence[MetricRecord],
 ) -> tuple[FigureSeries, ...]:
-    orbit: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod, str], float] = (
-        OrderedDict()
-    )
-    local_ce: OrderedDict[tuple[DirectedPairName, RandomSeed, str], float] = OrderedDict()
-    method_ce: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod, str], float] = (
-        OrderedDict()
-    )
+    orbit: OrderedDict[
+        tuple[DirectedPairName, RandomSeed, TransferMethod, EvaluationConditionName], Estimate
+    ] = OrderedDict()
+    local_ce: OrderedDict[
+        tuple[DirectedPairName, RandomSeed, EvaluationConditionName], Estimate
+    ] = OrderedDict()
+    method_ce: OrderedDict[
+        tuple[DirectedPairName, RandomSeed, TransferMethod, EvaluationConditionName], Estimate
+    ] = OrderedDict()
     for record in records:
         if not record.valid or record.metric_value is None:
             continue
@@ -1384,7 +1402,7 @@ def _semantic_sufficiency_series(
                 method_ce[(record.pair, record.seed, record.method, record.condition)] = (
                     record.metric_value
                 )
-    by_method: OrderedDict[TransferMethod, list[tuple[float, float]]] = OrderedDict()
+    by_method: OrderedDict[TransferMethod, list[tuple[Coefficient, Coefficient]]] = OrderedDict()
     for key, ce in method_ce.items():
         pair, seed, method, condition = key
         baseline = local_ce.get((pair, seed, condition))
@@ -1406,7 +1424,7 @@ def _semantic_sufficiency_series(
 def _failure_boundary_figure_series(
     rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    grouped: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
+    grouped: OrderedDict[ReportSeriesName, list[tuple[Coefficient, Coefficient]]] = OrderedDict()
     for index, row in enumerate(rows):
         dimension = row.get(ReportColumnName.BOUNDARY_DIMENSION)
         gain = row.get(ReportColumnName.REALIZED_GAIN)
@@ -1414,10 +1432,10 @@ def _failure_boundary_figure_series(
             continue
         setting = row.get(ReportColumnName.SETTING)
         x_value = float(setting) if isinstance(setting, int | float) else float(index)
-        grouped.setdefault(dimension, []).append((x_value, float(gain)))
+        grouped.setdefault(ReportSeriesName(dimension), []).append((x_value, float(gain)))
     return tuple(
         FigureSeries(
-            name=ReportSeriesName(dimension),
+            name=dimension,
             x=tuple(point[0] for point in points),
             y=tuple(point[1] for point in points),
         )
@@ -1431,10 +1449,10 @@ def _predicted_vs_realized_series(
 ) -> tuple[FigureSeries, ...]:
     from scipy.stats import spearmanr
 
-    certified: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], float] = (
+    certified: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], Estimate] = (
         OrderedDict()
     )
-    realized: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], float] = (
+    realized: OrderedDict[tuple[DirectedPairName, RandomSeed, TransferMethod], Estimate] = (
         OrderedDict()
     )
     for record in records:
@@ -1445,7 +1463,7 @@ def _predicted_vs_realized_series(
             certified[key] = record.metric_value
         if record.metric_name == MetricId.RELATIVE_MACRO_CE_GAIN:
             realized[key] = record.metric_value
-    by_pair: OrderedDict[DirectedPairName, list[tuple[float, float]]] = OrderedDict()
+    by_pair: OrderedDict[DirectedPairName, list[tuple[Coefficient, Coefficient]]] = OrderedDict()
     for key, certified_value in certified.items():
         realized_value = realized.get(key)
         if realized_value is None:
@@ -1474,8 +1492,8 @@ def _scalability_figure_series(
 def _map_value_bound_series(
     records: Sequence[MetricRecord],
 ) -> tuple[FigureSeries, ...]:
-    bounds: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
-    values: OrderedDict[tuple[str, RandomSeed], float] = OrderedDict()
+    bounds: OrderedDict[tuple[EvaluationConditionName, RandomSeed], Estimate] = OrderedDict()
+    values: OrderedDict[tuple[EvaluationConditionName, RandomSeed], Estimate] = OrderedDict()
     for record in records:
         if not record.valid or record.metric_value is None:
             continue
@@ -1484,8 +1502,8 @@ def _map_value_bound_series(
             bounds[key] = record.metric_value
         if record.metric_name == MetricId.EXACT_MAP_ACTION_VALUE:
             values[key] = record.metric_value
-    xs: list[float] = []
-    ys: list[float] = []
+    xs: list[Coefficient] = []
+    ys: list[Coefficient] = []
     for key, bound in bounds.items():
         value = values.get(key)
         if value is None:

@@ -7,18 +7,20 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import cast
 
+from pydantic import JsonValue
+
 from fedorbit.config.loading import active_config
 from fedorbit.types import (
+    ArtifactIdentifiers,
     ArtifactStage,
     ConfigurationSection,
+    MetricId,
     SemanticCell,
     SemanticCoordinate,
     Sha256Digest,
     StableJsonPayload,
     stable_json,
 )
-
-JsonValue = str | int | float | bool | None | list["JsonValue"] | Mapping[str, "JsonValue"]
 
 STAGE_DEPENDENCIES: Mapping[ArtifactStage, tuple[ArtifactStage, ...]] = OrderedDict(
     (
@@ -183,18 +185,22 @@ def stage_dependency_fingerprint(
     stage: ArtifactStage,
     cell: SemanticCell,
     relevance: frozenset[SemanticCoordinate],
-    upstream_artifact_ids: tuple[str, ...],
+    upstream_artifact_ids: ArtifactIdentifiers,
     config_sections: frozenset[ConfigurationSection],
     producer_module: str,
+    metric_name: MetricId | None = None,
 ) -> Sha256Digest:
     del producer_module
+    artifact_ids: list[str] = [identifier.value for identifier in upstream_artifact_ids]
+    if metric_name is not None:
+        artifact_ids.append(metric_name.value)
     payload = stable_json(
         cast(
             StableJsonPayload,
             OrderedDict(
                 stage=stage.value,
                 semantic_coordinates=cell.identity_json(relevance),
-                upstream_artifact_ids=list(upstream_artifact_ids),
+                upstream_artifact_ids=artifact_ids,
                 configuration_sha256=configuration_subset_digest(config_sections),
             ),
         )

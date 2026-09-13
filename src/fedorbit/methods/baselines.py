@@ -147,9 +147,9 @@ def _solve_support_lp(
     lp.num_row_ = 1
     lp.col_cost_ = col_cost
     lp.col_lower_ = [0.0] * columns
-    lp.col_upper_ = [infinity] + [float(problem.coordinate_caps[node]) for node in support.nodes]
+    lp.col_upper_ = [infinity] + [problem.coordinate_caps[node] for node in support.nodes]
     lp.row_lower_ = [-infinity]
-    lp.row_upper_ = [float(problem.total_budget)]
+    lp.row_upper_ = [problem.total_budget]
     lp.a_matrix_.format_ = highspy.MatrixFormat.kRowwise
     lp.a_matrix_.start_ = [0, columns]
     lp.a_matrix_.index_ = list(range(columns))

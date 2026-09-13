@@ -8,11 +8,14 @@ from typing import cast
 
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.types import (
+    AuditLabel,
+    AuditResourceText,
     ConceptCount,
     DirectedPair,
     DomainModel,
     DurationMinutes,
     ExposedCoarseGroupId,
+    FieldDescription,
     Fraction,
     OracleTransferConcept,
     ResearcherIdentifier,
@@ -24,14 +27,14 @@ from fedorbit.types import (
 
 
 class ProposedMappingEntry(DomainModel):
-    source_public_label: str
-    target_public_label: str
+    source_public_label: AuditLabel
+    target_public_label: AuditLabel
     exposed_coarse_group: ExposedCoarseGroupId
 
 
 class UnresolvedAlternativeEntry(DomainModel):
-    affected_public_label: str
-    alternatives_considered: tuple[str, ...]
+    affected_public_label: AuditLabel
+    alternatives_considered: tuple[AuditLabel, ...]
 
 
 class MapAvailabilityAuditSubmission(DomainModel):
@@ -39,10 +42,10 @@ class MapAvailabilityAuditSubmission(DomainModel):
     directed_pair: DirectedPair
     session_start_utc: Rfc3339UtcTimestamp
     session_end_utc: Rfc3339UtcTimestamp
-    resources_consulted: tuple[str, ...]
+    resources_consulted: tuple[AuditResourceText, ...]
     proposed_mapping: tuple[ProposedMappingEntry, ...]
     unresolved_alternatives: tuple[UnresolvedAlternativeEntry, ...]
-    rationale: str
+    rationale: FieldDescription
 
 
 _BLANK_SESSION_TIMESTAMP = Rfc3339UtcTimestamp("1970-01-01T00:00:00Z")
@@ -60,7 +63,7 @@ def blank_audit_template(
         resources_consulted=(),
         proposed_mapping=(),
         unresolved_alternatives=(),
-        rationale="",
+        rationale=FieldDescription(""),
     )
 
 
@@ -119,11 +122,11 @@ def submission_sha256(submission: MapAvailabilityAuditSubmission) -> Sha256Diges
     )
 
 
-def documented_public_labels() -> frozenset[str]:
-    labels: set[str] = set()
+def documented_public_labels() -> frozenset[AuditLabel]:
+    labels: set[AuditLabel] = set()
     for _, (_, edge_labels, ton_labels) in TRANSFER_ONTOLOGY.items():
-        labels.update(str(label) for label in edge_labels)
-        labels.update(str(label) for label in ton_labels)
+        labels.update(edge_labels)
+        labels.update(ton_labels)
     return frozenset(labels)
 
 
@@ -138,7 +141,7 @@ class SubmissionValidationFailure(StrEnum):
 def validate_submission(
     submission: MapAvailabilityAuditSubmission,
     minutes_limit: DurationMinutes,
-    public_labels: frozenset[str],
+    public_labels: frozenset[AuditLabel],
 ) -> tuple[SubmissionValidationFailure, ...]:
     failures: list[SubmissionValidationFailure] = []
     try:
@@ -188,12 +191,10 @@ def submission_is_complete_one_to_one(
 
 
 def _public_label_to_oracle_concept(
-    edge_or_ton_label: str,
+    edge_or_ton_label: AuditLabel,
 ) -> OracleTransferConcept | None:
     for concept, (_, edge_labels, ton_labels) in TRANSFER_ONTOLOGY.items():
-        if edge_or_ton_label in {str(label) for label in edge_labels} or edge_or_ton_label in {
-            str(label) for label in ton_labels
-        }:
+        if edge_or_ton_label in edge_labels or edge_or_ton_label in ton_labels:
             return concept
     return None
 

@@ -115,14 +115,14 @@ def _configure_model(model: Model, deadline: MonotonicDeadline | None) -> None:
     remaining = settings.wall_time_seconds_per_solve
     if deadline is not None:
         remaining = min(remaining, max(0.0, deadline - time.monotonic()))
-    model.setRealParam(ScipRealParameter.TIME_LIMIT.value, float(remaining))
-    model.setIntParam(ScipIntegerParameter.MAX_THREADS.value, int(settings.threads))
-    model.setIntParam(ScipIntegerParameter.RANDOM_SEED_SHIFT.value, int(settings.random_seed))
-    model.setIntParam(ScipIntegerParameter.PERMUTATION_SEED.value, int(settings.random_seed))
+    model.setRealParam(ScipRealParameter.TIME_LIMIT.value, remaining)
+    model.setIntParam(ScipIntegerParameter.MAX_THREADS.value, settings.threads)
+    model.setIntParam(ScipIntegerParameter.RANDOM_SEED_SHIFT.value, settings.random_seed)
+    model.setIntParam(ScipIntegerParameter.PERMUTATION_SEED.value, settings.random_seed)
     model.setRealParam(
-        ScipRealParameter.FEASIBILITY_TOLERANCE.value, float(settings.feasibility_tolerance)
+        ScipRealParameter.FEASIBILITY_TOLERANCE.value, settings.feasibility_tolerance
     )
-    model.setRealParam(ScipRealParameter.RELATIVE_GAP.value, float(settings.relative_mip_gap))
+    model.setRealParam(ScipRealParameter.RELATIVE_GAP.value, settings.relative_mip_gap)
 
 
 def _build_assignment_structure(

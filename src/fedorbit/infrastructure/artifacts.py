@@ -130,7 +130,7 @@ class ArtifactStore:
                     reason=ArtifactCacheMissReason.INDEXED_MANIFEST_INVALID,
                 )
                 return None
-            if manifest.dependency_fingerprint_sha256 == fingerprint_sha256.value:
+            if ArtifactFingerprint(manifest.dependency_fingerprint_sha256) == fingerprint_sha256:
                 logger.event(
                     ExecutionEventName.CACHE_HIT,
                     fingerprint=fingerprint_sha256.value,
@@ -139,7 +139,7 @@ class ArtifactStore:
                 )
                 return manifest
         for manifest in self._load_manifest_cache().values():
-            if manifest.dependency_fingerprint_sha256 != fingerprint_sha256.value:
+            if ArtifactFingerprint(manifest.dependency_fingerprint_sha256) != fingerprint_sha256:
                 continue
             try:
                 resolved = self.resolve(manifest.artifact_id)

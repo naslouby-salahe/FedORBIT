@@ -370,7 +370,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
         ExecutionEventName.EXPERIMENT_START,
         experiment=request.experiment.value,
         classification=request.definition.classification.value,
-        planned_cells=int(request.definition.derived_planned_cells),
+        planned_cells=request.definition.derived_planned_cells,
         overwrite_policy=request.overwrite_policy.value,
         seeds=list(request.definition.seeds),
     )

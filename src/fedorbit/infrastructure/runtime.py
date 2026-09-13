@@ -14,6 +14,7 @@ from typing import cast
 import psutil
 import structlog
 import torch
+from pydantic import JsonValue
 from structlog.typing import FilteringBoundLogger
 
 from fedorbit.config.loading import active_config, repository_root
@@ -258,7 +259,7 @@ class ExecutionLogger:
             reuse_note=event.reuse_note,
         )
 
-    def event(self, event_name: ExecutionEventName, **fields: object) -> None:
+    def event(self, event_name: ExecutionEventName, **fields: JsonValue) -> None:
         self._logger.info(event_name, **fields)
 
 

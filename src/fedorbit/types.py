@@ -110,6 +110,7 @@ OperatingSystemRelease = NewType("OperatingSystemRelease", str)
 PythonVersion = NewType("PythonVersion", str)
 FilesystemSlug = NewType("FilesystemSlug", str)
 ArtifactFileSuffix = NewType("ArtifactFileSuffix", str)
+ArtifactName = NewType("ArtifactName", str)
 
 
 class ArtifactSchemaVersion(StrEnum):
@@ -132,6 +133,7 @@ TorchPrecision = NewType("TorchPrecision", str)
 GitRevision = NewType("GitRevision", str)
 ReportSeriesName = NewType("ReportSeriesName", str)
 ReportAxisLabel = NewType("ReportAxisLabel", str)
+ConfidenceIntervalText = NewType("ConfidenceIntervalText", str)
 
 
 class ReportColumnName(StrEnum):
@@ -416,17 +418,25 @@ type ExperimentIdentifierText = str
 
 NonNegativeInt = Annotated[int, Field(ge=0)]
 PositiveInt = Annotated[int, Field(gt=0)]
+SignedInt = Annotated[int, Field()]
 NonNegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 PositiveFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
+UnitInterval = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
+OpenUnitInterval = Annotated[float, Field(gt=0.0, lt=1.0, allow_inf_nan=False)]
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 UINT32_LIMIT = 2**32
 
 
+ClientCount = PositiveInt
+SampleCount = PositiveInt
+PairCount = PositiveInt
+CellCount = PositiveInt
+PlannedCellCount = PositiveInt
+ClassInstanceCount = NonNegativeInt
 SupportCount = PositiveInt
 ConceptCount = PositiveInt
 FeatureCount = PositiveInt
 ClassCount = PositiveInt
-SampleCount = PositiveInt
 ProposalCount = PositiveInt
 EpochCount = PositiveInt
 BatchSize = PositiveInt
@@ -481,6 +491,8 @@ Score = FiniteFloat
 Timestamp = FiniteFloat
 ConfidenceLevel = FiniteFloat
 SignificanceLevel = FiniteFloat
+Probability = UnitInterval
+Rate = UnitInterval
 Fraction = FiniteFloat
 type ReportCoordinates = tuple[Coefficient, ...]
 type ReportColumns = tuple[ReportColumnName, ...]
@@ -492,12 +504,12 @@ type RawCellSamples = tuple[RawCellValue, ...]
 type TabularColumns = tuple[TabularColumnName, ...]
 type TabularColumnSet = frozenset[TabularColumnName]
 type ComponentColumns = tuple[TabularColumns, ...]
-type LabelCounts = tuple[tuple[DatasetLabel, NonNegativeInt], ...]
+type LabelCounts = tuple[tuple[DatasetLabel, ClassInstanceCount], ...]
 type LabelText = DatasetLabel | FineLabel
 type NativeLabels = tuple[FineLabel, ...]
 type NativeLabelSet = frozenset[FineLabel]
 type LocalClassNames = tuple[FineLabel, ...]
-type ExcludedLocalClasses = tuple[tuple[FineLabel, NonNegativeInt], ...]
+type ExcludedLocalClasses = tuple[tuple[FineLabel, ClassInstanceCount], ...]
 FeatureName = NewType("FeatureName", str)
 NumericFeatureValue = NewType("NumericFeatureValue", float)
 type FeatureNames = tuple[FeatureName, ...]
@@ -516,6 +528,16 @@ NormalizedGroupIdentifier = DuplicateGroupIdentifier
 type NormalizedGroupIdentifiers = tuple[NormalizedGroupIdentifier, ...]
 type ArtifactIdentifiers = tuple[ArtifactIdentifier, ...]
 type ArtifactPathTexts = tuple[ArtifactPathText, ...]
+
+ModelArchitectureName = NewType("ModelArchitectureName", str)
+LayerNormalizationName = NewType("LayerNormalizationName", str)
+ActivationName = NewType("ActivationName", str)
+WeightInitializationName = NewType("WeightInitializationName", str)
+SemanticPartitionCluster = NewType("SemanticPartitionCluster", str)
+type SemanticPartitionSpecification = SemanticPartitionId | tuple[SemanticPartitionCluster, ...]
+AuditLabel = FineLabel
+AuditResourceText = NewType("AuditResourceText", str)
+ReferenceLineCoordinate = FiniteFloat
 
 
 class ClientRole(StrEnum):

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from pydantic import JsonValue
+
 from fedorbit.analysis.metrics import (
     harm_indicator,
 )
@@ -84,6 +86,7 @@ from fedorbit.types import (
     DatasetId,
     DirectedPair,
     DirectedPairName,
+    Estimate,
     EvaluationCondition,
     EvaluationConditionKind,
     EvaluationConditionName,
@@ -97,6 +100,7 @@ from fedorbit.types import (
     OracleTransferConcept,
     OverwritePolicy,
     PValueName,
+    Probability,
     RelativeGain,
     ReportColumnName,
     ResampleCount,
@@ -104,6 +108,7 @@ from fedorbit.types import (
     SemanticCell,
     SemanticCoordinateText,
     Sha256Digest,
+    SignificanceLevel,
     Split,
     StableJsonPayload,
     StatisticalTestName,
@@ -184,7 +189,7 @@ _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.
 
 @dataclass(frozen=True, slots=True)
 class _SeedMetric:
-    value: float
+    value: Estimate
     artifact_id: ArtifactIdentifier
 
 
@@ -248,18 +253,18 @@ def transfer_ontology_and_null_padding_rows(
     payload_path = Path(manifest.payload_paths[0])
     if not payload_path.is_file():
         return ()
-    payload = cast(Mapping[str, object], json.loads(payload_path.read_text(encoding="utf-8")))
+    payload = cast(Mapping[str, JsonValue], json.loads(payload_path.read_text(encoding="utf-8")))
     rows: list[Mapping[ReportColumnName, TableScalar]] = []
-    for pair_entry in cast(list[Mapping[str, object]], payload.get("primary_pairs", [])):
+    for pair_entry in cast(list[Mapping[str, JsonValue]], payload.get("primary_pairs", [])):
         for ontology_row in cast(
-            list[Mapping[str, object]],
+            list[Mapping[str, JsonValue]],
             pair_entry.get("transfer_ontology", []),
         ):
             support = cast(
-                Mapping[str, object],
+                Mapping[str, JsonValue],
                 ontology_row.get(
                     "support_counts",
-                    OrderedDict[str, object](),
+                    OrderedDict[str, JsonValue](),
                 ),
             )
             rows.append(
@@ -352,7 +357,7 @@ def _completed_primary_transfer_macro_ce(
         ):
             continue
         result[(record.pair, record.method, record.seed)] = _SeedMetric(
-            float(record.metric_value), resolved.artifact_id
+            record.metric_value, resolved.artifact_id
         )
     return result
 
@@ -364,12 +369,12 @@ def persist_primary_transfer_comparison(
     pair: DirectedPairName,
     method: TransferMethod,
     paired_seed_count: Index,
-    mean_difference: float | None,
-    median_difference: float | None,
-    bca_ci_low: float | None,
-    bca_ci_high: float | None,
-    raw_p: float | None,
-    holm_p: float | None,
+    mean_difference: RelativeGain | None,
+    median_difference: RelativeGain | None,
+    bca_ci_low: RelativeGain | None,
+    bca_ci_high: RelativeGain | None,
+    raw_p: SignificanceLevel | None,
+    holm_p: SignificanceLevel | None,
     decision: ComparisonDecision,
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
@@ -388,7 +393,7 @@ def persist_primary_transfer_comparison(
             ArtifactStage.STATISTICS,
             cell,
             relevance,
-            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
             __name__,
         )
@@ -483,17 +488,17 @@ def execute_statistical_synthesis(
     )
     statistics_config = active_config().scientific.statistics
     for method in methods:
-        raw_p_by_pair: OrderedDict[DirectedPairName, float] = OrderedDict()
+        raw_p_by_pair: OrderedDict[DirectedPairName, SignificanceLevel] = OrderedDict()
         metadata_inputs: OrderedDict[DirectedPairName, tuple[Index, RandomSeed]] = OrderedDict()
         contrasts: OrderedDict[
-            str,
+            DirectedPairName,
             tuple[
                 Index,
-                float | None,
-                float | None,
-                float | None,
-                float | None,
-                tuple[ArtifactIdentifier, ...],
+                RelativeGain | None,
+                RelativeGain | None,
+                RelativeGain | None,
+                RelativeGain | None,
+                ArtifactIdentifiers,
             ],
         ] = OrderedDict()
         for pair in pairs:
@@ -535,10 +540,10 @@ def execute_statistical_synthesis(
             metadata_inputs[pair] = (sign_flip.nonzero_difference_count, bootstrap_seed)
             contrasts[pair] = (
                 paired_seed_count,
-                float(sign_flip.mean_difference),
-                float(sign_flip.median_difference),
-                None if bca.lower is None else float(bca.lower),
-                None if bca.upper is None else float(bca.upper),
+                sign_flip.mean_difference,
+                sign_flip.median_difference,
+                bca.lower,
+                bca.upper,
                 input_ids,
             )
         holm_adjusted = holm_step_down(
@@ -585,7 +590,7 @@ def execute_statistical_synthesis(
                 bca_low,
                 bca_high,
                 raw_p,
-                float(holm_p) if holm_p is not None else None,
+                holm_p,
                 decision,
                 input_ids,
                 request.overwrite_policy,
@@ -615,19 +620,19 @@ def execute_statistical_synthesis(
                 )
     gap_metrics = _completed_real_packet_coupling_gap(store)
     coupling_pairs = sorted({pair for pair, _ in gap_metrics})
-    coupling_raw_p_by_pair: OrderedDict[DirectedPairName, float] = OrderedDict()
+    coupling_raw_p_by_pair: OrderedDict[DirectedPairName, SignificanceLevel] = OrderedDict()
     coupling_metadata_inputs: OrderedDict[DirectedPairName, tuple[Index, RandomSeed]] = (
         OrderedDict()
     )
     coupling_contrasts: OrderedDict[
-        str,
+        DirectedPairName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            ArtifactIdentifiers,
         ],
     ] = OrderedDict()
     for pair in coupling_pairs:
@@ -660,10 +665,10 @@ def execute_statistical_synthesis(
         )
         coupling_contrasts[pair] = (
             paired_seed_count,
-            float(sign_flip.mean_difference),
-            float(sign_flip.median_difference),
-            None if bca.lower is None else float(bca.lower),
-            None if bca.upper is None else float(bca.upper),
+            sign_flip.mean_difference,
+            sign_flip.median_difference,
+            bca.lower,
+            bca.upper,
             input_ids,
         )
     coupling_holm_adjusted = holm_step_down(
@@ -714,7 +719,7 @@ def execute_statistical_synthesis(
             bca_low,
             bca_high,
             raw_p,
-            float(holm_p) if holm_p is not None else None,
+            holm_p,
             decision,
             input_ids,
             request.overwrite_policy,
@@ -753,17 +758,17 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    external_source_raw_p: OrderedDict[PValueName, float] = OrderedDict()
+    external_source_raw_p: OrderedDict[PValueName, SignificanceLevel] = OrderedDict()
     external_source_contrasts: OrderedDict[
-        str,
+        DirectedPairName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            SignificanceLevel | None,
+            ArtifactIdentifiers,
             Index,
             RandomSeed,
         ],
@@ -825,11 +830,11 @@ def execute_statistical_synthesis(
         ] = tost.p_equiv
         external_source_contrasts[pair] = (
             paired_seed_count,
-            float(sign_flip.mean_difference),
-            float(sign_flip.median_difference),
-            None if bca.lower is None else float(bca.lower),
-            None if bca.upper is None else float(bca.upper),
-            float(tost.p_equiv),
+            sign_flip.mean_difference,
+            sign_flip.median_difference,
+            bca.lower,
+            bca.upper,
+            tost.p_equiv,
             input_ids,
             sign_flip.nonzero_difference_count,
             bootstrap_seed,
@@ -912,7 +917,7 @@ def execute_statistical_synthesis(
             bca_low,
             bca_high,
             raw_p,
-            float(holm_p) if holm_p is not None else None,
+            holm_p,
             superiority_decision,
             None,
             None,
@@ -938,8 +943,8 @@ def execute_statistical_synthesis(
             median_difference,
             bca_low,
             bca_high,
-            float(p_equiv) if p_equiv is not None else None,
-            float(equivalence_holm_p) if equivalence_holm_p is not None else None,
+            p_equiv,
+            equivalence_holm_p,
             equivalence_decision,
             equivalence_margins.lower,
             equivalence_margins.upper,
@@ -986,17 +991,17 @@ def execute_statistical_synthesis(
             if method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         }
     )
-    point_correspondence_raw_p: OrderedDict[PValueName, float] = OrderedDict()
+    point_correspondence_raw_p: OrderedDict[PValueName, SignificanceLevel] = OrderedDict()
     point_correspondence_contrasts: OrderedDict[
-        str,
+        DirectedPairName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            SignificanceLevel | None,
+            ArtifactIdentifiers,
             Index,
             RandomSeed,
         ],
@@ -1059,11 +1064,11 @@ def execute_statistical_synthesis(
         ] = tost.p_equiv
         point_correspondence_contrasts[pair] = (
             paired_seed_count,
-            float(sign_flip.mean_difference),
-            float(sign_flip.median_difference),
-            None if bca.lower is None else float(bca.lower),
-            None if bca.upper is None else float(bca.upper),
-            float(tost.p_equiv),
+            sign_flip.mean_difference,
+            sign_flip.median_difference,
+            bca.lower,
+            bca.upper,
+            tost.p_equiv,
             input_ids,
             sign_flip.nonzero_difference_count,
             bootstrap_seed,
@@ -1138,7 +1143,7 @@ def execute_statistical_synthesis(
             bca_low,
             bca_high,
             raw_p,
-            float(holm_p) if holm_p is not None else None,
+            holm_p,
             difference_decision,
             None,
             None,
@@ -1164,8 +1169,8 @@ def execute_statistical_synthesis(
             median_difference,
             bca_low,
             bca_high,
-            float(p_equiv) if p_equiv is not None else None,
-            float(equivalence_holm_p) if equivalence_holm_p is not None else None,
+            p_equiv,
+            equivalence_holm_p,
             equivalence_decision,
             equivalence_margins.lower,
             equivalence_margins.upper,
@@ -1230,17 +1235,17 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == PRINCIPAL_EVALUATION_CONDITION.name
         }
     )
-    ablation_raw_p: OrderedDict[PValueName, float] = OrderedDict()
+    ablation_raw_p: OrderedDict[PValueName, SignificanceLevel] = OrderedDict()
     ablation_contrasts: OrderedDict[
-        str,
+        DirectedPairName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            SignificanceLevel | None,
+            ArtifactIdentifiers,
             Index,
             RandomSeed,
         ],
@@ -1302,11 +1307,11 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
         ] = tost.p_equiv
         ablation_contrasts[pair] = (
             paired_seed_count,
-            float(sign_flip.mean_difference),
-            float(sign_flip.median_difference),
-            None if bca.lower is None else float(bca.lower),
-            None if bca.upper is None else float(bca.upper),
-            float(tost.p_equiv),
+            sign_flip.mean_difference,
+            sign_flip.median_difference,
+            bca.lower,
+            bca.upper,
+            tost.p_equiv,
             input_ids,
             sign_flip.nonzero_difference_count,
             bootstrap_seed,
@@ -1380,7 +1385,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             bca_low,
             bca_high,
             raw_p,
-            float(holm_p) if holm_p is not None else None,
+            holm_p,
             difference_decision,
             None,
             None,
@@ -1406,8 +1411,8 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             median_difference,
             bca_low,
             bca_high,
-            float(p_equiv) if p_equiv is not None else None,
-            float(equivalence_holm_p) if equivalence_holm_p is not None else None,
+            p_equiv,
+            equivalence_holm_p,
             equivalence_decision,
             equivalence_margins.lower,
             equivalence_margins.upper,
@@ -1490,16 +1495,16 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             ),
         )
     )
-    sparsity_raw_p: OrderedDict[PValueName, float] = OrderedDict()
+    sparsity_raw_p: OrderedDict[PValueName, SignificanceLevel] = OrderedDict()
     sparsity_contrasts: OrderedDict[
-        str,
+        PValueName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            ArtifactIdentifiers,
             Index,
             RandomSeed,
         ],
@@ -1567,10 +1572,10 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             sparsity_raw_p[contrast_key] = sign_flip.p_value
             sparsity_contrasts[contrast_key] = (
                 paired_seed_count,
-                float(sign_flip.mean_difference),
-                float(sign_flip.median_difference),
-                None if bca.lower is None else float(bca.lower),
-                None if bca.upper is None else float(bca.upper),
+                sign_flip.mean_difference,
+                sign_flip.median_difference,
+                bca.lower,
+                bca.upper,
                 input_ids,
                 sign_flip.nonzero_difference_count,
                 bootstrap_seed,
@@ -1629,7 +1634,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 bca_low,
                 bca_high,
                 raw_p,
-                float(holm_p) if holm_p is not None else None,
+                holm_p,
                 decision,
                 None,
                 None,
@@ -1672,17 +1677,17 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == PRINCIPAL_EVALUATION_CONDITION.name
         }
     )
-    confirmation_raw_p: OrderedDict[DirectedPairName, float] = OrderedDict()
+    confirmation_raw_p: OrderedDict[DirectedPairName, SignificanceLevel] = OrderedDict()
     confirmation_contrasts: OrderedDict[
-        str,
+        DirectedPairName,
         tuple[
             Index,
-            float | None,
-            float | None,
-            float | None,
-            float | None,
-            tuple[ArtifactIdentifier, ...],
-            float | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            RelativeGain | None,
+            ArtifactIdentifiers,
+            Probability | None,
             Index,
             RandomSeed,
         ],
@@ -1749,7 +1754,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             ) / local_only_seeds[seed].value
             harmful_without_values.append(1.0 if harm_indicator(gain, harmful_threshold) else 0.0)
         harmful_without = tuple(harmful_without_values)
-        harm_rate_no_confirm = statistics.fmean(harmful_without)
+        harm_rate_without_confirmation: Probability = statistics.fmean(harmful_without)
         bootstrap_seed = statistical_bootstrap_seed(
             ContrastName(
                 "FedORBIT Without Confirmation vs FedORBIT Exact-Sparse Solver with confirmation"
@@ -1764,12 +1769,12 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
         confirmation_raw_p[pair] = sign_flip.p_value
         confirmation_contrasts[pair] = (
             paired_seed_count,
-            float(sign_flip.mean_difference),
-            float(sign_flip.median_difference),
-            None if bca.lower is None else float(bca.lower),
-            None if bca.upper is None else float(bca.upper),
+            sign_flip.mean_difference,
+            sign_flip.median_difference,
+            bca.lower,
+            bca.upper,
             input_ids,
-            harm_rate_no_confirm,
+            harm_rate_without_confirmation,
             sign_flip.nonzero_difference_count,
             bootstrap_seed,
         )
@@ -1838,7 +1843,7 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             bca_low,
             bca_high,
             raw_p,
-            float(holm_p) if holm_p is not None else None,
+            holm_p,
             decision,
             None,
             None,
@@ -1889,7 +1894,7 @@ def _completed_condition_macro_ce(
         ):
             continue
         result[(record.pair, record.method, record.condition, record.seed)] = _SeedMetric(
-            float(record.metric_value), resolved.artifact_id
+            record.metric_value, resolved.artifact_id
         )
     return result
 
@@ -1912,7 +1917,7 @@ def _completed_real_packet_coupling_gap(
         ):
             continue
         result[(record.pair, record.seed)] = _SeedMetric(
-            float(record.metric_value), resolved.artifact_id
+            record.metric_value, resolved.artifact_id
         )
     return result
 
@@ -1923,12 +1928,12 @@ def persist_coupling_mechanism_comparison(
     experiment: ExperimentName,
     pair: DirectedPairName,
     paired_seed_count: Index,
-    mean_difference: float | None,
-    median_difference: float | None,
-    bca_ci_low: float | None,
-    bca_ci_high: float | None,
-    raw_p: float | None,
-    holm_p: float | None,
+    mean_difference: RelativeGain | None,
+    median_difference: RelativeGain | None,
+    bca_ci_low: RelativeGain | None,
+    bca_ci_high: RelativeGain | None,
+    raw_p: SignificanceLevel | None,
+    holm_p: SignificanceLevel | None,
     decision: ComparisonDecision,
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
@@ -1947,7 +1952,7 @@ def persist_coupling_mechanism_comparison(
             ArtifactStage.STATISTICS,
             cell,
             relevance,
-            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
             __name__,
         )
@@ -2043,15 +2048,15 @@ def persist_baseline_comparison(
     contrast_name: ContrastName,
     materiality_threshold: RelativeGain | None,
     paired_seed_count: Index,
-    mean_difference: float | None,
-    median_difference: float | None,
-    bca_ci_low: float | None,
-    bca_ci_high: float | None,
-    raw_p: float | None,
-    holm_p: float | None,
+    mean_difference: RelativeGain | None,
+    median_difference: RelativeGain | None,
+    bca_ci_low: RelativeGain | None,
+    bca_ci_high: RelativeGain | None,
+    raw_p: SignificanceLevel | None,
+    holm_p: SignificanceLevel | None,
     decision: ComparisonDecision,
-    equivalence_margin_low: float | None,
-    equivalence_margin_high: float | None,
+    equivalence_margin_low: RelativeGain | None,
+    equivalence_margin_high: RelativeGain | None,
     input_metric_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
 ) -> ReusableArtifactManifest | None:
@@ -2070,7 +2075,7 @@ def persist_baseline_comparison(
             ArtifactStage.STATISTICS,
             cell,
             relevance,
-            tuple(identifier.value for identifier in input_metric_artifact_ids),
+            input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
             __name__,
         )
@@ -2191,7 +2196,7 @@ def persist_statistical_metadata(
             ArtifactStage.STATISTICS,
             cell,
             relevance,
-            tuple(identifier.value for identifier in input_artifact_ids),
+            input_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
             __name__,
         )

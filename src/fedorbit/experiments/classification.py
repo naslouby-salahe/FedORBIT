@@ -29,8 +29,10 @@ from fedorbit.types import (
     ConfigurationSection,
     DirectedPairName,
     DomainModel,
+    Estimate,
     EvidenceAdjudication,
     EvidenceCompleteness,
+    ArtifactName,
     EvidenceStatus,
     ExecutionEventName,
     ExperimentName,
@@ -39,8 +41,10 @@ from fedorbit.types import (
     Floor,
     MetricId,
     MultiplicityFamily,
+    PairCount,
     ReportArtifactName,
     ResearchQuestion,
+    SignificanceLevel,
     SimplificationRuleName,
     SimplificationRuleState,
     StableJsonPayload,
@@ -175,11 +179,11 @@ def _theorem_cells(
 
 def _metric_values(
     store: ArtifactStore, experiment: ExperimentName, metric_name: MetricId
-) -> tuple[float, ...]:
+) -> tuple[Estimate, ...]:
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
     return tuple(
-        float(record.metric_value)
+        record.metric_value
         for record in completed_experiment_metric_records(store, experiment)
         if record.metric_name == metric_name and record.valid and record.metric_value is not None
     )
@@ -199,7 +203,7 @@ def _pair_records(
 
 def _successful_pairs(
     records: tuple[PairedComparisonRecord, ...],
-    holm_maximum: float,
+    holm_maximum: SignificanceLevel,
     bca_floor: Floor,
 ) -> tuple[PairedComparisonRecord, ...]:
     return tuple(
@@ -226,8 +230,8 @@ def _harmful_pairs(
 
 def _local_reference_dominant_pairs(
     records: tuple[PairedComparisonRecord, ...],
-    holm_maximum: float,
-) -> frozenset[str]:
+    holm_maximum: SignificanceLevel,
+) -> frozenset[DirectedPairName]:
     threshold = active_config().scientific.materiality.realized_relative_macro_ce
     dominant: set[DirectedPairName] = set()
     for record in records:
@@ -295,10 +299,10 @@ def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
 
 def _ablation_pair_method_means(
     store: ArtifactStore, method: TransferMethod
-) -> Mapping[DirectedPairName, float]:
+) -> Mapping[DirectedPairName, Estimate]:
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
-    by_pair: OrderedDict[DirectedPairName, list[float]] = OrderedDict()
+    by_pair: OrderedDict[DirectedPairName, list[Estimate]] = OrderedDict()
     for record in completed_experiment_metric_records(store, ExperimentName.MECHANISM_ABLATIONS):
         if (
             record.method != method
@@ -307,8 +311,8 @@ def _ablation_pair_method_means(
             or record.metric_value is None
         ):
             continue
-        by_pair.setdefault(record.pair, []).append(float(record.metric_value))
-    means: OrderedDict[DirectedPairName, float] = OrderedDict()
+        by_pair.setdefault(record.pair, []).append(record.metric_value)
+    means: OrderedDict[DirectedPairName, Estimate] = OrderedDict()
     for pair, values in by_pair.items():
         means[pair] = sum(values) / len(values)
     return means
@@ -317,7 +321,7 @@ def _ablation_pair_method_means(
 def _mechanism_retention_pairs(
     store: ArtifactStore,
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> int:
+) -> PairCount:
     criteria = active_config().scientific.evaluation_criteria.coupling_mechanism
     full_means = _ablation_pair_method_means(store, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER)
     destroyed_means = _ablation_pair_method_means(store, TransferMethod.COUPLING_DESTROYED_FEDORBIT)
@@ -342,7 +346,7 @@ def _mechanism_retention_pairs(
 
 def _material_coupling_pairs(
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> int:
+) -> PairCount:
     return sum(
         1
         for record in comparisons
@@ -563,14 +567,14 @@ def _classify_question(
 def _rule_payload(
     rule: SimplificationRuleName,
     state: SimplificationRuleState,
-    reason: str,
+    reason: FieldDescription,
 ) -> StableJsonPayload:
     return cast(StableJsonPayload, OrderedDict(rule=rule, state=state, reason=reason))
 
 
 def _median(
-    values: tuple[float, ...],
-) -> float | None:
+    values: tuple[Estimate, ...],
+) -> Estimate | None:
     if not values:
         return None
     ordered = tuple(sorted(values))
@@ -595,14 +599,14 @@ def _sparse_irrelevance_applied(store: ArtifactStore) -> bool:
 
 def _generic_qap_rule(
     store: ArtifactStore,
-) -> tuple[SimplificationRuleState, str]:
+) -> tuple[SimplificationRuleState, FieldDescription]:
     from fedorbit.experiments.synthesis import completed_experiment_metric_records
 
     records = completed_experiment_metric_records(
         store, ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK
     )
     sparse = tuple(
-        float(record.metric_value)
+        record.metric_value
         for record in records
         if record.method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         and record.metric_name == MetricId.WALL_TIME
@@ -610,7 +614,7 @@ def _generic_qap_rule(
         and record.metric_value is not None
     )
     qap = tuple(
-        float(record.metric_value)
+        record.metric_value
         for record in records
         if record.method == TransferMethod.GENERIC_EXACT_QAP
         and record.metric_name == MetricId.WALL_TIME
@@ -620,31 +624,31 @@ def _generic_qap_rule(
     if not sparse or not qap:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "solver runtime ratios not jointly populated",
+            FieldDescription("solver runtime ratios not jointly populated"),
         )
     sparse_median = _median(sparse)
     qap_median = _median(qap)
     if sparse_median is None or qap_median is None or sparse_median <= 0.0:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "non-positive exact-sparse runtime",
+            FieldDescription("non-positive exact-sparse runtime"),
         )
     rule = active_config().scientific.simplification_rules.generic_qap_dominates
     ratio = qap_median / sparse_median
     if ratio <= rule.median_runtime_ratio_to_exact_sparse_maximum:
         return (
             SimplificationRuleState.APPLIED,
-            "QAP median runtime at or below exact-sparse",
+            FieldDescription("QAP median runtime at or below exact-sparse"),
         )
     return (
         SimplificationRuleState.NOT_APPLIED,
-        "QAP median runtime exceeds exact-sparse",
+        FieldDescription("QAP median runtime exceeds exact-sparse"),
     )
 
 
 def _strict_interface_rule(
     comparisons: tuple[PairedComparisonRecord, ...],
-) -> tuple[SimplificationRuleState, str]:
+) -> tuple[SimplificationRuleState, FieldDescription]:
     rule = active_config().scientific.simplification_rules.strict_interface_removes_gain
     fedorbit = _pair_records(
         comparisons, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, TransferMethod.LOCAL_ONLY
@@ -653,7 +657,7 @@ def _strict_interface_rule(
     if not fedorbit or not oracle:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "FedORBIT and oracle contrasts not jointly populated",
+            FieldDescription("FedORBIT and oracle contrasts not jointly populated"),
         )
     oracle_by_pair = OrderedDict((record.pair, record) for record in oracle)
     hits = 0
@@ -671,15 +675,15 @@ def _strict_interface_rule(
     if hits >= rule.primary_pair_majority_required:
         return (
             SimplificationRuleState.APPLIED,
-            "strict interface removes gain while oracle succeeds",
+            FieldDescription("strict interface removes gain while oracle succeeds"),
         )
     return (
         SimplificationRuleState.NOT_APPLIED,
-        "strict-interface majority not reached",
+        FieldDescription("strict-interface majority not reached"),
     )
 
 
-def _source_response_rule(store: ArtifactStore) -> tuple[SimplificationRuleState, str]:
+def _source_response_rule(store: ArtifactStore) -> tuple[SimplificationRuleState, FieldDescription]:
     failures = _metric_values(
         store,
         ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION,
@@ -688,18 +692,18 @@ def _source_response_rule(store: ArtifactStore) -> tuple[SimplificationRuleState
     if not failures:
         return (
             SimplificationRuleState.NOT_TESTED,
-            "principal source-packet failure fraction not persisted",
+            FieldDescription("principal source-packet failure fraction not persisted"),
         )
     rule = active_config().scientific.simplification_rules.source_response_is_too_unstable
     fraction = sum(1 for value in failures if value > 0.0) / len(failures)
     if fraction > rule.principal_source_packet_failure_fraction_strictly_greater_than:
         return (
             SimplificationRuleState.APPLIED,
-            "source-packet failure fraction exceeds threshold",
+            FieldDescription("source-packet failure fraction exceeds threshold"),
         )
     return (
         SimplificationRuleState.NOT_APPLIED,
-        "source-packet failure fraction below threshold",
+        FieldDescription("source-packet failure fraction below threshold"),
     )
 
 
@@ -723,10 +727,10 @@ def _simplification_rule_states(
             if below >= minimum
             else SimplificationRuleState.NOT_APPLIED
         )
-        rectangular_reason = "real-packet coupling below materiality"
+        rectangular_reason = FieldDescription("real-packet coupling below materiality")
     else:
         rectangular = SimplificationRuleState.NOT_TESTED
-        rectangular_reason = "no real-packet coupling gaps"
+        rectangular_reason = FieldDescription("no real-packet coupling gaps")
     sparse_gains = _metric_values(
         store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
     )
@@ -736,10 +740,10 @@ def _simplification_rule_states(
             if _sparse_irrelevance_applied(store)
             else SimplificationRuleState.NOT_APPLIED
         )
-        sparse_reason = "sparse useful-unit fraction"
+        sparse_reason = FieldDescription("sparse useful-unit fraction")
     else:
         sparse_state = SimplificationRuleState.NOT_TESTED
-        sparse_reason = "no sparsity metrics"
+        sparse_reason = FieldDescription("no sparsity metrics")
     point_rows = _pair_records(
         comparisons,
         TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
@@ -756,10 +760,10 @@ def _simplification_rule_states(
         point_state = (
             SimplificationRuleState.APPLIED if advantage else SimplificationRuleState.NOT_APPLIED
         )
-        point_reason = "point-matching vs exact-sparse contrast"
+        point_reason = FieldDescription("point-matching vs exact-sparse contrast")
     else:
         point_state = SimplificationRuleState.NOT_TESTED
-        point_reason = "no point-matching contrasts"
+        point_reason = FieldDescription("no point-matching contrasts")
     qap_state, qap_reason = _generic_qap_rule(store)
     interface_state, interface_reason = _strict_interface_rule(comparisons)
     source_state, source_reason = _source_response_rule(store)
@@ -843,7 +847,7 @@ def execute_evidence_classification(
         ),
         frozenset({ConfigurationSection.METRICS}),
         __name__,
-        "evidence-classification",
+        ArtifactName("evidence-classification"),
     )
 
 

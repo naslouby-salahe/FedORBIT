@@ -11,6 +11,7 @@ from fedorbit.infrastructure.provenance import (
     stage_dependency_fingerprint,
 )
 from fedorbit.types import (
+    ArtifactIdentifier,
     ArtifactStage,
     ConfigurationSection,
     DatasetId,
@@ -112,7 +113,7 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
-        ("upstream-1",),
+        (ArtifactIdentifier("upstream-1"),),
         frozenset({ConfigurationSection.MODELS, ConfigurationSection.GENERATORS}),
         "fedorbit.infrastructure.manifests",
     )
@@ -125,7 +126,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
-        ("upstream-1",),
+        (ArtifactIdentifier("upstream-1"),),
         frozenset({ConfigurationSection.MODELS}),
         "fedorbit.infrastructure.manifests",
     )
@@ -133,7 +134,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         ArtifactStage.TRAINING,
         PRIMARY_CELL,
         relevance,
-        ("upstream-2",),
+        (ArtifactIdentifier("upstream-2"),),
         frozenset({ConfigurationSection.MODELS}),
         "fedorbit.infrastructure.manifests",
     )

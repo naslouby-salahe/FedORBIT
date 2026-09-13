@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
 from fedorbit.experiments.transfer import semantic_partition_bucket_of
-from fedorbit.types import CoarseGroup, SemanticPartitionId
+from fedorbit.types import CoarseGroup, SemanticPartitionId, SemanticPartitionSpecification
 
 
 def test_principal_partition_is_identity_on_coarse_groups() -> None:
@@ -16,4 +18,4 @@ def test_oracle_fine_singleton_is_not_aliased_to_principal_partition() -> None:
 
 
 def test_unknown_partition_is_rejected() -> None:
-    assert semantic_partition_bucket_of("invented-partition") is None
+    assert semantic_partition_bucket_of(cast(SemanticPartitionSpecification, "invented-partition")) is None

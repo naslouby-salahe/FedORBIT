@@ -177,6 +177,7 @@ from fedorbit.types import (
     SemanticCoordinates,
     SemanticCoordinateText,
     SemanticPartitionId,
+    SemanticPartitionSpecification,
     SerializedPacket,
     Sha256Digest,
     SourceClientName,
@@ -346,7 +347,7 @@ def persist_primary_transfer_metric(
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: float | None,
+    metric_value: Estimate | None,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
@@ -369,9 +370,10 @@ def persist_primary_transfer_metric(
             ArtifactStage.EVALUATION,
             cell,
             relevance,
-            (*(identifier.value for identifier in input_artifact_ids), metric_name.value),
+            input_artifact_ids,
             _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
             __name__,
+            metric_name=metric_name,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -2189,7 +2191,7 @@ _SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
 
 
 def semantic_partition_bucket_of(
-    partition: str | tuple[str, ...],
+    partition: SemanticPartitionSpecification,
 ) -> Mapping[CoarseGroup, CoarseGroup] | None:
     if partition == SemanticPartitionId.PRINCIPAL_THREE_COARSE_GROUPS:
         return _SEMANTIC_PARTITION_PRINCIPAL
@@ -2204,7 +2206,7 @@ def semantic_partition_bucket_of(
 
 
 def semantic_partition_label(
-    partition: str | tuple[str, ...],
+    partition: SemanticPartitionSpecification,
 ) -> EvaluationConditionName:
     text = partition if isinstance(partition, str) else "|".join(partition)
     return EvaluationConditionName(text)

@@ -326,6 +326,12 @@ class CheckpointFileName(StrEnum):
     CHECKPOINT = "checkpoint.pt"
 
 
+class HumanAuditFileName(StrEnum):
+    SUBMISSION = "submission.json"
+    TEMPLATE = "template.json"
+    VALIDATED_SHA256 = "validated.sha256.json"
+
+
 class ArtifactDirectorySegment(StrEnum):
     FITTED = "fitted"
     PACKETS = "packets"

@@ -26,6 +26,7 @@ from fedorbit.experiments.scoring import (
     action_sha256,
     assemble_principal_action,
     ci_half_width_perturbation,
+    common_eligible_groups,
     curriculum_multipliers_from_action,
     persist_boundary_diagnostic_metrics,
     persist_ineligible_transfer_cell,
@@ -91,6 +92,7 @@ from fedorbit.methods.assimilation import (
 )
 from fedorbit.methods.target import (
     SourceProposal,
+    assert_target_diagnostic_reserve,
     rank_source_proposals,
     select_source_sequentially,
 )
@@ -118,6 +120,7 @@ from fedorbit.types import (
     PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
     ClassCount,
+    ConceptCount,
     ContrastCoordinates,
     DatasetId,
     DirectedPairName,
@@ -630,6 +633,13 @@ def execute_target_confirmation_and_portability(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
+        eligible = common_eligible_groups(source, target, source_materialized, target_materialized)
+        if eligible is not None:
+            target_eligible = eligible[1]
+            target_concepts: ConceptCount = sum(
+                len(concept_groups) for concept_groups in target_eligible.values()
+            )
+            assert_target_diagnostic_reserve(target_concepts)
         pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
         for seed in confirmatory_seeds:
             local_only = score_local_only_cell(

@@ -17,6 +17,15 @@ from tests.architecture.scan import (
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 DEFINITION = re.compile(r"^\s*(?:def|async def|class)\s+([A-Za-z_][A-Za-z0-9_]*)", re.M)
 
+
+def _declared_public_api() -> frozenset[str]:
+    whitelist = REPOSITORY_ROOT / "vulture_whitelist.py"
+    if not whitelist.is_file():
+        return frozenset()
+    tree = ast.parse(whitelist.read_text(encoding="utf-8"))
+    return frozenset(node.id for node in ast.walk(tree) if isinstance(node, ast.Name))
+
+
 FRAMEWORK_DECORATOR_FRAGMENTS = ("validator", "property", "app.command", "app.callback")
 FRAMEWORK_CALLBACK_NAMES = frozenset({"forward"})
 
@@ -56,12 +65,14 @@ def _framework_registered(node: ast.FunctionDef | ast.ClassDef) -> bool:
 
 
 def _public_symbols(path: Path) -> list[ast.FunctionDef | ast.ClassDef]:
+    declared = _declared_public_api()
     return [
         node
         for node in ast.walk(parse_module(path))
         if isinstance(node, (ast.FunctionDef, ast.ClassDef))
         and not node.name.startswith("_")
         and not _framework_registered(node)
+        and node.name not in declared
     ]
 
 

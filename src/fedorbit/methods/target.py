@@ -17,6 +17,7 @@ from fedorbit.types import (
     RepetitionCount,
     Score,
     SourceClientName,
+    StepCount,
 )
 
 
@@ -195,8 +196,33 @@ def select_source_sequentially(
     )
 
 
-TARGET_DIAGNOSTIC_INTERVENTION_CLASSES: ConceptCount = 8
 SHADOW_PAIR_DIRECTIONS: RepetitionCount = 2
+
+
+class OptimizerBudgetError(ValueError):
+    pass
+
+
+def target_diagnostic_reserve(intervention_class_count: ConceptCount) -> StepCount:
+    diagnostic = active_config().scientific.target_response_diagnostic
+    reserve: StepCount = (
+        intervention_class_count
+        * diagnostic.paired_replicates
+        * SHADOW_PAIR_DIRECTIONS
+        * diagnostic.shadow_optimizer_steps
+    )
+    return reserve
+
+
+def assert_target_diagnostic_reserve(intervention_class_count: ConceptCount) -> None:
+    budget = active_config().scientific.target_optimizer_budget
+    expected = target_diagnostic_reserve(intervention_class_count)
+    if budget.reserved.target_response_diagnostic != expected:
+        raise OptimizerBudgetError(
+            "configured target-response reserve "
+            f"{budget.reserved.target_response_diagnostic} does not equal the derivation "
+            f"{expected} for {intervention_class_count} intervention classes"
+        )
 
 
 class CurriculumError(ValueError):

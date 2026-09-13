@@ -41,6 +41,9 @@ from fedorbit.methods.map_availability_audit import (
     blank_audit_template,
     distinct_researcher_ids,
     documented_public_labels,
+    oracle_correspondence_accuracy,
+    required_concept_count,
+    submission_is_complete_one_to_one,
     submission_sha256,
     validate_submission,
 )
@@ -61,6 +64,7 @@ from fedorbit.types import (
     DirectedPair,
     DirectedPairName,
     ExperimentName,
+    HumanAuditFileName,
     Index,
     MetricId,
     MetricUnit,
@@ -195,11 +199,11 @@ def execute_map_availability_applicability_audit(
             directory = _human_audit_directory(
                 layout, request.experiment, source, target, researcher_id
             )
-            submission_path = directory / "submission.json"
+            submission_path = directory / HumanAuditFileName.SUBMISSION
             if not submission_path.is_file():
                 template = blank_audit_template(researcher_id, domain_pair)
                 atomic_write_json(
-                    directory / "template.json",
+                    directory / HumanAuditFileName.TEMPLATE,
                     cast(StableJsonPayload, template.model_dump(mode="json")),
                 )
                 continue
@@ -216,14 +220,21 @@ def execute_map_availability_applicability_audit(
             tuple(submissions)
         ):
             continue
+        concept_count = required_concept_count()
         for submission in submissions:
             atomic_write_json(
                 _human_audit_directory(
                     layout, request.experiment, source, target, submission.researcher_id
                 )
-                / "validated.sha256.json",
+                / HumanAuditFileName.VALIDATED_SHA256,
                 cast(
                     StableJsonPayload,
-                    OrderedDict(sha256=submission_sha256(submission)),
+                    OrderedDict(
+                        sha256=submission_sha256(submission),
+                        complete_one_to_one=submission_is_complete_one_to_one(
+                            submission, concept_count
+                        ),
+                        oracle_correspondence_accuracy=oracle_correspondence_accuracy(submission),
+                    ),
                 ),
             )

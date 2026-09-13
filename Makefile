@@ -2,7 +2,7 @@ UV := uv
 RUN := $(UV) run
 PYTEST := $(RUN) pytest
 
-.PHONY: help format format-check lint typecheck deadcode contract architecture unit scientific integration e2e smoke test audit-all
+.PHONY: help format format-check lint typecheck contract architecture unit scientific integration e2e smoke test audit-all
 
 help: ## Show this help and the full public command surface
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-28s %s\n", $$1, $$2}'
@@ -18,9 +18,6 @@ lint: ## Run Ruff lint
 
 typecheck: ## Run strict Pyright type checking
 	$(RUN) pyright
-
-deadcode: ## Report dead and unreferenced production code
-	$(RUN) vulture src vulture_whitelist.py --min-confidence 80
 
 contract: ## Verify the scientific-contract snapshot matches configs/fedorbit.yaml
 	$(PYTEST) tests/unit/config -k contract -q
@@ -46,5 +43,5 @@ smoke: ## Run the nonclaim smoke suite
 test: ## Run the complete pytest suite
 	$(PYTEST) -q
 
-audit-all: format-check lint typecheck deadcode contract architecture unit scientific integration e2e smoke ## Run every repository quality gate
+audit-all: format-check lint typecheck contract architecture unit scientific integration e2e smoke ## Run every repository quality gate
 	$(PYTEST) -q

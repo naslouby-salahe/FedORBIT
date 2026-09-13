@@ -8,10 +8,12 @@ from typing import cast
 
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.types import (
+    ConceptCount,
     DirectedPair,
     DomainModel,
     DurationMinutes,
     ExposedCoarseGroupId,
+    Fraction,
     OracleTransferConcept,
     ResearcherIdentifier,
     Rfc3339UtcTimestamp,
@@ -169,3 +171,47 @@ def distinct_researcher_ids(
     submissions: tuple[MapAvailabilityAuditSubmission, ...],
 ) -> bool:
     return len({submission.researcher_id for submission in submissions}) == len(submissions)
+
+
+def submission_is_complete_one_to_one(
+    submission: MapAvailabilityAuditSubmission, required_concept_count: ConceptCount
+) -> bool:
+    if submission.unresolved_alternatives:
+        return False
+    if len(submission.proposed_mapping) != required_concept_count:
+        return False
+    sources = {entry.source_public_label for entry in submission.proposed_mapping}
+    targets = {entry.target_public_label for entry in submission.proposed_mapping}
+    return len(sources) == len(submission.proposed_mapping) and len(targets) == len(
+        submission.proposed_mapping
+    )
+
+
+def _public_label_to_oracle_concept(
+    edge_or_ton_label: str,
+) -> OracleTransferConcept | None:
+    for concept, (_, edge_labels, ton_labels) in TRANSFER_ONTOLOGY.items():
+        if edge_or_ton_label in {str(label) for label in edge_labels} or edge_or_ton_label in {
+            str(label) for label in ton_labels
+        }:
+            return concept
+    return None
+
+
+def oracle_correspondence_accuracy(
+    submission: MapAvailabilityAuditSubmission,
+) -> Fraction:
+    if not submission.proposed_mapping:
+        return 0.0
+    correct = 0
+    for entry in submission.proposed_mapping:
+        source_concept = _public_label_to_oracle_concept(entry.source_public_label)
+        target_concept = _public_label_to_oracle_concept(entry.target_public_label)
+        if source_concept is not None and source_concept == target_concept:
+            correct += 1
+    return correct / len(submission.proposed_mapping)
+
+
+def required_concept_count() -> ConceptCount:
+    count: ConceptCount = len(TRANSFER_ONTOLOGY)
+    return count

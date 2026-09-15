@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from fedorbit.types import (
     ArtifactIdentifier,
     ContrastName,
+    DatasetId,
     DirectedPairName,
     Estimate,
     EvaluationConditionName,
@@ -51,7 +52,16 @@ type MetricSemanticIdentity = tuple[
     RandomSeed,
     MetricId,
 ]
-type EvaluationSemanticIdentity = PredictionSemanticIdentity | MetricSemanticIdentity
+type DiagnosticMetricSemanticIdentity = tuple[
+    ExperimentName,
+    DatasetId,
+    EvaluationConditionName,
+    RandomSeed,
+    MetricId,
+]
+type EvaluationSemanticIdentity = (
+    PredictionSemanticIdentity | MetricSemanticIdentity | DiagnosticMetricSemanticIdentity
+)
 
 
 class MetricDirection(StrEnum):
@@ -168,6 +178,47 @@ class MetricRecord(FrozenRecord):
             raise ValueError("invalid metric value must be finite when present")
         if not self.input_artifact_ids or any(not value for value in self.input_artifact_ids):
             raise ValueError("metric requires non-empty input artifact identities")
+        return self
+
+
+class DiagnosticMetricRecord(FrozenRecord):
+    experiment: ExperimentName
+    dataset: DatasetId
+    condition: EvaluationConditionName
+    seed: RandomSeed
+    metric_name: MetricId
+    metric_value: Estimate | None
+    metric_unit: MetricUnit
+    direction: MetricDirection
+    evaluation_class_set_sha256: Sha256Digest
+    input_artifact_ids: tuple[ArtifactIdentifier, ...]
+    dependency_fingerprint_sha256: Sha256Digest
+    valid: bool
+    invalid_reason: InvalidReason | None
+
+    @model_validator(mode="after")
+    def validate_record(self) -> DiagnosticMetricRecord:
+        if not self.dataset or not self.condition or not self.metric_unit:
+            raise ValueError("diagnostic metric identity/unit fields must be non-empty")
+        _require_sha256(
+            self.evaluation_class_set_sha256,
+            FieldDescription("evaluation class-set SHA-256"),
+        )
+        _require_sha256(
+            self.dependency_fingerprint_sha256,
+            FieldDescription("diagnostic metric dependency fingerprint"),
+        )
+        if self.valid:
+            if self.metric_value is None or not math.isfinite(self.metric_value):
+                raise ValueError("valid diagnostic metric requires a finite metric value")
+            if self.invalid_reason is not None:
+                raise ValueError("valid diagnostic metric must not have an invalid reason")
+        elif not self.invalid_reason:
+            raise ValueError("invalid diagnostic metric requires an invalid reason")
+        elif self.metric_value is not None and not math.isfinite(self.metric_value):
+            raise ValueError("invalid diagnostic metric value must be finite when present")
+        if not self.input_artifact_ids or any(not value for value in self.input_artifact_ids):
+            raise ValueError("diagnostic metric requires non-empty input artifact identities")
         return self
 
 
@@ -307,6 +358,31 @@ def validate_metric_records(records: MetricRecordCollection) -> MetricRecordColl
         "duplicate metric semantic identity",
     )
     return MetricRecordCollection(materialized)
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnosticMetricRecordCollection:
+    records: tuple[DiagnosticMetricRecord, ...]
+
+
+def validate_diagnostic_metric_records(
+    records: DiagnosticMetricRecordCollection,
+) -> DiagnosticMetricRecordCollection:
+    materialized = records.records
+    _require_unique_semantic_identities(
+        tuple(
+            (
+                record.experiment,
+                record.dataset,
+                record.condition,
+                record.seed,
+                record.metric_name,
+            )
+            for record in materialized
+        ),
+        "duplicate diagnostic metric semantic identity",
+    )
+    return DiagnosticMetricRecordCollection(materialized)
 
 
 def _require_unique_semantic_identities(

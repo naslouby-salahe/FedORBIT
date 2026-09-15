@@ -486,8 +486,6 @@ class ReportingPathSegment(StrEnum):
 TimestampFieldName = NewType("TimestampFieldName", str)
 DatasetLabel = NewType("DatasetLabel", str)
 FineLabel = NewType("FineLabel", str)
-type DatasetIdentifierText = str
-type ExperimentIdentifierText = str
 
 
 NonNegativeInt = Annotated[int, Field(ge=0)]

@@ -187,6 +187,10 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue: OrderedDict[ExperimentName, ExperimentDefinition] = OrderedDict()
 
+    primitive_validation_block_patterns = config.generators.exact_separator_theorem.block_patterns
+    primitive_validation_cells = len(primitive_validation_block_patterns) * (
+        1 + len(confirmatory_seeds)
+    )
     catalogue[ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION] = definition(
         ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION,
         ExperimentClassification.VALIDATION,
@@ -194,7 +198,7 @@ def build_catalogue() -> ExperimentCatalogue:
         (),
         (ConditionLabel(CatalogueCondition.HAND_FIXTURES),),
         (0,),
-        0,
+        primitive_validation_cells,
         (CataloguePrerequisite.PRIMITIVE_IMPLEMENTATION,),
     )
 

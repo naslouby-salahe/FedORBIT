@@ -15,6 +15,9 @@ import torch
 from fedorbit.analysis.metrics import (
     EfficiencyRecord,
 )
+from fedorbit.analysis.records import (
+    MetricDirection,
+)
 from fedorbit.config.loading import active_config, raw_dataset_root
 from fedorbit.datasets.common import (
     file_sha256,
@@ -28,7 +31,7 @@ from fedorbit.datasets.materialization import (
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.scoring import build_completion_manifest
+from fedorbit.experiments.scoring import build_completion_manifest, persist_diagnostic_metric
 from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
@@ -102,6 +105,7 @@ from fedorbit.types import (
     AnonymousNodeDisplayId,
     ArtifactDirectorySegment,
     ArtifactFingerprint,
+    ArtifactIdentifier,
     ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
@@ -113,12 +117,15 @@ from fedorbit.types import (
     CoarseGroup,
     ConfigurationSection,
     DatasetId,
+    EvaluationConditionName,
     ExecutionAction,
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
     ImplementationIdentity,
     InvalidReason,
+    MetricId,
+    MetricUnit,
     OverwritePolicy,
     ReportColumnName,
     Rfc3339UtcTimestamp,
@@ -234,6 +241,7 @@ def _source_response_estimator_payload(
 
 
 def _perform_final_source_response_band_validation(
+    store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> None:
@@ -283,7 +291,11 @@ def _perform_final_source_response_band_validation(
                     seed,
                 )
                 checkpoint.state_dict.load_into(model)
-                packet = construct_source_packet(
+                checkpoint_sha256 = file_sha256(checkpoint_path)
+                response_configuration_sha256 = Sha256Digest(
+                    hashlib.sha256(selected_path.read_bytes()).hexdigest()
+                )
+                constructed = construct_source_packet(
                     PacketConstructionContext(
                         dataset,
                         materialized.feature_count,
@@ -292,8 +304,8 @@ def _perform_final_source_response_band_validation(
                         tuple(AnonymousNodeDisplayId(group.concept.value) for group in groups),
                         tuple(group.train_support for group in groups),
                         tuple(group.meta_support for group in groups),
-                        file_sha256(checkpoint_path),
-                        Sha256Digest(hashlib.sha256(selected_path.read_bytes()).hexdigest()),
+                        checkpoint_sha256,
+                        response_configuration_sha256,
                         seed,
                     ),
                     checkpoint,
@@ -307,7 +319,25 @@ def _perform_final_source_response_band_validation(
                     checkpoint.train_class_weights,
                     candidate,
                     Rfc3339UtcTimestamp(datetime.now(UTC).isoformat().replace("+00:00", "Z")),
-                ).packet
+                )
+                packet = constructed.packet
+                persist_diagnostic_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    dataset,
+                    EvaluationConditionName(coarse_group.value),
+                    seed,
+                    MetricId.RESOURCE_LIMIT_INDICATOR,
+                    0.0 if constructed.estimate.stability_rule_passed else 1.0,
+                    MetricUnit.BOOLEAN,
+                    MetricDirection.DESCRIPTIVE,
+                    (
+                        ArtifactIdentifier(checkpoint_sha256),
+                        ArtifactIdentifier(response_configuration_sha256),
+                    ),
+                    request.overwrite_policy,
+                )
                 destination = (
                     experiment_workspace(layout, request.experiment)
                     / StorageLayoutSegment.ARTIFACTS
@@ -456,7 +486,7 @@ def execute_final_source_response_band_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
-    _perform_final_source_response_band_validation(layout, request)
+    _perform_final_source_response_band_validation(store, layout, request)
     return persist_synthetic_experiment_payload(
         store,
         layout,

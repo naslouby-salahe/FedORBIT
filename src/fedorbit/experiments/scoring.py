@@ -25,9 +25,12 @@ from fedorbit.analysis.metrics import (
     recall_from_counts,
 )
 from fedorbit.analysis.records import (
+    DiagnosticMetricRecord,
+    DiagnosticMetricRecordCollection,
     MetricDirection,
     MetricRecord,
     MetricRecordCollection,
+    validate_diagnostic_metric_records,
     validate_metric_records,
 )
 from fedorbit.config.loading import active_config
@@ -387,6 +390,112 @@ def persist_primary_transfer_metric(
         )
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
+    atomic_write_json(payload_path, payload)
+    payload_sha256 = file_sha256(payload_path)
+    configuration_sha256 = Sha256Digest(
+        configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
+    )
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SCORING_V1))
+    completion = build_completion_manifest(
+        coordinates,
+        fingerprint,
+        ArtifactPath(payload_path),
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        stage=ArtifactStage.EVALUATION,
+        upstream_artifact_ids=tuple(input_artifact_ids),
+    )
+    manifest = ReusableArtifactManifest.model_validate(
+        OrderedDict(
+            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
+            artifact_type=ArtifactType.PREDICTION,
+            semantic_producer_coordinates=coordinates,
+            producer_stage=ArtifactStage.EVALUATION,
+            dependency_fingerprint_sha256=fingerprint,
+            upstream_artifact_ids=tuple(input_artifact_ids),
+            applicable_configuration_sha256=configuration_sha256,
+            relevant_code_sha256=code_sha256,
+            payload_paths=(str(payload_path),),
+            payload_sha256=payload_sha256,
+            schema_version=ArtifactSchemaVersion.V1,
+            created_git_commit=current_code_revision().commit,
+            created_environment_sha256=environment_snapshot().fingerprint_sha256,
+            state=ArtifactState.COMPLETED,
+            completion_required=True,
+            completion_manifest_sha256=completion.completion_manifest_sha256,
+        )
+    )
+    store.write_completed(manifest, completion)
+    return manifest
+
+
+def persist_diagnostic_metric(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    dataset: DatasetId,
+    condition: EvaluationConditionName,
+    seed: RandomSeed,
+    metric_name: MetricId,
+    metric_value: Estimate | None,
+    metric_unit: MetricUnit,
+    direction: MetricDirection,
+    input_artifact_ids: ArtifactIdentifiers,
+    overwrite_policy: OverwritePolicy,
+    valid: bool = True,
+    invalid_reason: InvalidReason | None = None,
+) -> ReusableArtifactManifest | None:
+    relevance = experiment_relevance(experiment)
+    cell = SemanticCell(
+        experiment=experiment,
+        dataset=dataset,
+        condition=condition,
+        seed=ExperimentSeed(seed),
+    )
+    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
+    fingerprint = Sha256Digest(
+        stage_dependency_fingerprint(
+            ArtifactStage.EVALUATION,
+            cell,
+            relevance,
+            input_artifact_ids,
+            _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
+            ImplementationIdentity.SCORING_V1,
+            metric_name=metric_name,
+        )
+    )
+    if overwrite_policy == OverwritePolicy.REUSE:
+        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
+        if existing is not None:
+            return existing
+    metric = DiagnosticMetricRecord(
+        experiment=experiment,
+        dataset=dataset,
+        condition=condition,
+        seed=seed,
+        metric_name=metric_name,
+        metric_value=metric_value,
+        metric_unit=metric_unit,
+        direction=direction,
+        evaluation_class_set_sha256=Sha256Digest(
+            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
+        ),
+        input_artifact_ids=tuple(input_artifact_ids),
+        dependency_fingerprint_sha256=fingerprint,
+        valid=valid,
+        invalid_reason=invalid_reason,
+    )
+    validate_diagnostic_metric_records(DiagnosticMetricRecordCollection((metric,)))
+    payload_path = (
+        experiment_workspace(layout, experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"diagnostic.{dataset.value}.{condition}.{seed}.{metric_name.value}.json"
+    )
+    payload = cast(
+        StableJsonPayload, OrderedDict(diagnostic_metric_record=metric.model_dump(mode="json"))
+    )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(

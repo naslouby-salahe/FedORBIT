@@ -13,7 +13,7 @@ from fedorbit.analysis.records import (
     PairedComparisonRecord,
 )
 from fedorbit.config.loading import active_config
-from fedorbit.experiments.catalogue import ExperimentExecutionRequest
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest, build_catalogue
 from fedorbit.experiments.synthesis import (
     completed_experiment_metric_records as _completed_experiment_metric_records,
 )
@@ -193,6 +193,18 @@ def _metric_values(
     )
 
 
+def _diagnostic_metric_values(
+    store: ArtifactStore, experiment: ExperimentName, metric_name: MetricId
+) -> tuple[Estimate, ...]:
+    from fedorbit.experiments.synthesis import completed_experiment_diagnostic_metric_records
+
+    return tuple(
+        record.metric_value
+        for record in completed_experiment_diagnostic_metric_records(store, experiment)
+        if record.metric_name == metric_name and record.valid and record.metric_value is not None
+    )
+
+
 def _pair_records(
     comparisons: tuple[PairedComparisonRecord, ...],
     method_a: TransferMethod,
@@ -218,6 +230,9 @@ def _successful_pairs(
         and record.holm_p <= holm_maximum
         and record.bca_ci_low is not None
         and record.bca_ci_low > bca_floor
+        and record.mean_difference is not None
+        and record.materiality_threshold is not None
+        and record.mean_difference >= record.materiality_threshold
     )
 
 
@@ -331,9 +346,16 @@ def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
         return _not_tested("no theorem cells")
     wrong = sum(1 for cell in cells if not _cell_bool_field(cell, "exact_minima"))
     invalid = sum(1 for cell in cells if not _cell_bool_field(cell, "valid_certificate"))
-    if wrong == 0 and invalid == 0:
-        return _supported("separator exact on registered cells", "certificate verified")
-    return _not_supported("wrong minima or invalid certificates", "exactness failed")
+    if wrong != 0 or invalid != 0:
+        return _not_supported("wrong minima or invalid certificates", "exactness failed")
+    required = (
+        build_catalogue()
+        .definition(ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION)
+        .derived_planned_cells
+    )
+    if len(cells) < required:
+        return _not_tested(f"{len(cells)} of {required} required truth-available cells evaluated")
+    return _supported("separator exact on registered cells", "certificate verified")
 
 
 def _ablation_pair_method_means(
@@ -836,7 +858,7 @@ def _strict_interface_rule(
 
 
 def _source_response_rule(store: ArtifactStore) -> RuleVerdict:
-    failures = _metric_values(
+    failures = _diagnostic_metric_values(
         store,
         ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION,
         MetricId.RESOURCE_LIMIT_INDICATOR,

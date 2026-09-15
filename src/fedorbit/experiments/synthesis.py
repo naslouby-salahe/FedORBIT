@@ -17,6 +17,7 @@ from fedorbit.analysis.metrics import (
 )
 from fedorbit.analysis.records import (
     ComparisonDecision,
+    DiagnosticMetricRecord,
     MetricRecord,
     PairedComparisonRecord,
     StatisticalAlternative,
@@ -227,6 +228,17 @@ def completed_experiment_metric_records(
     return tuple(
         MetricRecord.model_validate(payload)
         for _, payload in _iter_completed_json_payloads(store, experiment, "metric_record")
+    )
+
+
+def completed_experiment_diagnostic_metric_records(
+    store: ArtifactStore, experiment: ExperimentName
+) -> tuple[DiagnosticMetricRecord, ...]:
+    return tuple(
+        DiagnosticMetricRecord.model_validate(payload)
+        for _, payload in _iter_completed_json_payloads(
+            store, experiment, "diagnostic_metric_record"
+        )
     )
 
 

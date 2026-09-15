@@ -99,8 +99,7 @@ CELL_RELEVANCE_BY_EXPERIMENT: Mapping[ExperimentName, frozenset[SemanticCoordina
                 {
                     SemanticCoordinate.EXPERIMENT,
                     SemanticCoordinate.DATASET,
-                    SemanticCoordinate.DIRECTED_PAIR,
-                    SemanticCoordinate.METHOD,
+                    SemanticCoordinate.CONDITION,
                     SemanticCoordinate.SEED,
                 }
             ),

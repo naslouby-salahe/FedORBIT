@@ -59,12 +59,12 @@ def test_primitive_validation_persists_the_realized_fixture_cell_plan(tmp_path: 
     definition = build_catalogue().definition(ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION)
     block_patterns = active_config().generators.exact_separator_theorem.block_patterns
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
-    assert _as_int(payload, "registered_planned_cells") == definition.derived_planned_cells == 0
+    expected_cells = len(block_patterns) * (1 + len(confirmatory_seeds))
+    assert _as_int(payload, "registered_planned_cells") == definition.derived_planned_cells
+    assert definition.derived_planned_cells == expected_cells
     assert _as_sequence(payload, "registered_seeds") == tuple(definition.seeds)
     assert _as_int(payload, "realized_cell_count") == len(_cells(payload))
-    assert _as_int(payload, "realized_cell_count") == len(block_patterns) * (
-        1 + len(confirmatory_seeds)
-    )
+    assert _as_int(payload, "realized_cell_count") == expected_cells
     assert _as_int(payload, "hand_fixture_seed") == (
         active_config().experiments.mathematical_primitive_validation.hand_fixture_seed
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import statistics
 from collections import OrderedDict
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -11,7 +11,9 @@ from typing import cast
 from pydantic import JsonValue
 
 from fedorbit.analysis.metrics import (
+    CrossEntropy,
     harm_indicator,
+    relative_macro_ce_gain,
 )
 from fedorbit.analysis.records import (
     ComparisonDecision,
@@ -54,7 +56,6 @@ from fedorbit.infrastructure.manifests import (
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
@@ -72,6 +73,7 @@ from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactIdentifiers,
+    ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
     ArtifactStage,
@@ -83,8 +85,6 @@ from fedorbit.types import (
     ConfigurationSection,
     ContrastName,
     ContrastPValueSuffix,
-    DatasetId,
-    DirectedPair,
     DirectedPairName,
     Estimate,
     EvaluationCondition,
@@ -92,15 +92,17 @@ from fedorbit.types import (
     EvaluationConditionName,
     ExperimentLocalMethod,
     ExperimentName,
+    ExperimentSeed,
     FineLabel,
+    ImplementationIdentity,
     Index,
     MethodName,
     MetricId,
     MultiplicityFamily,
     OracleTransferConcept,
     OverwritePolicy,
-    PValueName,
     Probability,
+    PValueName,
     RelativeGain,
     ReportColumnName,
     ResampleCount,
@@ -117,6 +119,7 @@ from fedorbit.types import (
     SupportSize,
     TransferMethod,
     contrast_p_value_name,
+    parse_directed_pair_name,
 )
 
 
@@ -382,9 +385,7 @@ def persist_primary_transfer_comparison(
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
-        directed_pair=DirectedPair(
-            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
-        ),
+        directed_pair=parse_directed_pair_name(pair),
         method=method,
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -395,7 +396,7 @@ def persist_primary_transfer_comparison(
             relevance,
             input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SYNTHESIS_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -408,7 +409,7 @@ def persist_primary_transfer_comparison(
         pair=DirectedPairName(pair),
         method_a=method,
         method_b=TransferMethod.LOCAL_ONLY,
-        metric=MetricId.MACRO_CROSS_ENTROPY,
+        metric=MetricId.RELATIVE_MACRO_CE_GAIN,
         paired_seed_count=paired_seed_count,
         mean_difference=mean_difference,
         median_difference=median_difference,
@@ -437,8 +438,7 @@ def persist_primary_transfer_comparison(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.STATISTICS).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SYNTHESIS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -446,7 +446,6 @@ def persist_primary_transfer_comparison(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.STATISTICS,
         upstream_artifact_ids=tuple(input_metric_artifact_ids),
     )
@@ -460,7 +459,6 @@ def persist_primary_transfer_comparison(
             upstream_artifact_ids=tuple(input_metric_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -475,19 +473,149 @@ def persist_primary_transfer_comparison(
     return manifest
 
 
+PRIMARY_TRANSFER_CONTRAST_METHOD = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+
+
+def _paired_relative_gains(
+    reference_values: Mapping[RandomSeed, _SeedMetric],
+    method_values: Mapping[RandomSeed, _SeedMetric],
+    shared_seeds: Sequence[RandomSeed],
+) -> tuple[RelativeGain, ...]:
+    gains: list[RelativeGain] = []
+    for seed in shared_seeds:
+        gain = relative_macro_ce_gain(
+            CrossEntropy(reference_values[seed].value),
+            CrossEntropy(method_values[seed].value),
+        )
+        if gain.relative is not None:
+            gains.append(gain.relative)
+    return tuple(gains)
+
+
+class StatisticsError(ValueError):
+    pass
+
+
+_FAMILY_CONTRAST_MULTIPLICITY_PER_PAIR: Mapping[MultiplicityFamily, Index] = OrderedDict(
+    (
+        (MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY, 1),
+        (MultiplicityFamily.EXTERNAL_SOURCE_VS_LOCAL_SIR, 2),
+        (MultiplicityFamily.COUPLING_MECHANISM, 1),
+        (MultiplicityFamily.POINT_CORRESPONDENCE_SAFETY, 2),
+        (MultiplicityFamily.MECHANISM_ABLATIONS, 2),
+        (MultiplicityFamily.SPARSITY_SENSITIVITY, 3),
+        (MultiplicityFamily.CONFIRMATION_SAFETY, 1),
+    )
+)
+
+
+def registered_family_contrast_counts() -> Mapping[MultiplicityFamily, Index]:
+    pair_count = len(active_config().scientific.datasets.primary_directed_pairs)
+    counts: OrderedDict[MultiplicityFamily, Index] = OrderedDict()
+    for family, per_pair in _FAMILY_CONTRAST_MULTIPLICITY_PER_PAIR.items():
+        counts[family] = pair_count * per_pair
+    return counts
+
+
+def enforce_registered_family_membership(
+    observed: Mapping[MultiplicityFamily, Index],
+) -> None:
+    registered = registered_family_contrast_counts()
+    for family, count in observed.items():
+        permitted = registered.get(family)
+        if permitted is None:
+            raise StatisticsError(f"unregistered multiplicity family: {family.value}")
+        if count > permitted:
+            raise StatisticsError(
+                f"multiplicity family {family.value} carries {count} contrasts, above the "
+                f"registered potential of {permitted}"
+            )
+
+
+def _family_lock_payload(fingerprint: Sha256Digest) -> StableJsonPayload:
+    lock_record: OrderedDict[str, StableJsonPayload] = OrderedDict(
+        experiment=ExperimentName.STATISTICAL_SYNTHESIS.value,
+        dependency_fingerprint_sha256=fingerprint,
+        state=ArtifactState.COMPLETED.value,
+        registered_family_contrast_counts=OrderedDict(
+            (family.value, count) for family, count in registered_family_contrast_counts().items()
+        ),
+    )
+    return cast(
+        StableJsonPayload,
+        OrderedDict(family_definition_lock=lock_record),
+    )
+
+
+def _locked_family_contrast_counts(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+) -> Mapping[str, Index] | None:
+    for _, payload in _iter_completed_json_payloads(
+        store, ExperimentName.STATISTICAL_SYNTHESIS, "family_definition_lock"
+    ):
+        recorded = payload.get("registered_family_contrast_counts")
+        if isinstance(recorded, Mapping):
+            recorded_counts = cast(Mapping[str, StableJsonPayload], recorded)
+            restored: OrderedDict[str, Index] = OrderedDict()
+            for key in recorded_counts:
+                restored[str(key)] = int(str(recorded_counts[key]))
+            return restored
+    del layout
+    return None
+
+
+def persist_family_definition_lock(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    from fedorbit.experiments.validation import persist_synthetic_experiment_payload
+
+    locked = _locked_family_contrast_counts(store, layout)
+    current: dict[str, Index] = {
+        family.value: count for family, count in registered_family_contrast_counts().items()
+    }
+    if locked is not None and dict(locked) != current:
+        raise StatisticsError(
+            "registered multiplicity family definitions changed after the family definitions were "
+            "locked; statistical families are locked before evidence-bearing TEST access"
+        )
+    if locked is not None:
+        return
+    persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        ExperimentSeed(0),
+        _family_lock_payload,
+        _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
+        ImplementationIdentity.SYNTHESIS_V1,
+        ArtifactName("family-definition-lock"),
+    )
+
+
+def enforce_observed_family_membership(store: ArtifactStore) -> None:
+    observed: OrderedDict[MultiplicityFamily, Index] = OrderedDict()
+    for _, payload in _iter_completed_json_payloads(
+        store, ExperimentName.STATISTICAL_SYNTHESIS, "comparison_record"
+    ):
+        family = MultiplicityFamily(str(payload.get("family")))
+        observed[family] = observed.get(family, 0) + 1
+    enforce_registered_family_membership(observed)
+
+
 def execute_statistical_synthesis(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> None:
+    persist_family_definition_lock(store, layout, request)
+    enforce_observed_family_membership(store)
     metrics = _completed_primary_transfer_macro_ce(store)
     pairs = sorted({pair for pair, _, _ in metrics})
-    methods = sorted(
-        {method for _, method, _ in metrics if method != TransferMethod.LOCAL_ONLY},
-        key=lambda method: method.value,
-    )
     statistics_config = active_config().scientific.statistics
-    for method in methods:
+    for method in (PRIMARY_TRANSFER_CONTRAST_METHOD,):
         raw_p_by_pair: OrderedDict[DirectedPairName, SignificanceLevel] = OrderedDict()
         metadata_inputs: OrderedDict[DirectedPairName, tuple[Index, RandomSeed]] = OrderedDict()
         contrasts: OrderedDict[
@@ -513,29 +641,37 @@ def execute_statistical_synthesis(
                 if candidate_pair == pair and candidate_method == method
             )
             shared_seeds = sorted(set(local_only_seeds) & set(method_seeds))
-            paired_seed_count: Index = len(shared_seeds)
+            relative_gains: OrderedDict[RandomSeed, RelativeGain] = OrderedDict()
+            for seed in shared_seeds:
+                gain = relative_macro_ce_gain(
+                    CrossEntropy(local_only_seeds[seed].value),
+                    CrossEntropy(method_seeds[seed].value),
+                )
+                if gain.relative is not None:
+                    relative_gains[seed] = gain.relative
+            paired_seed_count: Index = len(relative_gains)
             input_ids = tuple(
                 identifier
-                for seed in shared_seeds
+                for seed in relative_gains
                 for identifier in (
                     local_only_seeds[seed].artifact_id,
                     method_seeds[seed].artifact_id,
                 )
             )
-            if len(shared_seeds) < statistics_config.minimum_valid_paired_seeds:
+            if paired_seed_count < statistics_config.minimum_valid_paired_seeds:
                 contrasts[pair] = (paired_seed_count, None, None, None, None, input_ids)
                 continue
-            local_only_values = tuple(local_only_seeds[seed].value for seed in shared_seeds)
-            method_values = tuple(method_seeds[seed].value for seed in shared_seeds)
+            gain_values = tuple(relative_gains.values())
+            zero_reference = tuple(0.0 for _ in gain_values)
             bootstrap_seed = statistical_bootstrap_seed(
                 ContrastName(f"{method.value} vs Local-Only"),
                 MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
                 DirectedPairName(pair),
-                MetricId.MACRO_CROSS_ENTROPY,
+                MetricId.RELATIVE_MACRO_CE_GAIN,
                 BootstrapPurpose.PRIMARY_TRANSFER_GAIN,
             )
-            bca = paired_bca_interval(local_only_values, method_values, bootstrap_seed)
-            sign_flip = exact_sign_flip_test(local_only_values, method_values)
+            bca = paired_bca_interval(gain_values, zero_reference, bootstrap_seed)
+            sign_flip = exact_sign_flip_test(gain_values, zero_reference)
             raw_p_by_pair[pair] = sign_flip.p_value
             metadata_inputs[pair] = (sign_flip.nonzero_difference_count, bootstrap_seed)
             contrasts[pair] = (
@@ -1552,14 +1688,8 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                     sparsity_unpaired_bootstrap_seed,
                 )
                 continue
-            gain_a = tuple(
-                (local_only_seeds[seed].value - seeds_a[seed].value) / local_only_seeds[seed].value
-                for seed in shared_seeds
-            )
-            gain_b = tuple(
-                (local_only_seeds[seed].value - seeds_b[seed].value) / local_only_seeds[seed].value
-                for seed in shared_seeds
-            )
+            gain_a = _paired_relative_gains(local_only_seeds, seeds_a, shared_seeds)
+            gain_b = _paired_relative_gains(local_only_seeds, seeds_b, shared_seeds)
             bootstrap_seed = statistical_bootstrap_seed(
                 ContrastName(f"{condition_a} vs {condition_b}"),
                 MultiplicityFamily.SPARSITY_SENSITIVITY,
@@ -1740,20 +1870,16 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 confirmation_unpaired_bootstrap_seed,
             )
             continue
-        harmful_with_values: list[float] = []
-        for seed in shared_seeds:
-            gain: RelativeGain = (
-                local_only_seeds[seed].value - with_confirm_seeds[seed].value
-            ) / local_only_seeds[seed].value
-            harmful_with_values.append(1.0 if harm_indicator(gain, harmful_threshold) else 0.0)
-        harmful_with = tuple(harmful_with_values)
-        harmful_without_values: list[float] = []
-        for seed in shared_seeds:
-            gain: RelativeGain = (
-                local_only_seeds[seed].value - without_confirm_seeds[seed].value
-            ) / local_only_seeds[seed].value
-            harmful_without_values.append(1.0 if harm_indicator(gain, harmful_threshold) else 0.0)
-        harmful_without = tuple(harmful_without_values)
+        harmful_with = tuple(
+            1.0 if harm_indicator(gain, harmful_threshold) else 0.0
+            for gain in _paired_relative_gains(local_only_seeds, with_confirm_seeds, shared_seeds)
+        )
+        harmful_without = tuple(
+            1.0 if harm_indicator(gain, harmful_threshold) else 0.0
+            for gain in _paired_relative_gains(
+                local_only_seeds, without_confirm_seeds, shared_seeds
+            )
+        )
         harm_rate_without_confirmation: Probability = statistics.fmean(harmful_without)
         bootstrap_seed = statistical_bootstrap_seed(
             ContrastName(
@@ -1916,9 +2042,7 @@ def _completed_real_packet_coupling_gap(
             or record.metric_value is None
         ):
             continue
-        result[(record.pair, record.seed)] = _SeedMetric(
-            record.metric_value, resolved.artifact_id
-        )
+        result[(record.pair, record.seed)] = _SeedMetric(record.metric_value, resolved.artifact_id)
     return result
 
 
@@ -1941,9 +2065,7 @@ def persist_coupling_mechanism_comparison(
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
-        directed_pair=DirectedPair(
-            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
-        ),
+        directed_pair=parse_directed_pair_name(pair),
         method=TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -1954,7 +2076,7 @@ def persist_coupling_mechanism_comparison(
             relevance,
             input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SYNTHESIS_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -1998,8 +2120,7 @@ def persist_coupling_mechanism_comparison(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.STATISTICS).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SYNTHESIS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -2007,7 +2128,6 @@ def persist_coupling_mechanism_comparison(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.STATISTICS,
         upstream_artifact_ids=tuple(input_metric_artifact_ids),
     )
@@ -2021,7 +2141,6 @@ def persist_coupling_mechanism_comparison(
             upstream_artifact_ids=tuple(input_metric_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -2063,9 +2182,7 @@ def persist_baseline_comparison(
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
-        directed_pair=DirectedPair(
-            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
-        ),
+        directed_pair=parse_directed_pair_name(pair),
         method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         condition=EvaluationConditionName(contrast_name),
     )
@@ -2077,7 +2194,7 @@ def persist_baseline_comparison(
             relevance,
             input_metric_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SYNTHESIS_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -2119,8 +2236,7 @@ def persist_baseline_comparison(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.STATISTICS).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SYNTHESIS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -2128,7 +2244,6 @@ def persist_baseline_comparison(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.STATISTICS,
         upstream_artifact_ids=tuple(input_metric_artifact_ids),
     )
@@ -2142,7 +2257,6 @@ def persist_baseline_comparison(
             upstream_artifact_ids=tuple(input_metric_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -2183,9 +2297,7 @@ def persist_statistical_metadata(
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
-        directed_pair=DirectedPair(
-            source=DatasetId(pair.split(" -> ")[0]), target=DatasetId(pair.split(" -> ")[1])
-        ),
+        directed_pair=parse_directed_pair_name(pair),
         method=method,
         condition=EvaluationConditionName(comparison_statistic.value),
     )
@@ -2198,7 +2310,7 @@ def persist_statistical_metadata(
             relevance,
             input_artifact_ids,
             _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SYNTHESIS_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -2217,7 +2329,7 @@ def persist_statistical_metadata(
         bootstrap_seed=bootstrap_seed,
         holm_rank=holm_rank,
         family_size=family_size,
-        statistical_code_sha256=implementation_fingerprint(__name__),
+        statistical_code_sha256=implementation_fingerprint(ImplementationIdentity.SYNTHESIS_V1),
     )
     validate_comparison_metadata(comparison, metadata)
     payload_path = (
@@ -2237,8 +2349,7 @@ def persist_statistical_metadata(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.STATISTICS).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SYNTHESIS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -2246,7 +2357,6 @@ def persist_statistical_metadata(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.STATISTICS,
         upstream_artifact_ids=tuple(input_artifact_ids),
     )
@@ -2260,7 +2370,6 @@ def persist_statistical_metadata(
             upstream_artifact_ids=tuple(input_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,

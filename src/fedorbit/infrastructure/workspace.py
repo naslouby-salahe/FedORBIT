@@ -1,34 +1,41 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
-import tempfile
 import unicodedata
 from collections import Counter, OrderedDict
+from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from pathlib import Path
 from typing import cast
 
 import pandas as pd
-from filelock import FileLock
 
 from fedorbit.config.loading import active_config, repository_root
+from fedorbit.datasets.common import PreprocessingObservationArtifact
 from fedorbit.datasets.edge_iiotset.loader import inspect_edge_tabular_files
 from fedorbit.datasets.ton_iot.components import component_for
 from fedorbit.datasets.ton_iot.loader import inspect_ton_iot_component_files
-from fedorbit.infrastructure.storage import atomic_write_json
+from fedorbit.infrastructure.storage import (
+    promote_json,
+    promote_table_payload,
+)
 from fedorbit.types import (
     ByteCount,
+    ClientComponentName,
     DatasetId,
     DatasetRelativePath,
+    DatasetReleaseIdentity,
     ExperimentName,
     FilesystemSlug,
     RawDatasetDirectory,
     RawInventoryArtifact,
     ReportColumnName,
     Sha256Digest,
+    Split,
     StableJsonPayload,
+    StorageLayoutSegment,
     TabularColumnName,
     stable_json,
 )
@@ -85,6 +92,76 @@ def results_workspace(layout: WorkspaceLayout, experiment: ExperimentName) -> Pa
     return layout.results_experiments / safe_slug(experiment.value)
 
 
+class PreprocessingDirectorySegment(StrEnum):
+    SPLITS = auto()
+
+
+class PreprocessingPayloadFileName(StrEnum):
+    DATASET_MANIFEST = "data.json"
+    MATERIALIZED_CLIENT = "client.pt"
+    SPLIT_PAYLOAD = "data.parquet"
+
+
+class DatasetManifestFileName(StrEnum):
+    PREFIX = "dataset-manifest"
+    SUFFIX = "json"
+
+
+class ExperimentLogDirectory(StrEnum):
+    LOGS = auto()
+    EXECUTION = auto()
+    FAILURES = auto()
+
+
+class ExperimentLogFileName(StrEnum):
+    EVENTS = "events.jsonl"
+
+
+def prepared_dataset_directory(layout: WorkspaceLayout, dataset: DatasetId) -> Path:
+    return layout.preprocessing / StorageLayoutSegment.PREPARED / dataset.value
+
+
+def feature_dataset_directory(layout: WorkspaceLayout, dataset: DatasetId) -> Path:
+    return layout.preprocessing / StorageLayoutSegment.FEATURES / dataset.value
+
+
+def split_dataset_directory(
+    layout: WorkspaceLayout,
+    dataset: DatasetId,
+    split: Split,
+) -> Path:
+    return layout.preprocessing / PreprocessingDirectorySegment.SPLITS / dataset.value / split.value
+
+
+def dataset_manifest_path(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    dataset: DatasetId,
+) -> Path:
+    return (
+        experiment_workspace(layout, experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / f"{DatasetManifestFileName.PREFIX.value}.{dataset.value}."
+        f"{DatasetManifestFileName.SUFFIX.value}"
+    )
+
+
+def experiment_event_log_path(
+    execution_root: Path,
+    experiment: ExperimentName,
+    log_directory: ExperimentLogDirectory,
+) -> Path:
+    return (
+        execution_root
+        / StorageLayoutSegment.EXPERIMENTS
+        / safe_slug(experiment.value)
+        / ExperimentLogDirectory.LOGS
+        / log_directory
+        / ExperimentLogFileName.EVENTS
+    )
+
+
 class RawInventoryError(ValueError):
     pass
 
@@ -93,6 +170,7 @@ class RawInventoryError(ValueError):
 class RawInventoryRequest:
     dataset: DatasetId
     raw_root: Path
+    release_identity: DatasetReleaseIdentity | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,10 +185,26 @@ class RawFileInventory:
 class RawDatasetInventory:
     dataset: DatasetId
     files: tuple[RawFileInventory, ...]
+    component: ClientComponentName | None = None
+    release_identity: DatasetReleaseIdentity | None = None
 
     def __post_init__(self) -> None:
         if not self.files:
             raise RawInventoryError("raw dataset inventory requires at least one file")
+
+    def release_payload(self) -> StableJsonPayload:
+        identity = self.release_identity
+        if identity is None:
+            return cast(StableJsonPayload, None)
+        return cast(
+            StableJsonPayload,
+            OrderedDict[str, StableJsonPayload](
+                release=identity.release,
+                acquisition_source=identity.acquisition_source,
+                acquisition_timestamp=identity.acquisition_timestamp,
+                license_note=identity.license_note,
+            ),
+        )
 
     def fingerprint(self) -> Sha256Digest:
         return Sha256Digest(
@@ -135,6 +229,8 @@ class RawDatasetInventory:
             StableJsonPayload,
             OrderedDict[str, StableJsonPayload](
                 dataset=self.dataset.value,
+                component=self.component,
+                release_identity=self.release_payload(),
                 files=file_entries,
             ),
         )
@@ -144,6 +240,7 @@ class RawDatasetInventory:
 class RawInventoryPersistenceRequest:
     inventory: RawDatasetInventory
     preprocessing_root: Path
+    staging_root: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,20 +248,28 @@ class RawDuplicateReportRequest:
     dataset: DatasetId
     raw_root: Path
     preprocessing_root: Path
+    staging_root: Path | None = None
 
 
-def promote_parquet(frame: pd.DataFrame, destination: Path, filename: str) -> Path:
-    target = destination / filename
-    with FileLock(str(destination / f"{filename}.lock")):
-        descriptor, temporary_name = tempfile.mkstemp(dir=destination, suffix=".parquet")
-        os.close(descriptor)
-        temporary = Path(temporary_name)
-        try:
-            frame.to_parquet(temporary, index=False, compression="zstd")
-            os.replace(temporary, target)
-        finally:
-            temporary.unlink(missing_ok=True)
-    return target
+def execution_staging_root(execution_root: Path) -> Path:
+    layout = active_config().runtime.artifact_layout
+    return execution_root / layout.cache_directory / layout.staging_directory
+
+
+def request_staging_root(preprocessing_root: Path, staging_root: Path | None) -> Path:
+    if staging_root is not None:
+        return staging_root
+    return execution_staging_root(preprocessing_root.parent)
+
+
+def promote_parquet(
+    frame: pd.DataFrame,
+    destination: Path,
+    filename: str,
+    staging_root: Path,
+    sort_columns: Sequence[TabularColumnName] | None = None,
+) -> Path:
+    return promote_table_payload(destination / filename, frame, sort_columns, staging_root)
 
 
 def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
@@ -173,19 +278,21 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
         / RawInventoryArtifact.INVENTORIES
         / request.inventory.dataset.value
     )
-    destination.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(
+    staging_root = request_staging_root(request.preprocessing_root, request.staging_root)
+    promote_json(
         destination / RawInventoryArtifact.MANIFEST_JSON,
         request.inventory.serialization_payload(),
+        staging_root,
     )
-    atomic_write_json(
+    promote_json(
         destination / RawInventoryArtifact.CHECKSUMS_JSON,
         cast(
             StableJsonPayload,
             OrderedDict((entry.relative_path, entry.sha256) for entry in request.inventory.files),
         ),
+        staging_root,
     )
-    atomic_write_json(
+    promote_json(
         destination / RawInventoryArtifact.SCHEMA_JSON,
         cast(
             StableJsonPayload,
@@ -193,6 +300,7 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
                 (entry.relative_path, list(entry.columns)) for entry in request.inventory.files
             ),
         ),
+        staging_root,
     )
     frame = pd.DataFrame(
         OrderedDict(
@@ -202,13 +310,20 @@ def persist_raw_inventory(request: RawInventoryPersistenceRequest) -> Path:
             columns=[list(entry.columns) for entry in request.inventory.files],
         )
     )
-    promote_parquet(frame, destination, "files.parquet")
+    promote_parquet(
+        frame,
+        destination,
+        "files.parquet",
+        staging_root,
+        (TabularColumnName("relative_path"),),
+    )
     return destination / RawInventoryArtifact.MANIFEST_JSON
 
 
 def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
-    destination = request.preprocessing_root / "validation" / request.dataset.value
-    destination.mkdir(parents=True, exist_ok=True)
+    destination = (
+        request.preprocessing_root / StorageLayoutSegment.VALIDATION / request.dataset.value
+    )
     occurrence_counts: Counter[Sha256Digest] = Counter()
     for source in _selected_raw_paths(request.dataset, request.raw_root):
         with source.open("rb") as handle:
@@ -230,7 +345,13 @@ def persist_raw_duplicate_report(request: RawDuplicateReportRequest) -> Path:
             ReportColumnName.DUPLICATE_ROW_COUNT,
         ),
     )
-    return promote_parquet(frame, destination, "duplicates.parquet")
+    return promote_parquet(
+        frame,
+        destination,
+        PreprocessingObservationArtifact.DUPLICATES,
+        request_staging_root(request.preprocessing_root, request.staging_root),
+        (TabularColumnName(ReportColumnName.RAW_ROW_SHA256.value),),
+    )
 
 
 def _selected_raw_paths(dataset: DatasetId, raw_root: Path) -> tuple[Path, ...]:
@@ -255,6 +376,12 @@ def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:
         )
     return RawDatasetInventory(
         dataset=request.dataset,
+        component=(
+            ClientComponentName(request.dataset.value)
+            if request.dataset == DatasetId.EDGE_IIOTSET_NETWORK
+            else ClientComponentName(component_for(request.dataset).component_name)
+        ),
+        release_identity=request.release_identity,
         files=tuple(
             RawFileInventory(
                 relative_path=entry.relative_path,

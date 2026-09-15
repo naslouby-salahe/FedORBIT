@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
 from fedorbit.config.loading import configured, load_fedorbit_config
 from fedorbit.methods.target import (
     SelectionError,
     SourceProposal,
+    TransferNodeRisk,
+    build_target_importance,
     rank_source_proposals,
     select_source_sequentially,
 )
@@ -121,3 +125,20 @@ def test_ranking_is_deterministic() -> None:
     first = rank_source_proposals(candidates)
     second = rank_source_proposals(tuple(reversed(candidates)))
     assert first == second
+
+
+def test_target_importance_normalizes_actionable_meta_risks_and_zeros_null_nodes() -> None:
+    importance = build_target_importance(
+        (
+            TransferNodeRisk(node_index=0, is_actionable=True, meta_class_risk=0.0),
+            TransferNodeRisk(node_index=1, is_actionable=True, meta_class_risk=0.2),
+            TransferNodeRisk(node_index=2, is_actionable=False, meta_class_risk=0.9),
+        )
+    )
+    floor = load_fedorbit_config().scientific.target_importance.class_risk_floor
+    expected_total = floor + 0.2
+
+    assert importance.weights_by_node_index[0] == pytest.approx(floor / expected_total)
+    assert importance.weights_by_node_index[1] == pytest.approx(0.2 / expected_total)
+    assert importance.weights_by_node_index[2] == 0.0
+    assert importance.as_vector(3).sum() == pytest.approx(1.0)

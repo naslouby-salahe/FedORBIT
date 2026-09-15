@@ -12,6 +12,13 @@ from torch import nn
 from torch.optim.optimizer import StateDict
 from torch.utils.data import DataLoader, TensorDataset
 
+from fedorbit.analysis.metrics import (
+    ClassEntropySet,
+    CrossEntropy,
+)
+from fedorbit.analysis.metrics import (
+    macro_cross_entropy as reduce_macro_cross_entropy,
+)
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import (
     RandomSeed,
@@ -251,13 +258,13 @@ def macro_cross_entropy(
     probabilities = torch.softmax(logits.to(dtype=torch.float32), dim=1)
     selected = probabilities.gather(1, targets.unsqueeze(1)).squeeze(1)
     losses = -torch.log(torch.clamp(selected, min=probability_log_floor)).to(dtype=torch.float64)
-    class_losses: list[torch.Tensor] = []
+    class_entropies: list[CrossEntropy] = []
     for class_index in range(int(logits.shape[1])):
         mask = targets == class_index
         if not bool(mask.any()):
             raise TrainingError("VALID split is missing a local class")
-        class_losses.append(losses[mask].mean())
-    return float(torch.stack(class_losses).mean())
+        class_entropies.append(CrossEntropy(float(losses[mask].mean())))
+    return reduce_macro_cross_entropy(ClassEntropySet(tuple(class_entropies))).value
 
 
 def make_adamw(

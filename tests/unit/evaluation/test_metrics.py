@@ -19,11 +19,13 @@ from fedorbit.analysis.metrics import (
     beneficial_rejected_rate,
     class_conditional_cross_entropy,
     confusion_counts,
+    example_cross_entropy,
     f1_from_counts,
     macro_cross_entropy,
     macro_f1,
     precision_from_counts,
     recall_from_counts,
+    relative_macro_ce_gain,
 )
 from fedorbit.config.loading import load_fedorbit_config
 from fedorbit.config.models import FedorbitConfig
@@ -114,3 +116,42 @@ def test_beneficial_rejected_rate(config: FedorbitConfig) -> None:
     del config
     assert beneficial_rejected_rate(rejected_with_counterfactual_gain=2, proposed=8) == 0.25
     assert beneficial_rejected_rate(rejected_with_counterfactual_gain=0, proposed=0) is None
+
+
+def test_relative_macro_ce_gain_matches_hand_computed_reference(
+    config: FedorbitConfig,
+) -> None:
+    floor = config.scientific.metrics.relative_macro_ce_denominator_floor
+    reference = CrossEntropy(0.8)
+    improving = relative_macro_ce_gain(reference, CrossEntropy(0.6))
+    assert improving.relative == pytest.approx((0.8 - 0.6) / max(0.8, floor))
+    assert improving.absolute == pytest.approx(0.2)
+    worsening = relative_macro_ce_gain(reference, CrossEntropy(1.0))
+    assert worsening.relative == pytest.approx((0.8 - 1.0) / max(0.8, floor))
+    assert worsening.relative is not None and worsening.relative < 0.0
+    assert worsening.absolute == pytest.approx(-0.2)
+
+
+def test_relative_macro_ce_gain_is_na_at_or_below_the_denominator_floor(
+    config: FedorbitConfig,
+) -> None:
+    floor = config.scientific.metrics.relative_macro_ce_denominator_floor
+    method = CrossEntropy(0.0)
+    at_floor = relative_macro_ce_gain(CrossEntropy(floor), method)
+    assert at_floor.relative == pytest.approx(floor / max(floor, floor))
+    assert at_floor.absolute == pytest.approx(floor)
+    below_floor = relative_macro_ce_gain(CrossEntropy(floor / 10.0), method)
+    assert below_floor.relative is None
+    assert below_floor.absolute == pytest.approx(floor / 10.0)
+
+
+def test_example_and_class_conditional_cross_entropy_share_one_floor(
+    config: FedorbitConfig,
+) -> None:
+    floor = config.scientific.metrics.probability_log_floor
+    assert example_cross_entropy(Probability(0.5)).value == pytest.approx(-math.log(0.5))
+    assert example_cross_entropy(Probability(0.0)).value == pytest.approx(-math.log(floor))
+    class_value = class_conditional_cross_entropy(
+        TrueClassProbabilities((Probability(0.5), Probability(0.0)))
+    )
+    assert class_value.value == pytest.approx((-math.log(0.5) - math.log(floor)) / 2)

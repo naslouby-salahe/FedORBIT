@@ -30,7 +30,9 @@ from fedorbit.analysis.records import (
     MetricRecordCollection,
     validate_metric_records,
 )
+from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import (
+    FieldRole,
     file_sha256,
 )
 from fedorbit.datasets.materialization import (
@@ -51,12 +53,11 @@ from fedorbit.infrastructure.manifests import (
     CompletionManifest,
     ReusableArtifactManifest,
     artifact_id,
-    completion_manifest_self_hash,
+    build_artifact_completion,
 )
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
@@ -71,7 +72,10 @@ from fedorbit.infrastructure.workspace import (
 from fedorbit.interface import (
     AccessLogger,
     ResourceKind,
+    validate_disjoint_feature_namespaces,
     validate_dynamic_access_log_scan,
+    validate_no_cross_client_entity_ids,
+    validate_no_cross_client_timestamp_pairing,
     validate_resource_manifest_equality,
 )
 from fedorbit.learning.checkpoints import load_base_checkpoint
@@ -105,6 +109,7 @@ from fedorbit.methods.baselines import (
 from fedorbit.methods.target import (
     CurriculumMultipliers,
     TargetImportanceError,
+    TargetOptimizerStepLedger,
     TransferNodeRisk,
     build_target_importance,
 )
@@ -151,7 +156,6 @@ from fedorbit.types import (
     ClassIndex,
     ClientRole,
     CoarseGroup,
-    CompletionValidationState,
     ConfigurationSection,
     ContrastCoordinates,
     CorrespondenceBlockId,
@@ -163,6 +167,7 @@ from fedorbit.types import (
     ExperimentName,
     ExperimentSeed,
     FilesystemSlug,
+    ImplementationIdentity,
     Index,
     InvalidReason,
     MetricId,
@@ -170,6 +175,7 @@ from fedorbit.types import (
     MutableCell,
     OracleTransferConcept,
     OverwritePolicy,
+    PairSeedIneligibilityReason,
     SampleCount,
     ScaleFactor,
     Score,
@@ -184,10 +190,12 @@ from fedorbit.types import (
     Split,
     StableJsonPayload,
     StorageLayoutSegment,
+    StrictResourceValidity,
+    StrictResourceViolationError,
     SupportCount,
-    TerminalState,
+    TabularColumnName,
     TransferMethod,
-    stable_json,
+    directed_pair_name,
 )
 
 
@@ -198,55 +206,25 @@ def build_completion_manifest(
     payload_sha256: Sha256Digest,
     configuration_sha256: Sha256Digest,
     code_sha256: Sha256Digest,
-    runtime_sha256: Sha256Digest,
     stage: ArtifactStage = ArtifactStage.EVALUATION,
     upstream_artifact_ids: ArtifactIdentifiers = (),
 ) -> CompletionManifest:
-    completion = CompletionManifest.model_validate(
-        OrderedDict(
-            schema_version=ArtifactSchemaVersion.V1,
-            semantic_experiment_coordinates=coordinates,
-            producer_stage=stage,
-            terminal_state=TerminalState.COMPLETED,
-            dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=upstream_artifact_ids,
-            mandatory_artifact_paths=(str(payload_path),),
-            mandatory_artifact_sha256=payload_sha256,
-            scientific_configuration_sha256=configuration_sha256,
-            relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
-            upstream_lineage=stable_json(OrderedDict[str, StableJsonPayload]()),
-            completion_validation_state=CompletionValidationState.VALIDATED,
-            completion_written_last=True,
-            completion_manifest_sha256="",
-        )
-    )
-    return completion.model_copy(
-        update=OrderedDict(completion_manifest_sha256=completion_manifest_self_hash(completion))
+    return build_artifact_completion(
+        coordinates,
+        fingerprint,
+        payload_path,
+        payload_sha256,
+        configuration_sha256,
+        code_sha256,
+        stage,
+        upstream_artifact_ids=upstream_artifact_ids,
     )
 
 
 def latest_completed_manifest(
     store: ArtifactStore, experiment: ExperimentName
 ) -> ReusableArtifactManifest | None:
-    candidates: list[ReusableArtifactManifest] = []
-    for manifest in store.all_manifests():
-        if experiment.value not in manifest.semantic_producer_coordinates:
-            continue
-        try:
-            resolved = store.resolve(manifest.artifact_id)
-        except ValueError:
-            continue
-        if resolved.state == ArtifactState.COMPLETED:
-            candidates.append(resolved)
-    if not candidates:
-        return None
-    return max(
-        candidates,
-        key=lambda manifest: max(
-            Path(payload).stat().st_mtime_ns for payload in manifest.payload_paths
-        ),
-    )
+    return store.current_completed_manifest(experiment.value)
 
 
 _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS = frozenset(
@@ -302,7 +280,7 @@ def score_local_only_cell(
     n_classes = materialized.class_manifest.class_count
     model = create_classifier(
         target,
-        test.features.shape[1],
+        materialized.feature_count,
         n_classes,
         checkpoint.selected_hyperparameters.dropout_probability,
         seed,
@@ -372,7 +350,7 @@ def persist_primary_transfer_metric(
             relevance,
             input_artifact_ids,
             _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SCORING_V1,
             metric_name=metric_name,
         )
     )
@@ -414,8 +392,7 @@ def persist_primary_transfer_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SCORING_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -423,8 +400,8 @@ def persist_primary_transfer_metric(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.EVALUATION,
+        upstream_artifact_ids=tuple(input_artifact_ids),
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -433,10 +410,9 @@ def persist_primary_transfer_metric(
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
             dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=(),
+            upstream_artifact_ids=tuple(input_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -462,6 +438,7 @@ def persist_ineligible_transfer_cell(
     seed: RandomSeed,
     overwrite_policy: OverwritePolicy,
     condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
+    pair_seed_ineligibility_reason: PairSeedIneligibilityReason | None = None,
 ) -> ReusableArtifactManifest | None:
     return persist_primary_transfer_metric(
         store,
@@ -480,7 +457,11 @@ def persist_ineligible_transfer_cell(
         overwrite_policy,
         condition,
         valid=False,
-        invalid_reason=InvalidReason("INELIGIBLE/ABSTAIN"),
+        invalid_reason=(
+            InvalidReason("INELIGIBLE/ABSTAIN")
+            if pair_seed_ineligibility_reason is None
+            else InvalidReason(pair_seed_ineligibility_reason.value)
+        ),
     )
 
 
@@ -620,12 +601,15 @@ def persist_boundary_diagnostic_metrics(
         )
 
 
-def _dataset_eligible_groups_by_coarse(
-    target: DatasetId, materialized: MaterializedClient
+def eligible_groups_by_coarse(
+    dataset: DatasetId,
+    materialized: MaterializedClient,
+    role: ClientRole,
 ) -> Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]:
     eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
-    for group in transfer_concept_groups(target, materialized):
-        if group.source_eligible:
+    for group in transfer_concept_groups(dataset, materialized):
+        eligible = group.source_eligible if role is ClientRole.SOURCE else group.target_eligible
+        if eligible:
             eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
     return OrderedDict((coarse, tuple(groups)) for coarse, groups in eligible_by_group.items())
 
@@ -772,6 +756,11 @@ def _confirm_assimilate_and_score(
     access.record(ClientRole.TARGET, ResourceKind.META)
     access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
     pre_confirm = capture_pre_confirm_pair(model, optimizer)
+    optimizer_step_ledger = TargetOptimizerStepLedger(
+        method,
+        assimilation_coordinates.directed_pair,
+        seed,
+    )
     verdict = run_proposal_confirmation(
         ConfirmationRequest(
             model,
@@ -786,7 +775,8 @@ def _confirm_assimilate_and_score(
             checkpoint.selected_hyperparameters,
             seed,
             contrast_coordinates,
-        )
+        ),
+        optimizer_step_ledger,
     )
     if confirmation_verdict_sink is not None:
         confirmation_verdict_sink.value = verdict.accepted
@@ -805,6 +795,7 @@ def _confirm_assimilate_and_score(
             multipliers,
             seed,
             assimilation_coordinates,
+            optimizer_step_ledger,
         )
     else:
         settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
@@ -844,12 +835,12 @@ def score_local_sir_cell(
     checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
-    eligible_groups_by_coarse = _dataset_eligible_groups_by_coarse(target, materialized)
-    if not eligible_groups_by_coarse:
+    eligible_by_coarse = eligible_groups_by_coarse(target, materialized, ClientRole.TARGET)
+    if not eligible_by_coarse:
         return None
-    blocks = self_padded_blocks(eligible_groups_by_coarse)
+    blocks = self_padded_blocks(eligible_by_coarse)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
-    for coarse_group in eligible_groups_by_coarse:
+    for coarse_group in eligible_by_coarse:
         packet = load_dataset_source_packet(layout, target, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
@@ -864,7 +855,7 @@ def score_local_sir_cell(
     test = materialized.splits[Split.TEST]
     model = create_classifier(
         target,
-        train.features.shape[1],
+        materialized.feature_count,
         n_classes,
         checkpoint.selected_hyperparameters.dropout_probability,
         seed,
@@ -877,7 +868,7 @@ def score_local_sir_cell(
     meta_class_ce = tuple(
         entry.value for entry in meta_score.class_conditional_cross_entropy.values
     )
-    node_risks = target_node_risks(blocks, eligible_groups_by_coarse, meta_class_ce)
+    node_risks = target_node_risks(blocks, eligible_by_coarse, meta_class_ce)
     try:
         target_importance = build_target_importance(node_risks)
     except TargetImportanceError:
@@ -892,9 +883,7 @@ def score_local_sir_cell(
     )
     solution = local_sir_action(problem, response_matrix)
     action = solution.selected_action
-    multipliers = curriculum_multipliers_from_action(
-        action, blocks, eligible_groups_by_coarse, n_classes
-    )
+    multipliers = curriculum_multipliers_from_action(action, blocks, eligible_by_coarse, n_classes)
     optimizer = make_adamw(
         model,
         checkpoint.selected_hyperparameters.learning_rate,
@@ -920,7 +909,7 @@ def score_local_sir_cell(
         ContrastCoordinates(f"local-sir:{target.value}:{seed}"),
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
-            directed_pair=DirectedPairName(f"{target.value} -> {target.value}"),
+            directed_pair=directed_pair_name(target, target),
             condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
@@ -945,14 +934,200 @@ def common_eligible_groups(
     ]
     | None
 ):
-    target_eligible_all = _dataset_eligible_groups_by_coarse(target, target_materialized)
-    source_eligible_all = _dataset_eligible_groups_by_coarse(source, source_materialized)
+    target_eligible_all = eligible_groups_by_coarse(target, target_materialized, ClientRole.TARGET)
+    source_eligible_all = eligible_groups_by_coarse(source, source_materialized, ClientRole.SOURCE)
     common_coarse = tuple(group for group in target_eligible_all if group in source_eligible_all)
     if not common_coarse:
         return None
     source_eligible = OrderedDict((group, source_eligible_all[group]) for group in common_coarse)
     target_eligible = OrderedDict((group, target_eligible_all[group]) for group in common_coarse)
     return source_eligible, target_eligible
+
+
+@dataclass(frozen=True, slots=True)
+class PairSeedStructure:
+    source_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
+    target_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
+    ineligibility_reason: PairSeedIneligibilityReason | None
+
+    @property
+    def is_eligible(self) -> bool:
+        return self.ineligibility_reason is None
+
+
+def pair_seed_structure(
+    source_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    target_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
+    available_response_blocks: frozenset[CoarseGroup],
+    strict_resource_validity: StrictResourceValidity,
+) -> PairSeedStructure:
+    common_coarse = tuple(
+        coarse
+        for coarse in target_eligible
+        if coarse in source_eligible and coarse in available_response_blocks
+    )
+    selected_source = OrderedDict((coarse, source_eligible[coarse]) for coarse in common_coarse)
+    selected_target = OrderedDict((coarse, target_eligible[coarse]) for coarse in common_coarse)
+    if not strict_resource_validity:
+        return PairSeedStructure(
+            selected_source,
+            selected_target,
+            PairSeedIneligibilityReason.STRICT_RESOURCE_VIOLATION,
+        )
+    if not common_coarse:
+        return PairSeedStructure(
+            selected_source,
+            selected_target,
+            PairSeedIneligibilityReason.NO_SHARED_ELIGIBLE_COARSE_GROUP,
+        )
+    support = active_config().scientific.transfer_support
+    target_concept_count = sum(len(groups) for groups in selected_target.values())
+    if target_concept_count < support.minimum_actionable_target_concepts:
+        return PairSeedStructure(
+            selected_source,
+            selected_target,
+            PairSeedIneligibilityReason.INSUFFICIENT_ACTIONABLE_TARGET_CONCEPTS,
+        )
+    if not any(
+        len(groups) >= support.minimum_nontrivial_block_size for groups in selected_target.values()
+    ):
+        return PairSeedStructure(
+            selected_source,
+            selected_target,
+            PairSeedIneligibilityReason.NO_NONTRIVIAL_TARGET_BLOCK,
+        )
+    if not any(
+        len(groups) >= support.minimum_nontrivial_block_size for groups in selected_source.values()
+    ):
+        return PairSeedStructure(
+            selected_source,
+            selected_target,
+            PairSeedIneligibilityReason.NO_NONTRIVIAL_SOURCE_RESPONSE_BLOCK,
+        )
+    return PairSeedStructure(selected_source, selected_target, None)
+
+
+def strict_pair_resource_validity(
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+) -> StrictResourceValidity:
+    source_identity_columns = frozenset(
+        column
+        for column, role in source_materialized.schema.roles.items()
+        if role is FieldRole.FORBIDDEN_IDENTITY
+    )
+    target_identity_columns = frozenset(
+        column
+        for column, role in target_materialized.schema.roles.items()
+        if role is FieldRole.FORBIDDEN_IDENTITY
+    )
+    source_timestamp_columns: frozenset[TabularColumnName] = (
+        frozenset()
+        if source_materialized.schema.timestamp_column is None
+        else frozenset({source_materialized.schema.timestamp_column})
+    )
+    target_timestamp_columns: frozenset[TabularColumnName] = (
+        frozenset()
+        if target_materialized.schema.timestamp_column is None
+        else frozenset({target_materialized.schema.timestamp_column})
+    )
+    try:
+        validate_disjoint_feature_namespaces(
+            frozenset(source_materialized.feature_names),
+            frozenset(target_materialized.feature_names),
+        )
+        validate_no_cross_client_entity_ids(source_identity_columns, target_identity_columns)
+        validate_no_cross_client_timestamp_pairing(
+            source_timestamp_columns,
+            target_timestamp_columns,
+        )
+    except StrictResourceViolationError:
+        return StrictResourceValidity(False)
+    return StrictResourceValidity(True)
+
+
+def assess_pair_seed_structure(
+    layout: WorkspaceLayout,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+) -> PairSeedStructure:
+    common = common_eligible_groups(
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+    )
+    if common is None:
+        return PairSeedStructure(
+            OrderedDict(),
+            OrderedDict(),
+            PairSeedIneligibilityReason.NO_SHARED_ELIGIBLE_COARSE_GROUP,
+        )
+    source_eligible, target_eligible = common
+    available_response_blocks = frozenset(
+        coarse
+        for coarse in target_eligible
+        if load_dataset_source_packet(layout, source, seed, coarse) is not None
+    )
+    return pair_seed_structure(
+        source_eligible,
+        target_eligible,
+        available_response_blocks,
+        strict_pair_resource_validity(source_materialized, target_materialized),
+    )
+
+
+def _block_keyed_eligible_groups(
+    eligible_by_coarse: (
+        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
+        | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
+    ),
+) -> Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]:
+    return OrderedDict(
+        (correspondence_block_id(group), groups) for group, groups in eligible_by_coarse.items()
+    )
+
+
+def registered_exact_correspondence(
+    blocks: PaddedBlockStructure,
+    source_eligible_by_coarse: Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
+    target_eligible_by_coarse: Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
+    source_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
+    seed: RandomSeed,
+) -> BlockCorrespondence:
+    images: list[Index] = []
+    for block_index, block_id in enumerate(blocks.coarse_groups):
+        coarse_group = CoarseGroup(str(block_id))
+        block_range = blocks.block_index_range(block_index)
+        block_key = correspondence_block_id(coarse_group)
+        source_groups = source_eligible_by_coarse.get(block_key, ())
+        target_groups = target_eligible_by_coarse.get(block_key, ())
+        packet = source_packets_by_coarse.get(coarse_group)
+        source_concept_positions: OrderedDict[OracleTransferConcept, Index] = OrderedDict()
+        if packet is not None:
+            positions = packet.registered_node_order(seed).anonymous_position_of_semantic_index()
+            for semantic_index, group in enumerate(source_groups):
+                if semantic_index < len(positions):
+                    source_concept_positions[group.concept] = positions[semantic_index]
+        assigned: OrderedDict[Index, Index] = OrderedDict()
+        for target_offset, group in enumerate(target_groups):
+            source_offset = source_concept_positions.get(group.concept)
+            if source_offset is None or source_offset >= len(block_range):
+                continue
+            source_node = block_range.start + source_offset
+            if source_node in assigned.values():
+                continue
+            assigned[block_range.start + target_offset] = source_node
+        taken = set(assigned.values())
+        remaining_sources = [node for node in block_range if node not in taken]
+        remaining_targets = [node for node in block_range if node not in assigned]
+        for target_node, source_node in zip(remaining_targets, remaining_sources, strict=True):
+            assigned[target_node] = source_node
+        images.extend(assigned[node] for node in block_range)
+    return BlockCorrespondence(blocks=blocks, images=tuple(images))
 
 
 def cross_client_padded_blocks(
@@ -1102,14 +1277,25 @@ def score_matched_resource_rectangular_cell(
         return None
     source_eligible, target_eligible = common
     common_coarse = tuple(target_eligible)
-    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
     packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
         packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
-    if not packets_by_coarse:
+    pair_structure = pair_seed_structure(
+        source_eligible,
+        target_eligible,
+        frozenset(packets_by_coarse),
+        strict_pair_resource_validity(source_materialized, target_materialized),
+    )
+    if not pair_structure.is_eligible:
         return None
+    source_eligible = pair_structure.source_eligible
+    target_eligible = pair_structure.target_eligible
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    packets_by_coarse = OrderedDict(
+        (coarse, packets_by_coarse[coarse]) for coarse in target_eligible
+    )
     lower_matrix = assemble_cross_client_response_matrix(
         blocks, packets_by_coarse, SourcePacket.lower_matrix
     )
@@ -1124,7 +1310,7 @@ def score_matched_resource_rectangular_cell(
     test = target_materialized.splits[Split.TEST]
     model = create_classifier(
         target,
-        train.features.shape[1],
+        target_materialized.feature_count,
         n_classes,
         checkpoint.selected_hyperparameters.dropout_probability,
         seed,
@@ -1181,7 +1367,7 @@ def score_matched_resource_rectangular_cell(
         ),
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
-            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+            directed_pair=directed_pair_name(source, target),
             condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
@@ -1215,7 +1401,6 @@ def score_point_correspondence_commitment_cell(
         return None
     source_eligible, target_eligible = common
     common_coarse = tuple(target_eligible)
-    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
     source_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     target_packets: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
     for coarse_group in common_coarse:
@@ -1225,8 +1410,19 @@ def score_point_correspondence_commitment_cell(
         target_packet = load_dataset_source_packet(layout, target, seed, coarse_group)
         if target_packet is not None:
             target_packets[coarse_group] = target_packet
-    if not source_packets or not target_packets:
+    pair_structure = pair_seed_structure(
+        source_eligible,
+        target_eligible,
+        frozenset(source_packets) & frozenset(target_packets),
+        strict_pair_resource_validity(source_materialized, target_materialized),
+    )
+    if not pair_structure.is_eligible:
         return None
+    source_eligible = pair_structure.source_eligible
+    target_eligible = pair_structure.target_eligible
+    blocks = cross_client_padded_blocks(source_eligible, target_eligible)
+    source_packets = OrderedDict((coarse, source_packets[coarse]) for coarse in target_eligible)
+    target_packets = OrderedDict((coarse, target_packets[coarse]) for coarse in target_eligible)
     source_matrix = assemble_cross_client_response_matrix(
         blocks, source_packets, SourcePacket.lower_matrix
     )
@@ -1245,7 +1441,7 @@ def score_point_correspondence_commitment_cell(
     test = target_materialized.splits[Split.TEST]
     model = create_classifier(
         target,
-        train.features.shape[1],
+        target_materialized.feature_count,
         n_classes,
         checkpoint.selected_hyperparameters.dropout_probability,
         seed,
@@ -1301,7 +1497,7 @@ def score_point_correspondence_commitment_cell(
         ),
         AssimilationCoordinates(
             target_client=SourceClientName(target.value),
-            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+            directed_pair=directed_pair_name(source, target),
             condition=PRINCIPAL_EVALUATION_CONDITION.name,
             seed=seed,
             clean_pretransfer_checkpoint_artifact_id=checkpoint_artifact_id,
@@ -1354,6 +1550,7 @@ def assemble_principal_action(
     | None = None,
     checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
     fine_singleton: bool = False,
+    uses_registered_exact_map: bool = False,
 ) -> PrincipalActionAssembly | None:
     checkpoint_path = _target_confirmatory_checkpoint_path(
         layout, target, seed, checkpoint_source_experiment
@@ -1373,8 +1570,18 @@ def assemble_principal_action(
         packet = load_dataset_source_packet(layout, source, seed, coarse_group)
         if packet is not None:
             packets_by_coarse[coarse_group] = packet
-    if not packets_by_coarse:
+    pair_structure = pair_seed_structure(
+        source_eligible_original,
+        target_eligible_original,
+        frozenset(packets_by_coarse),
+        strict_pair_resource_validity(source_materialized, target_materialized),
+    )
+    if not pair_structure.is_eligible:
         return None
+    source_eligible_original = pair_structure.source_eligible
+    target_eligible_original = pair_structure.target_eligible
+    common_coarse = tuple(target_eligible_original)
+    packets_by_coarse = OrderedDict((coarse, packets_by_coarse[coarse]) for coarse in common_coarse)
     source_eligible: (
         Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
         | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
@@ -1422,7 +1629,11 @@ def assemble_principal_action(
             packet = packets_by_coarse.get(coarse_group)
             if packet is None:
                 continue
-            local_index = source_local_index[concept]
+            semantic_index = source_local_index[concept]
+            anonymous_positions = packet.registered_node_order(
+                seed
+            ).anonymous_position_of_semantic_index()
+            local_index = anonymous_positions[semantic_index]
             lower = packet.lower_matrix()
             upper = packet.upper_matrix()
             if local_index < lower.shape[0] and local_index < upper.shape[0]:
@@ -1470,6 +1681,16 @@ def assemble_principal_action(
         )
     if perturb is not None:
         lower_matrix, upper_matrix = perturb(blocks, lower_matrix, upper_matrix)
+    if uses_registered_exact_map and not fine_singleton:
+        exact_correspondence = registered_exact_correspondence(
+            blocks,
+            _block_keyed_eligible_groups(source_eligible),
+            _block_keyed_eligible_groups(target_eligible),
+            packets_by_coarse,
+            seed,
+        )
+        lower_matrix = exact_correspondence.permute_response_matrix(lower_matrix)
+        upper_matrix = exact_correspondence.permute_response_matrix(upper_matrix)
     checkpoint = load_base_checkpoint(checkpoint_path)
     n_classes = target_materialized.class_manifest.class_count
     train = target_materialized.splits[Split.TRAIN]
@@ -1478,7 +1699,7 @@ def assemble_principal_action(
     test = target_materialized.splits[Split.TEST]
     model = create_classifier(
         target,
-        train.features.shape[1],
+        target_materialized.feature_count,
         n_classes,
         checkpoint.selected_hyperparameters.dropout_probability,
         seed,
@@ -1572,6 +1793,7 @@ def score_robust_action_cell(
     action_sink: MutableCell[CurriculumAction] | None = None,
     confirmation_verdict_sink: MutableCell[bool] | None = None,
     fine_singleton: bool = False,
+    uses_registered_exact_map: bool = False,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
     assembly = assemble_principal_action(
         store,
@@ -1587,6 +1809,7 @@ def score_robust_action_cell(
         perturb,
         checkpoint_source_experiment,
         fine_singleton,
+        uses_registered_exact_map,
     )
     if assembly is None:
         return None
@@ -1605,7 +1828,7 @@ def score_robust_action_cell(
     )
     assimilation_coordinates = AssimilationCoordinates(
         target_client=SourceClientName(target.value),
-        directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+        directed_pair=directed_pair_name(source, target),
         condition=PRINCIPAL_EVALUATION_CONDITION.name,
         seed=seed,
         clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
@@ -1731,6 +1954,11 @@ def _settle_without_confirmation_and_score(
     lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
     lifecycle.complete_phase(PreTestPhase.CONFIRMATION_DECISION_FINALIZED)
     pre_confirm = capture_pre_confirm_pair(model, optimizer)
+    optimizer_step_ledger = TargetOptimizerStepLedger(
+        TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
+        assimilation_coordinates.directed_pair,
+        seed,
+    )
     if action.realized_support_size > 0:
         apply_accepted_assimilation(
             model,
@@ -1742,6 +1970,7 @@ def _settle_without_confirmation_and_score(
             multipliers,
             seed,
             assimilation_coordinates,
+            optimizer_step_ledger,
         )
     else:
         settle_rejected_proposal(model, optimizer, pre_confirm.baseline)
@@ -1833,6 +2062,7 @@ def score_exact_map_oracle_cell(
         FilesystemSlug("exact-map-oracle"),
         TransferMethod.EXACT_MAP_ORACLE,
         solve_exact_map_oracle_action,
+        uses_registered_exact_map=True,
     )
 
 
@@ -2037,6 +2267,11 @@ def _confirm_assimilate_score_capturing_verdict(
         access.record(ClientRole.TARGET, ResourceKind.META)
         access.record(ClientRole.TARGET, ResourceKind.CONFIRM)
         pre_confirm = capture_pre_confirm_pair(model, optimizer)
+        optimizer_step_ledger = TargetOptimizerStepLedger(
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            assimilation_coordinates.directed_pair,
+            seed,
+        )
         verdict = run_proposal_confirmation(
             ConfirmationRequest(
                 model,
@@ -2051,7 +2286,8 @@ def _confirm_assimilate_score_capturing_verdict(
                 checkpoint.selected_hyperparameters,
                 seed,
                 contrast_coordinates,
-            )
+            ),
+            optimizer_step_ledger,
         )
         verdicts.value = verdict
         lifecycle = PreTestLifecycle()
@@ -2069,6 +2305,7 @@ def _confirm_assimilate_score_capturing_verdict(
                 multipliers,
                 seed,
                 assimilation_coordinates,
+                optimizer_step_ledger,
             )
         else:
             settle_rejected_proposal(model, optimizer, pre_confirm.baseline)

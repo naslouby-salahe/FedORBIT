@@ -18,4 +18,5 @@ def test_oracle_fine_singleton_is_not_aliased_to_principal_partition() -> None:
 
 
 def test_unknown_partition_is_rejected() -> None:
-    assert semantic_partition_bucket_of(cast(SemanticPartitionSpecification, "invented-partition")) is None
+    partition = cast(SemanticPartitionSpecification, "invented-partition")
+    assert semantic_partition_bucket_of(partition) is None

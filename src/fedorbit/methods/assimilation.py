@@ -26,7 +26,11 @@ from fedorbit.methods.confirmation import (
     ConfirmReplicateOutcomes,
     hierarchical_bootstrap_lower_bound,
 )
-from fedorbit.methods.target import CurriculumMultipliers
+from fedorbit.methods.target import (
+    CurriculumMultipliers,
+    TargetOptimizerBudgetCategory,
+    TargetOptimizerStepLedger,
+)
 from fedorbit.response.estimation import shadow_batch_schedule
 from fedorbit.types import (
     ArtifactIdentifier,
@@ -247,6 +251,7 @@ class ConfirmationRequest:
 
 def run_proposal_confirmation(
     request: ConfirmationRequest,
+    optimizer_step_ledger: TargetOptimizerStepLedger,
     batch_size: BatchSize | None = None,
 ) -> ConfirmationVerdict:
     config = active_config()
@@ -256,6 +261,11 @@ def run_proposal_confirmation(
         raise AssimilationError("confirmation batch size must be positive")
     if request.confirm_features.shape[0] == 0 or request.confirm_targets.shape[0] == 0:
         raise AssimilationError("CONFIRM split is empty")
+    optimizer_step_ledger.assert_seed(request.seed)
+    optimizer_step_ledger.consume(
+        TargetOptimizerBudgetCategory.CONFIRMATION_CANDIDATES,
+        config.scientific.target_optimizer_budget.reserved.confirmation_candidates,
+    )
     model = request.model
     class_count = ClassIndex(request.base_class_weights.values.shape[0])
     neutral = CurriculumMultipliers(torch.ones_like(request.base_class_weights.values))
@@ -359,6 +369,7 @@ def apply_accepted_assimilation(
     curriculum_multipliers: CurriculumMultipliers,
     seed: RandomSeed,
     assimilation_coordinates: AssimilationCoordinates,
+    optimizer_step_ledger: TargetOptimizerStepLedger,
     batch_size: BatchSize | None = None,
 ) -> StepCount:
     config = active_config()
@@ -366,6 +377,9 @@ def apply_accepted_assimilation(
     if effective_batch <= 0:
         raise AssimilationError("assimilation batch size must be positive")
     total_steps = config.scientific.confirmation.accepted_live_assimilation_steps
+    optimizer_step_ledger.assert_seed(seed)
+    optimizer_step_ledger.assert_directed_pair(assimilation_coordinates.directed_pair)
+    optimizer_step_ledger.consume(TargetOptimizerBudgetCategory.LIVE_ASSIMILATION, total_steps)
     coordinates_payload: OrderedDict[str, str | int] = OrderedDict()
     for key in ASSIMILATION_COORDINATE_KEYS:
         value = getattr(assimilation_coordinates, key.value)

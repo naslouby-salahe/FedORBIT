@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.datasets.common import (
+    DatasetInspectionError,
+    FieldRole,
+    infer_feature_type,
+    reconcile_component_columns,
+)
 from fedorbit.datasets.preprocessing import (
     MISSING_TOKEN_VOCABULARY,
     PreprocessingToken,
@@ -32,6 +39,29 @@ def test_missing_token_contract_is_type_scoped() -> None:
     assert numeric_zero_is_not_missing(NumericFeatureValue(0.0))
 
 
+def test_type_inference_requires_every_observed_value_to_be_losslessly_numeric() -> None:
+    assert infer_feature_type(("1", "2.5", "nan", None)) is FieldRole.BEHAVIORAL_NUMERIC
+    assert infer_feature_type(("1", "not-a-number")) is FieldRole.BEHAVIORAL_CATEGORICAL
+    assert infer_feature_type(("", None)) is FieldRole.BEHAVIORAL_CATEGORICAL
+
+
+def test_component_schema_reconciliation_preserves_reference_order_and_rejects_drift() -> None:
+    timestamp = TabularColumnName("ts")
+    binary = TabularColumnName("label")
+    multiclass = TabularColumnName("type")
+    alpha = TabularColumnName("alpha")
+    beta = TabularColumnName("beta")
+    gamma = TabularColumnName("gamma")
+
+    assert reconcile_component_columns(
+        ((timestamp, binary, multiclass, beta, alpha), (alpha, timestamp, beta, binary, multiclass))
+    ) == (timestamp, binary, multiclass, beta, alpha)
+    with pytest.raises(DatasetInspectionError, match="schema diverges"):
+        reconcile_component_columns(
+            ((timestamp, binary, multiclass, alpha), (timestamp, binary, multiclass, gamma))
+        )
+
+
 def test_feature_quality_uses_raw_semantic_features_once() -> None:
     good = TabularColumnName("good")
     bad = TabularColumnName("bad")
@@ -50,6 +80,63 @@ def test_feature_quality_uses_raw_semantic_features_once() -> None:
     assert report.candidate_count_before_filtering == 3
     bad = next(item for item in report.candidate_features if item.name == "bad")
     assert bad.dropped
+
+
+def test_feature_quality_and_indicator_thresholds_are_strict_and_train_scoped() -> None:
+    threshold_feature = TabularColumnName("threshold_feature")
+    dropped_feature = TabularColumnName("dropped_feature")
+    retained_features = tuple(TabularColumnName(f"retained_{index}") for index in range(4))
+    at_drop_threshold = np.asarray([np.nan, *range(19)], dtype=np.float64)
+    above_drop_threshold = np.asarray([np.nan, np.nan, *range(18)], dtype=np.float64)
+    retained = np.zeros(20, dtype=np.float64)
+    report = evaluate_feature_quality(
+        (threshold_feature, dropped_feature, *retained_features),
+        frozenset(),
+        TrainingFeatureValues(
+            {
+                threshold_feature: at_drop_threshold,
+                dropped_feature: above_drop_threshold,
+                **dict.fromkeys(retained_features, retained),
+            }
+        ),
+    )
+    threshold_candidate, dropped_candidate, *_ = report.candidate_features
+
+    assert threshold_candidate.train_missing_fraction == 0.05
+    assert not threshold_candidate.dropped
+    assert threshold_candidate.missing_indicator
+    assert dropped_candidate.train_missing_fraction == 0.1
+    assert dropped_candidate.dropped
+    assert not report.client_invalid
+
+    invalid_report = evaluate_feature_quality(
+        (threshold_feature, dropped_feature, *retained_features),
+        frozenset(),
+        TrainingFeatureValues(
+            {
+                threshold_feature: above_drop_threshold,
+                dropped_feature: above_drop_threshold,
+                **dict.fromkeys(retained_features, retained),
+            }
+        ),
+    )
+
+    assert invalid_report.dropped_feature_count == 2
+    assert invalid_report.client_invalid
+
+    indicator_feature = TabularColumnName("indicator_feature")
+    indicator_report = evaluate_feature_quality(
+        (indicator_feature,),
+        frozenset(),
+        TrainingFeatureValues(
+            {indicator_feature: np.asarray([np.nan, *range(999)], dtype=np.float64)}
+        ),
+    )
+
+    indicator_candidate = indicator_report.candidate_features[0]
+    assert indicator_candidate.train_missing_fraction == 0.001
+    assert not indicator_candidate.dropped
+    assert indicator_candidate.missing_indicator
 
 
 def test_numeric_preprocessor_uses_linear_quartiles_and_configured_clip(
@@ -92,3 +179,17 @@ def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
     encoded = one_hot(RawCellText("a"), fitted)
     assert len(encoded) == len(fitted.vocabulary)
     assert sum(encoded) == 1.0
+
+
+def test_categorical_rare_threshold_is_strict() -> None:
+    boundary = fit_categorical_preprocessor(
+        (*(RawCellText("common") for _ in range(999)), RawCellText("boundary"))
+    )
+    rare = fit_categorical_preprocessor(
+        (*(RawCellText("common") for _ in range(1000)), RawCellText("rare"))
+    )
+
+    assert CategoryName("boundary") not in boundary.rare_categories
+    assert CategoryName("boundary") in boundary.vocabulary
+    assert CategoryName("rare") in rare.rare_categories
+    assert transform_categorical(RawCellText("rare"), rare) == PreprocessingToken.RARE

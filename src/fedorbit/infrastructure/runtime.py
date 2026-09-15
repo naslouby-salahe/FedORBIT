@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import resource
 import subprocess
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
+from enum import StrEnum
+from pathlib import Path
 from typing import cast
 
 import psutil
 import structlog
 import torch
+from filelock import FileLock
 from pydantic import JsonValue
 from structlog.typing import FilteringBoundLogger
 
@@ -22,6 +26,7 @@ from fedorbit.infrastructure.environment import EnvironmentSnapshot
 from fedorbit.infrastructure.failures import ExecutionOutcome
 from fedorbit.types import (
     ArtifactIdentifier,
+    ArtifactIdentifiers,
     ArtifactStage,
     ArtifactState,
     ByteCount,
@@ -29,14 +34,15 @@ from fedorbit.types import (
     DerivedSeed,
     ElapsedSeconds,
     ExecutionAction,
-    ExecutionEventName,
     ExperimentName,
     FieldDescription,
     GitRevision,
+    Index,
     MemoryMib,
     RandomSeed,
     RngNamespace,
     RuntimeDeviceType,
+    ScientificSubsystem,
     SemanticCoordinates,
     Sha256Digest,
     StableJsonPayload,
@@ -223,6 +229,10 @@ def assert_float32_training(dtype: torch.dtype) -> None:
         raise PrincipalDeterminismError(f"principal training must remain float32; found {dtype}")
 
 
+def _zero_index() -> Index:
+    return cast(Index, 0)
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionLogEvent:
     occurred_at: datetime
@@ -237,6 +247,57 @@ class ExecutionLogEvent:
     reuse_action: ExecutionAction | None = None
     reuse_note: FieldDescription | None = None
     terminal_outcome: ExecutionOutcome | None = None
+    subsystem: ScientificSubsystem | None = None
+    artifacts_read: ArtifactIdentifiers = ()
+    upstream_artifact_ids: ArtifactIdentifiers = ()
+    unconsumed_artifact_count: Index = field(default_factory=_zero_index)
+    provenance_recorded: bool = False
+
+
+class InfrastructureEventName(StrEnum):
+    ARTIFACT_PROMOTED = "artifact_promoted"
+    ARTIFACT_RETIRED = "artifact_retired"
+    ARTIFACT_STALE = "artifact_stale"
+    LINEAGE_WARNING = "lineage_warning"
+    RESOURCE_PHASE = "resource_phase"
+    ABSTENTION = "abstention"
+
+
+@dataclass(frozen=True, slots=True)
+class ResourcePhaseObservation:
+    phase: FieldDescription
+    elapsed_seconds: ElapsedSeconds
+    peak_host_rss_mib: MemoryMib
+    peak_cuda_allocated_bytes: ByteCount
+
+
+class ExecutionEventLog:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def append(self, event_name: StrEnum, fields: Mapping[str, JsonValue]) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        payload = cast(
+            StableJsonPayload,
+            OrderedDict(
+                (
+                    ("event", event_name.value),
+                    ("occurred_at", datetime.now(UTC).isoformat()),
+                    *fields.items(),
+                )
+            ),
+        )
+        with (
+            FileLock(str(self._path) + ".lock"),
+            self._path.open("a", encoding="utf-8") as handle,
+        ):
+            handle.write(stable_json(payload) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
 
 
 class ExecutionLogger:
@@ -257,18 +318,42 @@ class ExecutionLogger:
             elapsed_seconds=event.elapsed_seconds,
             reuse_action=event.reuse_action,
             reuse_note=event.reuse_note,
+            subsystem=event.subsystem,
+            artifacts_read=[identifier.value for identifier in event.artifacts_read],
+            upstream_artifact_ids=[identifier.value for identifier in event.upstream_artifact_ids],
+            unconsumed_artifact_count=event.unconsumed_artifact_count,
+            provenance_recorded=event.provenance_recorded,
         )
 
-    def event(self, event_name: ExecutionEventName, **fields: JsonValue) -> None:
+    def event(self, event_name: StrEnum, **fields: JsonValue) -> None:
         self._logger.info(event_name, **fields)
+
+    def resource_phase(self, observation: ResourcePhaseObservation) -> None:
+        self._logger.info(
+            InfrastructureEventName.RESOURCE_PHASE.value,
+            phase=observation.phase,
+            elapsed_seconds=observation.elapsed_seconds,
+            peak_host_rss_mib=observation.peak_host_rss_mib,
+            peak_cuda_allocated_bytes=observation.peak_cuda_allocated_bytes,
+        )
+
+    def abstention(
+        self,
+        coordinates: SemanticCoordinates,
+        reason: FieldDescription,
+    ) -> None:
+        self._logger.info(
+            InfrastructureEventName.ABSTENTION.value,
+            cell_coordinates=coordinates.value,
+            reason=reason,
+        )
+
+    def warning(self, message: FieldDescription) -> None:
+        self._logger.info(InfrastructureEventName.LINEAGE_WARNING.value, message=message)
 
 
 def execution_logger() -> ExecutionLogger:
     return ExecutionLogger(cast(FilteringBoundLogger, structlog.get_logger("fedorbit.execution")))
-
-
-class IncompatibleIdentityError(ValueError):
-    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,15 +467,6 @@ def build_reproducibility_identity(environment: EnvironmentSnapshot) -> Reproduc
 
 def compatible(current: ReproducibilityIdentity, recorded: ReproducibilityIdentity) -> bool:
     return current.fingerprint() == recorded.fingerprint()
-
-
-def reject_incompatible(
-    current: ReproducibilityIdentity, recorded: ReproducibilityIdentity
-) -> None:
-    if not compatible(current, recorded):
-        raise IncompatibleIdentityError(
-            "recorded reproducibility identity is incompatible with the current execution context"
-        )
 
 
 SEED32_MODULUS = 2**32

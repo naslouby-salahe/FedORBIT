@@ -250,13 +250,15 @@ def estimate_response_bands(
         confidence_level=confidence_level,
         standard_error_floor=final.response_standard_error_floor,
     )
-    entries, useful_columns = _build_final_entries(
+    built = _build_final_entries(
         outcome_count,
         intervention_count,
         means,
         standard_errors,
         critical,
     )
+    entries = built.entries
+    useful_columns = built.useful_intervention_columns
     useful_entries = tuple(entry for entry in entries if entry.useful)
     if not useful_entries:
         return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), math.nan, False)
@@ -273,13 +275,19 @@ def estimate_response_bands(
     return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), ratio, stable)
 
 
+@dataclass(frozen=True, slots=True)
+class FinalResponseEntries:
+    entries: tuple[FinalResponseEntry, ...]
+    useful_intervention_columns: frozenset[Index]
+
+
 def _build_final_entries(
     outcome_count: ConceptCount,
     intervention_count: ConceptCount,
     means: DerivativeSeries,
     standard_errors: tuple[StandardError, ...],
     critical: Estimate,
-) -> tuple[list[FinalResponseEntry], set[Index]]:
+) -> FinalResponseEntries:
     final = active_config().scientific.source_response_final
     entries: list[FinalResponseEntry] = []
     useful_columns: set[Index] = set()
@@ -306,4 +314,4 @@ def _build_final_entries(
                     useful,
                 )
             )
-    return entries, useful_columns
+    return FinalResponseEntries(tuple(entries), frozenset(useful_columns))

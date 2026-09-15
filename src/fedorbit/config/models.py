@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Self
+
+from pydantic import model_validator
 
 from fedorbit.types import (
     AbsoluteMetric,
@@ -28,6 +31,7 @@ from fedorbit.types import (
     Fraction,
     GiBMemory,
     GpuName,
+    Index,
     InterventionMagnitude,
     InvalidPermutationCount,
     LearningRate,
@@ -57,6 +61,7 @@ from fedorbit.types import (
     Tolerance,
     WeightDecay,
     WorkerCount,
+    directed_pair_name,
 )
 
 FrozenModel = DomainModel
@@ -119,7 +124,7 @@ class DirectedPairSpec(FrozenModel):
 
     @property
     def direction(self) -> DirectedPairName:
-        return DirectedPairName(f"{self.source.value} -> {self.target.value}")
+        return directed_pair_name(self.source, self.target)
 
 
 class DatasetsConfig(FrozenModel):
@@ -564,11 +569,51 @@ class SemanticSufficiencyFrontierConfig(FrozenModel):
 
 class WeakSignalSupportAndHeterogeneityBoundariesConfig(FrozenModel):
     response_scales: tuple[ScaleFactor, ...]
+    baseline_response_scale: ScaleFactor
     ci_half_width_multipliers: tuple[ScaleFactor, ...]
+    baseline_ci_half_width_multiplier: ScaleFactor
     target_usable_support_fractions: tuple[Fraction, ...]
+    baseline_target_usable_support_fraction: Fraction
     response_heterogeneity_multipliers: tuple[ScaleFactor, ...]
+    baseline_response_heterogeneity_multiplier: ScaleFactor
     support_budgets: tuple[SupportCount, ...]
+    baseline_support_budget: SupportCount
     methods: tuple[MethodName, ...]
+
+    @model_validator(mode="after")
+    def validate_baseline_membership(self) -> Self:
+        baseline_grids = (
+            (self.baseline_response_scale, self.response_scales),
+            (self.baseline_ci_half_width_multiplier, self.ci_half_width_multipliers),
+            (self.baseline_target_usable_support_fraction, self.target_usable_support_fractions),
+            (
+                self.baseline_response_heterogeneity_multiplier,
+                self.response_heterogeneity_multipliers,
+            ),
+            (self.baseline_support_budget, self.support_budgets),
+        )
+        if any(baseline not in grid for baseline, grid in baseline_grids):
+            raise ValueError("weak-signal baseline values must belong to their registered grids")
+        return self
+
+    def distinct_condition_count(self) -> Index:
+        return (
+            1
+            + sum(scale != self.baseline_response_scale for scale in self.response_scales)
+            + sum(
+                multiplier != self.baseline_ci_half_width_multiplier
+                for multiplier in self.ci_half_width_multipliers
+            )
+            + sum(
+                fraction != self.baseline_target_usable_support_fraction
+                for fraction in self.target_usable_support_fractions
+            )
+            + sum(
+                multiplier != self.baseline_response_heterogeneity_multiplier
+                for multiplier in self.response_heterogeneity_multipliers
+            )
+            + sum(support != self.baseline_support_budget for support in self.support_budgets)
+        )
 
 
 class MapAvailabilityApplicabilityAuditConfig(FrozenModel):
@@ -581,6 +626,7 @@ class ScalabilityAndEfficiencyConfig(FrozenModel):
     k_values: tuple[ConceptCount, ...]
     block_patterns: tuple[ScalabilityBlockPattern, ...]
     exact_qap_supports: tuple[SupportCount, ...]
+    real_timing_methods: tuple[MethodName, ...]
 
 
 class ExperimentsConfig(FrozenModel):
@@ -606,6 +652,7 @@ class ExperimentsConfig(FrozenModel):
 
 class FailureHandlingConfig(FrozenModel):
     retries_after_initial_infrastructure_failure: RetryCount
+    solver_failures_per_pair_allowed: Index
 
 
 class ExperimentSubdirectories(FrozenModel):

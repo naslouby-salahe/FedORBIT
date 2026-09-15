@@ -520,14 +520,7 @@ def build_catalogue() -> ExperimentCatalogue:
     )
 
     weak_signal = experiments.weak_signal_support_and_heterogeneity_boundaries
-    weak_conditions = (
-        len(weak_signal.response_scales)
-        + len(weak_signal.ci_half_width_multipliers)
-        + len(weak_signal.target_usable_support_fractions)
-        + len(weak_signal.response_heterogeneity_multipliers)
-        + len(weak_signal.support_budgets)
-        - 4
-    )
+    weak_conditions = weak_signal.distinct_condition_count()
     catalogue[ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES] = definition(
         ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES,
         ExperimentClassification.FAILURE_BOUNDARY,
@@ -563,15 +556,13 @@ def build_catalogue() -> ExperimentCatalogue:
     scalability_dense_cells = (
         len(scalability.k_values) * len(scalability.block_patterns) * len(confirmatory_seeds)
     )
-    real_timing_cells = planned_packets * 3
+    real_timing_cells = (
+        primary_pair_count * len(confirmatory_seeds) * len(scalability.real_timing_methods)
+    )
     catalogue[ExperimentName.SCALABILITY_AND_EFFICIENCY] = definition(
         ExperimentName.SCALABILITY_AND_EFFICIENCY,
         ExperimentClassification.ROBUSTNESS_EFFICIENCY,
-        (
-            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-            TransferMethod.GENERIC_EXACT_QAP,
-            TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
-        ),
+        scalability.real_timing_methods,
         (),
         (),
         confirmatory_seeds,

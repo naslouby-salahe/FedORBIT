@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import OrderedDict
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from enum import StrEnum
+from pathlib import Path
+from statistics import median
 from typing import cast
 
 from fedorbit.analysis.records import (
@@ -28,6 +34,7 @@ from fedorbit.experiments.synthetic import (
     CouplingGenerationError,
     CouplingInstance,
     CouplingInstanceRequest,
+    MechanismGenerationError,
     ScalabilityGenerationError,
     ScalabilityInstanceRequest,
     UnresolvedMapWorld,
@@ -40,6 +47,7 @@ from fedorbit.experiments.synthetic import (
 )
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
+    ExecutionError,
 )
 from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import (
@@ -52,7 +60,6 @@ from fedorbit.infrastructure.preparation import (
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
@@ -72,6 +79,7 @@ from fedorbit.infrastructure.workspace import (
 )
 from fedorbit.methods.baselines import (
     coupling_destroyed_matrices,
+    optimize_against_fixed_matrix,
 )
 from fedorbit.optimization.certificates import (
     RectangularHull,
@@ -82,7 +90,9 @@ from fedorbit.optimization.certificates import (
 )
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
+    BlockNodeCounts,
     PaddedBlockStructure,
+    active_image_assignment_count,
     build_padded_block_structure,
     enumerate_block_permutations,
 )
@@ -95,6 +105,7 @@ from fedorbit.optimization.exact_qap import (
 )
 from fedorbit.optimization.exact_sparse import (
     fixed_action_worst_correspondence,
+    solve_robust_action,
 )
 from fedorbit.optimization.objective import (
     CurriculumAction,
@@ -108,6 +119,7 @@ from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
     ArtifactIdentifiers,
+    ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
     ArtifactStage,
@@ -122,9 +134,12 @@ from fedorbit.types import (
     EvaluationConditionKind,
     EvaluationConditionName,
     ExecutionEventName,
+    ExperimentLocalMethod,
     ExperimentName,
     ExperimentSeed,
+    ImplementationIdentity,
     Index,
+    InvalidReason,
     MethodName,
     MetricId,
     MetricUnit,
@@ -157,22 +172,24 @@ def persist_synthetic_benchmark_metric(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     condition: EvaluationConditionName,
-    support: SupportCount,
+    support: SupportSize | None,
     method: TransferMethod,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: Estimate,
+    metric_value: Estimate | None,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
+    valid: bool = True,
+    invalid_reason: InvalidReason | None = None,
 ) -> ReusableArtifactManifest | None:
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
         experiment=experiment,
         method=method,
         condition=condition,
-        support=SupportSize(support),
+        support=support,
         seed=ExperimentSeed(seed),
     )
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -183,7 +200,7 @@ def persist_synthetic_benchmark_metric(
             relevance,
             input_artifact_ids,
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SOLVERS_V1,
             metric_name=metric_name,
         )
     )
@@ -206,15 +223,19 @@ def persist_synthetic_benchmark_metric(
         ),
         input_artifact_ids=tuple(input_artifact_ids),
         dependency_fingerprint_sha256=fingerprint,
-        valid=True,
-        invalid_reason=None,
+        valid=valid,
+        invalid_reason=invalid_reason,
     )
     validate_metric_records(MetricRecordCollection((metric,)))
+    support_label = "uncapped" if support is None else str(support.value)
     payload_path = (
         experiment_workspace(layout, experiment)
         / StorageLayoutSegment.ARTIFACTS
         / StorageLayoutSegment.DERIVED
-        / f"metric.{condition}.support-{support}.{method.value}.{seed}.{metric_name.value}.json"
+        / (
+            f"metric.{condition}.support-{support_label}.{method.value}."
+            f"{seed}.{metric_name.value}.json"
+        )
     )
     payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
     atomic_write_json(payload_path, payload)
@@ -222,8 +243,7 @@ def persist_synthetic_benchmark_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SOLVERS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -231,8 +251,8 @@ def persist_synthetic_benchmark_metric(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.EVALUATION,
+        upstream_artifact_ids=tuple(input_artifact_ids),
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -241,10 +261,9 @@ def persist_synthetic_benchmark_metric(
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
             dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=(),
+            upstream_artifact_ids=tuple(input_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -259,27 +278,120 @@ def persist_synthetic_benchmark_metric(
     return manifest
 
 
+@dataclass(frozen=True, slots=True)
+class ScalabilitySolverInstance:
+    problem: RobustActionProblem
+    action: CurriculumAction
+    blocks: PaddedBlockStructure
+
+
+@dataclass(frozen=True, slots=True)
+class MeasuredKernel[ResultT]:
+    result: ResultT
+    measurement: EfficiencyMeasurement
+
+
+@dataclass(frozen=True, slots=True)
+class ScalabilityCellCoordinates:
+    k: ConceptCount
+    block_pattern: ScalabilityBlockPattern
+
+
+def registered_transfer_method(method: MethodName) -> TransferMethod:
+    if not isinstance(method, TransferMethod):
+        raise ExecutionError(f"registered method is not a transfer method: {method}")
+    return method
+
+
+def persist_unavailable_registered_methods(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    condition: EvaluationConditionName,
+    support: SupportSize | None,
+    seed: RandomSeed,
+    methods: tuple[MethodName, ...],
+    invalid_reason: InvalidReason,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    for method in methods:
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            registered_transfer_method(method),
+            seed,
+            MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY,
+            None,
+            MetricUnit.BOOLEAN,
+            MetricDirection.DESCRIPTIVE,
+            (ArtifactIdentifier("unavailable-synthetic-cell"),),
+            overwrite_policy,
+            valid=False,
+            invalid_reason=invalid_reason,
+        )
+
+
+def measure_registered_kernel[ResultT](
+    operation: Callable[[], ResultT],
+) -> MeasuredKernel[ResultT]:
+    runtime = active_config().runtime
+    for _ in range(runtime.deterministic_kernel_warmups):
+        operation()
+    results: list[ResultT] = []
+    measurements: list[EfficiencyMeasurement] = []
+    for _ in range(runtime.deterministic_kernel_timed_repetitions):
+        with measure_efficiency() as efficiency:
+            results.append(operation())
+        measurements.append(efficiency.result)
+    combined = EfficiencyMeasurement(
+        wall_time_seconds=median(measurement.wall_time_seconds for measurement in measurements),
+        peak_host_rss_mib=median(measurement.peak_host_rss_mib for measurement in measurements),
+        peak_cuda_allocated_bytes=int(
+            median(measurement.peak_cuda_allocated_bytes for measurement in measurements)
+        ),
+    )
+    return MeasuredKernel(results[-1], combined)
+
+
+def scalability_predicted_work(
+    blocks: PaddedBlockStructure,
+    action: CurriculumAction,
+) -> float:
+    per_block = [0] * len(blocks.padded_size_tuple)
+    for node in action.active_support_nodes:
+        per_block[blocks.block_of_node(node)] += 1
+    assignment_count = active_image_assignment_count(
+        blocks, BlockNodeCounts(blocks, tuple(per_block))
+    )
+    return float(assignment_count * sum(size**3 for size in blocks.padded_size_tuple))
+
+
 def synthetic_solver_instance(
     node_count: ConceptCount,
     block_pattern: ScalabilityBlockPattern,
     support: SupportCount,
     seed: RandomSeed,
-) -> tuple[RobustActionProblem, CurriculumAction, PaddedBlockStructure]:
+    actionable_node_count: ConceptCount | None = None,
+) -> ScalabilitySolverInstance:
     instance = generate_scalability_instance(
         ScalabilityInstanceRequest(node_count, block_pattern, support, seed)
     )
     groups = tuple(CoarseGroup)[:2]
     counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
     blocks = build_padded_block_structure(groups, counts, counts)
+    actionable = support if actionable_node_count is None else actionable_node_count
     problem = build_robust_action_problem(
         blocks,
         instance.lower_response_matrix,
         instance.lower_response_matrix,
         instance.target_importance,
-        tuple(range(support)),
+        tuple(range(actionable)),
     )
     action = CurriculumAction(problem=problem, coordinates=instance.fixed_action)
-    return problem, action, blocks
+    return ScalabilitySolverInstance(problem, action, blocks)
 
 
 def solver_benchmark_reference_truth(
@@ -300,7 +412,7 @@ def _persist_solver_benchmark_error_metrics(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     condition: EvaluationConditionName,
-    support: SupportCount,
+    support: SupportSize | None,
     method: TransferMethod,
     seed: RandomSeed,
     reference_truth: Score | None,
@@ -369,7 +481,7 @@ def _persist_solver_benchmark_efficiency_metrics(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     condition: EvaluationConditionName,
-    support: SupportCount,
+    support: SupportSize | None,
     method: TransferMethod,
     seed: RandomSeed,
     measurement: EfficiencyMeasurement,
@@ -410,29 +522,43 @@ def _persist_solver_benchmark_efficiency_metrics(
         )
 
 
-def _score_exact_sparse_solver_benchmark_cell(
+def score_synthetic_solver_benchmark_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     condition: EvaluationConditionName,
-    support: SupportCount,
+    support: SupportSize | None,
     seed: RandomSeed,
     problem: RobustActionProblem,
     action: CurriculumAction,
     reference_truth: Score | None,
     methods: tuple[MethodName, ...],
     overwrite_policy: OverwritePolicy,
+    repeated_timing_methods: frozenset[TransferMethod] = frozenset(),
 ) -> None:
     input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
     solver_config = active_config().solvers.exact_sparse
     if TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER in methods:
-        with measure_efficiency() as efficiency:
-            outcome = fixed_action_worst_correspondence(
-                problem,
-                action,
-                solver_config.lap_objective_tie_tolerance,
-                solver_config.action_tie_tolerance,
+        if TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER in repeated_timing_methods:
+            measured = measure_registered_kernel(
+                lambda: fixed_action_worst_correspondence(
+                    problem,
+                    action,
+                    solver_config.lap_objective_tie_tolerance,
+                    solver_config.action_tie_tolerance,
+                )
             )
+            outcome = measured.result
+            measurement = measured.measurement
+        else:
+            with measure_efficiency() as efficiency:
+                outcome = fixed_action_worst_correspondence(
+                    problem,
+                    action,
+                    solver_config.lap_objective_tie_tolerance,
+                    solver_config.action_tie_tolerance,
+                )
+                measurement = efficiency.result
         _persist_solver_benchmark_efficiency_metrics(
             store,
             layout,
@@ -441,7 +567,7 @@ def _score_exact_sparse_solver_benchmark_cell(
             support,
             TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
             seed,
-            efficiency.result,
+            measurement,
             input_artifact_ids,
             overwrite_policy,
         )
@@ -603,26 +729,37 @@ def execute_exact_sparse_solver_benchmark(
     for node_count in k_values:
         for pattern in config.block_patterns:
             for support in config.supports:
-                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
+                condition = scalability_condition_name(node_count, pattern)
                 for seed in confirmatory_seeds:
                     try:
-                        problem, action, blocks = synthetic_solver_instance(
-                            node_count, pattern, support, seed
+                        instance = synthetic_solver_instance(node_count, pattern, support, seed)
+                    except ScalabilityGenerationError as error:
+                        persist_unavailable_registered_methods(
+                            store,
+                            layout,
+                            request.experiment,
+                            condition,
+                            SupportSize(support),
+                            seed,
+                            config.methods,
+                            InvalidReason(str(error)),
+                            request.overwrite_policy,
                         )
-                    except ScalabilityGenerationError:
                         continue
                     reference_truth = solver_benchmark_reference_truth(
-                        blocks, action, config.exhaustive_truth_correspondence_count_maximum
+                        instance.blocks,
+                        instance.action,
+                        config.exhaustive_truth_correspondence_count_maximum,
                     )
-                    _score_exact_sparse_solver_benchmark_cell(
+                    score_synthetic_solver_benchmark_cell(
                         store,
                         layout,
                         request.experiment,
                         condition,
-                        support,
+                        SupportSize(support),
                         seed,
-                        problem,
-                        action,
+                        instance.problem,
+                        instance.action,
                         reference_truth,
                         config.methods,
                         request.overwrite_policy,
@@ -645,18 +782,13 @@ def execute_scalability_and_efficiency(
     for node_count in config.k_values:
         for pattern in config.block_patterns:
             for support in config.exact_qap_supports:
-                condition = EvaluationConditionName(f"k{node_count}-{pattern.value}")
+                condition = scalability_condition_name(node_count, pattern)
                 for seed in confirmatory_seeds:
                     try:
-                        problem, action, blocks = synthetic_solver_instance(
-                            node_count, pattern, support, seed
-                        )
+                        instance = synthetic_solver_instance(node_count, pattern, support, seed)
                     except ScalabilityGenerationError:
                         continue
-                    work = float(
-                        sum(size**3 for size in blocks.padded_size_tuple)
-                        * max(blocks.total_padded_nodes, 1)
-                    )
+                    work = scalability_predicted_work(instance.blocks, instance.action)
                     logger.event(
                         ExecutionEventName.SOLVER_CELL_START,
                         experiment=request.experiment.value,
@@ -676,51 +808,48 @@ def execute_scalability_and_efficiency(
                         work,
                         MetricUnit.COUNT,
                         MetricDirection.DESCRIPTIVE,
-                        (),
+                        (ArtifactIdentifier("synthetic-generator"),),
                         request.overwrite_policy,
                     )
-                    _score_exact_sparse_solver_benchmark_cell(
+                    score_synthetic_solver_benchmark_cell(
                         store,
                         layout,
                         request.experiment,
                         condition,
-                        support,
+                        SupportSize(support),
                         seed,
-                        problem,
-                        action,
+                        instance.problem,
+                        instance.action,
                         None,
                         exact_methods,
                         request.overwrite_policy,
+                        REPEATED_TIMING_METHODS,
                     )
             dense_condition = EvaluationConditionName(f"k{node_count}-{pattern.value}-dense")
             dense_support = config.exact_qap_supports[0]
             for seed in confirmatory_seeds:
                 try:
-                    problem, action, _ = synthetic_solver_instance(
-                        node_count, pattern, dense_support, seed
+                    dense_instance = synthetic_solver_instance(
+                        node_count, pattern, dense_support, seed, node_count
                     )
                 except ScalabilityGenerationError:
                     continue
-                _score_exact_sparse_solver_benchmark_cell(
+                score_synthetic_solver_benchmark_cell(
                     store,
                     layout,
                     request.experiment,
                     dense_condition,
-                    dense_support,
+                    None,
                     seed,
-                    problem,
-                    action,
+                    dense_instance.problem,
+                    dense_instance.action,
                     None,
                     dense_methods,
                     request.overwrite_policy,
                 )
     raw_root = raw_dataset_root()
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
-    real_methods = (
-        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-        TransferMethod.GENERIC_EXACT_QAP,
-        TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK,
-    )
+    real_methods = active_config().experiments.scalability_and_efficiency.real_timing_methods
     device = execution_device()
     principal_support = active_config().scientific.action.principal_sparse_support
     for directed_pair in primary_pairs:
@@ -753,73 +882,305 @@ def execute_scalability_and_efficiency(
                 target=target.value,
                 seed=seed,
             )
-            _score_exact_sparse_solver_benchmark_cell(
-                store,
-                layout,
-                request.experiment,
-                condition,
-                principal_support,
-                seed,
-                assembly.problem,
-                assembly.action,
-                None,
-                real_methods,
-                request.overwrite_policy,
+            supported_methods = tuple(
+                method
+                for method in real_methods
+                if method is not TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK
             )
-    _persist_work_structure_spearman(store, layout, request)
+            if supported_methods:
+                score_synthetic_solver_benchmark_cell(
+                    store,
+                    layout,
+                    request.experiment,
+                    condition,
+                    SupportSize(principal_support),
+                    seed,
+                    assembly.problem,
+                    assembly.action,
+                    None,
+                    supported_methods,
+                    request.overwrite_policy,
+                    REPEATED_TIMING_METHODS,
+                )
+            if TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK in real_methods:
+                dense_problem = build_robust_action_problem(
+                    assembly.blocks,
+                    assembly.problem.lower_response_matrix,
+                    assembly.problem.upper_response_matrix,
+                    assembly.problem.target_importance,
+                    tuple(range(assembly.blocks.total_padded_nodes)),
+                )
+                dense_action = CurriculumAction(assembly.problem, assembly.action.coordinates)
+                score_synthetic_solver_benchmark_cell(
+                    store,
+                    layout,
+                    request.experiment,
+                    condition,
+                    None,
+                    seed,
+                    dense_problem,
+                    dense_action,
+                    None,
+                    dense_methods,
+                    request.overwrite_policy,
+                )
+    persist_work_structure_trend(store, layout, request)
 
 
-def _persist_work_structure_spearman(
+REPEATED_TIMING_METHODS: frozenset[TransferMethod] = frozenset(
+    {TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class CompletedMetricArtifact:
+    artifact_id: ArtifactIdentifier
+    record: MetricRecord
+    support: SupportSize | None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkStructurePoint:
+    k: ConceptCount
+    predicted_work: float
+    median_runtime_seconds: float
+
+
+@dataclass(frozen=True, slots=True)
+class WorkStructureStratum:
+    block_pattern: ScalabilityBlockPattern
+    support: SupportSize | None
+    points: tuple[WorkStructurePoint, ...]
+    correlation: float | None
+
+
+type ScalabilityCellKey = tuple[EvaluationConditionName, RandomSeed, SupportSize | None]
+
+
+class WorkStructureTrendState(StrEnum):
+    INSUFFICIENT_TREND_EVIDENCE = "Insufficient Trend Evidence"
+
+
+def scalability_condition_name(
+    node_count: ConceptCount, pattern: ScalabilityBlockPattern
+) -> EvaluationConditionName:
+    return EvaluationConditionName(f"k{node_count}-{pattern.value}")
+
+
+def scalability_condition_coordinates(
+    condition: EvaluationConditionName,
+) -> ScalabilityCellCoordinates | None:
+    prefix, separator, remainder = condition.partition("-")
+    if not separator or not prefix.startswith("k") or not prefix[1:].isdigit():
+        return None
+    if remainder not in {pattern.value for pattern in ScalabilityBlockPattern}:
+        return None
+    k: ConceptCount = int(prefix[1:])
+    return ScalabilityCellCoordinates(k, ScalabilityBlockPattern(remainder))
+
+
+def completed_scalability_metric_artifacts(
     store: ArtifactStore,
-    layout: WorkspaceLayout,
-    request: ExperimentExecutionRequest,
-) -> None:
+) -> tuple[CompletedMetricArtifact, ...]:
+    artifacts: list[CompletedMetricArtifact] = []
+    for manifest in store.all_manifests():
+        if (
+            ExperimentName.SCALABILITY_AND_EFFICIENCY.value
+            not in manifest.semantic_producer_coordinates
+        ):
+            continue
+        try:
+            resolved = store.resolve(manifest.artifact_id)
+        except ValueError:
+            continue
+        if resolved.state is not ArtifactState.COMPLETED:
+            continue
+        support_value = json.loads(resolved.semantic_producer_coordinates).get("support")
+        for payload_path in resolved.payload_paths:
+            path = Path(payload_path)
+            if not path.is_file():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            record_payload = payload.get("metric_record")
+            if record_payload is None:
+                continue
+            artifacts.append(
+                CompletedMetricArtifact(
+                    resolved.artifact_id,
+                    MetricRecord.model_validate(record_payload),
+                    None if support_value is None else SupportSize(support_value),
+                )
+            )
+    return tuple(artifacts)
+
+
+def work_structure_strata(
+    artifacts: tuple[CompletedMetricArtifact, ...],
+) -> tuple[WorkStructureStratum, ...]:
+    predicted_work: OrderedDict[ScalabilityCellKey, float] = OrderedDict()
+    runtime: OrderedDict[ScalabilityCellKey, float] = OrderedDict()
+    timed_out: set[ScalabilityCellKey] = set()
+    for artifact in artifacts:
+        record = artifact.record
+        if (
+            record.method is not TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+            or not record.valid
+            or record.metric_value is None
+        ):
+            continue
+        key: ScalabilityCellKey = (record.condition, record.seed, artifact.support)
+        if record.metric_name is MetricId.PREDICTED_WORK_COORDINATE:
+            predicted_work[key] = record.metric_value
+        elif record.metric_name is MetricId.WALL_TIME:
+            runtime[key] = record.metric_value
+        elif record.metric_name is MetricId.TIMEOUT_INDICATOR and record.metric_value > 0.0:
+            timed_out.add(key)
+    grouped: OrderedDict[
+        tuple[ScalabilityBlockPattern, SupportSize | None],
+        OrderedDict[ConceptCount, list[float]],
+    ] = OrderedDict()
+    work_per_coordinate: OrderedDict[ScalabilityCellCoordinates, float] = OrderedDict()
+    for key, runtime_seconds in runtime.items():
+        if key in timed_out or runtime_seconds <= 0.0:
+            continue
+        coordinates = scalability_condition_coordinates(key[0])
+        if coordinates is None:
+            continue
+        work = predicted_work.get(key)
+        if work is None or work <= 0.0:
+            continue
+        work_per_coordinate[coordinates] = work
+        stratum = grouped.setdefault((coordinates.block_pattern, key[2]), OrderedDict())
+        stratum.setdefault(coordinates.k, []).append(runtime_seconds)
+    minimum_points = active_config().scientific.statistics.spearman_minimum_valid_points
+    strata: list[WorkStructureStratum] = []
+    for (block_pattern, support), runtimes_by_k in grouped.items():
+        points = tuple(
+            WorkStructurePoint(
+                k,
+                work_per_coordinate[ScalabilityCellCoordinates(k, block_pattern)],
+                median(runtimes),
+            )
+            for k, runtimes in sorted(runtimes_by_k.items())
+        )
+        correlation = _work_structure_correlation(points) if len(points) >= minimum_points else None
+        strata.append(WorkStructureStratum(block_pattern, support, points, correlation))
+    return tuple(strata)
+
+
+def _work_structure_correlation(points: tuple[WorkStructurePoint, ...]) -> float:
     from math import log
 
     from scipy.stats import spearmanr
 
-    from fedorbit.experiments.synthesis import completed_experiment_metric_records_with_support
+    statistic = spearmanr(
+        [log(point.predicted_work) for point in points],
+        [log(point.median_runtime_seconds) for point in points],
+    ).statistic
+    return float(statistic)
 
-    records = completed_experiment_metric_records_with_support(store, request.experiment)
-    grouped: OrderedDict[tuple[str, int | None], list[tuple[float, float]]] = OrderedDict()
-    work_by_key: OrderedDict[tuple[EvaluationConditionName, RandomSeed], float] = OrderedDict()
-    runtime_by_key: OrderedDict[tuple[EvaluationConditionName, RandomSeed], float] = OrderedDict()
-    for record, support in records:
-        if record.method != TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER:
-            continue
-        if not record.valid or record.metric_value is None:
-            continue
-        key = (record.condition, record.seed)
-        if record.metric_name == MetricId.PREDICTED_WORK_COORDINATE:
-            work_by_key[key] = record.metric_value
-        if record.metric_name == MetricId.WALL_TIME:
-            runtime_by_key[key] = record.metric_value
-        grouped.setdefault((record.condition.rsplit("-", 1)[-1], support), [])
-    points: list[tuple[float, float]] = []
-    for key, work in work_by_key.items():
-        runtime = runtime_by_key.get(key)
-        if runtime is None or work <= 0.0 or runtime <= 0.0:
-            continue
-        points.append((log(work), log(runtime)))
-    minimum = active_config().scientific.statistics.spearman_minimum_valid_points
-    if len(points) < minimum:
-        return
-    correlation = float(
-        spearmanr([point[0] for point in points], [point[1] for point in points]).statistic
-    )
-    persist_synthetic_diagnostic_metric(
+
+def _persist_work_structure_summary(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    strata: tuple[WorkStructureStratum, ...],
+    input_artifact_ids: tuple[ArtifactIdentifier, ...],
+) -> None:
+    from fedorbit.experiments.validation import persist_synthetic_experiment_payload
+
+    seed = ExperimentSeed(active_config().scientific.randomness.confirmatory_seeds[0])
+    persist_synthetic_experiment_payload(
         store,
         layout,
-        request.experiment,
+        request,
+        seed,
+        lambda fingerprint: cast(
+            StableJsonPayload,
+            OrderedDict(
+                experiment=request.experiment.value,
+                dependency_fingerprint_sha256=fingerprint,
+                predicted_work_coordinate=(
+                    "active-image assignment count multiplied by the sum of "
+                    "padded block sizes cubed"
+                ),
+                strata=tuple(
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            block_pattern=stratum.block_pattern.value,
+                            support=None if stratum.support is None else stratum.support,
+                            distinct_k_count=len(stratum.points),
+                            correlation=stratum.correlation,
+                            points=tuple(
+                                cast(
+                                    StableJsonPayload,
+                                    OrderedDict(
+                                        k=point.k,
+                                        predicted_work=point.predicted_work,
+                                        median_runtime_seconds=point.median_runtime_seconds,
+                                    ),
+                                )
+                                for point in stratum.points
+                            ),
+                        ),
+                    )
+                    for stratum in strata
+                ),
+                input_artifact_ids=tuple(identifier.value for identifier in input_artifact_ids),
+            ),
+        ),
+        _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+        ImplementationIdentity.SOLVERS_V1,
+        ArtifactName("work-structure-trend"),
         EvaluationCondition(EvaluationConditionKind.WORK_STRUCTURE).name,
-        active_config().scientific.randomness.confirmatory_seeds[0],
-        MetricId.WORK_STRUCTURE_SPEARMAN,
-        correlation,
-        MetricUnit.CORRELATION,
-        MetricDirection.DESCRIPTIVE,
-        (),
-        request.overwrite_policy,
     )
+
+
+def persist_work_structure_trend(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+) -> None:
+    artifacts = completed_scalability_metric_artifacts(store)
+    strata = work_structure_strata(artifacts)
+    correlations = tuple(
+        stratum.correlation for stratum in strata if stratum.correlation is not None
+    )
+    condition = EvaluationCondition(EvaluationConditionKind.WORK_STRUCTURE).name
+    seed = active_config().scientific.randomness.confirmatory_seeds[0]
+    input_artifact_ids = tuple(artifact.artifact_id for artifact in artifacts)
+    if not correlations:
+        persist_synthetic_diagnostic_metric(
+            store,
+            layout,
+            request.experiment,
+            condition,
+            seed,
+            MetricId.WORK_STRUCTURE_SPEARMAN,
+            None,
+            MetricUnit.CORRELATION,
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids or (ArtifactIdentifier("ineligible-cell"),),
+            request.overwrite_policy,
+            valid=False,
+            invalid_reason=InvalidReason(WorkStructureTrendState.INSUFFICIENT_TREND_EVIDENCE.value),
+        )
+    else:
+        persist_synthetic_diagnostic_metric(
+            store,
+            layout,
+            request.experiment,
+            condition,
+            seed,
+            MetricId.WORK_STRUCTURE_SPEARMAN,
+            min(correlations),
+            MetricUnit.CORRELATION,
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            request.overwrite_policy,
+        )
+    _persist_work_structure_summary(store, layout, request, strata, input_artifact_ids)
 
 
 def persist_synthetic_diagnostic_metric(
@@ -829,11 +1190,13 @@ def persist_synthetic_diagnostic_metric(
     condition: EvaluationConditionName,
     seed: RandomSeed,
     metric_name: MetricId,
-    metric_value: Estimate,
+    metric_value: Estimate | None,
     metric_unit: MetricUnit,
     direction: MetricDirection,
     input_artifact_ids: ArtifactIdentifiers,
     overwrite_policy: OverwritePolicy,
+    valid: bool = True,
+    invalid_reason: InvalidReason | None = None,
 ) -> ReusableArtifactManifest | None:
     relevance = experiment_relevance(experiment)
     cell = SemanticCell(
@@ -850,7 +1213,7 @@ def persist_synthetic_diagnostic_metric(
             relevance,
             input_artifact_ids,
             _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.SOLVERS_V1,
             metric_name=metric_name,
         )
     )
@@ -873,8 +1236,8 @@ def persist_synthetic_diagnostic_metric(
         ),
         input_artifact_ids=tuple(input_artifact_ids),
         dependency_fingerprint_sha256=fingerprint,
-        valid=True,
-        invalid_reason=None,
+        valid=valid,
+        invalid_reason=invalid_reason,
     )
     validate_metric_records(MetricRecordCollection((metric,)))
     payload_path = (
@@ -889,8 +1252,7 @@ def persist_synthetic_diagnostic_metric(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(_THEOREM_VALIDATION_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = Sha256Digest(runtime_fingerprint(ArtifactStage.EVALUATION).sha256)
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SOLVERS_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -898,8 +1260,8 @@ def persist_synthetic_diagnostic_metric(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=ArtifactStage.EVALUATION,
+        upstream_artifact_ids=tuple(input_artifact_ids),
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -908,10 +1270,9 @@ def persist_synthetic_diagnostic_metric(
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
             dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=(),
+            upstream_artifact_ids=tuple(input_artifact_ids),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -942,7 +1303,44 @@ def _fixture_seed(
     return derived
 
 
-def _persist_map_world_metrics(
+class UnresolvedMapWorldUnavailability(StrEnum):
+    FIXTURE_NOT_CONSTRUCTIBLE = "registered unresolved-map fixture is not constructible"
+
+
+def persist_unavailable_map_world_metrics(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    world_kind: UnresolvedMapWorldKind,
+    fixture_index: Index,
+    seed: RandomSeed,
+    invalid_reason: InvalidReason,
+    overwrite_policy: OverwritePolicy,
+) -> None:
+    condition = EvaluationConditionName(f"{world_kind.value}-{fixture_index}")
+    for metric_name in (
+        MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
+        MetricId.EXACT_MAP_ACTION_VALUE,
+        MetricId.ORBIT_RADIUS_MAP_BOUND,
+    ):
+        persist_synthetic_diagnostic_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            seed,
+            metric_name,
+            None,
+            MetricUnit.SCORE,
+            MetricDirection.DESCRIPTIVE,
+            (ArtifactIdentifier("unavailable-synthetic-cell"),),
+            overwrite_policy,
+            valid=False,
+            invalid_reason=invalid_reason,
+        )
+
+
+def persist_map_world_metrics(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
@@ -986,10 +1384,26 @@ def _run_unresolved_map_fixtures(
         for fixture_index in range(fixtures_per_seed):
             index: Index = fixture_index
             fixture_seed = _fixture_seed(seed, world_kind, index)
-            world = generate_unresolved_map_world(
-                UnresolvedMapWorldRequest(world_kind, fixture_seed)
-            )
-            _persist_map_world_metrics(
+            try:
+                world = generate_unresolved_map_world(
+                    UnresolvedMapWorldRequest(world_kind, fixture_seed)
+                )
+            except MechanismGenerationError as error:
+                persist_unavailable_map_world_metrics(
+                    store,
+                    layout,
+                    request.experiment,
+                    world_kind,
+                    index,
+                    seed,
+                    InvalidReason(
+                        f"{UnresolvedMapWorldUnavailability.FIXTURE_NOT_CONSTRUCTIBLE.value}"
+                        f": {error}"
+                    ),
+                    request.overwrite_policy,
+                )
+                continue
+            persist_map_world_metrics(
                 store,
                 layout,
                 request.experiment,
@@ -1056,8 +1470,9 @@ def execute_exact_map_value_bound_validation(
     )
 
 
-def _synthetic_coupling_problem(
+def synthetic_coupling_problem(
     instance: CouplingInstance,
+    support: SupportCount,
 ) -> tuple[RobustActionProblem, tuple[BlockCorrespondence, ...], CurriculumAction, RectangularHull]:
     groups = tuple(CoarseGroup)[: len(instance.block_pattern)]
     counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
@@ -1070,6 +1485,7 @@ def _synthetic_coupling_problem(
         instance.target_importance,
         tuple(range(sum(instance.block_pattern))),
     )
+    problem = replace(problem, principal_support=support)
     alpha = CurriculumAction(problem=problem, coordinates=instance.active_action)
     hull = build_rectangular_hull(
         blocks, instance.lower_response_matrix, instance.lower_response_matrix
@@ -1077,7 +1493,7 @@ def _synthetic_coupling_problem(
     return problem, orbit, alpha, hull
 
 
-def _persist_coupling_mechanism_metrics(
+def persist_coupling_mechanism_metrics(
     store: ArtifactStore,
     layout: WorkspaceLayout,
     experiment: ExperimentName,
@@ -1092,7 +1508,9 @@ def _persist_coupling_mechanism_metrics(
     overwrite_policy: OverwritePolicy,
 ) -> None:
     input_artifact_ids = (ArtifactIdentifier("synthetic-generator"),)
-    candidates = (alpha, zero_action(problem))
+    exact_action = solve_robust_action(problem).selected_action
+    rectangular_action = optimize_against_fixed_matrix(problem, hull.lower_bounds).selected_action
+    candidates = (exact_action, rectangular_action, zero_action(problem))
     for metric_name, metric_value in (
         (
             MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
@@ -1106,22 +1524,97 @@ def _persist_coupling_mechanism_metrics(
             MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
             rectangular_value_over_candidates(candidates, problem, hull),
         ),
+        (
+            MetricId.COUPLING_ACTION_SET_SUPPORT,
+            float(problem.principal_support),
+        ),
     ):
+        metric_unit = (
+            MetricUnit.COUNT
+            if metric_name is MetricId.COUPLING_ACTION_SET_SUPPORT
+            else MetricUnit.SCORE
+        )
         persist_synthetic_benchmark_metric(
             store,
             layout,
             experiment,
             condition,
-            support,
+            SupportSize(support),
             method,
             seed,
             metric_name,
             float(metric_value),
-            MetricUnit.SCORE,
+            metric_unit,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
             overwrite_policy,
         )
+
+
+def persist_exact_orbit_coupling_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    condition: EvaluationConditionName,
+    support: SupportCount,
+    seed: RandomSeed,
+    problem: RobustActionProblem,
+    orbit: tuple[BlockCorrespondence, ...],
+    alpha: CurriculumAction,
+    hull: RectangularHull,
+) -> None:
+    from fedorbit.experiments.validation import persist_synthetic_experiment_payload
+
+    exact_action = solve_robust_action(problem).selected_action
+    rectangular_action = optimize_against_fixed_matrix(problem, hull.lower_bounds).selected_action
+    candidates = (exact_action, rectangular_action, zero_action(problem))
+    persist_synthetic_experiment_payload(
+        store,
+        layout,
+        request,
+        ExperimentSeed(seed),
+        lambda fingerprint: cast(
+            StableJsonPayload,
+            OrderedDict(
+                experiment=request.experiment.value,
+                dependency_fingerprint_sha256=fingerprint,
+                method=ExperimentLocalMethod.EXACT_ORBIT.value,
+                condition=condition,
+                support=support,
+                seed=seed,
+                state=ArtifactState.COMPLETED.value,
+                orbit_size=len(orbit),
+                metrics=OrderedDict(
+                    (
+                        (
+                            MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP.value,
+                            float(
+                                fixed_action_rectangularization_gap(alpha, orbit, hull.lower_bounds)
+                            ),
+                        ),
+                        (
+                            MetricId.ROBUST_COUPLING_VALUE_GAP.value,
+                            float(robust_coupling_gap(candidates, problem, orbit, hull)),
+                        ),
+                        (
+                            MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC.value,
+                            float(rectangular_value_over_candidates(candidates, problem, hull)),
+                        ),
+                        (
+                            MetricId.COUPLING_ACTION_SET_SUPPORT.value,
+                            float(problem.principal_support),
+                        ),
+                    )
+                ),
+                input_artifact_ids=[ArtifactIdentifier("synthetic-generator").value],
+            ),
+        ),
+        _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
+        ImplementationIdentity.SOLVERS_V1,
+        ArtifactName(f"exact-orbit.{condition}.support-{support}.{seed}"),
+        condition,
+        SupportSize(support),
+    )
 
 
 def execute_synthetic_coupling_mechanism_validation(
@@ -1157,8 +1650,22 @@ def execute_synthetic_coupling_mechanism_validation(
                                     instance = generate_coupling_instance(coupling_request)
                                 except CouplingGenerationError:
                                     continue
-                                problem, orbit, alpha, hull = _synthetic_coupling_problem(instance)
-                                _persist_coupling_mechanism_metrics(
+                                problem, orbit, alpha, hull = synthetic_coupling_problem(
+                                    instance, support
+                                )
+                                persist_exact_orbit_coupling_cell(
+                                    store,
+                                    layout,
+                                    request,
+                                    condition,
+                                    support,
+                                    seed,
+                                    problem,
+                                    orbit,
+                                    alpha,
+                                    hull,
+                                )
+                                persist_coupling_mechanism_metrics(
                                     store,
                                     layout,
                                     request.experiment,
@@ -1186,6 +1693,9 @@ def execute_synthetic_coupling_mechanism_validation(
                                     instance.target_importance,
                                     tuple(range(sum(instance.block_pattern))),
                                 )
+                                destroyed_problem = replace(
+                                    destroyed_problem, principal_support=support
+                                )
                                 destroyed_alpha = CurriculumAction(
                                     problem=destroyed_problem, coordinates=instance.active_action
                                 )
@@ -1194,7 +1704,7 @@ def execute_synthetic_coupling_mechanism_validation(
                                     destroyed.lower_response_matrix,
                                     destroyed.lower_response_matrix,
                                 )
-                                _persist_coupling_mechanism_metrics(
+                                persist_coupling_mechanism_metrics(
                                     store,
                                     layout,
                                     request.experiment,

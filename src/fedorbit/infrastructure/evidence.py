@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import OrderedDict
 from collections.abc import Mapping
@@ -8,15 +9,16 @@ from io import BytesIO
 from pathlib import Path
 from typing import Protocol, cast
 
+import matplotlib
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.figure import Figure
 from pydantic import BaseModel, ConfigDict
-from reportlab.pdfgen.canvas import Canvas
 
 from fedorbit.analysis.records import MetricRecord
 from fedorbit.config.loading import active_config
+from fedorbit.config.models import ReportingPrecisionConfig
 from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import ReusableArtifactManifest
 from fedorbit.infrastructure.runtime import (
@@ -25,14 +27,19 @@ from fedorbit.infrastructure.runtime import (
     ReproducibilityIdentity,
     build_reproducibility_identity,
     deterministic_backend_state,
-    reject_incompatible,
 )
 from fedorbit.infrastructure.storage import atomic_write_bytes, atomic_write_json
 from fedorbit.infrastructure.workspace import WorkspaceLayout, results_workspace
 from fedorbit.types import (
     ArtifactIdentifier,
+    ArtifactIdentifiers,
+    ArtifactStage,
+    ConfidenceIntervalText,
     ExperimentName,
+    FieldDescription,
     JsonValue,
+    MetricId,
+    MetricUnit,
     ReferenceLineCoordinate,
     ReportArtifactName,
     ReportAxisLabel,
@@ -55,6 +62,97 @@ REPORT_FIGURE_WIDTH = 480
 REPORT_FIGURE_HEIGHT = 180
 REPORT_METRIC_SCALE = 4.0
 REPORT_BAR_COLOR = "#2a6fbb"
+SVG_HASH_SALT = "fedorbit"
+METRIC_VALUE_FIELD = "metric_value"
+TABLE_EXPORT_SUFFIX = ".csv"
+UNAVAILABLE_CELL_TEXT = "NA"
+EXPORT_LEDGER_KEY = "report_exports"
+SVG_EXPORT_DESCRIPTION_PREFIX = "dependency-fingerprint-sha256"
+NONDETERMINISTIC_SVG_METADATA: Mapping[str, None] = OrderedDict((("Date", None), ("Creator", None)))
+
+
+def export_dependency_fingerprint(
+    name: ReportArtifactName,
+    dependency_artifact_ids: ArtifactIdentifiers = (),
+) -> Sha256Digest:
+    payload = stable_json(
+        cast(
+            StableJsonPayload,
+            OrderedDict(
+                export=name.value,
+                producer_stage=ArtifactStage.REPORTING.value,
+                dependency_artifact_ids=tuple(
+                    identifier.value for identifier in dependency_artifact_ids
+                ),
+            ),
+        )
+    )
+    return Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())
+
+
+def _reporting_precision() -> ReportingPrecisionConfig:
+    return active_config().reporting.precision
+
+
+def format_scientific_metric(value: float) -> str:
+    return f"{value:.{_reporting_precision().scientific_metric_decimals}f}"
+
+
+def format_macro_f1(value: float) -> str:
+    return f"{value:.{_reporting_precision().macro_f1_decimals}f}"
+
+
+def format_balanced_accuracy(value: float) -> str:
+    return f"{value:.{_reporting_precision().balanced_accuracy_decimals}f}"
+
+
+def format_p_value(value: float) -> str:
+    precision = _reporting_precision()
+    if value < precision.p_value_less_than_threshold:
+        return f"<{precision.p_value_less_than_threshold:.{precision.p_value_decimals}f}"
+    return f"{value:.{precision.p_value_decimals}f}"
+
+
+def format_runtime_seconds(value: float) -> str:
+    return f"{value:.{_reporting_precision().runtime_seconds_decimals}f}"
+
+
+def format_memory_mib(value: float) -> str:
+    return f"{value:.{_reporting_precision().memory_decimals}f}"
+
+
+def format_integer(value: float) -> str:
+    return str(round(value))
+
+
+def format_interval_estimate(
+    estimate: float,
+    low: float | None,
+    high: float | None,
+) -> ConfidenceIntervalText:
+    rendered_estimate = format_scientific_metric(estimate)
+    if low is None or high is None:
+        return ConfidenceIntervalText(rendered_estimate)
+    rendered_low = format_scientific_metric(low)
+    rendered_high = format_scientific_metric(high)
+    return ConfidenceIntervalText(f"{rendered_estimate} [{rendered_low}, {rendered_high}]")
+
+
+def format_metric_value(metric: MetricRecord) -> str:
+    value = metric.metric_value
+    if value is None:
+        return ""
+    if metric.metric_unit in (MetricUnit.BOOLEAN, MetricUnit.COUNT, MetricUnit.BYTES):
+        return format_integer(value)
+    if metric.metric_unit == MetricUnit.MEBIBYTES:
+        return format_memory_mib(value)
+    if metric.metric_unit == MetricUnit.SECONDS:
+        return format_runtime_seconds(value)
+    if metric.metric_name == MetricId.MACRO_F1:
+        return format_macro_f1(value)
+    if metric.metric_name == MetricId.BALANCED_ACCURACY:
+        return format_balanced_accuracy(value)
+    return format_scientific_metric(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,12 +218,6 @@ TableScalar = str | int | float | bool | None
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceTablePayload:
-    columns: ReportColumns
-    rows: tuple[tuple[TableScalar, ...], ...]
-
-
-@dataclass(frozen=True, slots=True)
 class EvidenceTable:
     columns: ReportColumns
     rows: tuple[tuple[TableScalar, ...], ...]
@@ -137,9 +229,6 @@ class EvidenceTable:
             raise TableError("evidence table columns must be unique")
         if any(len(row) != len(self.columns) for row in self.rows):
             raise TableError("evidence table row width differs from column count")
-
-    def payload(self) -> EvidenceTablePayload:
-        return EvidenceTablePayload(self.columns, self.rows)
 
 
 class EvidenceExportError(ValueError):
@@ -160,7 +249,10 @@ def _metric_tabular_values(
     metric: MetricRecord,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     serialized = metric.model_dump(mode="json")
-    return tuple(serialized), tuple(str(value) for value in serialized.values())
+    return tuple(serialized), tuple(
+        format_metric_value(metric) if column == METRIC_VALUE_FIELD else str(value)
+        for column, value in serialized.items()
+    )
 
 
 class VerifiedEvidenceWriter:
@@ -218,23 +310,16 @@ class VerifiedEvidenceWriter:
             / _experiment_supplementary_table_directory()
             / ReportingPathSegment.METRIC_RECORDS_CSV
         )
-        tex_path = (
-            workspace
-            / ReportingPathSegment.TABLES
-            / _experiment_supplementary_table_directory()
-            / ReportingPathSegment.METRIC_RECORDS_TEX
-        )
         atomic_write_bytes(csv_path, _csv_bytes(columns, (row,)))
-        atomic_write_bytes(tex_path, _tex_bytes(columns, (row,)))
         figure_paths = self.write_metric_figure(experiment, artifact_id, metric)
-        return (summary, csv_path, tex_path, *figure_paths)
+        return (summary, csv_path, *figure_paths)
 
     def write_metric_figure(
         self,
         experiment: ExperimentName,
         artifact_id: ArtifactIdentifier,
         metric: MetricRecord,
-    ) -> tuple[Path, Path]:
+    ) -> tuple[Path, ...]:
         self._store.resolve(artifact_id)
         if metric.metric_value is None:
             raise EvidenceExportError("metric figure requires a valid finite metric value")
@@ -243,12 +328,10 @@ class VerifiedEvidenceWriter:
             / ReportingPathSegment.FIGURES
             / _experiment_main_figure_directory()
         )
-        label = f"{metric.metric_name.value}: {metric.metric_value:g} {metric.metric_unit}"
+        label = f"{metric.metric_name.value}: {format_metric_value(metric)} {metric.metric_unit}"
         svg_path = destination / ReportingPathSegment.METRIC_VALUE_SVG
-        pdf_path = destination / ReportingPathSegment.METRIC_VALUE_PDF
         atomic_write_bytes(svg_path, _metric_svg_bytes(label, metric.metric_value))
-        atomic_write_bytes(pdf_path, _metric_pdf_bytes(label, metric.metric_value))
-        return (svg_path, pdf_path)
+        return (svg_path,)
 
     def write_project_summary(
         self,
@@ -356,20 +439,24 @@ class VerifiedEvidenceWriter:
         self,
         table: EvidenceTable,
         name: ReportArtifactName,
+        dependency_artifact_ids: ArtifactIdentifiers = (),
     ) -> Path:
         destination = (
             self._layout.project_summary
             / ReportingPathSegment.TABLES
             / _project_main_table_directory()
-            / f"{name}{ReportingPathSegment.TABLE_SUFFIX.value}"
+            / f"{name}{TABLE_EXPORT_SUFFIX}"
         )
-        atomic_write_json(destination, table.payload())
-        return destination
+        fingerprint = export_dependency_fingerprint(name, dependency_artifact_ids)
+        promoted = self._promote_export(destination, _table_csv_bytes(table))
+        self._record_export_fingerprint(name, fingerprint)
+        return promoted
 
     def write_project_evidence_figure(
         self,
         figure: EvidenceFigure,
         name: ReportArtifactName,
+        dependency_artifact_ids: ArtifactIdentifiers = (),
     ) -> Path:
         destination = (
             self._layout.project_summary
@@ -377,8 +464,44 @@ class VerifiedEvidenceWriter:
             / _project_main_figure_directory()
             / f"{name}{ReportingPathSegment.FIGURE_SUFFIX.value}"
         )
-        atomic_write_bytes(destination, _evidence_figure_svg_bytes(figure))
+        fingerprint = export_dependency_fingerprint(name, dependency_artifact_ids)
+        rendered = figure_svg_bytes(
+            figure,
+            FieldDescription(f"{SVG_EXPORT_DESCRIPTION_PREFIX}: {fingerprint}"),
+        )
+        promoted = self._promote_export(destination, rendered)
+        self._record_export_fingerprint(name, fingerprint)
+        return promoted
+
+    def _promote_export(self, destination: Path, rendered: bytes) -> Path:
+        if destination.is_file() and destination.read_bytes() == rendered:
+            return destination
+        atomic_write_bytes(destination, rendered)
         return destination
+
+    def _record_export_fingerprint(
+        self,
+        name: ReportArtifactName,
+        fingerprint: Sha256Digest,
+    ) -> None:
+        ledger = (
+            self._layout.project_summary
+            / ReportingPathSegment.REPRODUCIBILITY
+            / _project_execution_reproducibility_directory()
+            / ReportingPathSegment.EXECUTION_JSON
+        )
+        payload: OrderedDict[str, JsonValue] = OrderedDict()
+        if ledger.is_file():
+            parsed = json.loads(ledger.read_text(encoding="utf-8"))
+            if isinstance(parsed, dict):
+                payload.update(cast(Mapping[str, JsonValue], parsed))
+        recorded = payload.get(EXPORT_LEDGER_KEY)
+        exports: OrderedDict[str, JsonValue] = OrderedDict()
+        if isinstance(recorded, Mapping):
+            exports.update(cast(Mapping[str, JsonValue], recorded))
+        exports[name.value] = fingerprint
+        payload[EXPORT_LEDGER_KEY] = exports
+        atomic_write_json(ledger, cast(StableJsonPayload, payload))
 
     def metric_record(self, artifact_id: ArtifactIdentifier) -> MetricRecord | None:
         manifest = self._store.resolve(artifact_id)
@@ -404,8 +527,15 @@ def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> b
     return _tabular_frame(columns, rows).to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
-def _tex_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> bytes:
-    return _tabular_frame(columns, rows).to_latex(index=False, escape=True).encode("utf-8")
+def _table_csv_bytes(table: EvidenceTable) -> bytes:
+    rendered = tuple(
+        tuple(
+            UNAVAILABLE_CELL_TEXT if cell is None else cell if isinstance(cell, str) else str(cell)
+            for cell in row
+        )
+        for row in table.rows
+    )
+    return _csv_bytes(table.columns, rendered)
 
 
 def _experiment_metric_summary_directory() -> str:
@@ -448,6 +578,16 @@ def _project_execution_reproducibility_directory() -> str:
     return directories.project_execution_reproducibility
 
 
+def _render_svg_bytes(figure: Figure, description: FieldDescription | None = None) -> bytes:
+    metadata: OrderedDict[str, str | None] = OrderedDict(NONDETERMINISTIC_SVG_METADATA)
+    if description is not None:
+        metadata["Description"] = description
+    buffer = BytesIO()
+    with matplotlib.rc_context({"svg.hashsalt": SVG_HASH_SALT}):
+        FigureCanvasSVG(figure).print_svg(buffer, metadata=metadata)
+    return buffer.getvalue()
+
+
 def _metric_svg_bytes(label: str, value: float) -> bytes:
     figure = Figure(
         figsize=(REPORT_FIGURE_WIDTH / 72, REPORT_FIGURE_HEIGHT / 72),
@@ -461,9 +601,7 @@ def _metric_svg_bytes(label: str, value: float) -> bytes:
     axes.set_xlim(0.0, REPORT_METRIC_SCALE)
     axes.set_title(label)
     axes.set_yticks(())
-    buffer = BytesIO()
-    FigureCanvasSVG(figure).print_svg(buffer)
-    return buffer.getvalue()
+    return _render_svg_bytes(figure)
 
 
 def _draw_series(axes: Axes, series: FigureSeries) -> None:
@@ -530,7 +668,10 @@ def _panel_groups(
     return tuple((key, tuple(items)) for key, items in grouped.items())
 
 
-def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
+def figure_svg_bytes(
+    figure: EvidenceFigure,
+    export_description: FieldDescription | None = None,
+) -> bytes:
     panels = _panel_groups(figure.series) if figure.separate_panels else ()
     panel_count = len(panels) if figure.separate_panels else 1
     plot = Figure(
@@ -551,31 +692,7 @@ def _evidence_figure_svg_bytes(figure: EvidenceFigure) -> bytes:
         for series in figure.series:
             _draw_series(axes, series)
         _style_axes(axes, figure, figure.series)
-    buffer = BytesIO()
-    FigureCanvasSVG(plot).print_svg(buffer)
-    return buffer.getvalue()
-
-
-def _metric_pdf_bytes(label: str, value: float) -> bytes:
-    bar_width = min(
-        float(REPORT_FIGURE_WIDTH - 80),
-        max(0.0, abs(value) * (REPORT_FIGURE_WIDTH - 80) / REPORT_METRIC_SCALE),
-    )
-    buffer = BytesIO()
-    document = Canvas(
-        buffer,
-        pagesize=(REPORT_FIGURE_WIDTH, REPORT_FIGURE_HEIGHT),
-        pageCompression=1,
-        invariant=1,
-    )
-    document.setFont("Helvetica", 14)
-    document.drawString(40, 150, label)
-    document.setFillColor(REPORT_BAR_COLOR)
-    document.rect(40, 70, bar_width, 40, fill=1, stroke=0)
-    document.setStrokeColor("black")
-    document.line(40, 70, REPORT_FIGURE_WIDTH - 40, 70)
-    document.save()
-    return buffer.getvalue()
+    return _render_svg_bytes(plot, export_description)
 
 
 def _identity_payload(identity: ReproducibilityIdentity) -> OrderedDict[str, JsonValue]:
@@ -608,10 +725,3 @@ def recorded_execution_identity(layout: WorkspaceLayout) -> ReproducibilityIdent
         code_revision=CodeRevision(GitRevision(str(recorded["code_revision"]))),
         statistical_identity_digest=Sha256Digest(str(recorded["statistical_identity_digest"])),
     )
-
-
-def assert_recorded_execution_identity_compatible(layout: WorkspaceLayout) -> None:
-    recorded = recorded_execution_identity(layout)
-    if recorded is None:
-        return
-    reject_incompatible(build_reproducibility_identity(environment_snapshot()), recorded)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import cast
 
 import torch
@@ -60,9 +62,7 @@ from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
     ExecutionError,
     RecoveryBoundary,
-    execution_store,
 )
-from fedorbit.infrastructure.evidence import VerifiedEvidenceWriter
 from fedorbit.infrastructure.failures import (
     ExecutionOutcome,
     FailureClassification,
@@ -78,11 +78,20 @@ from fedorbit.infrastructure.manifests import (
 )
 from fedorbit.infrastructure.runtime import (
     ExecutionLogEvent,
+    RandomSeed,
     execution_logger,
 )
+from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
     build_layout,
+)
+from fedorbit.interface import (
+    AnonymityCoordinate,
+    AnonymityCoordinateEntry,
+    ResourceKind,
+    StrictResourcePolicy,
+    anonymous_node_order,
 )
 from fedorbit.methods.assimilation import (
     capture_pre_confirm_pair,
@@ -94,6 +103,9 @@ from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstim
 from fedorbit.types import (
     AnonymousNodeDisplayId,
     ArtifactState,
+    ClientCount,
+    ClientRole,
+    CoarseGroup,
     ElapsedSeconds,
     ExecutionEventName,
     ExperimentName,
@@ -108,14 +120,24 @@ from fedorbit.types import (
     ScientificAlgorithmicFailureError,
     SemanticCoordinates,
     Sha256Digest,
+    SmokeArtifactFileName,
+    SmokeCheck,
     StableJsonPayload,
+    StorageLayoutSegment,
+    StrictResourceViolationError,
 )
 
 
 def run_smoke_validation(
     overwrite_policy: OverwritePolicy,
 ) -> None:
-    del overwrite_policy
+    completion_path = (
+        build_layout().execution_root
+        / StorageLayoutSegment.SMOKE
+        / SmokeArtifactFileName.EXECUTION_JSON
+    )
+    if overwrite_policy is OverwritePolicy.REUSE and _smoke_completion_is_valid(completion_path):
+        return
     seed = active_config().scientific.randomness.pilot_seeds[0]
     exact = generate_exact_separator_instance(ExactSeparatorInstanceRequest((2, 2), seed))
     if exact.lower_response_matrix.shape != (4, 4):
@@ -158,59 +180,79 @@ def run_smoke_validation(
     snapshots = capture_pre_confirm_pair(model, optimizer)
     if len(snapshots.baseline.model_state.tensors) != len(snapshots.curriculum.model_state.tensors):
         raise ExecutionError("pre-confirm snapshots have inconsistent parameter counts")
+    _validate_smoke_firewall(seed)
+    _validate_smoke_semantic_idempotency(seed)
+    _validate_smoke_crash_recovery()
+    atomic_write_json(completion_path, _smoke_completion_payload())
 
 
-def latest_completed_manifest(
-    store: ArtifactStore, experiment: ExperimentName
-) -> ReusableArtifactManifest | None:
-    candidates: list[ReusableArtifactManifest] = []
-    for manifest in store.all_manifests():
-        if experiment.value not in manifest.semantic_producer_coordinates:
-            continue
-        try:
-            resolved = store.resolve(manifest.artifact_id)
-        except ValueError:
-            continue
-        if resolved.state == ArtifactState.COMPLETED:
-            candidates.append(resolved)
-    if not candidates:
-        return None
-    return max(
-        candidates,
-        key=lambda manifest: max(
-            Path(payload).stat().st_mtime_ns for payload in manifest.payload_paths
-        ),
+def _smoke_completion_payload() -> StableJsonPayload:
+    return cast(
+        StableJsonPayload,
+        OrderedDict(checks=[check.value for check in SmokeCheck]),
     )
 
 
-def _write_immediate_experiment_evidence(
-    store: ArtifactStore, layout: WorkspaceLayout, experiment: ExperimentName
-) -> None:
-    manifest = latest_completed_manifest(store, experiment)
-    if manifest is None:
+def _smoke_completion_is_valid(completion_path: Path) -> bool:
+    if not completion_path.is_file():
+        return False
+    try:
+        recorded = json.loads(completion_path.read_text(encoding="utf-8"))
+        return recorded == _smoke_completion_payload()
+    except (OSError, ValueError):
+        return False
+
+
+def _validate_smoke_firewall(seed: RandomSeed) -> None:
+    policy = StrictResourcePolicy()
+    policy.assert_source_allowed(ResourceKind.TRAIN)
+    policy.assert_target_allowed(ResourceKind.TEST, transfer_finalized=True)
+    try:
+        policy.assert_target_allowed(ResourceKind.TEST, transfer_finalized=False)
+    except StrictResourceViolationError:
         return
-    writer = VerifiedEvidenceWriter(store, layout)
-    writer.write(
-        experiment,
-        manifest.artifact_id,
-        cast(
-            StableJsonPayload,
-            OrderedDict(
-                experiment=experiment.value,
-                artifact_id=manifest.artifact_id,
-                state=manifest.state.value,
-                dependency_fingerprint_sha256=manifest.dependency_fingerprint_sha256,
+    raise ExecutionError(f"smoke firewall accepted TEST before finalization for seed {seed}")
+
+
+def _validate_smoke_semantic_idempotency(seed: RandomSeed) -> None:
+    coordinate = AnonymityCoordinate(
+        entries=(
+            AnonymityCoordinateEntry(
+                StorageLayoutSegment.SMOKE.value,
+                SmokeCheck.SEMANTIC_IDEMPOTENCY.value,
             ),
-        ),
-        overwrite=True,
+        )
     )
-    writer.write_metric_exports(experiment, manifest.artifact_id)
+    first = anonymous_node_order(
+        cast(ClientCount, 2),
+        seed,
+        ClientRole.SOURCE,
+        CoarseGroup.DISRUPTION,
+        coordinate,
+    )
+    second = anonymous_node_order(
+        cast(ClientCount, 2),
+        seed,
+        ClientRole.SOURCE,
+        CoarseGroup.DISRUPTION,
+        coordinate,
+    )
+    if first != second:
+        raise ExecutionError("smoke semantic identity is not deterministic")
+
+
+def _validate_smoke_crash_recovery() -> None:
+    with TemporaryDirectory(prefix="fedorbit-smoke-") as temporary_directory:
+        store = ArtifactStore(Path(temporary_directory))
+        staging = store.staging_dir()
+        staging.mkdir(parents=True)
+        RecoveryBoundary(store).discard_interrupted_staging()
+        if staging.exists():
+            raise ExecutionError("smoke recovery did not remove interrupted staging")
 
 
 def _execute_producer_with_retry(
     producer: Callable[[], ReusableArtifactManifest | None],
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
     experiment: ExperimentName,
 ) -> None:
     policy = RetryPolicy(
@@ -242,7 +284,6 @@ def _execute_producer_with_retry(
                     elapsed_seconds=elapsed,
                 )
             )
-            _write_immediate_experiment_evidence(store, layout, experiment)
             return
         except (InfrastructureFailureError, ScientificAlgorithmicFailureError) as error:
             classification = classify_failure(error)
@@ -362,8 +403,8 @@ def registered_experiment_producers(
 
 
 def run_experiment(request: ExperimentExecutionRequest) -> None:
-    store = execution_store()
     layout = build_layout()
+    store = ArtifactStore(layout.execution_root, layout.staging)
     RecoveryBoundary(store).discard_interrupted_staging()
     logger = execution_logger()
     logger.event(
@@ -380,7 +421,7 @@ def run_experiment(request: ExperimentExecutionRequest) -> None:
             f"registered experiment has no scientific producer: {request.experiment.value}"
         )
     started_at = time.perf_counter()
-    _execute_producer_with_retry(producer, store, layout, request.experiment)
+    _execute_producer_with_retry(producer, request.experiment)
     elapsed: ElapsedSeconds = time.perf_counter() - started_at
     logger.event(
         ExecutionEventName.EXPERIMENT_END,

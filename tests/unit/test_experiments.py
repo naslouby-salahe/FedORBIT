@@ -126,7 +126,7 @@ def test_scalability_derived_cells(
     catalogue: ExperimentCatalogue,
 ) -> None:
     definition = catalogue.definition(ExperimentName.SCALABILITY_AND_EFFICIENCY)
-    assert definition.derived_planned_cells == 1120 + 120
+    assert definition.derived_planned_cells == 1120 + 180
 
 
 def test_map_audit_recovery_attempts(

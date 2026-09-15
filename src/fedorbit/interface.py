@@ -67,6 +67,12 @@ class AnonymousNodeOrder:
             raise AnonymityError("value count does not match anonymous node count")
         return tuple(values[index] for index in self.permutation)
 
+    def anonymous_position_of_semantic_index(self) -> tuple[AnonymousNodeIndex, ...]:
+        positions: list[AnonymousNodeIndex] = [0] * len(self.permutation)
+        for anonymous_position, semantic_index in enumerate(self.permutation):
+            positions[semantic_index] = anonymous_position
+        return tuple(positions)
+
 
 def anonymous_node_order(
     node_count: SampleCount,

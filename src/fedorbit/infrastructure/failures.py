@@ -103,7 +103,7 @@ _ALGORITHMIC_TYPES: tuple[type[BaseException], ...] = (ScientificAlgorithmicFail
 def classify_failure(error: BaseException) -> FailureClassification:
     if isinstance(error, _INFRASTRUCTURE_TYPES):
         return _INFRASTRUCTURE
-    if isinstance(error, _VALIDATION_TYPES):
+    if isinstance(error, (*_VALIDATION_TYPES, FedorbitValidationError)):
         return _VALIDATION
     if isinstance(error, _ALGORITHMIC_TYPES):
         return _ALGORITHMIC

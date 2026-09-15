@@ -10,7 +10,7 @@ from fedorbit.experiments.dispatch import (
 )
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
-from fedorbit.types import CliCommand, ExperimentName, OverwritePolicy
+from fedorbit.types import CliCommand, ExperimentName, OverwritePolicy, SemanticCoordinate
 
 
 def test_experiment_enum_matches_catalogue() -> None:
@@ -37,3 +37,13 @@ def test_cli_exposes_run_for_registered_experiments() -> None:
     command_names = {command.name for command in app.registered_commands}
     assert CliCommand.RUN.value in command_names
     assert set(build_catalogue().registered_names()) == set(ExperimentName)
+
+
+def test_every_registered_experiment_declares_cell_relevance_coordinates() -> None:
+    from fedorbit.experiments.cells import CELL_RELEVANCE_BY_EXPERIMENT
+
+    assert set(CELL_RELEVANCE_BY_EXPERIMENT) == set(ExperimentName)
+    for experiment, relevance in CELL_RELEVANCE_BY_EXPERIMENT.items():
+        assert relevance, f"{experiment.value} declares an empty cell relevance set"
+        assert SemanticCoordinate.EXPERIMENT in relevance
+        assert SemanticCoordinate.SEED in relevance

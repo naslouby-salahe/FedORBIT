@@ -2,26 +2,34 @@ from __future__ import annotations
 
 import hashlib
 from collections import OrderedDict
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import cast
+
+from pydantic import JsonValue
 
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.types import (
     AuditLabel,
     AuditResourceText,
     ConceptCount,
+    DatasetId,
     DirectedPair,
+    DirectedPairName,
     DomainModel,
     DurationMinutes,
     ExposedCoarseGroupId,
     FieldDescription,
     Fraction,
+    Index,
     OracleTransferConcept,
     ResearcherIdentifier,
     Rfc3339UtcTimestamp,
     Sha256Digest,
     StableJsonPayload,
+    directed_pair_name,
     stable_json,
 )
 
@@ -216,3 +224,223 @@ def oracle_correspondence_accuracy(
 def required_concept_count() -> ConceptCount:
     count: ConceptCount = len(TRANSFER_ONTOLOGY)
     return count
+
+
+class MapAvailabilityAuditOutcome(StrEnum):
+    TRIVIAL_TO_RECONSTRUCT = "Trivial To Reconstruct"
+    NOT_DEMONSTRATED_TRIVIAL = "Not Demonstrated Trivial"
+    BLOCKED_HUMAN_INPUT_REQUIRED = "Blocked / Human Input Required"
+
+
+class MapAvailabilityAuditFileName(StrEnum):
+    RECORDED_SUBMISSION_SHA256 = "recorded.sha256.json"
+    PAIR_OUTCOME = "pair_outcome.json"
+    EXPERIMENT_SUMMARY = "human_audit_summary.json"
+
+
+class MapAvailabilityAuditPairOutcome(DomainModel):
+    source: DatasetId
+    target: DatasetId
+    outcome: MapAvailabilityAuditOutcome
+    reason: FieldDescription
+    required_researcher_count: Index
+    researcher_ids: tuple[ResearcherIdentifier, ...]
+    recorded_submission_sha256: tuple[Sha256Digest, ...]
+    complete_one_to_one: tuple[bool, ...]
+    unresolved_alternative_count: tuple[Index, ...]
+    oracle_correspondence_accuracy: tuple[Fraction, ...]
+
+
+class MapAvailabilityAuditSummary(DomainModel):
+    required_researcher_count: Index
+    evaluated_pair_count: Index
+    trivial_pairs: tuple[DirectedPairName, ...]
+    not_demonstrated_pairs: tuple[DirectedPairName, ...]
+    blocked_pairs: tuple[DirectedPairName, ...]
+    practical_motivation_kill_rule_fires: bool
+    wording_restricted_to_pairs: tuple[DirectedPairName, ...]
+    practical_motivation_scope: FieldDescription
+
+
+def summarise_map_availability_outcomes(
+    required_researcher_count: Index,
+    outcomes: tuple[MapAvailabilityAuditPairOutcome, ...],
+) -> MapAvailabilityAuditSummary:
+    trivial = tuple(
+        _outcome_pair(outcome)
+        for outcome in outcomes
+        if outcome.outcome is MapAvailabilityAuditOutcome.TRIVIAL_TO_RECONSTRUCT
+    )
+    demonstrated_not_trivial = tuple(
+        _outcome_pair(outcome)
+        for outcome in outcomes
+        if outcome.outcome is MapAvailabilityAuditOutcome.NOT_DEMONSTRATED_TRIVIAL
+    )
+    blocked = tuple(
+        _outcome_pair(outcome)
+        for outcome in outcomes
+        if outcome.outcome is MapAvailabilityAuditOutcome.BLOCKED_HUMAN_INPUT_REQUIRED
+    )
+    kill_rule_fires = bool(outcomes) and not demonstrated_not_trivial and not blocked
+    restricted = demonstrated_not_trivial + blocked
+    if kill_rule_fires:
+        scope = FieldDescription(
+            "every evaluated primary pair is trivial to reconstruct; practical unresolved-map "
+            "motivation is not supported"
+        )
+    elif demonstrated_not_trivial and trivial:
+        scope = FieldDescription(
+            "practical unresolved-map wording is restricted to the pairs that are not "
+            "demonstrated trivial"
+        )
+    elif demonstrated_not_trivial:
+        scope = FieldDescription(
+            "practical unresolved-map wording covers the registered primary pairs within "
+            "measured evidence"
+        )
+    else:
+        scope = FieldDescription(
+            "human-audit submissions are incomplete; benchmark-wide natural-unavailability "
+            "wording remains forbidden"
+        )
+    return MapAvailabilityAuditSummary(
+        required_researcher_count=required_researcher_count,
+        evaluated_pair_count=len(outcomes),
+        trivial_pairs=trivial,
+        not_demonstrated_pairs=demonstrated_not_trivial,
+        blocked_pairs=blocked,
+        practical_motivation_kill_rule_fires=kill_rule_fires,
+        wording_restricted_to_pairs=restricted,
+        practical_motivation_scope=scope,
+    )
+
+
+def _outcome_pair(outcome: MapAvailabilityAuditPairOutcome) -> DirectedPairName:
+    return directed_pair_name(outcome.source, outcome.target)
+
+
+@dataclass(frozen=True, slots=True)
+class MapAvailabilityAuditPairDecision:
+    directed_pair: DirectedPair
+    outcome: MapAvailabilityAuditOutcome
+    reason: FieldDescription
+    required_researcher_count: Index
+    researcher_ids: tuple[ResearcherIdentifier, ...]
+    recorded_submission_sha256: tuple[Sha256Digest, ...]
+    complete_one_to_one: tuple[bool, ...]
+    unresolved_alternative_count: tuple[Index, ...]
+    oracle_correspondence_accuracy: tuple[Fraction, ...]
+
+    def record(self) -> MapAvailabilityAuditPairOutcome:
+        return MapAvailabilityAuditPairOutcome(
+            source=self.directed_pair.source,
+            target=self.directed_pair.target,
+            outcome=self.outcome,
+            reason=self.reason,
+            required_researcher_count=self.required_researcher_count,
+            researcher_ids=self.researcher_ids,
+            recorded_submission_sha256=self.recorded_submission_sha256,
+            complete_one_to_one=self.complete_one_to_one,
+            unresolved_alternative_count=self.unresolved_alternative_count,
+            oracle_correspondence_accuracy=self.oracle_correspondence_accuracy,
+        )
+
+    def payload(self) -> Mapping[str, JsonValue]:
+        return cast(
+            Mapping[str, JsonValue],
+            OrderedDict(
+                (
+                    ("source", self.directed_pair.source.value),
+                    ("target", self.directed_pair.target.value),
+                    ("outcome", self.outcome.value),
+                    ("reason", self.reason),
+                    ("required_researcher_count", self.required_researcher_count),
+                    ("researcher_ids", list(self.researcher_ids)),
+                    (
+                        "recorded_submission_sha256",
+                        list(self.recorded_submission_sha256),
+                    ),
+                    ("complete_one_to_one", list(self.complete_one_to_one)),
+                    (
+                        "unresolved_alternative_count",
+                        list(self.unresolved_alternative_count),
+                    ),
+                    (
+                        "oracle_correspondence_accuracy",
+                        list(self.oracle_correspondence_accuracy),
+                    ),
+                )
+            ),
+        )
+
+
+def accepted_map_availability_submissions(
+    submissions: tuple[MapAvailabilityAuditSubmission, ...],
+    minutes_limit: DurationMinutes,
+    public_labels: frozenset[AuditLabel],
+) -> tuple[MapAvailabilityAuditSubmission, ...]:
+    return tuple(
+        sorted(
+            (
+                submission
+                for submission in submissions
+                if not validate_submission(submission, minutes_limit, public_labels)
+            ),
+            key=lambda submission: submission.researcher_id,
+        )
+    )
+
+
+def decide_map_availability_outcome(
+    directed_pair: DirectedPair,
+    submissions: tuple[MapAvailabilityAuditSubmission, ...],
+    required_researcher_count: Index,
+    minutes_limit: DurationMinutes,
+    public_labels: frozenset[AuditLabel],
+) -> MapAvailabilityAuditPairDecision:
+    accepted = accepted_map_availability_submissions(submissions, minutes_limit, public_labels)
+    if len(accepted) != required_researcher_count or not distinct_researcher_ids(accepted):
+        return MapAvailabilityAuditPairDecision(
+            directed_pair=directed_pair,
+            outcome=MapAvailabilityAuditOutcome.BLOCKED_HUMAN_INPUT_REQUIRED,
+            reason=FieldDescription(
+                "required independent researcher submissions are missing, invalid, or duplicated"
+            ),
+            required_researcher_count=required_researcher_count,
+            researcher_ids=(),
+            recorded_submission_sha256=(),
+            complete_one_to_one=(),
+            unresolved_alternative_count=(),
+            oracle_correspondence_accuracy=(),
+        )
+    concept_count = required_concept_count()
+    recorded_sha256 = tuple(submission_sha256(submission) for submission in accepted)
+    complete_one_to_one = tuple(
+        submission_is_complete_one_to_one(submission, concept_count) for submission in accepted
+    )
+    unresolved_counts = tuple(len(submission.unresolved_alternatives) for submission in accepted)
+    accuracies = tuple(oracle_correspondence_accuracy(submission) for submission in accepted)
+    trivial = (
+        all(complete_one_to_one)
+        and all(count == 0 for count in unresolved_counts)
+        and all(accuracy == 1.0 for accuracy in accuracies)
+    )
+    return MapAvailabilityAuditPairDecision(
+        directed_pair=directed_pair,
+        outcome=(
+            MapAvailabilityAuditOutcome.TRIVIAL_TO_RECONSTRUCT
+            if trivial
+            else MapAvailabilityAuditOutcome.NOT_DEMONSTRATED_TRIVIAL
+        ),
+        reason=FieldDescription(
+            "both researchers reconstructed the complete public map within the timed session"
+            if trivial
+            else "at least one researcher did not reconstruct the exact complete public map"
+        ),
+        required_researcher_count=required_researcher_count,
+        researcher_ids=tuple(submission.researcher_id for submission in accepted),
+        recorded_submission_sha256=recorded_sha256,
+        complete_one_to_one=complete_one_to_one,
+        unresolved_alternative_count=unresolved_counts,
+        oracle_correspondence_accuracy=accuracies,
+    )

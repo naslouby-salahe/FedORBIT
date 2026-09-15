@@ -6,11 +6,9 @@ from fedorbit.config.loading import configured
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.runtime import (
-    IncompatibleIdentityError,
     build_reproducibility_identity,
     compatible,
     current_code_revision,
-    reject_incompatible,
 )
 
 
@@ -61,8 +59,6 @@ def test_identity_rejects_confirmatory_seed_change() -> None:
         current = build_reproducibility_identity(environment)
 
     assert not compatible(current, recorded)
-    with pytest.raises(IncompatibleIdentityError):
-        reject_incompatible(current, recorded)
 
 
 def test_identity_rejects_statistics_change(

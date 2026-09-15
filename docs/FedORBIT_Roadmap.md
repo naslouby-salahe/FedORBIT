@@ -4225,7 +4225,7 @@ Pass interpretation follows the central mechanism criteria.
 Planned units:
 
 $$
-4\ primary\ pairs\times10\ seeds=40.
+6\ primary\ directed\ pairs\times10\ seeds=60.
 $$
 
 Compare:
@@ -4510,7 +4510,7 @@ Primary pairs × confirmatory seeds.
 Derived cells:
 
 $$
-4\times3\times4\times10=480.
+6\times3\times4\times10=720.
 $$
 
 The singleton condition is oracle/diagnostic and not strict-interface evidence.
@@ -4578,7 +4578,7 @@ Local-Only
 Derived cells:
 
 $$
-15\times3\times4\times10=1,800.
+15\times3\times6\times10=2,700.
 $$
 
 ### Perturbation semantics
@@ -4636,10 +4636,11 @@ Packet-only recovery:
 * generic structural QAP;
 * every primary pair-seed.
 
-Derived recovery attempts:
+Derived recovery attempts: the two registered packet-only recovery methods over every primary
+pair-seed, that is
 
 $$
-2\times40=80.
+2\times6\times10=120.
 $$
 
 Human public-resource audit:
@@ -4739,13 +4740,17 @@ Total synthetic solver cells:
 1,120
 ```
 
-Real primary timing cells:
+Real primary timing cells: the three registered real-timing methods over every primary
+pair-seed, that is
 
 $$
-40\times3=120
+6\times10\times3=180
 $$
 
-before deterministic data exclusions.
+before deterministic data exclusions. The unit is the shared real pair-seed problem, because the
+efficiency comparison contrasts the three methods on identical inputs; the earlier rendering
+counted source-client packets (`4\times10=40`) rather than the pair-seed problems the timing
+protocol actually measures.
 
 Timing uses the authoritative warmup/repetition protocol.
 

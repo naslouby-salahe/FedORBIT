@@ -440,10 +440,18 @@ def deduplicate_rows(schema: AdapterSchema, rows: tuple[NormalizedRow, ...]) -> 
     )
 
 
+def conflicting_duplicate_labels_error(
+    group_sha256: Sha256Digest,
+    conflicting_labels: LocalClassNames,
+) -> RowNormalizationError:
+    return RowNormalizationError(
+        f"duplicate group {group_sha256[:16]} contains conflicting labels: {conflicting_labels}"
+    )
+
+
 def validate_duplicate_groups(groups: DuplicateGroups) -> None:
     for members in groups.as_member_records():
         if members.has_conflicting_labels():
-            raise RowNormalizationError(
-                f"duplicate group {members.group_sha256[:16]} contains conflicting labels: "
-                f"{members.conflicting_labels()}"
+            raise conflicting_duplicate_labels_error(
+                members.group_sha256, members.conflicting_labels()
             )

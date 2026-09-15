@@ -307,11 +307,16 @@ CorrespondenceBlockId = NewType("CorrespondenceBlockId", str)
 
 class StorageLayoutSegment(StrEnum):
     EXPERIMENTS = "experiments"
+    SMOKE = "smoke"
     CHECKPOINTS = "checkpoints"
     MANIFESTS = "manifests"
     COMPLETIONS = "completions"
     STAGING = "staging"
     PREPROCESSING = "preprocessing"
+    METADATA = "metadata"
+    VALIDATION = "validation"
+    PREPARED = "prepared"
+    FEATURES = "features"
     ARTIFACTS = "artifacts"
     DERIVED = "derived"
     MANIFEST_GLOB = "*.json"
@@ -344,6 +349,19 @@ class ArtifactStoreFileName(StrEnum):
     FINGERPRINT_INDEX = "fingerprint-index.json"
 
 
+class SmokeArtifactFileName(StrEnum):
+    EXECUTION_JSON = "execution.json"
+
+
+class SmokeCheck(StrEnum):
+    SYNTHETIC_PRIMITIVES = "synthetic_primitives"
+    TINY_MODEL_SNAPSHOT = "tiny_model_snapshot"
+    SOURCE_PACKET_VALIDATION = "source_packet_validation"
+    STRICT_RESOURCE_FIREWALL = "strict_resource_firewall"
+    SEMANTIC_IDEMPOTENCY = "semantic_idempotency"
+    CRASH_RECOVERY = "crash_recovery"
+
+
 class ArtifactCacheMissReason(StrEnum):
     ABSENT = "absent"
     INDEXED_MANIFEST_INVALID = "indexed_manifest_invalid"
@@ -371,6 +389,16 @@ class FailureHandlingLogCoordinate(StrEnum):
 
 class DatasetPreprocessingState(StrEnum):
     MATERIALIZED = "materialized"
+    INVALID = "invalid"
+    RESOURCE_BLOCKED = "resource_blocked"
+
+
+class PairSeedIneligibilityReason(StrEnum):
+    NO_SHARED_ELIGIBLE_COARSE_GROUP = "no shared eligible coarse group"
+    INSUFFICIENT_ACTIONABLE_TARGET_CONCEPTS = "insufficient actionable target concepts"
+    NO_NONTRIVIAL_TARGET_BLOCK = "no nontrivial target coarse block"
+    NO_NONTRIVIAL_SOURCE_RESPONSE_BLOCK = "no nontrivial source response block"
+    STRICT_RESOURCE_VIOLATION = "strict-resource violation"
 
 
 class RawInventoryArtifact(StrEnum):
@@ -378,6 +406,54 @@ class RawInventoryArtifact(StrEnum):
     MANIFEST_JSON = "manifest.json"
     CHECKSUMS_JSON = "checksums.json"
     SCHEMA_JSON = "schema.json"
+
+
+DatasetReleaseName = NewType("DatasetReleaseName", str)
+AcquisitionSourceDescriptor = NewType("AcquisitionSourceDescriptor", str)
+LicenseUseNote = NewType("LicenseUseNote", str)
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetReleaseIdentity:
+    release: DatasetReleaseName
+    acquisition_source: AcquisitionSourceDescriptor
+    acquisition_timestamp: Rfc3339UtcTimestamp
+    license_note: LicenseUseNote
+
+
+class ProvenanceArtifactFamily(StrEnum):
+    RAW_DATA = "raw_data"
+    CLEANED_DATA = "cleaned_data"
+    SPLIT = "split"
+    PREPROCESSING = "preprocessing"
+    ELIGIBILITY = "eligibility"
+    BASE_CHECKPOINT = "base_checkpoint"
+    RESPONSE_PACKET = "response_packet"
+    TARGET_IMPORTANCE = "target_importance"
+    SCORE = "score"
+    METRIC = "metric"
+    STATISTICAL_RESULT = "statistical_result"
+
+
+class ProvenanceAccessRole(StrEnum):
+    INPUT = "input"
+    OUTPUT = "output"
+    REFERENCE = "reference"
+
+
+class ScientificSubsystem(StrEnum):
+    RAW_INVENTORY = "raw_inventory"
+    PREPARATION = "preparation"
+    ELIGIBILITY = "eligibility"
+    BASE_MODEL_PILOT = "base_model_pilot"
+    BASE_MODEL_TRAINING = "base_model_training"
+    SCORING = "scoring"
+    SOURCE_RESPONSE = "source_response"
+    TARGET_IMPORTANCE = "target_importance"
+    CORRESPONDENCE = "correspondence"
+    CONFIRMATION = "confirmation"
+    STATISTICS = "statistics"
+    REPORTING = "reporting"
 
 
 class FedorbitConfigSection(StrEnum):
@@ -396,13 +472,11 @@ class ReportingPathSegment(StrEnum):
     FIGURES = "figures"
     REPRODUCIBILITY = "reproducibility"
     EVIDENCE_SUFFIX = ".evidence.json"
-    TABLE_SUFFIX = ".table.json"
-    FIGURE_SUFFIX = ".figure.svg"
+    TABLE_SUFFIX = ".csv"
+    FIGURE_SUFFIX = ".svg"
     SUMMARY_JSON = "summary.json"
     METRIC_RECORDS_CSV = "metric_records.csv"
-    METRIC_RECORDS_TEX = "metric_records.tex"
     METRIC_VALUE_SVG = "metric_value.svg"
-    METRIC_VALUE_PDF = "metric_value.pdf"
     EXPERIMENTS_CSV = "experiments.csv"
     EVIDENCE_SUMMARY_CSV = "evidence_summary.csv"
     SCIENTIFIC_CONFIGURATION_JSON = "scientific_configuration.json"
@@ -601,6 +675,13 @@ class Split(StrEnum):
     TEST = "TEST"
 
 
+class PreprocessingFitStage(StrEnum):
+    LOCAL_CLASS_MANIFEST = "local_class_manifest"
+    FEATURE_QUALITY = "feature_quality"
+    NUMERIC_PREPROCESSOR = "numeric_preprocessor"
+    CATEGORICAL_PREPROCESSOR = "categorical_preprocessor"
+
+
 class CoarseGroup(StrEnum):
     DISRUPTION = "Disruption"
     EXPLOITATION = "Exploitation"
@@ -626,7 +707,7 @@ class WeakSignalBoundaryDimension(StrEnum):
     TARGET_USABLE_SUPPORT_FRACTION = "target-usable-support-fraction"
 
 
-class ResearchQuestion(StrEnum):
+class EvidenceHypothesis(StrEnum):
     EXACT_SPARSE_SEPARATOR_EXACTNESS = "Exact Sparse Separator Exactness"
     JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM = (
         "Joint Correspondence Avoids Rectangular Pessimism"
@@ -757,12 +838,26 @@ class EvidenceAdjudication:
 
 
 class SimplificationRuleName(StrEnum):
+    EXACTNESS_FAILURE = "exactness_failure"
     RECTANGULARIZATION_IS_SUFFICIENT = "rectangularization_is_sufficient"
+    THEORY_CLASSIFICATION_FAILURE = "theory_classification_failure"
     GENERIC_QAP_DOMINATES = "generic_qap_dominates"
     SPARSE_SUPPORT_IS_OPERATIONALLY_IRRELEVANT = "sparse_support_is_operationally_irrelevant"
+    LOCAL_SIR_IS_SUFFICIENT = "local_sir_is_sufficient"
     POINT_MATCHING_IS_SUFFICIENT = "point_matching_is_sufficient"
+    COUPLING_DESTRUCTION_RETAINS_GAIN = "coupling_destruction_retains_gain"
     STRICT_INTERFACE_REMOVES_GAIN = "strict_interface_removes_gain"
+    CONFIRMATION_HAS_NO_SAFETY_VALUE = "confirmation_has_no_safety_value"
     SOURCE_RESPONSE_IS_TOO_UNSTABLE = "source_response_is_too_unstable"
+    UNRESOLVED_MAP_REGIME_LACKS_PRACTICAL_MOTIVATION = (
+        "unresolved_map_regime_lacks_practical_motivation"
+    )
+
+
+class CellUnavailabilityReason(StrEnum):
+    INELIGIBLE_OR_ABSTAIN = "INELIGIBLE/ABSTAIN"
+    INVALID_EVALUATION_DATA = "invalid_evaluation_data"
+    SCIENTIFIC_ALGORITHMIC_FAILURE = "scientific_algorithmic_failure"
 
 
 class SimplificationRuleState(StrEnum):
@@ -808,6 +903,12 @@ class ArtifactState(StrEnum):
     BLOCKED = "Blocked"
 
 
+class BoundaryReportState(StrEnum):
+    ABSTAINED = "Abstained"
+    UNAVAILABLE = "Unavailable (ineligible or missing stored evidence)"
+    COMPLETED = "Completed"
+
+
 class OverwritePolicy(StrEnum):
     REUSE = "reuse"
     REPLACE = "replace"
@@ -827,6 +928,10 @@ class TerminalState(StrEnum):
     FAILED_SCIENTIFIC_ALGORITHMIC = "Failed / Scientific Algorithmic Failure"
     TIME_LIMIT = "Time Limit"
     RESOURCE_LIMIT = "Resource Limit"
+
+
+class DenseCcpCertificationStatus(StrEnum):
+    HEURISTIC_ONLY = "heuristic-only"
 
 
 class RngNamespace(StrEnum):
@@ -853,6 +958,8 @@ class ArtifactType(StrEnum):
     TARGET_IMPORTANCE = "target_importance"
     SOLVER_RESULT = "solver_result"
     CONFIRMATION_INPUT = "confirmation_input"
+    STATISTICAL_RESULT = "statistical_result"
+    EVIDENCE = "evidence"
     OTHER = "other"
 
 
@@ -873,6 +980,18 @@ class ArtifactStage(StrEnum):
     REPORTING = "reporting"
 
 
+class ImplementationIdentity(StrEnum):
+    DATASET_MATERIALIZATION_V1 = "dataset_materialization_v1"
+    DATASET_MATERIALIZATION_V2 = "dataset_materialization_v2"
+    DATASET_MATERIALIZATION_V3 = "dataset_materialization_v3"
+    TRAINING_V1 = "training_v1"
+    SCORING_V1 = "scoring_v1"
+    SOLVERS_V1 = "solvers_v1"
+    SYNTHESIS_V1 = "synthesis_v1"
+    VALIDATION_V1 = "validation_v1"
+    CLASSIFICATION_V1 = "classification_v1"
+
+
 class ConfigurationSection(StrEnum):
     ACTION = "action"
     GENERATORS = "generators"
@@ -880,6 +999,9 @@ class ConfigurationSection(StrEnum):
     RESPONSE = "response"
     SOLVERS = "solvers"
     METRICS = "metrics"
+    CONFIRMATION = "confirmation"
+    TARGET_IMPORTANCE = "target_importance"
+    MULTI_SOURCE_SELECTION = "multi_source_selection"
 
 
 class SemanticCoordinate(StrEnum):
@@ -926,6 +1048,7 @@ class MetricId(StrEnum):
     FIXED_ACTION_RECTANGULARIZATION_GAP = "Fixed-Action Rectangularization Gap"
     ROBUST_COUPLING_VALUE_GAP = "Robust Coupling Value Gap"
     COUPLING_UPPER_BOUND_DIAGNOSTIC = "Coupling Upper-Bound Diagnostic"
+    COUPLING_ACTION_SET_SUPPORT = "Coupling Action-Set Support"
     EXACT_MAP_ACTION_VALUE = "Exact-Map Action Value"
     ORBIT_RADIUS_MAP_BOUND = "Orbit-Radius Map Bound"
     PREDICTED_REALIZED_SPEARMAN = "Predicted-Realized Spearman Correlation"
@@ -963,6 +1086,7 @@ class MetricId(StrEnum):
     PREDICTED_WORK_COORDINATE = "Predicted Work Coordinate"
     RESOURCE_LIMIT_INDICATOR = "Resource-Limit Indicator"
     PACKET_ONLY_RECOVERY_ACCURACY = "Packet-Only Recovery Accuracy"
+    TRIVIAL_MAP_RECONSTRUCTION_INDICATOR = "Trivial Map Reconstruction Indicator"
     STRICT_RESOURCE_VALIDITY = "Strict Resource Validity"
     DETERMINISTIC_REPLAY_CONSISTENCY = "Deterministic Replay Consistency"
     ABSTENTION_INDICATOR = "Abstention Indicator"
@@ -1070,6 +1194,17 @@ class ExperimentSeed:
             raise ValueError("experiment seed must be in the unsigned 32-bit range")
 
 
+def directed_pair_name(source: DatasetId, target: DatasetId) -> DirectedPairName:
+    return DirectedPairName(f"{source.value} -> {target.value}")
+
+
+def parse_directed_pair_name(name: DirectedPairName) -> DirectedPair:
+    source, separator, target = name.partition(" -> ")
+    if not separator:
+        raise ValueError(f"malformed directed-pair name: {name!r}")
+    return DirectedPair(DatasetId(source), DatasetId(target))
+
+
 @dataclass(frozen=True, slots=True)
 class DirectedPair:
     source: DatasetId
@@ -1077,7 +1212,7 @@ class DirectedPair:
 
     @property
     def direction(self) -> DirectedPairName:
-        return DirectedPairName(f"{self.source.value} -> {self.target.value}")
+        return directed_pair_name(self.source, self.target)
 
 
 @dataclass(frozen=True, slots=True)

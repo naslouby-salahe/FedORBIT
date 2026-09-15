@@ -176,7 +176,9 @@ def test_domain_public_signatures_use_canonical_domain_types() -> None:
 
 
 def test_checker_catches_private_function_primitive_param() -> None:
-    assert _violations("def _internal_step(seed: int) -> None: ...\n") == ["_internal_step(seed: int)"]
+    assert _violations("def _internal_step(seed: int) -> None: ...\n") == [
+        "_internal_step(seed: int)"
+    ]
 
 
 def test_checker_catches_primitive_seed_param() -> None:

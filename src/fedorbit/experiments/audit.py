@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import contextlib
 from collections import OrderedDict
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 from fedorbit.analysis.records import (
     MetricDirection,
@@ -22,8 +28,12 @@ from fedorbit.experiments.scoring import (
     load_dataset_source_packet,
     persist_primary_transfer_metric,
 )
+from fedorbit.experiments.solvers import (
+    registered_transfer_method,
+)
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
+    ExecutionError,
 )
 from fedorbit.infrastructure.preparation import (
     load_or_materialize_client,
@@ -37,20 +47,26 @@ from fedorbit.infrastructure.workspace import (
     experiment_workspace,
 )
 from fedorbit.methods.map_availability_audit import (
+    MapAvailabilityAuditFileName,
+    MapAvailabilityAuditPairOutcome,
     MapAvailabilityAuditSubmission,
+    accepted_map_availability_submissions,
     blank_audit_template,
-    distinct_researcher_ids,
+    decide_map_availability_outcome,
     documented_public_labels,
     oracle_correspondence_accuracy,
     required_concept_count,
     submission_is_complete_one_to_one,
     submission_sha256,
-    validate_submission,
+    summarise_map_availability_outcomes,
 )
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
+    PaddedBlockStructure,
 )
 from fedorbit.optimization.exact_qap import (
+    QapSeparatorResult,
+    generic_exact_qap_correspondence,
     point_correspondence_commitment,
 )
 from fedorbit.response.packet import (
@@ -62,31 +78,69 @@ from fedorbit.types import (
     CoarseGroup,
     DatasetId,
     DirectedPair,
-    DirectedPairName,
     ExperimentName,
     HumanAuditFileName,
     Index,
+    InvalidReason,
+    MethodName,
     MetricId,
     MetricUnit,
     ResearcherIdentifier,
     StableJsonPayload,
     StorageLayoutSegment,
     TransferMethod,
+    directed_pair_name,
 )
 
 
-def _human_audit_researcher_id(
+class PacketOnlyRecoveryUnavailability(StrEnum):
+    PAIR_ENDPOINT_UNAVAILABLE = "directed-pair endpoint client is not materialized"
+    NO_SHARED_ELIGIBLE_COARSE_GROUP = "no shared eligible coarse group"
+    NO_ANONYMOUS_SOURCE_PACKET = (
+        "no eligible anonymous source packet for the directed pair and seed"
+    )
+    UNCERTIFIED_STRUCTURAL_QAP = "structural QAP correspondence is not certified"
+
+
+type StructuralQapRecovery = Callable[
+    [NDArray[np.float64], NDArray[np.float64], PaddedBlockStructure], QapSeparatorResult
+]
+
+RECOVERY_METHOD_ATTEMPTS: Mapping[TransferMethod, StructuralQapRecovery] = OrderedDict(
+    (
+        (TransferMethod.POINT_CORRESPONDENCE_COMMITMENT, point_correspondence_commitment),
+        (TransferMethod.GENERIC_EXACT_QAP, generic_exact_qap_correspondence),
+    )
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PacketOnlyRecoveryAttempt:
+    unavailability: PacketOnlyRecoveryUnavailability | None
+    recovered: bool
+    input_artifact_ids: tuple[ArtifactIdentifier, ...]
+
+
+def registered_recovery_method(method: MethodName) -> TransferMethod:
+    transfer_method = registered_transfer_method(method)
+    if transfer_method not in RECOVERY_METHOD_ATTEMPTS:
+        raise ExecutionError(
+            f"registered packet-only recovery method has no certified implementation: {method}"
+        )
+    return transfer_method
+
+
+def human_audit_researcher_id(
     index: Index,
 ) -> ResearcherIdentifier:
     return ResearcherIdentifier(f"researcher-{index + 1}")
 
 
-def _human_audit_directory(
+def human_audit_pair_directory(
     layout: WorkspaceLayout,
     experiment: ExperimentName,
     source: DatasetId,
     target: DatasetId,
-    researcher_id: ResearcherIdentifier,
 ) -> Path:
     return (
         experiment_workspace(layout, experiment)
@@ -94,21 +148,64 @@ def _human_audit_directory(
         / ArtifactDirectorySegment.FITTED
         / ArtifactDirectorySegment.HUMAN_AUDIT
         / f"{source.value}-to-{target.value}"
-        / researcher_id
     )
+
+
+def human_audit_researcher_directory(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    source: DatasetId,
+    target: DatasetId,
+    researcher_id: ResearcherIdentifier,
+) -> Path:
+    return human_audit_pair_directory(layout, experiment, source, target) / researcher_id
+
+
+def completed_human_audit_outcomes(
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+) -> tuple[MapAvailabilityAuditPairOutcome, ...]:
+    outcomes: list[MapAvailabilityAuditPairOutcome] = []
+    for pair in active_config().scientific.datasets.primary_directed_pairs:
+        path = (
+            human_audit_pair_directory(layout, experiment, pair.source, pair.target)
+            / MapAvailabilityAuditFileName.PAIR_OUTCOME
+        )
+        if not path.is_file():
+            continue
+        outcomes.append(
+            MapAvailabilityAuditPairOutcome.model_validate_json(path.read_text(encoding="utf-8"))
+        )
+    return tuple(outcomes)
+
+
+def _unavailable_attempt(
+    unavailability: PacketOnlyRecoveryUnavailability,
+    input_artifact_ids: tuple[ArtifactIdentifier, ...],
+) -> PacketOnlyRecoveryAttempt:
+    return PacketOnlyRecoveryAttempt(unavailability, False, input_artifact_ids)
 
 
 def _score_packet_only_recovery_attempt(
     layout: WorkspaceLayout,
     source: DatasetId,
     target: DatasetId,
-    source_materialized: MaterializedClient,
-    target_materialized: MaterializedClient,
+    source_materialized: MaterializedClient | None,
+    target_materialized: MaterializedClient | None,
     seed: RandomSeed,
-) -> tuple[bool, tuple[ArtifactIdentifier, ...]] | None:
+    method: TransferMethod,
+) -> PacketOnlyRecoveryAttempt:
+    if source_materialized is None or target_materialized is None:
+        return _unavailable_attempt(
+            PacketOnlyRecoveryUnavailability.PAIR_ENDPOINT_UNAVAILABLE,
+            (ArtifactIdentifier("ineligible-cell"),),
+        )
     common = common_eligible_groups(source, target, source_materialized, target_materialized)
     if common is None:
-        return None
+        return _unavailable_attempt(
+            PacketOnlyRecoveryUnavailability.NO_SHARED_ELIGIBLE_COARSE_GROUP,
+            (ArtifactIdentifier("ineligible-cell"),),
+        )
     source_eligible, target_eligible = common
     common_coarse = tuple(target_eligible)
     blocks = cross_client_padded_blocks(source_eligible, target_eligible)
@@ -122,23 +219,31 @@ def _score_packet_only_recovery_attempt(
         if target_packet is not None:
             target_packets[coarse_group] = target_packet
     if not source_packets or not target_packets:
-        return None
+        return _unavailable_attempt(
+            PacketOnlyRecoveryUnavailability.NO_ANONYMOUS_SOURCE_PACKET,
+            (ArtifactIdentifier("ineligible-cell"),),
+        )
     source_matrix = assemble_cross_client_response_matrix(
         blocks, source_packets, SourcePacket.lower_matrix
     )
     target_matrix = assemble_target_response_matrix(
         blocks, target_packets, SourcePacket.lower_matrix
     )
-    qap_result = point_correspondence_commitment(source_matrix, target_matrix, blocks)
-    if not qap_result.certified or qap_result.correspondence is None:
-        return None
-    oracle_correspondence = BlockCorrespondence.lexicographically_smallest(blocks)
-    recovered = qap_result.correspondence.images == oracle_correspondence.images
     input_artifact_ids = tuple(
         ArtifactIdentifier(packet.packet_integrity_sha256)
         for packet in (*source_packets.values(), *target_packets.values())
     )
-    return recovered, input_artifact_ids
+    outcome = RECOVERY_METHOD_ATTEMPTS[method](source_matrix, target_matrix, blocks)
+    if not outcome.certified or outcome.correspondence is None:
+        return _unavailable_attempt(
+            PacketOnlyRecoveryUnavailability.UNCERTIFIED_STRUCTURAL_QAP, input_artifact_ids
+        )
+    oracle_correspondence = BlockCorrespondence.lexicographically_smallest(blocks)
+    return PacketOnlyRecoveryAttempt(
+        None,
+        outcome.correspondence.images == oracle_correspondence.images,
+        input_artifact_ids,
+    )
 
 
 def execute_map_availability_applicability_audit(
@@ -167,15 +272,20 @@ def execute_map_availability_applicability_audit(
         domain_pair = DirectedPair(source=source, target=target)
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        if source_materialized is not None and target_materialized is not None:
-            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
-            for seed in confirmatory_seeds:
+        pair_direction = directed_pair_name(source, target)
+        for seed in confirmatory_seeds:
+            for method_name in config.packet_only_recovery_methods:
+                method = registered_recovery_method(method_name)
                 attempt = _score_packet_only_recovery_attempt(
-                    layout, source, target, source_materialized, target_materialized, seed
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    method,
                 )
-                if attempt is None:
-                    continue
-                recovered, input_artifact_ids = attempt
+                unavailability = attempt.unavailability
                 persist_primary_transfer_metric(
                     store,
                     layout,
@@ -183,20 +293,24 @@ def execute_map_availability_applicability_audit(
                     pair_direction,
                     source,
                     target,
-                    TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+                    method,
                     seed,
                     MetricId.PACKET_ONLY_RECOVERY_ACCURACY,
-                    1.0 if recovered else 0.0,
+                    None if unavailability is not None else (1.0 if attempt.recovered else 0.0),
                     MetricUnit.BOOLEAN,
                     MetricDirection.HIGHER_IS_BETTER,
-                    input_artifact_ids,
+                    attempt.input_artifact_ids,
                     request.overwrite_policy,
+                    valid=unavailability is None,
+                    invalid_reason=(
+                        None if unavailability is None else InvalidReason(unavailability.value)
+                    ),
                 )
         submissions: list[MapAvailabilityAuditSubmission] = []
         for researcher_index in range(config.independent_researchers):
             index: Index = researcher_index
-            researcher_id = _human_audit_researcher_id(index)
-            directory = _human_audit_directory(
+            researcher_id = human_audit_researcher_id(index)
+            directory = human_audit_researcher_directory(
                 layout, request.experiment, source, target, researcher_id
             )
             submission_path = directory / HumanAuditFileName.SUBMISSION
@@ -210,20 +324,45 @@ def execute_map_availability_applicability_audit(
             submission = MapAvailabilityAuditSubmission.model_validate_json(
                 submission_path.read_text(encoding="utf-8")
             )
-            failures = validate_submission(
-                submission, config.minutes_per_researcher_per_pair, public_labels
-            )
-            if failures:
-                continue
             submissions.append(submission)
-        if len(submissions) != config.independent_researchers or not distinct_researcher_ids(
-            tuple(submissions)
-        ):
-            continue
-        concept_count = required_concept_count()
-        for submission in submissions:
+        accepted = accepted_map_availability_submissions(
+            tuple(submissions),
+            config.minutes_per_researcher_per_pair,
+            public_labels,
+        )
+        endpoint_directory = human_audit_pair_directory(layout, request.experiment, source, target)
+        if accepted:
             atomic_write_json(
-                _human_audit_directory(
+                endpoint_directory / MapAvailabilityAuditFileName.RECORDED_SUBMISSION_SHA256,
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(
+                        source=source.value,
+                        target=target.value,
+                        recorded_submission_sha256=OrderedDict(
+                            (
+                                submission.researcher_id,
+                                submission_sha256(submission),
+                            )
+                            for submission in accepted
+                        ),
+                    ),
+                ),
+            )
+        decision = decide_map_availability_outcome(
+            domain_pair,
+            accepted,
+            config.independent_researchers,
+            config.minutes_per_researcher_per_pair,
+            public_labels,
+        )
+        atomic_write_json(
+            endpoint_directory / MapAvailabilityAuditFileName.PAIR_OUTCOME,
+            cast(StableJsonPayload, decision.record().model_dump(mode="json")),
+        )
+        for submission in accepted:
+            atomic_write_json(
+                human_audit_researcher_directory(
                     layout, request.experiment, source, target, submission.researcher_id
                 )
                 / HumanAuditFileName.VALIDATED_SHA256,
@@ -232,9 +371,22 @@ def execute_map_availability_applicability_audit(
                     OrderedDict(
                         sha256=submission_sha256(submission),
                         complete_one_to_one=submission_is_complete_one_to_one(
-                            submission, concept_count
+                            submission, required_concept_count()
                         ),
                         oracle_correspondence_accuracy=oracle_correspondence_accuracy(submission),
                     ),
                 ),
             )
+    atomic_write_json(
+        experiment_workspace(layout, request.experiment)
+        / StorageLayoutSegment.ARTIFACTS
+        / StorageLayoutSegment.DERIVED
+        / MapAvailabilityAuditFileName.EXPERIMENT_SUMMARY,
+        cast(
+            StableJsonPayload,
+            summarise_map_availability_outcomes(
+                config.independent_researchers,
+                completed_human_audit_outcomes(layout, request.experiment),
+            ).model_dump(mode="json"),
+        ),
+    )

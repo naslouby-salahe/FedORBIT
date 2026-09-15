@@ -102,6 +102,8 @@ class CurriculumAction:
             raise ActionSpaceError("curriculum action coordinates must be nonnegative")
         if np.any(self.coordinates > self.problem.coordinate_caps + 0.0):
             raise ActionSpaceError("curriculum action violates a coordinate cap")
+        if float(np.sum(self.coordinates)) > self.problem.total_budget:
+            raise ActionSpaceError("curriculum action exceeds the total budget")
 
     @property
     def realized_support_size(self) -> Index:

@@ -25,13 +25,14 @@ from fedorbit.types import (
     ContrastName,
     DirectedPairName,
     EvaluationConditionName,
+    EvidenceHypothesis,
     EvidenceStatus,
     ExperimentName,
     ExperimentSeed,
+    ImplementationIdentity,
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
-    ResearchQuestion,
     Sha256Digest,
     StableJsonPayload,
     SupportSize,
@@ -298,7 +299,7 @@ def test_evidence_classification_exactness_reflects_theorem_instances(tmp_path: 
         ExperimentSeed(theorem_request.definition.seeds[0]),
         _theorem_instance_payload(True, True),
         frozenset({ConfigurationSection.ACTION}),
-        "fedorbit.experiments.validation",
+        ImplementationIdentity.VALIDATION_V1,
         ArtifactName("theorem-exhaustive.test-pass"),
         EvaluationConditionName("pattern-2-seed1103-instance0"),
         SupportSize(1),
@@ -311,7 +312,7 @@ def test_evidence_classification_exactness_reflects_theorem_instances(tmp_path: 
     manifest = execute_evidence_classification(store, layout, request)
     payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
     rows = {row["question"]: row for row in payload["statuses"]}
-    exactness_row = rows[ResearchQuestion.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
+    exactness_row = rows[EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
     assert exactness_row["final_state"] == EvidenceStatus.SUPPORTED.value
 
 
@@ -331,7 +332,7 @@ def test_evidence_classification_exactness_fails_on_wrong_minima(tmp_path: Path)
         ExperimentSeed(theorem_request.definition.seeds[0]),
         _theorem_instance_payload(False, True),
         frozenset({ConfigurationSection.ACTION}),
-        "fedorbit.experiments.validation",
+        ImplementationIdentity.VALIDATION_V1,
         ArtifactName("theorem-exhaustive.test-fail"),
         EvaluationConditionName("pattern-2-seed1103-instance1"),
         SupportSize(1),
@@ -344,5 +345,5 @@ def test_evidence_classification_exactness_fails_on_wrong_minima(tmp_path: Path)
     manifest = execute_evidence_classification(store, layout, request)
     payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
     rows = {row["question"]: row for row in payload["statuses"]}
-    exactness_row = rows[ResearchQuestion.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
+    exactness_row = rows[EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
     assert exactness_row["final_state"] == EvidenceStatus.NOT_SUPPORTED.value

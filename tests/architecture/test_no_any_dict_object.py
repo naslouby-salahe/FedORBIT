@@ -128,9 +128,7 @@ def test_no_internal_enum_value_comparison_in_production() -> None:
         tree = parse_module(path)
         for node in ast.walk(tree):
             if isinstance(node, ast.Compare) and _is_enum_value_comparison(node):
-                raise AssertionError(
-                    f"internal enum .value comparison in {path}:{node.lineno}"
-                )
+                raise AssertionError(f"internal enum .value comparison in {path}:{node.lineno}")
 
 
 def _check_any_in_source(source: str) -> list[str]:
@@ -176,7 +174,4 @@ def test_checker_catches_object_annotation_mutation() -> None:
 
 def test_checker_catches_enum_value_comparison_mutation() -> None:
     source = "if policy.value == 'local': ...\n"
-    assert _check_enum_value_comparison_in_source(source) == [
-        "enum .value comparison line 1"
-    ]
-
+    assert _check_enum_value_comparison_in_source(source) == ["enum .value comparison line 1"]

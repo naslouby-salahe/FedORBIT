@@ -44,6 +44,8 @@ def test_edge_schema_resolves_timestamp_labels_and_feature_roles() -> None:
     assert (
         schema.role_of(TabularColumnName("http.request.method")) == FieldRole.FORBIDDEN_PROVENANCE
     )
+    assert set(schema.roles) == set(EDGE_COLUMNS)
+    assert all(isinstance(role, FieldRole) for role in schema.roles.values())
 
 
 def test_edge_exclusion_contract_contains_all_registered_safeguards() -> None:

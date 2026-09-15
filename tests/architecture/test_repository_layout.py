@@ -249,6 +249,11 @@ def test_no_temp_planning_directory() -> None:
     assert not temp.exists(), "docs/temp/ must not exist in a clean repository"
 
 
+def test_experiment_dispatch_does_not_export_manuscript_evidence() -> None:
+    dispatch = (SRC_ROOT / "experiments" / "dispatch.py").read_text(encoding="utf-8")
+    assert "VerifiedEvidenceWriter" not in dispatch
+
+
 def test_no_unexpected_files_under_src() -> None:
     suspicious_extensions = {".csv", ".json", ".yaml", ".yml", ".ipynb", ".txt", ".log"}
     for path in SRC_ROOT.rglob("*"):

@@ -23,11 +23,11 @@ from fedorbit.learning.training import (
     train_base_model,
 )
 from fedorbit.types import (
+    Coefficient,
     ConceptCount,
     DatasetId,
-    Discrepancy,
+    FeatureCount,
     Fraction,
-    Index,
     LearningRate,
     RngNamespace,
     Score,
@@ -144,18 +144,24 @@ def select_pilot_configuration(results: tuple[PilotFitResult, ...]) -> PilotSele
         )
     if len(candidates) != registered_configuration_count:
         raise PilotError("pilot selection requires every registered pilot configuration")
-    return min(candidates, key=_pilot_selection_sort_key)
+    return min(candidates, key=_pilot_selection_order)
 
 
-def _pilot_selection_sort_key(
-    item: PilotSelection,
-) -> tuple[Score, StandardError, Discrepancy, WeightDecay, Fraction]:
+@dataclass(frozen=True, slots=True, order=True)
+class PilotSelectionOrder:
+    median_valid_macro_cross_entropy: Score
+    valid_macro_cross_entropy_standard_deviation: StandardError
+    learning_rate_distance: Coefficient
+    weight_decay: WeightDecay
+    dropout: Fraction
+
+
+def _pilot_selection_order(item: PilotSelection) -> PilotSelectionOrder:
     reference_learning_rate = active_config().scientific.base_model_pilot.reference_learning_rate
-    learning_rate_distance = abs(item.configuration.learning_rate - reference_learning_rate)
-    return (
+    return PilotSelectionOrder(
         item.median_valid_macro_cross_entropy,
         item.valid_macro_cross_entropy_standard_deviation,
-        learning_rate_distance,
+        abs(item.configuration.learning_rate - reference_learning_rate),
         item.configuration.weight_decay,
         item.configuration.dropout,
     )
@@ -163,7 +169,7 @@ def _pilot_selection_sort_key(
 
 def create_classifier(
     dataset: DatasetId,
-    input_dimension: Index,
+    input_dimension: FeatureCount,
     n_classes: ConceptCount,
     dropout_probability: Fraction,
     seed: RandomSeed,

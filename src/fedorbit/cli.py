@@ -4,6 +4,7 @@ import math
 import statistics
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, cast
 
@@ -11,9 +12,15 @@ import structlog
 import typer
 from typer import Argument, Exit
 
+from fedorbit.analysis.metrics import CrossEntropy, relative_macro_ce_gain
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config, raw_dataset_root
-from fedorbit.experiments.catalogue import ExperimentCatalogue, build_catalogue
+from fedorbit.experiments.catalogue import (
+    CataloguePrerequisiteValue,
+    ExperimentCatalogue,
+    ExperimentDefinition,
+    build_catalogue,
+)
 from fedorbit.experiments.classification import EvidenceStatusRow, completed_evidence_status_rows
 from fedorbit.experiments.dispatch import (
     ExperimentExecutionRequest,
@@ -28,15 +35,21 @@ from fedorbit.experiments.synthesis import (
     transfer_ontology_and_null_padding_rows,
 )
 from fedorbit.experiments.training import training_protocol_rows
-from fedorbit.infrastructure.artifacts import ArtifactStore, ExecutionError, execution_store
+from fedorbit.infrastructure.artifacts import (
+    ArtifactStateReport,
+    ArtifactStore,
+    ExecutionError,
+    execution_store,
+)
 from fedorbit.infrastructure.environment import (
     environment_snapshot,
     reference_gpu_matches,
 )
-from fedorbit.infrastructure.evidence import assert_recorded_execution_identity_compatible
+from fedorbit.infrastructure.evidence import recorded_execution_identity
 from fedorbit.infrastructure.failures import validation_failure_outcome
 from fedorbit.infrastructure.manifests import DatasetManifest, ReusableArtifactManifest
 from fedorbit.infrastructure.preparation import DatasetPreparationRequest, preprocess_datasets
+from fedorbit.infrastructure.runtime import build_reproducibility_identity, compatible
 from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
     build_layout,
@@ -93,12 +106,15 @@ from fedorbit.types import (
     ExperimentLocalMethod,
     ExperimentName,
     FailureReason,
+    FieldDescription,
+    Fraction,
     Index,
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
     PreprocessingReadiness,
     RandomSeed,
+    RelativeGain,
     ReportArtifactName,
     ReportColumnName,
     ReportSeriesName,
@@ -116,7 +132,22 @@ class CliUsageError(ValueError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class ExperimentStateReport:
+    state: ArtifactState
+    reason: FieldDescription
+
+
 OPTIONAL_ARGUMENT = Argument(None)
+
+
+def _realized_gain(
+    reference: Estimate | None,
+    method: Estimate | None,
+) -> RelativeGain | None:
+    if reference is None or method is None:
+        return None
+    return relative_macro_ce_gain(CrossEntropy(reference), CrossEntropy(method)).relative
 
 
 def exit_from_error(error: BaseException) -> NoReturn:
@@ -155,8 +186,12 @@ def doctor() -> None:
     gpu_ok = reference_gpu_matches()
     raw_root = raw_dataset_root()
     layout = build_layout()
-    assert_recorded_execution_identity_compatible(layout)
+    recorded_identity = recorded_execution_identity(layout)
+    identity_compatible = recorded_identity is None or compatible(
+        build_reproducibility_identity(snapshot), recorded_identity
+    )
     typer.echo(f"python: {snapshot.python_version}")
+    typer.echo(f"recorded execution identity compatible: {identity_compatible}")
     typer.echo(f"reference gpu matches: {gpu_ok}")
     typer.echo(f"raw data root present: {raw_root.is_dir()}")
     if not gpu_ok or not raw_root.is_dir():
@@ -166,13 +201,61 @@ def doctor() -> None:
 def plan() -> None:
     catalogue = build_catalogue()
     names = catalogue.registered_names()
+    store = execution_store()
+    layout = build_layout()
     typer.echo(f"registered experiments: {len(names)}")
     for name in names:
         definition = catalogue.definition(name)
+        prerequisite_states = _plan_prerequisite_states(store, layout, definition.prerequisites)
+        resume_boundary = _plan_resume_boundary(name, prerequisite_states)
         typer.echo(
             f"{name.value} | {definition.classification.value} | "
             f"planned cells: {definition.derived_planned_cells}"
         )
+        typer.echo(
+            "  semantic scope: "
+            f"pairs={','.join(scope.value for scope in definition.datasets_or_pairs) or 'none'}; "
+            f"methods={','.join(method.value for method in definition.methods) or 'none'}; "
+            f"conditions={_planned_condition_count(definition)}; seeds={len(definition.seeds)}"
+        )
+        typer.echo(
+            "  prerequisites: "
+            f"{'; '.join(prerequisite_states) or 'none'}; resume boundary: {resume_boundary}"
+        )
+
+
+def _plan_prerequisite_states(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    prerequisites: tuple[CataloguePrerequisiteValue, ...],
+) -> tuple[str, ...]:
+    states: list[str] = []
+    for prerequisite in prerequisites:
+        if isinstance(prerequisite, ExperimentName):
+            state = _experiment_state(store, layout.execution_root, prerequisite)
+            states.append(f"{prerequisite.value}={state.state.value}")
+        else:
+            states.append(str(prerequisite.value))
+    return tuple(states)
+
+
+def _planned_condition_count(definition: ExperimentDefinition) -> Index:
+    if definition.name is ExperimentName.WEAK_SIGNAL_SUPPORT_AND_HETEROGENEITY_BOUNDARIES:
+        weak_boundaries = (
+            active_config().experiments.weak_signal_support_and_heterogeneity_boundaries
+        )
+        return weak_boundaries.distinct_condition_count()
+    return len(definition.conditions.entries)
+
+
+def _plan_resume_boundary(
+    experiment: ExperimentName,
+    prerequisite_states: tuple[str, ...],
+) -> str:
+    for state in prerequisite_states:
+        if not state.endswith(f"={ArtifactState.COMPLETED.value}"):
+            return state.split("=", maxsplit=1)[0]
+    return experiment.value
 
 
 def preprocess(
@@ -191,8 +274,19 @@ def preprocess(
                 overwrite_policy=OverwritePolicy.REPLACE if overwrite else OverwritePolicy.REUSE,
             )
         )
+        blocked_reasons = OrderedDict(result.resource_blocked_datasets)
+        invalid_reasons = OrderedDict(result.invalid_datasets)
         for observation in result.observations:
             event_time = observation.event_time
+            terminal_reason = invalid_reasons.get(observation.dataset) or blocked_reasons.get(
+                observation.dataset
+            )
+            if terminal_reason is not None:
+                typer.echo(
+                    f"{observation.dataset.value}: {PreprocessingReadiness.BLOCKED} | "
+                    f"reason={terminal_reason}"
+                )
+                continue
             state = (
                 PreprocessingReadiness.READY
                 if observation.valid_for_chronological_preprocessing
@@ -202,8 +296,6 @@ def preprocess(
                 f"{observation.dataset.value}: {state} | chronology={event_time.state.value} | "
                 f"reason={event_time.reason}"
             )
-        for dataset, reason in result.resource_blocked_datasets:
-            typer.echo(f"{dataset.value}: {PreprocessingReadiness.BLOCKED} | reason={reason}")
     except (CliUsageError, ExecutionError) as error:
         exit_from_error(error)
 
@@ -216,28 +308,7 @@ def _verified_manifest(
     store: ArtifactStore,
     experiment: ExperimentName,
 ) -> ReusableArtifactManifest | None:
-    candidates: list[ReusableArtifactManifest] = []
-    for manifest in store.all_manifests():
-        if experiment.value not in manifest.semantic_producer_coordinates:
-            continue
-        try:
-            resolved = store.resolve(manifest.artifact_id)
-        except ValueError:
-            continue
-        if resolved.state == ArtifactState.COMPLETED:
-            candidates.append(resolved)
-    if not candidates:
-        return None
-    return max(candidates, key=_manifest_payload_mtime_ns)
-
-
-def _manifest_payload_mtime_ns(manifest: ReusableArtifactManifest) -> int:
-    times = tuple(
-        Path(payload).stat().st_mtime_ns
-        for payload in manifest.payload_paths
-        if Path(payload).is_file()
-    )
-    return max(times) if times else 0
+    return store.current_completed_manifest(experiment.value)
 
 
 def _blocked_experiment(layout_root: Path, experiment: ExperimentName) -> bool:
@@ -255,22 +326,39 @@ def _experiment_state(
     store: ArtifactStore,
     layout_root: Path,
     experiment: ExperimentName,
-) -> ArtifactState:
+) -> ExperimentStateReport:
     if _blocked_experiment(layout_root, experiment):
-        return ArtifactState.BLOCKED
+        return ExperimentStateReport(
+            ArtifactState.BLOCKED, FieldDescription("blocked by an upstream prerequisite")
+        )
     candidates = tuple(
         manifest
         for manifest in store.all_manifests()
         if experiment.value in manifest.semantic_producer_coordinates
     )
     if not candidates:
-        return ArtifactState.MISSING
-    latest = max(candidates, key=_manifest_payload_mtime_ns)
-    try:
-        resolved = store.resolve(latest.artifact_id)
-    except ValueError:
-        return ArtifactState.INVALID
-    return resolved.state
+        return ExperimentStateReport(
+            ArtifactState.MISSING, FieldDescription("no recorded artifact")
+        )
+    for manifest in candidates:
+        report = store.artifact_state(manifest.artifact_id)
+        if report.state is not ArtifactState.COMPLETED:
+            return ExperimentStateReport(
+                report.state,
+                FieldDescription(_state_reason(report)),
+            )
+    return ExperimentStateReport(
+        ArtifactState.COMPLETED, FieldDescription("verified completed artifact")
+    )
+
+
+def _state_reason(report: ArtifactStateReport) -> str:
+    parts: list[str] = [str(report.reason)]
+    if report.first_changed_dependency is not None:
+        parts.append(f"first changed dependency: {report.first_changed_dependency}")
+    if report.nearest_reusable_ancestor is not None:
+        parts.append(f"nearest reusable ancestor: {report.nearest_reusable_ancestor}")
+    return "; ".join(part for part in parts if part)
 
 
 def _base_model_pilot_dataset_manifests(layout: WorkspaceLayout) -> tuple[DatasetManifest, ...]:
@@ -794,11 +882,7 @@ def _sparsity_and_dense_results_rows(
             if method is None:
                 continue
             condition_ce = _metric_value_by_condition(sparsity_records, pair, method, condition)
-            realized_gain = (
-                (local_only_ce - condition_ce) / local_only_ce
-                if local_only_ce is not None and condition_ce is not None and local_only_ce != 0.0
-                else None
-            )
+            realized_gain = _realized_gain(local_only_ce, condition_ce)
             runtime = _metric_value_by_condition(
                 sparsity_records,
                 pair,
@@ -1004,7 +1088,7 @@ def _confirmation_results_rows(
                     ),
                     (
                         ReportColumnName.COVERAGE,
-                        _mean(MetricId.COVERAGE_CONFIRM) or (accepted / proposals),
+                        _confirmation_coverage(records, pair, accepted, proposals),
                     ),
                     (
                         ReportColumnName.NO_CONFIRM_HARMFUL_RATE,
@@ -1165,9 +1249,7 @@ def _coupling_mechanism_results_rows(
             continue
         comparison = comparisons_by_pair.get(DirectedPairName(pair))
         ci = (
-            ConfidenceIntervalText(
-                f"[{comparison.bca_ci_low:.4g}, {comparison.bca_ci_high:.4g}]"
-            )
+            ConfidenceIntervalText(f"[{comparison.bca_ci_low:.4g}, {comparison.bca_ci_high:.4g}]")
             if comparison is not None
             and comparison.bca_ci_low is not None
             and comparison.bca_ci_high is not None
@@ -1218,11 +1300,7 @@ def _failure_boundary_results_rows(
                     PRINCIPAL_EVALUATION_CONDITION.name,
                 )
             method_ce = _metric_value_by_condition(experiment_records, pair, method, condition)
-            realized_gain = (
-                (local_only_ce - method_ce) / local_only_ce
-                if local_only_ce is not None and method_ce is not None and local_only_ce != 0.0
-                else None
-            )
+            realized_gain = _realized_gain(local_only_ce, method_ce)
             certified_value = _metric_value_by_condition(
                 experiment_records,
                 pair,
@@ -1346,35 +1424,61 @@ def _sparsity_figure_series(
     )
 
 
+def _confirmation_coverage(
+    records: Sequence[MetricRecord],
+    pair: DirectedPairName,
+    accepted: Index,
+    proposals: Index,
+) -> Fraction | None:
+    recorded = [
+        record.metric_value
+        for record in records
+        if record.pair == pair
+        and record.method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        and record.metric_name == MetricId.COVERAGE_CONFIRM
+        and record.valid
+        and record.metric_value is not None
+    ]
+    if recorded:
+        measured: Fraction = sum(recorded) / len(recorded)
+        return measured
+    if proposals == 0:
+        return None
+    derived: Fraction = accepted / proposals
+    return derived
+
+
 def _confirmation_figure_series(
     rows: Sequence[Mapping[ReportColumnName, TableScalar]],
 ) -> tuple[FigureSeries, ...]:
-    starts_x: list[Coefficient] = []
-    starts_y: list[Coefficient] = []
-    ends_x: list[Coefficient] = []
-    ends_y: list[Coefficient] = []
+    by_pair: OrderedDict[DirectedPairName, tuple[Coefficient, Coefficient, Coefficient]] = (
+        OrderedDict()
+    )
     for row in rows:
+        pair = row.get(ReportColumnName.PAIR)
         coverage = row.get(ReportColumnName.COVERAGE)
         harm = row.get(ReportColumnName.HARMFUL_ACCEPTED_RATE)
         no_confirm_harm = row.get(ReportColumnName.NO_CONFIRM_HARMFUL_RATE)
+        if not isinstance(pair, str):
+            continue
         if not isinstance(coverage, int | float):
             continue
         if not isinstance(harm, int | float) or not isinstance(no_confirm_harm, int | float):
             continue
-        starts_x.append(float(coverage))
-        starts_y.append(float(no_confirm_harm))
-        ends_x.append(float(coverage))
-        ends_y.append(float(harm))
-    if not starts_x:
-        return ()
-    return (
+        by_pair[DirectedPairName(pair)] = (
+            float(coverage),
+            float(no_confirm_harm),
+            float(harm),
+        )
+    return tuple(
         FigureSeries(
-            name=ReportSeriesName("no-confirm to confirm"),
-            x=tuple(starts_x),
-            y=tuple(starts_y),
-            arrow_x=tuple(ends_x),
-            arrow_y=tuple(ends_y),
-        ),
+            name=ReportSeriesName(pair),
+            x=(coverage,),
+            y=(no_confirm_harm,),
+            arrow_x=(coverage,),
+            arrow_y=(harm,),
+        )
+        for pair, (coverage, no_confirm_harm, harm) in by_pair.items()
     )
 
 
@@ -1407,9 +1511,12 @@ def _semantic_sufficiency_series(
         pair, seed, method, condition = key
         baseline = local_ce.get((pair, seed, condition))
         size = orbit.get(key)
-        if baseline is None or baseline == 0.0 or size is None or size <= 0.0:
+        if size is None or size <= 0.0:
             continue
-        by_method.setdefault(method, []).append((math.log(size), (baseline - ce) / baseline))
+        gain = _realized_gain(baseline, ce)
+        if gain is None:
+            continue
+        by_method.setdefault(method, []).append((math.log(size), gain))
     return tuple(
         FigureSeries(
             name=ReportSeriesName(method.value),
@@ -1444,7 +1551,7 @@ def _failure_boundary_figure_series(
     )
 
 
-def _predicted_vs_realized_series(
+def predicted_vs_realized_series(
     records: Sequence[MetricRecord],
 ) -> tuple[FigureSeries, ...]:
     from scipy.stats import spearmanr
@@ -1473,11 +1580,13 @@ def _predicted_vs_realized_series(
     for pair, points in by_pair.items():
         xs = tuple(point[0] for point in points)
         ys = tuple(point[1] for point in points)
-        name = pair
+        point_count = len(points)
         if len(points) >= active_config().scientific.statistics.spearman_minimum_valid_points:
             correlation = float(spearmanr(list(xs), list(ys)).statistic)
-            name = DirectedPairName(f"{pair} Spearman={correlation:.3f}")
-        series.append(FigureSeries(name=ReportSeriesName(name), x=xs, y=ys))
+            name = ReportSeriesName(f"{pair} | Spearman rho={correlation:.3f}; n={point_count}")
+        else:
+            name = ReportSeriesName(f"{pair} | Spearman unavailable; n={point_count}")
+        series.append(FigureSeries(name=name, x=xs, y=ys))
     return tuple(series)
 
 
@@ -1788,7 +1897,15 @@ def report(
                 typer.echo(
                     str(
                         writer.write_project_evidence_table(
-                            confirmation_results_table(confirmation_rows),
+                            confirmation_results_table(
+                                confirmation_rows,
+                                registered_pairs=tuple(
+                                    spec.direction
+                                    for spec in (
+                                        active_config().scientific.datasets.primary_directed_pairs
+                                    )
+                                ),
+                            ),
                             ReportArtifactName.CONFIRMATION_RESULTS,
                         )
                     )
@@ -1853,7 +1970,7 @@ def report(
                         )
                     )
                 )
-            predicted_series = _predicted_vs_realized_series(primary_transfer_metrics)
+            predicted_series = predicted_vs_realized_series(primary_transfer_metrics)
             if predicted_series:
                 typer.echo(
                     str(
@@ -1960,17 +2077,18 @@ def status(experiment_name: ExperimentName | None = OPTIONAL_ARGUMENT) -> None:
         store = execution_store()
         layout = build_layout()
         typer.echo(
-            f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} {'Est-run':<8} {'Est-end':<8}"
+            f"{'#':>2} {'Experiment':<50} {'Role':<22} {'Status':<10} {'Est-run':<8} "
+            f"{'Est-end':<8} Reason"
         )
         index = 0
         for name in names:
             if name not in selected:
                 continue
             definition = catalogue.definition(name)
-            status_value = _experiment_state(store, layout.execution_root, name)
+            report = _experiment_state(store, layout.execution_root, name)
             typer.echo(
                 f"{index:>2} {name.value:<50} {definition.classification.value:<22} "
-                f"{status_value.value:<10} {'-':<8} {'-':<8}"
+                f"{report.state.value:<10} {'-':<8} {'-':<8} {report.reason}"
             )
             index += 1
     except CliUsageError as error:

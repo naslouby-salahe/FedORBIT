@@ -409,10 +409,15 @@ experiments:
     - "Exact-Map Oracle"
   weak_signal_support_and_heterogeneity_boundaries:
     response_scales: [1.0, 0.75, 0.5, 0.25, 0.0]
+    baseline_response_scale: 1.0
     ci_half_width_multipliers: [1.0, 1.5, 2.0, 4.0]
+    baseline_ci_half_width_multiplier: 1.0
     target_usable_support_fractions: [1.0, 0.5, 0.25, 0.1]
+    baseline_target_usable_support_fraction: 1.0
     response_heterogeneity_multipliers: [0.5, 1.0, 2.0]
+    baseline_response_heterogeneity_multiplier: 1.0
     support_budgets: [1, 2, 3]
+    baseline_support_budget: 2
     methods:
     - "FedORBIT Exact-Sparse Solver"
     - "Matched-Resource Rectangular"
@@ -427,9 +432,14 @@ experiments:
     k_values: [6, 8, 10, 12, 16, 20, 24, 32]
     block_patterns: [balanced, maximally_skewed]
     exact_qap_supports: [1, 2, 3]
+    real_timing_methods:
+    - "FedORBIT Exact-Sparse Solver"
+    - "Generic Exact QAP"
+    - "FedORBIT Dense-CCP Fallback"
 runtime:
   failure_handling:
     retries_after_initial_infrastructure_failure: 2
+    solver_failures_per_pair_allowed: 1
   execution_device: cuda
   reference_model_gpu: "NVIDIA GeForce RTX 5060 Ti 16 GB"
   solver_cpu_worker_ceiling: 4

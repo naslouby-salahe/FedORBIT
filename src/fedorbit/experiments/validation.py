@@ -4,19 +4,23 @@ import contextlib
 import json
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import cast
 
 import numpy as np
 import torch
+from pydantic import JsonValue
 from torch import nn
 
 from fedorbit.analysis.records import (
     MetricDirection,
 )
 from fedorbit.config.loading import active_config, raw_dataset_root
+from fedorbit.config.models import DirectedPairSpec
 from fedorbit.datasets.common import (
     DatasetInspectionRequest,
     FieldRole,
@@ -28,15 +32,20 @@ from fedorbit.datasets.materialization import (
     MaterializedClient,
     transfer_concept_groups,
 )
-from fedorbit.experiments.catalogue import ExperimentExecutionRequest
+from fedorbit.experiments.catalogue import (
+    CatalogueMethod,
+    ExperimentExecutionRequest,
+    build_catalogue,
+    method_resource_manifest,
+)
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.experiments.scoring import (
     build_completion_manifest,
-    persist_ineligible_transfer_cell,
     persist_primary_transfer_metric,
 )
 from fedorbit.experiments.solvers import (
     persist_synthetic_diagnostic_metric,
+    registered_transfer_method,
     solver_benchmark_reference_truth,
     synthetic_solver_instance,
 )
@@ -55,6 +64,7 @@ from fedorbit.experiments.synthetic import (
 )
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
+    ExecutionError,
 )
 from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import (
@@ -67,7 +77,6 @@ from fedorbit.infrastructure.preparation import (
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
@@ -82,6 +91,8 @@ from fedorbit.infrastructure.workspace import (
     experiment_workspace,
 )
 from fedorbit.interface import (
+    ResourceKind,
+    StrictResourcePolicy,
     validate_disjoint_feature_namespaces,
     validate_no_cross_client_entity_ids,
     validate_no_cross_client_timestamp_pairing,
@@ -118,6 +129,7 @@ from fedorbit.optimization.objective import (
     build_robust_action_problem,
     evaluate_objective,
 )
+from fedorbit.oracle import ORACLE_METHOD
 from fedorbit.types import (
     ArtifactFingerprint,
     ArtifactIdentifier,
@@ -134,12 +146,14 @@ from fedorbit.types import (
     ConfigurationSection,
     CouplingCompatibility,
     DatasetId,
-    DirectedPairName,
     EvaluationConditionName,
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
+    ImplementationIdentity,
     Index,
+    InvalidReason,
+    MethodName,
     MetricId,
     MetricUnit,
     OverwritePolicy,
@@ -158,8 +172,130 @@ from fedorbit.types import (
     Tolerance,
     TransferMethod,
     ValidationReason,
+    directed_pair_name,
     stable_json,
 )
+
+
+class DatasetValidationInvalidity(StrEnum):
+    CLIENT_NOT_MATERIALIZED = "registered primary client is not materialized"
+    PAIR_ENDPOINT_NOT_MATERIALIZED = "directed-pair endpoint client is not materialized"
+    SHARED_FEATURE_NAMESPACE = "source and target feature namespaces are not disjoint"
+    CROSS_CLIENT_ENTITY_ID_SHARED = "cross-client entity identifiers are shared"
+    CROSS_CLIENT_TIMESTAMP_PAIRING = "cross-client timestamps enable row pairing"
+
+
+@dataclass(frozen=True, slots=True)
+class StrictResourceValidity:
+    valid: bool
+    reason: InvalidReason | None
+
+
+def pair_strict_resource_validity(
+    source_materialized: MaterializedClient | None,
+    target_materialized: MaterializedClient | None,
+) -> StrictResourceValidity:
+    if source_materialized is None or target_materialized is None:
+        return StrictResourceValidity(
+            False, InvalidReason(DatasetValidationInvalidity.PAIR_ENDPOINT_NOT_MATERIALIZED.value)
+        )
+    try:
+        validate_disjoint_feature_namespaces(
+            frozenset(source_materialized.feature_names),
+            frozenset(target_materialized.feature_names),
+        )
+    except StrictResourceViolationError:
+        return StrictResourceValidity(
+            False, InvalidReason(DatasetValidationInvalidity.SHARED_FEATURE_NAMESPACE.value)
+        )
+    try:
+        validate_no_cross_client_entity_ids(
+            _forbidden_identity_columns(source_materialized),
+            _forbidden_identity_columns(target_materialized),
+        )
+    except StrictResourceViolationError:
+        return StrictResourceValidity(
+            False, InvalidReason(DatasetValidationInvalidity.CROSS_CLIENT_ENTITY_ID_SHARED.value)
+        )
+    try:
+        validate_no_cross_client_timestamp_pairing(
+            _timestamp_columns(source_materialized),
+            _timestamp_columns(target_materialized),
+        )
+    except StrictResourceViolationError:
+        return StrictResourceValidity(
+            False, InvalidReason(DatasetValidationInvalidity.CROSS_CLIENT_TIMESTAMP_PAIRING.value)
+        )
+    return StrictResourceValidity(True, None)
+
+
+type DatasetClientPairSeedUnit = Mapping[str, JsonValue]
+
+
+def dataset_client_pair_seed_units(
+    materialized: Mapping[DatasetId, MaterializedClient | None],
+    primary_clients: tuple[DatasetId, ...],
+    pairs: tuple[DirectedPairSpec, ...],
+    seeds: tuple[RandomSeed, ...],
+) -> tuple[DatasetClientPairSeedUnit, ...]:
+    pair_validity: OrderedDict[tuple[DatasetId, DatasetId], StrictResourceValidity] = OrderedDict()
+    for pair in pairs:
+        pair_validity[(pair.source, pair.target)] = pair_strict_resource_validity(
+            materialized.get(pair.source), materialized.get(pair.target)
+        )
+    units: list[DatasetClientPairSeedUnit] = []
+    for client in primary_clients:
+        client_materialized = materialized.get(client)
+        for pair in pairs:
+            is_source_endpoint = pair.source == client
+            is_target_endpoint = pair.target == client
+            pair_resource = pair_validity[(pair.source, pair.target)]
+            unavailable: bool | None = None
+            reason: InvalidReason | None = None
+            if client_materialized is None:
+                unavailable, reason = (
+                    True,
+                    InvalidReason(DatasetValidationInvalidity.CLIENT_NOT_MATERIALIZED.value),
+                )
+            elif is_source_endpoint or is_target_endpoint:
+                unavailable, reason = (not pair_resource.valid, pair_resource.reason)
+            for seed in seeds:
+                units.append(
+                    cast(
+                        DatasetClientPairSeedUnit,
+                        OrderedDict(
+                            client=client.value,
+                            source=pair.source.value,
+                            target=pair.target.value,
+                            seed=seed,
+                            is_source_endpoint=is_source_endpoint,
+                            is_target_endpoint=is_target_endpoint,
+                            state=(
+                                ArtifactState.INVALID.value
+                                if unavailable
+                                else ArtifactState.COMPLETED.value
+                            ),
+                            invalid_reason=None if reason is None else reason,
+                            strict_resource_valid=pair_resource.valid,
+                            shared_transfer_concept_count=(
+                                None
+                                if client_materialized is None
+                                else len(transfer_concept_groups(client, client_materialized))
+                            ),
+                            feature_count=(
+                                None
+                                if client_materialized is None
+                                else len(client_materialized.feature_names)
+                            ),
+                            local_class_count=(
+                                None
+                                if client_materialized is None
+                                else client_materialized.class_manifest.class_count
+                            ),
+                        ),
+                    )
+                )
+    return tuple(units)
 
 
 def execute_dataset_client_and_resource_validation(
@@ -171,9 +307,11 @@ def execute_dataset_client_and_resource_validation(
     if blocked:
         _persist_blocked_experiment(layout, request, blocked)
     raw_root = raw_dataset_root()
+    config = active_config()
     datasets: list[StableJsonPayload] = []
     materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
-    for dataset in active_config().scientific.datasets.clients:
+    registered_clients = config.scientific.datasets.clients
+    for dataset in registered_clients:
         try:
             client = load_or_materialize_client(dataset, raw_root, layout)
         except MaterializationError as error:
@@ -202,7 +340,7 @@ def execute_dataset_client_and_resource_validation(
             )
         )
     pairs: list[StableJsonPayload] = []
-    for pair in active_config().scientific.datasets.primary_directed_pairs:
+    for pair in config.scientific.datasets.primary_directed_pairs:
         source = materialized.get(pair.source)
         target = materialized.get(pair.target)
         if source is None or target is None:
@@ -235,7 +373,18 @@ def execute_dataset_client_and_resource_validation(
                 ),
             )
         )
-    seed = ExperimentSeed(active_config().scientific.randomness.confirmatory_seeds[0])
+    primary_clients = tuple(
+        dataset
+        for dataset, client in registered_clients.items()
+        if client.role == ClientRole.PRIMARY
+    )
+    units = dataset_client_pair_seed_units(
+        materialized,
+        primary_clients,
+        config.scientific.datasets.primary_directed_pairs,
+        config.scientific.randomness.confirmatory_seeds,
+    )
+    seed = ExperimentSeed(config.scientific.randomness.confirmatory_seeds[0])
     return persist_synthetic_experiment_payload(
         store,
         layout,
@@ -248,10 +397,12 @@ def execute_dataset_client_and_resource_validation(
                 dependency_fingerprint_sha256=fingerprint,
                 datasets=tuple(datasets),
                 primary_pairs=tuple(pairs),
+                unit_count=len(units),
+                units=units,
             ),
         ),
         frozenset(),
-        __name__,
+        ImplementationIdentity.VALIDATION_V1,
         ArtifactName("dataset-client-resource-validation"),
     )
 
@@ -305,7 +456,7 @@ def persist_synthetic_experiment_payload(
     seed: ExperimentSeed,
     payload_builder: Callable[[Sha256Digest], StableJsonPayload],
     configuration_sections: frozenset[ConfigurationSection],
-    producer_module: str,
+    implementation_identity: ImplementationIdentity,
     artifact_name: ArtifactName,
     condition: EvaluationConditionName | None = None,
     support: SupportSize | None = None,
@@ -325,7 +476,7 @@ def persist_synthetic_experiment_payload(
             relevance,
             (),
             configuration_sections,
-            producer_module,
+            implementation_identity,
         )
     )
     if request.overwrite_policy == OverwritePolicy.REUSE:
@@ -342,8 +493,7 @@ def persist_synthetic_experiment_payload(
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(configuration_subset_digest(configuration_sections))
-    code_sha256 = Sha256Digest(implementation_fingerprint(producer_module))
-    runtime_sha256 = runtime_fingerprint(ArtifactStage.EVALUATION).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(implementation_identity))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -351,7 +501,6 @@ def persist_synthetic_experiment_payload(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -363,7 +512,6 @@ def persist_synthetic_experiment_payload(
             upstream_artifact_ids=(),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -443,7 +591,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
                         summary_seed,
                         _instance_payload,
                         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-                        __name__,
+                        ImplementationIdentity.VALIDATION_V1,
                         ArtifactName(
                             f"theorem-exhaustive.{pattern_key}.s{support}.seed{seed}.i{instance_index}"
                         ),
@@ -468,7 +616,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
             ),
         ),
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
-        __name__,
+        ImplementationIdentity.VALIDATION_V1,
         ArtifactName("theorem-exhaustive-validation"),
     )
 
@@ -569,7 +717,7 @@ def execute_coupling_and_map_bound_validation(
                                 generation_failures = 0
                                 gap_failures = 0
                                 for instance_seed in seeds:
-                                    produced, gap_failed = _coupling_validation_instance(
+                                    coupling_outcome = _coupling_validation_instance(
                                         cell_compatibility,
                                         cell_heterogeneity,
                                         cell_asymmetry,
@@ -580,9 +728,9 @@ def execute_coupling_and_map_bound_validation(
                                         incompatible_gap_threshold,
                                     )
                                     generated += 1
-                                    if not produced:
+                                    if not coupling_outcome.produced:
                                         generation_failures += 1
-                                    elif gap_failed:
+                                    elif coupling_outcome.incompatible_gap_failed:
                                         gap_failures += 1
                                 cell_payload = cast(
                                     StableJsonPayload,
@@ -614,7 +762,7 @@ def execute_coupling_and_map_bound_validation(
                                 summary_seed,
                                 _cell_payload,
                                 _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
-                                __name__,
+                                ImplementationIdentity.VALIDATION_V1,
                                 ArtifactName(f"coupling-validation.{condition_label}.s{support}"),
                                 EvaluationConditionName(condition_label),
                                 SupportSize(support),
@@ -660,9 +808,15 @@ def execute_coupling_and_map_bound_validation(
             ),
         ),
         _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
-        __name__,
+        ImplementationIdentity.VALIDATION_V1,
         ArtifactName("coupling-and-map-bound-validation"),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class CouplingValidationOutcome:
+    produced: bool
+    incompatible_gap_failed: bool
 
 
 def _coupling_validation_instance(
@@ -674,7 +828,7 @@ def _coupling_validation_instance(
     support: SupportCount,
     seed: RandomSeed,
     incompatible_gap_threshold: Threshold,
-) -> tuple[bool, bool]:
+) -> CouplingValidationOutcome:
     request = CouplingInstanceRequest(
         compatibility=compatibility,
         response_heterogeneity=heterogeneity,
@@ -688,9 +842,9 @@ def _coupling_validation_instance(
     try:
         instance = generate_coupling_instance(request)
     except CouplingGenerationError:
-        return (False, False)
+        return CouplingValidationOutcome(False, False)
     if compatibility != CouplingCompatibility.INCOMPATIBLE:
-        return (True, False)
+        return CouplingValidationOutcome(True, False)
     groups = tuple(CoarseGroup)[: len(instance.block_pattern)]
     counts = OrderedDict(zip(groups, instance.block_pattern, strict=True))
     blocks = build_padded_block_structure(groups, counts, counts)
@@ -707,7 +861,7 @@ def _coupling_validation_instance(
         blocks, instance.lower_response_matrix, instance.lower_response_matrix
     )
     gap = fixed_action_rectangularization_gap(alpha, orbit, hull.lower_bounds)
-    return (True, not gap > incompatible_gap_threshold)
+    return CouplingValidationOutcome(True, not gap > incompatible_gap_threshold)
 
 
 def _map_bound_fixture_results(seeds: tuple[RandomSeed, ...]) -> StableJsonPayload:
@@ -743,18 +897,18 @@ def _deterministic_replay_consistent(
     support: SupportCount,
     seed: RandomSeed,
 ) -> bool:
-    problem_a, action_a, _ = synthetic_solver_instance(node_count, pattern, support, seed)
-    problem_b, action_b, _ = synthetic_solver_instance(node_count, pattern, support, seed)
+    instance_a = synthetic_solver_instance(node_count, pattern, support, seed)
+    instance_b = synthetic_solver_instance(node_count, pattern, support, seed)
     solver_config = active_config().solvers.exact_sparse
     outcome_a = fixed_action_worst_correspondence(
-        problem_a,
-        action_a,
+        instance_a.problem,
+        instance_a.action,
         solver_config.lap_objective_tie_tolerance,
         solver_config.action_tie_tolerance,
     )
     outcome_b = fixed_action_worst_correspondence(
-        problem_b,
-        action_b,
+        instance_b.problem,
+        instance_b.action,
         solver_config.lap_objective_tie_tolerance,
         solver_config.action_tie_tolerance,
     )
@@ -786,7 +940,6 @@ def execute_baseline_and_oracle_correctness_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> None:
-    raw_root = raw_dataset_root()
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     validation_seeds = (confirmatory_seeds[0], confirmatory_seeds[4])
     tractable_config = active_config().experiments.exact_sparse_solver_benchmark
@@ -810,14 +963,18 @@ def execute_baseline_and_oracle_correctness_validation(
             (ArtifactIdentifier("synthetic-generator"),),
             request.overwrite_policy,
         )
-        problem, action, blocks = synthetic_solver_instance(
+        tractable_instance = synthetic_solver_instance(
             tractable_k, tractable_pattern, tractable_support, seed
         )
         exhaustive_truth = solver_benchmark_reference_truth(
-            blocks, action, tractable_config.exhaustive_truth_correspondence_count_maximum
+            tractable_instance.blocks,
+            tractable_instance.action,
+            tractable_config.exhaustive_truth_correspondence_count_maximum,
         )
         if exhaustive_truth is not None:
-            qap_result = fixed_action_worst_correspondence_qap(problem, action)
+            qap_result = fixed_action_worst_correspondence_qap(
+                tractable_instance.problem, tractable_instance.action
+            )
             if qap_result.certified and qap_result.objective_value is not None:
                 persist_synthetic_diagnostic_metric(
                     store,
@@ -832,8 +989,10 @@ def execute_baseline_and_oracle_correctness_validation(
                     (ArtifactIdentifier("synthetic-generator"),),
                     request.overwrite_policy,
                 )
-            source_matrix = problem.lower_response_matrix
-            pc_result = point_correspondence_commitment(source_matrix, source_matrix, blocks)
+            source_matrix = tractable_instance.problem.lower_response_matrix
+            pc_result = point_correspondence_commitment(
+                source_matrix, source_matrix, tractable_instance.blocks
+            )
             if (
                 pc_result.certified
                 and pc_result.correspondence is not None
@@ -845,7 +1004,7 @@ def execute_baseline_and_oracle_correctness_validation(
                             correspondence.permute_response_matrix(source_matrix) * source_matrix
                         )
                     )
-                    for correspondence in enumerate_block_permutations(blocks)
+                    for correspondence in enumerate_block_permutations(tractable_instance.blocks)
                 )
                 persist_synthetic_diagnostic_metric(
                     store,
@@ -860,9 +1019,11 @@ def execute_baseline_and_oracle_correctness_validation(
                     (ArtifactIdentifier("synthetic-generator"),),
                     request.overwrite_policy,
                 )
-            exhaustive_hull = build_rectangular_hull(blocks, source_matrix, source_matrix)
+            exhaustive_hull = build_rectangular_hull(
+                tractable_instance.blocks, source_matrix, source_matrix
+            )
             analytic_lower, analytic_upper = analytic_rectangular_hull_bounds(
-                blocks, source_matrix, source_matrix
+                tractable_instance.blocks, source_matrix, source_matrix
             )
             hull_max_error = float(
                 max(
@@ -883,7 +1044,68 @@ def execute_baseline_and_oracle_correctness_validation(
                 (ArtifactIdentifier("synthetic-generator"),),
                 request.overwrite_policy,
             )
-    primary_pairs = active_config().scientific.datasets.primary_directed_pairs
+    persist_real_pair_baseline_validation(store, layout, request, validation_seeds)
+
+
+class BaselineValidationUnavailability(StrEnum):
+    PAIR_ENDPOINT_NOT_MATERIALIZED = "directed-pair endpoint client is not materialized"
+    METHOD_RESOURCE_OUTSIDE_STRICT_WHITELIST = (
+        "registered method resource is outside the strict whitelist"
+    )
+
+
+def _resource_permitted_for_either_role(
+    policy: StrictResourcePolicy,
+    resource: ResourceKind,
+) -> bool:
+    for role in (ClientRole.SOURCE, ClientRole.TARGET):
+        try:
+            policy.assert_role_allowed(role, resource, transfer_finalized=True)
+        except StrictResourceViolationError:
+            continue
+        return True
+    return False
+
+
+def registered_method_resource_validity(
+    method: TransferMethod,
+) -> StrictResourceValidity:
+    policy = StrictResourcePolicy()
+    for resource in sorted(method_resource_manifest(method), key=lambda kind: kind.value):
+        if not _resource_permitted_for_either_role(policy, resource):
+            return StrictResourceValidity(
+                False,
+                InvalidReason(
+                    f"{BaselineValidationUnavailability.METHOD_RESOURCE_OUTSIDE_STRICT_WHITELIST.value}"
+                    f": {resource.value}"
+                ),
+            )
+    return StrictResourceValidity(True, None)
+
+
+def oracle_validation_context(
+    experiment: ExperimentName,
+    registered_methods: tuple[CatalogueMethod, ...],
+) -> bool:
+    return (
+        experiment is ExperimentName.BASELINE_AND_ORACLE_CORRECTNESS_VALIDATION
+        and ORACLE_METHOD in registered_methods
+    )
+
+
+def oracle_information_accessed(method: MethodName) -> bool:
+    return method == ORACLE_METHOD
+
+
+def persist_real_pair_baseline_validation(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    validation_seeds: tuple[RandomSeed, ...],
+) -> None:
+    raw_root = raw_dataset_root()
+    registered_methods = request.definition.methods
+    oracle_context = oracle_validation_context(request.experiment, registered_methods)
     materialized_by_dataset: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
 
     def materialized(dataset: DatasetId) -> MaterializedClient | None:
@@ -894,63 +1116,59 @@ def execute_baseline_and_oracle_correctness_validation(
                 )
         return materialized_by_dataset.get(dataset)
 
-    for directed_pair in primary_pairs:
+    for directed_pair in active_config().scientific.datasets.primary_directed_pairs:
         source = directed_pair.source
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
-        if source_materialized is None or target_materialized is None:
-            for seed in validation_seeds:
-                persist_ineligible_transfer_cell(
+        pair_direction = directed_pair_name(source, target)
+        pair_resource = pair_strict_resource_validity(source_materialized, target_materialized)
+        endpoint_available = source_materialized is not None and target_materialized is not None
+        for seed in validation_seeds:
+            for method_name in registered_methods:
+                if not isinstance(method_name, TransferMethod):
+                    raise ExecutionError(
+                        f"registered baseline method is not a transfer method: {method_name}"
+                    )
+                method = registered_transfer_method(method_name)
+                method_resource = registered_method_resource_validity(method)
+                try:
+                    validate_oracle_acl_isolation(
+                        oracle_context, oracle_information_accessed(method)
+                    )
+                except StrictResourceViolationError:
+                    acl_valid = False
+                else:
+                    acl_valid = True
+                unavailable_reason: InvalidReason | None = None
+                if not endpoint_available:
+                    unavailable_reason = InvalidReason(
+                        BaselineValidationUnavailability.PAIR_ENDPOINT_NOT_MATERIALIZED.value
+                    )
+                elif not method_resource.valid:
+                    unavailable_reason = method_resource.reason
+                persist_primary_transfer_metric(
                     store,
                     layout,
                     request.experiment,
                     pair_direction,
                     source,
                     target,
-                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                    method,
                     seed,
+                    MetricId.STRICT_RESOURCE_VALIDITY,
+                    (
+                        None
+                        if unavailable_reason is not None
+                        else (1.0 if pair_resource.valid and acl_valid else 0.0)
+                    ),
+                    MetricUnit.BOOLEAN,
+                    MetricDirection.HIGHER_IS_BETTER,
+                    (ArtifactIdentifier("materialized-client-schema"),),
                     request.overwrite_policy,
+                    valid=unavailable_reason is None,
+                    invalid_reason=unavailable_reason,
                 )
-            continue
-        try:
-            validate_disjoint_feature_namespaces(
-                frozenset(source_materialized.feature_names),
-                frozenset(target_materialized.feature_names),
-            )
-            validate_no_cross_client_entity_ids(
-                _forbidden_identity_columns(source_materialized),
-                _forbidden_identity_columns(target_materialized),
-            )
-            validate_no_cross_client_timestamp_pairing(
-                _timestamp_columns(source_materialized),
-                _timestamp_columns(target_materialized),
-            )
-            validate_oracle_acl_isolation(
-                cell_is_oracle_validation_context=True, oracle_information_accessed=True
-            )
-            valid = True
-        except StrictResourceViolationError:
-            valid = False
-        input_artifact_ids = (ArtifactIdentifier("materialized-client-schema"),)
-        for seed in validation_seeds:
-            persist_primary_transfer_metric(
-                store,
-                layout,
-                request.experiment,
-                pair_direction,
-                source,
-                target,
-                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-                seed,
-                MetricId.STRICT_RESOURCE_VALIDITY,
-                1.0 if valid else 0.0,
-                MetricUnit.BOOLEAN,
-                MetricDirection.HIGHER_IS_BETTER,
-                input_artifact_ids,
-                request.overwrite_policy,
-            )
 
 
 class PrimitiveValidationError(ValueError):
@@ -970,7 +1188,12 @@ def execute_primitive_validation(
     overwrite_policy: OverwritePolicy = OverwritePolicy.REUSE,
 ) -> ReusableArtifactManifest:
     configuration = active_config()
-    seed = ExperimentSeed(0)
+    definition = build_catalogue().definition(_EXPERIMENT)
+    hand_fixture_seed = (
+        configuration.experiments.mathematical_primitive_validation.hand_fixture_seed
+    )
+    property_check_seeds = configuration.scientific.randomness.confirmatory_seeds
+    seed = ExperimentSeed(hand_fixture_seed)
     cell = SemanticCell(experiment=_EXPERIMENT, seed=seed)
     relevance = experiment_relevance(_EXPERIMENT)
     coordinates = SemanticCoordinateText(cell.identity_json(relevance))
@@ -981,7 +1204,7 @@ def execute_primitive_validation(
             relevance,
             (),
             _CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.VALIDATION_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -989,17 +1212,30 @@ def execute_primitive_validation(
         if existing is not None:
             return existing
     payload_path = _payload_path(layout, fingerprint)
+    block_patterns = configuration.generators.exact_separator_theorem.block_patterns
     cells = tuple(
-        _validation_payload(block_pattern, pilot_seed)
-        for block_pattern in configuration.generators.exact_separator_theorem.block_patterns
-        for pilot_seed in configuration.scientific.randomness.pilot_seeds
+        _validation_payload(block_pattern, hand_fixture_seed, PrimitiveFixtureKind.HAND_FIXTURE)
+        for block_pattern in block_patterns
+    ) + tuple(
+        _validation_payload(block_pattern, seed, PrimitiveFixtureKind.PROPERTY_CHECK)
+        for block_pattern in block_patterns
+        for seed in property_check_seeds
     )
-    payload = cast(StableJsonPayload, OrderedDict(cells=list(cells)))
+    payload = cast(
+        StableJsonPayload,
+        OrderedDict(
+            registered_planned_cells=definition.derived_planned_cells,
+            registered_seeds=list(definition.seeds),
+            hand_fixture_seed=hand_fixture_seed,
+            property_check_seeds=list(property_check_seeds),
+            realized_cell_count=len(cells),
+            cells=list(cells),
+        ),
+    )
     atomic_write_json(payload_path, payload)
     payload_sha256 = file_sha256(payload_path)
     configuration_sha256 = Sha256Digest(configuration_subset_digest(_CONFIGURATION_SECTIONS))
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = runtime_fingerprint(_STAGE).sha256
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.VALIDATION_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -1007,7 +1243,6 @@ def execute_primitive_validation(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -1019,7 +1254,6 @@ def execute_primitive_validation(
             upstream_artifact_ids=(),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,
@@ -1043,8 +1277,15 @@ def _payload_path(layout: WorkspaceLayout, fingerprint: Sha256Digest) -> Path:
     )
 
 
+class PrimitiveFixtureKind(StrEnum):
+    HAND_FIXTURE = "hand fixture"
+    PROPERTY_CHECK = "property check"
+
+
 def _validation_payload(
-    block_pattern: tuple[ConceptCount, ...], source_seed: RandomSeed
+    block_pattern: tuple[ConceptCount, ...],
+    source_seed: RandomSeed,
+    fixture_kind: PrimitiveFixtureKind,
 ) -> StableJsonPayload:
     configuration = active_config()
     fixture_tolerance = (
@@ -1125,6 +1366,9 @@ def _validation_payload(
     return cast(
         StableJsonPayload,
         OrderedDict(
+            cell_kind=fixture_kind.value,
+            state=ArtifactState.COMPLETED.value,
+            invalid_reason=None,
             block_pattern=list(block_pattern),
             seed=source_seed,
             response_shape=list(instance.lower_response_matrix.shape),

@@ -15,6 +15,7 @@ from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
+    AnonymousNodeOrder,
     anonymous_node_order,
     validate_anonymous_node_ids,
     validate_exact_fields,
@@ -36,6 +37,7 @@ from fedorbit.types import (
     AnonymousNodeDisplayId,
     ClientRole,
     CoarseGroup,
+    ConceptCount,
     DatasetId,
     Estimate,
     ExposedCoarseGroupId,
@@ -260,6 +262,26 @@ class SourcePacket:
     def upper_matrix(self) -> np.ndarray:
         return self._response_matrix(self.U)
 
+    def registered_node_order(self, seed: RandomSeed) -> AnonymousNodeOrder:
+        return anonymous_node_order(
+            len(self.anonymous_fine_node_ids),
+            seed,
+            ClientRole.SOURCE,
+            CoarseGroup(self.exposed_coarse_group_id),
+            AnonymityCoordinate(
+                (
+                    AnonymityCoordinateEntry(
+                        PacketField.SOURCE_CHECKPOINT_SHA256,
+                        self.source_checkpoint_sha256,
+                    ),
+                    AnonymityCoordinateEntry(
+                        PacketField.RESPONSE_CONFIGURATION_SHA256,
+                        self.response_configuration_sha256,
+                    ),
+                )
+            ),
+        )
+
     def validate(self) -> None:
         validate_exact_fields(
             frozenset(field.name for field in fields(self)),
@@ -347,7 +369,7 @@ class SourcePacket:
 class PacketConstructionContext:
     dataset: DatasetId
     input_dimension: FeatureCount
-    n_classes: Index
+    n_classes: ConceptCount
     coarse_group_id: CoarseGroup
     fine_node_order: NodeDisplayIds
     per_node_train_support: PerNodeSupport
@@ -438,11 +460,12 @@ def construct_source_packet(
             )
         ),
     )
+    anonymized_estimate = anonymized_response_estimate(complete_estimate, ordering)
     replicate_count = (
         active_config().scientific.source_response_final.paired_replicates_per_intervention
     )
     packet = build_source_packet(
-        complete_estimate,
+        anonymized_estimate,
         anonymous_fine_node_ids=ordering.display_ids,
         exposed_coarse_group_id=ExposedCoarseGroupId(context.coarse_group_id.value),
         per_node_train_support=ordering.reorder(context.per_node_train_support),
@@ -492,6 +515,35 @@ def build_source_packet(
 
     packet = create(Sha256Digest(""))
     return create(packet.compute_integrity_sha256())
+
+
+def anonymized_response_estimate(
+    estimate: FinalResponseEstimate,
+    order: AnonymousNodeOrder,
+) -> FinalResponseEstimate:
+    positions = order.anonymous_position_of_semantic_index()
+    entries = sorted(
+        (
+            FinalResponseEntry(
+                positions[entry.outcome_index],
+                positions[entry.intervention_index],
+                entry.a_hat,
+                entry.standard_error,
+                entry.lower,
+                entry.upper,
+                entry.useful,
+            )
+            for entry in estimate.entries
+        ),
+        key=lambda entry: (entry.outcome_index, entry.intervention_index),
+    )
+    return FinalResponseEstimate(
+        tuple(entries),
+        estimate.critical_value,
+        estimate.useful_intervention_columns,
+        estimate.median_band_width_ratio,
+        estimate.stability_rule_passed,
+    )
 
 
 def pad_absent_transfer_nodes(

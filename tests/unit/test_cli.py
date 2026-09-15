@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
 from typer.testing import CliRunner
 
+import fedorbit.cli as cli
+from fedorbit.analysis.records import MetricRecord
 from fedorbit.cli import (
     CliUsageError,
     app,
     dataset_identifier,
     experiment_identifier,
 )
+from fedorbit.infrastructure.runtime import ReproducibilityIdentity
+from fedorbit.infrastructure.workspace import WorkspaceLayout
 from fedorbit.types import (
     ExitStatus,
     ExperimentName,
+    MetricId,
+    TransferMethod,
 )
 
 runner = CliRunner()
@@ -68,6 +77,25 @@ def test_help_lists_only_registered_commands() -> None:
         assert command in result.output
 
 
+def test_doctor_reports_recorded_identity_mismatch_without_failing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def mismatched_identity(_layout: WorkspaceLayout) -> ReproducibilityIdentity:
+        return cast(ReproducibilityIdentity, SimpleNamespace())
+
+    def incompatible(_current: ReproducibilityIdentity, _recorded: ReproducibilityIdentity) -> bool:
+        return False
+
+    monkeypatch.setattr(cli, "recorded_execution_identity", mismatched_identity)
+    monkeypatch.setattr(cli, "compatible", incompatible)
+    monkeypatch.setattr(cli, "reference_gpu_matches", lambda: True)
+
+    result = runner.invoke(app, ["doctor"])
+
+    assert result.exit_code == 0
+    assert "recorded execution identity compatible: False" in result.output
+
+
 def test_no_scientific_override_options_exist() -> None:
     for option in ("--method", "--seed", "--support", "--budget", "--threshold"):
         result = runner.invoke(app, ["run", "Primary Strict Cross-Telemetry Transfer", option, "x"])
@@ -79,6 +107,47 @@ def test_plan_is_read_only_and_derives_catalogue() -> None:
     assert result.exit_code == 0
     assert f"registered experiments: {len(ExperimentName)}" in result.output
     assert "Primary Strict Cross-Telemetry Transfer" in result.output
+    assert "semantic scope:" in result.output
+    assert "prerequisites:" in result.output
+    assert "resume boundary:" in result.output
+
+
+def test_predicted_vs_realized_series_reports_spearman_point_count_or_unavailable() -> None:
+    pair = "source -> target"
+
+    def record(metric: MetricId, seed: int, value: float) -> MetricRecord:
+        return cast(
+            MetricRecord,
+            SimpleNamespace(
+                valid=True,
+                metric_value=value,
+                pair=pair,
+                seed=seed,
+                method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                metric_name=metric,
+            ),
+        )
+
+    insufficient = cli.predicted_vs_realized_series(
+        (
+            record(MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, 1, 0.1),
+            record(MetricId.RELATIVE_MACRO_CE_GAIN, 1, 0.2),
+        )
+    )
+    eligible = cli.predicted_vs_realized_series(
+        tuple(
+            item
+            for seed in range(5)
+            for item in (
+                record(MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, seed, float(seed)),
+                record(MetricId.RELATIVE_MACRO_CE_GAIN, seed, float(seed)),
+            )
+        )
+    )
+
+    assert insufficient[0].name == "source -> target | Spearman unavailable; n=1"
+    assert "rho=" in eligible[0].name
+    assert "n=5" in eligible[0].name
 
 
 def test_report_rejects_invented_experiment() -> None:

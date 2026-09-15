@@ -4,10 +4,8 @@ import pytest
 
 from fedorbit.experiments.cells import experiment_relevance
 from fedorbit.infrastructure.provenance import (
-    ProvenanceError,
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.types import (
@@ -18,6 +16,7 @@ from fedorbit.types import (
     DirectedPair,
     ExperimentName,
     ExperimentSeed,
+    ImplementationIdentity,
     SemanticCell,
     SemanticCoordinate,
     SupportSize,
@@ -71,38 +70,13 @@ def test_relevance_covers_registered_experiments() -> None:
         assert len(relevance) >= 2
 
 
-def test_implementation_fingerprint_is_producer_identity() -> None:
-    baseline = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    assert implementation_fingerprint("fedorbit.infrastructure.manifests") == baseline
-    assert implementation_fingerprint("fedorbit.config.loading") != baseline
+def test_implementation_fingerprint_is_stable_for_unchanged_identity() -> None:
+    baseline = implementation_fingerprint(ImplementationIdentity.TRAINING_V1)
+    assert implementation_fingerprint(ImplementationIdentity.TRAINING_V1) == baseline
+    assert implementation_fingerprint(ImplementationIdentity.SCORING_V1) != baseline
 
 
-def test_implementation_fingerprint_does_not_scan_source() -> None:
-    producer = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    same_identity = implementation_fingerprint("fedorbit.infrastructure.manifests")
-    assert producer == same_identity
-
-
-def test_implementation_fingerprint_rejects_non_fedorbit_producer() -> None:
-    with pytest.raises(ProvenanceError):
-        implementation_fingerprint("os.path")
-
-
-def test_runtime_fingerprint_is_stage_local() -> None:
-    training = runtime_fingerprint(ArtifactStage.TRAINING)
-    assert "torch" in training.components
-    assert "torch-cuda" in training.components
-    preprocessing = runtime_fingerprint(ArtifactStage.PREPROCESSING)
-    assert preprocessing.digest != training.digest
-    assert "matplotlib" not in preprocessing.components
-
-
-def test_runtime_fingerprint_excludes_plotting_dependencies() -> None:
-    for stage in (ArtifactStage.EVALUATION, ArtifactStage.REPORTING, ArtifactStage.STATISTICS):
-        assert "matplotlib" not in runtime_fingerprint(stage).components
-
-
-def test_runtime_fingerprint_unknown_stage_rejected() -> None:
+def test_invented_stage_rejected() -> None:
     with pytest.raises(ValueError):
         ArtifactStage("invented_stage")
 
@@ -115,7 +89,7 @@ def test_stage_dependency_fingerprint_composes_all_material_inputs() -> None:
         relevance,
         (ArtifactIdentifier("upstream-1"),),
         frozenset({ConfigurationSection.MODELS, ConfigurationSection.GENERATORS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     assert stage_dependency_fingerprint(*arguments) == stage_dependency_fingerprint(*arguments)
 
@@ -128,7 +102,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         (ArtifactIdentifier("upstream-1"),),
         frozenset({ConfigurationSection.MODELS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -136,7 +110,7 @@ def test_stage_dependency_fingerprint_sensitive_to_upstreams() -> None:
         relevance,
         (ArtifactIdentifier("upstream-2"),),
         frozenset({ConfigurationSection.MODELS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     assert changed != base
 
@@ -149,7 +123,7 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({ConfigurationSection.MODELS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -157,12 +131,12 @@ def test_stage_dependency_fingerprint_sensitive_to_config_subset() -> None:
         relevance,
         (),
         frozenset({ConfigurationSection.MODELS, ConfigurationSection.GENERATORS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     assert changed != base
 
 
-def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
+def test_stage_dependency_fingerprint_is_sensitive_to_implementation_identity() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     base = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -170,7 +144,7 @@ def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
         relevance,
         (),
         frozenset({ConfigurationSection.MODELS}),
-        "fedorbit.infrastructure.manifests",
+        ImplementationIdentity.TRAINING_V1,
     )
     changed = stage_dependency_fingerprint(
         ArtifactStage.TRAINING,
@@ -178,9 +152,9 @@ def test_stage_dependency_fingerprint_ignores_producer_module_path() -> None:
         relevance,
         (),
         frozenset({ConfigurationSection.MODELS}),
-        "fedorbit.infrastructure.reuse",
+        ImplementationIdentity.SCORING_V1,
     )
-    assert changed == base
+    assert changed != base
 
 
 def test_every_configuration_section_contributes_to_the_dependency_digest() -> None:

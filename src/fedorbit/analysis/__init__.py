@@ -3,6 +3,14 @@ from __future__ import annotations
 from fedorbit.analysis.comparisons import (
     PairContrastEvidence,
     PairContrastEvidenceSet,
+    PairingField,
+    PairingMismatchError,
+    require_matching_lineage,
+)
+from fedorbit.analysis.metrics import (
+    InvalidEvaluationDataError,
+    RelativeMacroCeGain,
+    relative_macro_ce_gain,
 )
 from fedorbit.analysis.statistics import (
     BcaInterval,
@@ -27,10 +35,14 @@ from fedorbit.analysis.statistics import (
 
 __all__ = [
     "BcaInterval",
+    "InvalidEvaluationDataError",
     "McNemarResult",
     "PValueSet",
     "PairContrastEvidence",
     "PairContrastEvidenceSet",
+    "PairingField",
+    "PairingMismatchError",
+    "RelativeMacroCeGain",
     "SignFlipResult",
     "StatisticsError",
     "TostResult",
@@ -43,6 +55,8 @@ __all__ = [
     "nominal_alpha",
     "one_sided_sign_flip_p_value",
     "paired_bca_interval",
+    "relative_macro_ce_gain",
+    "require_matching_lineage",
     "sign_flip_p_value",
     "statistical_bootstrap_seed",
     "tost_equivalence",

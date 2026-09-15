@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter, OrderedDict, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -32,11 +32,13 @@ from fedorbit.datasets.preprocessing import (
     NormalizedFeatureVector,
     NormalizedRow,
     NumericPreprocessor,
+    RowNormalizationError,
     TrainingFeatureValues,
     evaluate_feature_quality,
     fit_categorical_preprocessor,
     fit_numeric_preprocessor,
     normalize_and_split_training_rows,
+    normalize_training_rows,
     normalize_value,
     numeric_zero_is_not_missing,
     one_hot,
@@ -51,10 +53,12 @@ from fedorbit.types import (
     ClassCount,
     ClassIndex,
     ClientComponentName,
+    ComponentColumns,
     DatasetId,
     DatasetLabel,
     DuplicateGroupIdentifier,
     ExcludedLocalClasses,
+    FeatureCount,
     FeatureName,
     FeatureNames,
     FineLabel,
@@ -64,6 +68,7 @@ from fedorbit.types import (
     NormalizedGroupIdentifier,
     NumericFeatureValue,
     OracleTransferConcept,
+    PreprocessingFitStage,
     RandomSeed,
     RawCellText,
     RawDatasetDirectory,
@@ -199,6 +204,7 @@ def subsampled_materialized_client(
         feature_quality=materialized.feature_quality,
         class_row_counts=class_row_counts,
         provenance=materialized.provenance,
+        preprocessing_fit_accesses=materialized.preprocessing_fit_accesses,
     )
 
 
@@ -220,6 +226,31 @@ class DatasetProvenance:
 
 
 @dataclass(frozen=True, slots=True)
+class PreprocessingFitAccess:
+    stage: PreprocessingFitStage
+    accessed_splits: tuple[Split, ...]
+
+    def __post_init__(self) -> None:
+        if self.accessed_splits != (Split.TRAIN,):
+            raise MaterializationError(
+                f"preprocessing fit stage {self.stage.value} accessed non-TRAIN splits"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class PreprocessingFitAccessLog:
+    _records: tuple[PreprocessingFitAccess, ...] = ()
+
+    def record(self, stage: PreprocessingFitStage) -> PreprocessingFitAccessLog:
+        return PreprocessingFitAccessLog(
+            (*self._records, PreprocessingFitAccess(stage, (Split.TRAIN,)))
+        )
+
+    def records(self) -> tuple[PreprocessingFitAccess, ...]:
+        return self._records
+
+
+@dataclass(frozen=True, slots=True)
 class MaterializedClient:
     dataset: DatasetId
     schema: AdapterSchema
@@ -229,13 +260,76 @@ class MaterializedClient:
     feature_quality: FeatureQualityReport
     class_row_counts: Mapping[FineLabel, Mapping[Split, Index]]
     provenance: DatasetProvenance
+    preprocessing_fit_accesses: tuple[PreprocessingFitAccess, ...]
+
+    @property
+    def feature_count(self) -> FeatureCount:
+        return len(self.feature_names)
+
+
+def read_component_header_columns(paths: tuple[Path, ...]) -> ComponentColumns:
+    per_file_columns: list[TabularColumns] = []
+    for path in paths:
+        header = pd.read_csv(
+            path,
+            dtype=str,
+            keep_default_na=False,
+            na_filter=False,
+            encoding="utf-8-sig",
+            dtype_backend="numpy_nullable",
+            nrows=0,
+        )
+        observed = tuple(
+            TabularColumnName(str(column)) for column in cast(Sequence[str], header.columns)
+        )
+        if not observed:
+            raise MaterializationError(f"empty selected table: {path}")
+        per_file_columns.append(observed)
+    return tuple(per_file_columns)
+
+
+def iter_component_frame_chunks(
+    paths: tuple[Path, ...],
+    chunk_rows: int,
+) -> Iterator[pd.DataFrame]:
+    if chunk_rows < 1:
+        raise MaterializationError("component chunk size must be positive")
+    for path in paths:
+        reader = pd.read_csv(
+            path,
+            dtype=str,
+            keep_default_na=False,
+            na_filter=False,
+            encoding="utf-8-sig",
+            dtype_backend="numpy_nullable",
+            chunksize=chunk_rows,
+        )
+        yield from reader
+
+
+def frame_to_raw_rows(frame: pd.DataFrame, columns: TabularColumns) -> RawTabularRows:
+    reindexed = frame.reindex(columns=list(columns))
+    column_arrays: list[RawTabularColumns] = [
+        [RawCellText(cast(str, value)) for value in reindexed[column].to_numpy(dtype=object)]
+        for column in columns
+    ]
+    return [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)]
+
+
+def iter_component_raw_row_chunks(
+    paths: tuple[Path, ...],
+    columns: TabularColumns,
+    chunk_rows: int,
+) -> Iterator[RawTabularRows]:
+    for frame in iter_component_frame_chunks(paths, chunk_rows):
+        yield frame_to_raw_rows(frame, columns)
 
 
 def _read_component_rows(
     paths: tuple[Path, ...],
 ) -> tuple[TabularColumns, RawTabularRows, tuple[RawFileProvenance, ...]]:
     frames: list[pd.DataFrame] = []
-    per_file_columns: list[TabularColumns] = []
+    per_file_columns: list[TabularColumns] = list(read_component_header_columns(paths))
     raw_files: list[RawFileProvenance] = []
     for path in paths:
         frame = pd.read_csv(
@@ -247,12 +341,10 @@ def _read_component_rows(
             dtype_backend="numpy_nullable",
         )
         observed = tuple(
-            TabularColumnName(str(column))
-            for column in cast(Sequence[str], frame.columns)
+            TabularColumnName(str(column)) for column in cast(Sequence[str], frame.columns)
         )
         if not observed:
             raise MaterializationError(f"empty selected table: {path}")
-        per_file_columns.append(observed)
         frames.append(frame)
         raw_files.append(
             RawFileProvenance(RawDatasetPath(str(path)), file_sha256(path), len(frame))
@@ -313,7 +405,7 @@ def _parse_epoch_seconds(value: RawCellText) -> TimestampSeconds:
         raise MaterializationError(f"unparseable event-time cell: {value!r}") from error
 
 
-def _build_normalized_rows(
+def build_normalized_rows(
     schema: AdapterSchema,
     rows: RawTabularRows,
 ) -> tuple[NormalizedRow, ...]:
@@ -346,7 +438,7 @@ def _build_normalized_rows(
     return tuple(normalized_rows)
 
 
-def _retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManifest:
+def retained_local_classes(rows: tuple[NormalizedRow, ...]) -> LocalClassManifest:
     minimum = (
         active_config().scientific.transfer_support.local_prediction_attack_class_total_rows_minimum
     )
@@ -371,24 +463,25 @@ class SplitAssignmentResult:
     conflicting_duplicate_group_count: Index
 
 
-def _assign_splits(
+def assign_materialized_splits(
     schema: AdapterSchema,
     rows: tuple[NormalizedRow, ...],
-    manifest: LocalClassManifest,
 ) -> SplitAssignmentResult:
+    try:
+        all_duplicate_groups = normalize_training_rows(schema, rows)
+    except RowNormalizationError as error:
+        raise MaterializationError(f"invalid duplicate groups: {error}") from error
+    del all_duplicate_groups
     buckets: dict[Split, list[NormalizedRow]] = OrderedDict((split, []) for split in Split)
     by_class: defaultdict[FineLabel, list[NormalizedRow]] = defaultdict(list)
     for row in rows:
-        if row.label in manifest.class_names:
-            by_class[row.label].append(row)
+        by_class[row.label].append(row)
     duplicate_group_count = 0
     conflicting_duplicate_group_count = 0
     for class_rows in by_class.values():
         normalized = normalize_and_split_training_rows(schema, tuple(class_rows))
         for group_sha256, members in normalized.duplicate_groups.groups:
             duplicate_group_count += 1
-            if len({member.label for member in members}) > 1:
-                conflicting_duplicate_group_count += 1
             split = normalized.split_assignment.split_of(
                 DuplicateGroupId(DuplicateGroupIdentifier(group_sha256))
             )
@@ -437,16 +530,26 @@ def require_safe_memory_budget(dataset: DatasetId, paths: tuple[Path, ...]) -> N
 
 
 def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient:
+    from fedorbit.datasets.component_validation import (
+        ComponentContentState,
+        validate_component_content,
+    )
+
     if dataset == DatasetId.EDGE_IIOTSET_NETWORK:
         raise MaterializationError(
             "Edge-IIoTset network is Invalid Data for chronological materialization"
         )
     component = component_for(dataset)
     paths = discover_ton_iot_component_files(raw_root / RawDatasetDirectory.TON_IOT, component)
+    content_verdict = validate_component_content(dataset, paths)
+    if content_verdict.state is ComponentContentState.INVALID_DATA:
+        raise MaterializationError(str(content_verdict.reason))
+    if content_verdict.state is ComponentContentState.RESOURCE_BLOCKED:
+        raise MaterializationResourceLimitError(str(content_verdict.reason))
     require_safe_memory_budget(dataset, paths)
     columns, raw_rows, raw_files = _read_component_rows(paths)
     schema = _resolve_schema(dataset, columns, raw_rows)
-    rows = _build_normalized_rows(schema, raw_rows)
+    rows = build_normalized_rows(schema, raw_rows)
     del raw_rows
     assert schema.timestamp_column is not None
     timestamp_column_array = np.fromiter(
@@ -455,10 +558,17 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
     timestamp_lower: TimestampSeconds = float(timestamp_column_array.min())
     timestamp_upper: TimestampSeconds = float(timestamp_column_array.max())
     timestamp_range: TimestampRange = (timestamp_lower, timestamp_upper)
-    manifest = _retained_local_classes(rows)
-    split_result = _assign_splits(schema, rows, manifest)
-    buckets = split_result.buckets
+    split_result = assign_materialized_splits(schema, rows)
     del rows
+    fit_access_log = PreprocessingFitAccessLog().record(PreprocessingFitStage.LOCAL_CLASS_MANIFEST)
+    manifest = retained_local_classes(split_result.buckets[Split.TRAIN])
+    buckets = OrderedDict(
+        (
+            split,
+            tuple(row for row in split_result.buckets[split] if row.label in manifest.class_names),
+        )
+        for split in Split
+    )
     provenance = DatasetProvenance(
         component=component.component_name,
         raw_files=raw_files,
@@ -497,6 +607,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
             for column in behavioral
         )
     )
+    fit_access_log = fit_access_log.record(PreprocessingFitStage.FEATURE_QUALITY)
     quality = evaluate_feature_quality(behavioral, categorical_columns, train_values)
     if quality.client_invalid:
         raise MaterializationError(
@@ -511,10 +622,12 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         if candidate.dropped:
             continue
         if candidate.is_categorical:
+            fit_access_log = fit_access_log.record(PreprocessingFitStage.CATEGORICAL_PREPROCESSOR)
             categorical_preprocessors[candidate.name] = fit_categorical_preprocessor(
                 _categorical_array(train_rows, candidate.name)
             )
         else:
+            fit_access_log = fit_access_log.record(PreprocessingFitStage.NUMERIC_PREPROCESSOR)
             fitted = fit_numeric_preprocessor(_numeric_array(train_rows, candidate.name))
             if fitted.constant_after_imputation:
                 continue
@@ -575,6 +688,7 @@ def materialize_client(dataset: DatasetId, raw_root: Path) -> MaterializedClient
         feature_quality=quality,
         class_row_counts=class_row_counts,
         provenance=provenance,
+        preprocessing_fit_accesses=fit_access_log.records(),
     )
 
 
@@ -585,6 +699,9 @@ class TransferConceptGroup:
     train_support: Index
     meta_support: Index
     source_eligible: bool
+    confirm_support: Index = 0
+    test_support: Index = 0
+    target_eligible: bool = False
 
 
 def transfer_concept_groups(
@@ -613,7 +730,25 @@ def transfer_concept_groups(
             ]
             for index in indices
         )
-        eligibility = transfer_eligibility(train_support, meta_support, 0, 0, 0)
+        confirm_support = sum(
+            materialized.class_row_counts[materialized.class_manifest.class_names[index]][
+                Split.CONFIRM
+            ]
+            for index in indices
+        )
+        test_support = sum(
+            materialized.class_row_counts[materialized.class_manifest.class_names[index]][
+                Split.TEST
+            ]
+            for index in indices
+        )
+        eligibility = transfer_eligibility(
+            train_support,
+            meta_support,
+            meta_support,
+            confirm_support,
+            test_support,
+        )
         groups.append(
             TransferConceptGroup(
                 concept=concept,
@@ -621,6 +756,9 @@ def transfer_concept_groups(
                 train_support=train_support,
                 meta_support=meta_support,
                 source_eligible=eligibility.source_eligible,
+                confirm_support=confirm_support,
+                test_support=test_support,
+                target_eligible=eligibility.target_eligible,
             )
         )
     return tuple(groups)

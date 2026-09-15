@@ -3,21 +3,25 @@ from __future__ import annotations
 import math
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from enum import StrEnum
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
 
 from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.runtime import RandomSeed
 from fedorbit.types import (
     Coefficient,
     ConceptCount,
+    DirectedPairName,
     Index,
     RepetitionCount,
     Score,
     SourceClientName,
     StepCount,
+    TransferMethod,
 )
 
 
@@ -201,6 +205,110 @@ SHADOW_PAIR_DIRECTIONS: RepetitionCount = 2
 
 class OptimizerBudgetError(ValueError):
     pass
+
+
+class TargetOptimizerBudgetCategory(StrEnum):
+    TARGET_RESPONSE_DIAGNOSTIC = "target_response_diagnostic"
+    CONFIRMATION_CANDIDATES = "confirmation_candidates"
+    LIVE_ASSIMILATION = "live_assimilation"
+    NONTRANSFERABLE_SAFETY_RESERVE = "nontransferable_safety_reserve"
+
+
+@dataclass(frozen=True, slots=True)
+class TargetOptimizerReservations:
+    target_response_diagnostic: StepCount
+    confirmation_candidates: StepCount
+    live_assimilation: StepCount
+    nontransferable_safety_reserve: StepCount
+
+    @property
+    def total_steps(self) -> StepCount:
+        return (
+            self.target_response_diagnostic
+            + self.confirmation_candidates
+            + self.live_assimilation
+            + self.nontransferable_safety_reserve
+        )
+
+    def remaining(self, category: TargetOptimizerBudgetCategory) -> StepCount:
+        match category:
+            case TargetOptimizerBudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
+                return self.target_response_diagnostic
+            case TargetOptimizerBudgetCategory.CONFIRMATION_CANDIDATES:
+                return self.confirmation_candidates
+            case TargetOptimizerBudgetCategory.LIVE_ASSIMILATION:
+                return self.live_assimilation
+            case TargetOptimizerBudgetCategory.NONTRANSFERABLE_SAFETY_RESERVE:
+                return self.nontransferable_safety_reserve
+
+    def reduced(
+        self,
+        category: TargetOptimizerBudgetCategory,
+        step_count: StepCount,
+    ) -> TargetOptimizerReservations:
+        remaining = self.remaining(category) - step_count
+        match category:
+            case TargetOptimizerBudgetCategory.TARGET_RESPONSE_DIAGNOSTIC:
+                return replace(self, target_response_diagnostic=remaining)
+            case TargetOptimizerBudgetCategory.CONFIRMATION_CANDIDATES:
+                return replace(self, confirmation_candidates=remaining)
+            case TargetOptimizerBudgetCategory.LIVE_ASSIMILATION:
+                return replace(self, live_assimilation=remaining)
+            case TargetOptimizerBudgetCategory.NONTRANSFERABLE_SAFETY_RESERVE:
+                return replace(self, nontransferable_safety_reserve=remaining)
+
+
+@dataclass(slots=True)
+class TargetOptimizerStepLedger:
+    method: TransferMethod
+    directed_pair: DirectedPairName
+    seed: RandomSeed
+    _reservations: TargetOptimizerReservations = field(init=False)
+
+    def __post_init__(self) -> None:
+        budget = active_config().scientific.target_optimizer_budget
+        reserved = budget.reserved
+        reservations = TargetOptimizerReservations(
+            reserved.target_response_diagnostic,
+            reserved.confirmation_candidates,
+            reserved.live_assimilation,
+            reserved.nontransferable_safety_reserve,
+        )
+        if reservations.total_steps > budget.maximum_steps_per_method_pair_seed_before_test:
+            raise OptimizerBudgetError("target optimizer reservations exceed the registered cap")
+        self._reservations = reservations
+
+    def consume(
+        self,
+        category: TargetOptimizerBudgetCategory,
+        step_count: StepCount,
+    ) -> None:
+        if step_count < 0:
+            raise OptimizerBudgetError("target optimizer step count must be nonnegative")
+        remaining = self._reservations.remaining(category)
+        if step_count > remaining:
+            raise OptimizerBudgetError(
+                f"target optimizer budget exceeded for {self.method.value}, "
+                f"{self.directed_pair}, seed {self.seed}, category {category.value}: "
+                f"requested {step_count}, remaining {remaining}"
+            )
+        self._reservations = self._reservations.reduced(category, step_count)
+
+    def remaining(self, category: TargetOptimizerBudgetCategory) -> StepCount:
+        return self._reservations.remaining(category)
+
+    def assert_seed(self, seed: RandomSeed) -> None:
+        if self.seed != seed:
+            raise OptimizerBudgetError(
+                f"target optimizer ledger seed {self.seed} does not match execution seed {seed}"
+            )
+
+    def assert_directed_pair(self, directed_pair: DirectedPairName) -> None:
+        if self.directed_pair != directed_pair:
+            raise OptimizerBudgetError(
+                f"target optimizer ledger pair {self.directed_pair} does not match "
+                f"execution pair {directed_pair}"
+            )
 
 
 def target_diagnostic_reserve(intervention_class_count: ConceptCount) -> StepCount:

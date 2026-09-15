@@ -244,20 +244,22 @@ def fixed_action_worst_correspondence_qap(
         return _uncertified_result(TerminalState.TIME_LIMIT)
     images = _extract_images(model, assignment_variables, blocks)
     correspondence = BlockCorrespondence(blocks=blocks, images=images)
+    objective_value: Score = float(model.getObjVal()) - float(
+        problem.linear_costs @ alpha.coordinates
+    )
     return QapSeparatorResult(
         correspondence=correspondence,
-        objective_value=float(model.getObjVal()),
+        objective_value=objective_value,
         certified=True,
         terminal_state=None,
     )
 
 
-def point_correspondence_commitment(
+def _structural_qap_coefficients(
     source_response_matrix: NDArray[np.float64],
     target_response_matrix: NDArray[np.float64],
     blocks: PaddedBlockStructure,
-) -> QapSeparatorResult:
-    config = active_config()
+) -> OrderedDict[ProductKey, Score]:
     size = blocks.total_padded_nodes
     if source_response_matrix.shape != (size, size) or target_response_matrix.shape != (size, size):
         raise SolverExecutionError("point-correspondence matrices must match padded size")
@@ -272,14 +274,30 @@ def point_correspondence_commitment(
         )
         if coefficient:
             coefficients[(source_a, source_b, target_k, target_j)] = coefficient
+    return coefficients
+
+
+def _solve_structural_qap(
+    model_name: str,
+    variable_prefix: SolverVariablePrefix,
+    source_response_matrix: NDArray[np.float64],
+    target_response_matrix: NDArray[np.float64],
+    blocks: PaddedBlockStructure,
+    tie_tolerance: Tolerance,
+    require_relative_gap_certificate: bool,
+) -> QapSeparatorResult:
+    config = active_config()
+    coefficients = _structural_qap_coefficients(
+        source_response_matrix, target_response_matrix, blocks
+    )
     deadline = MonotonicDeadline(
         time.monotonic() + config.solvers.generic_exact_qap.wall_time_seconds_per_solve
     )
-    model = Model("qap_point_correspondence")
+    model = Model(model_name)
     _configure_model(model, deadline)
-    assignment_variables = _build_assignment_structure(model, blocks, SolverVariablePrefix("pc"))
+    assignment_variables = _build_assignment_structure(model, blocks, variable_prefix)
     objective_terms = _add_mccormick_products(
-        model, assignment_variables, coefficients, SolverVariablePrefix("pc")
+        model, assignment_variables, coefficients, variable_prefix
     )
     model.setObjective(quicksum(objective_terms) if objective_terms else 0.0, "minimize")
     model.optimize()
@@ -292,7 +310,10 @@ def point_correspondence_commitment(
             certified=False,
             terminal_state=limit_state or TerminalState.FAILED_SCIENTIFIC_ALGORITHMIC,
         )
-    tie_tolerance = config.scientific.baselines.point_correspondence_commitment.qap_tie_tolerance
+    if require_relative_gap_certificate:
+        gap = float(model.getGap())
+        if not math.isfinite(gap) or gap > config.solvers.generic_exact_qap.relative_mip_gap:
+            return _uncertified_result(TerminalState.TIME_LIMIT)
     best_objective = float(model.getObjVal())
     refined = _refine_lexicographic_correspondence(
         model,
@@ -321,6 +342,38 @@ def point_correspondence_commitment(
         objective_value=squared_distance,
         certified=True,
         terminal_state=None,
+    )
+
+
+def point_correspondence_commitment(
+    source_response_matrix: NDArray[np.float64],
+    target_response_matrix: NDArray[np.float64],
+    blocks: PaddedBlockStructure,
+) -> QapSeparatorResult:
+    return _solve_structural_qap(
+        "qap_point_correspondence",
+        SolverVariablePrefix("pc"),
+        source_response_matrix,
+        target_response_matrix,
+        blocks,
+        active_config().scientific.baselines.point_correspondence_commitment.qap_tie_tolerance,
+        False,
+    )
+
+
+def generic_exact_qap_correspondence(
+    source_response_matrix: NDArray[np.float64],
+    target_response_matrix: NDArray[np.float64],
+    blocks: PaddedBlockStructure,
+) -> QapSeparatorResult:
+    return _solve_structural_qap(
+        "qap_generic_structural",
+        SolverVariablePrefix("gq"),
+        source_response_matrix,
+        target_response_matrix,
+        blocks,
+        active_config().solvers.exact_sparse.action_tie_tolerance,
+        True,
     )
 
 

@@ -36,6 +36,7 @@ from fedorbit.optimization.objective import (
 )
 from fedorbit.types import (
     Coefficient,
+    DenseCcpCertificationStatus,
     Discrepancy,
     Index,
     MonotonicDeadline,
@@ -125,6 +126,7 @@ class DenseCcpOutcome:
     integrality_residual: Discrepancy
     outer_cut_count: Index
     converged_heuristically: bool
+    certification_status: DenseCcpCertificationStatus
     terminal_state: TerminalState | None
     worst_projected_correspondence: BlockCorrespondence
 
@@ -752,6 +754,7 @@ def solve_dense_ccp(
         integrality_residual=best_candidate.integrality_residual,
         outer_cut_count=result.outer_cut_count,
         converged_heuristically=result.converged_heuristically,
+        certification_status=DenseCcpCertificationStatus.HEURISTIC_ONLY,
         terminal_state=result.terminal_state,
         worst_projected_correspondence=best_candidate.correspondence,
     )

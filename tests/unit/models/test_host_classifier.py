@@ -24,6 +24,11 @@ def test_host_classifier_contract() -> None:
     batch_norm = next(module for module in model.modules() if isinstance(module, nn.BatchNorm1d))
     assert batch_norm.eps == 1e-5
     assert batch_norm.momentum == 0.1
+    assert batch_norm.affine
+    assert batch_norm.track_running_stats
+    relus = [module for module in model.modules() if isinstance(module, nn.ReLU)]
+    assert len(relus) == 3
+    assert all(not module.inplace for module in relus)
     assert all(parameter.dtype == torch.float32 for parameter in model.parameters())
 
 
@@ -37,3 +42,15 @@ def test_host_initialization_is_named_generator_deterministic() -> None:
     for name, parameter in first.named_parameters():
         if name.endswith("bias"):
             assert torch.equal(parameter, torch.zeros_like(parameter))
+    expected_generator = torch.Generator().manual_seed(53)
+    for module in first.modules():
+        if isinstance(module, nn.Linear):
+            expected = torch.empty_like(module.weight)
+            nn.init.kaiming_uniform_(
+                expected,
+                a=0.0,
+                mode="fan_in",
+                nonlinearity="relu",
+                generator=expected_generator,
+            )
+            assert torch.equal(module.weight, expected)

@@ -217,6 +217,7 @@ tempCodeRunnerFile.py
 !/results/**/.gitkeep
 /docs/.refactor-audit/
 /docs/.graphify-audit/
+/docs/.audit/
 
 # PyPI configuration file
 .pypirc

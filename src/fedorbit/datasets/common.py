@@ -14,11 +14,13 @@ from pathlib import Path
 from typing import cast
 
 from filelock import FileLock
+from pydantic import JsonValue
 
 from fedorbit.config.loading import active_config, repository_root
 from fedorbit.datasets.ontology import NormalTrafficLabel, normalize_label
 from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.types import (
+    ByteCount,
     ComponentColumns,
     DatasetId,
     DatasetLabel,
@@ -35,6 +37,7 @@ from fedorbit.types import (
     TabularColumns,
     TabularColumnSet,
     ValidationReason,
+    is_sha256_digest,
     stable_json,
 )
 
@@ -128,6 +131,7 @@ class PreprocessingObservationArtifact(StrEnum):
     VALIDATION = "validation.json"
     LEAKAGE = "leakage.json"
     TIMESTAMP_ALIASES = "timestamp_aliases.json"
+    DUPLICATES = "duplicates.parquet"
 
 
 def _digest_cache_path() -> Path:
@@ -140,16 +144,91 @@ def _digest_cache_path() -> Path:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class RawFileDigestEntry:
+    size: ByteCount
+    modification_nanoseconds: Index
+    sha256: Sha256Digest
+
+    def matches(self, size: ByteCount, modification_nanoseconds: Index) -> bool:
+        return self.size == size and self.modification_nanoseconds == modification_nanoseconds
+
+    @staticmethod
+    def from_json(value: JsonValue) -> RawFileDigestEntry | None:
+        if not isinstance(value, dict):
+            return None
+        size = value.get("size")
+        modification_nanoseconds = value.get("mtime_ns")
+        digest = value.get("sha256")
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            return None
+        if (
+            not isinstance(modification_nanoseconds, int)
+            or isinstance(modification_nanoseconds, bool)
+            or modification_nanoseconds < 0
+        ):
+            return None
+        if not isinstance(digest, str) or not is_sha256_digest(Sha256Digest(digest)):
+            return None
+        return RawFileDigestEntry(size, modification_nanoseconds, Sha256Digest(digest))
+
+    def to_json(self) -> StableJsonPayload:
+        return cast(
+            StableJsonPayload,
+            OrderedDict(
+                (
+                    ("size", self.size),
+                    ("mtime_ns", self.modification_nanoseconds),
+                    ("sha256", self.sha256),
+                )
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RawFileDigestCache:
+    entries: Mapping[str, RawFileDigestEntry]
+
+    @staticmethod
+    def empty() -> RawFileDigestCache:
+        return RawFileDigestCache(OrderedDict())
+
+    @staticmethod
+    def from_json(value: JsonValue) -> RawFileDigestCache:
+        if not isinstance(value, dict):
+            return RawFileDigestCache.empty()
+        entries: OrderedDict[str, RawFileDigestEntry] = OrderedDict()
+        for path, entry_value in value.items():
+            entry = RawFileDigestEntry.from_json(entry_value)
+            if entry is not None:
+                entries[path] = entry
+        return RawFileDigestCache(entries)
+
+    def entry_for(self, resolved_path: str) -> RawFileDigestEntry | None:
+        return self.entries.get(resolved_path)
+
+    def with_entry(self, resolved_path: str, entry: RawFileDigestEntry) -> RawFileDigestCache:
+        updated: OrderedDict[str, RawFileDigestEntry] = OrderedDict(self.entries)
+        updated[resolved_path] = entry
+        return RawFileDigestCache(updated)
+
+    def to_json(self) -> StableJsonPayload:
+        return cast(
+            StableJsonPayload,
+            OrderedDict((path, entry.to_json()) for path, entry in self.entries.items()),
+        )
+
+
 def _load_digest_cache(
     cache_path: Path,
-) -> dict[str, dict[str, int | str]]:
+) -> RawFileDigestCache:
     if not cache_path.is_file():
-        return OrderedDict()
+        return RawFileDigestCache.empty()
     try:
         loaded = json.loads(cache_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return OrderedDict()
-    return loaded if isinstance(loaded, dict) else OrderedDict()
+        return RawFileDigestCache.empty()
+    return RawFileDigestCache.from_json(loaded)
 
 
 def _hash_file_contents(path: Path) -> Sha256Digest:
@@ -166,20 +245,14 @@ def file_sha256(path: Path) -> Sha256Digest:
     cache_path = _digest_cache_path()
     with FileLock(str(cache_path) + ".cachelock"):
         cache = _load_digest_cache(cache_path)
-        entry = cache.get(resolved)
-        if (
-            entry is not None
-            and entry.get("size") == stat.st_size
-            and entry.get("mtime_ns") == stat.st_mtime_ns
-        ):
-            return Sha256Digest(cast(str, entry["sha256"]))
+        entry = cache.entry_for(resolved)
+        if entry is not None and entry.matches(stat.st_size, stat.st_mtime_ns):
+            return entry.sha256
         digest = _hash_file_contents(path)
-        cache[resolved] = OrderedDict(
-            size=stat.st_size,
-            mtime_ns=stat.st_mtime_ns,
-            sha256=digest,
+        recorded = cache.with_entry(
+            resolved, RawFileDigestEntry(stat.st_size, stat.st_mtime_ns, digest)
         )
-        atomic_write_json(cache_path, cast(StableJsonPayload, cache))
+        atomic_write_json(cache_path, recorded.to_json())
         return digest
 
 
@@ -318,7 +391,7 @@ def is_missing_sample(value: RawCellValue) -> bool:
     return str(value).strip().casefold() in MissingSampleToken
 
 
-def _lossless_float64(value: RawNumericCellValue) -> bool:
+def is_lossless_float64(value: RawNumericCellValue) -> bool:
     if isinstance(value, bool):
         return False
     if isinstance(value, (int, float)):
@@ -338,7 +411,7 @@ def infer_feature_type(samples: RawCellSamples) -> FieldRole:
     )
     if not non_missing:
         return FieldRole.BEHAVIORAL_CATEGORICAL
-    if all(_lossless_float64(sample) for sample in non_missing):
+    if all(is_lossless_float64(sample) for sample in non_missing):
         return FieldRole.BEHAVIORAL_NUMERIC
     return FieldRole.BEHAVIORAL_CATEGORICAL
 

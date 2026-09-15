@@ -5,6 +5,7 @@ import statistics
 from dataclasses import dataclass
 
 from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.failures import FedorbitValidationError
 from fedorbit.types import (
     ByteCount,
     ClassIndex,
@@ -13,6 +14,7 @@ from fedorbit.types import (
     Estimate,
     Fraction,
     Index,
+    InvalidReason,
     MemoryMib,
     RelativeGain,
     SampleCount,
@@ -24,6 +26,18 @@ from fedorbit.types import (
 
 class MetricComputationError(ValueError):
     pass
+
+
+class InvalidEvaluationDataError(FedorbitValidationError):
+    reason: InvalidReason
+    class_index: ClassIndex
+
+    def __init__(self, class_index: ClassIndex) -> None:
+        self.class_index = class_index
+        self.reason = InvalidReason(
+            f"fixed evaluation class {class_index} has zero evaluation examples in the split"
+        )
+        super().__init__(self.reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,18 +104,37 @@ class ClassRecallSet:
             raise MetricComputationError("balanced accuracy over an empty evaluation class set")
 
 
+def example_cross_entropy(true_class_probability: Probability) -> CrossEntropy:
+    log_floor = active_config().scientific.metrics.probability_log_floor
+    return CrossEntropy(-math.log(max(true_class_probability.value, log_floor)))
+
+
 def class_conditional_cross_entropy(
     true_class_probabilities: TrueClassProbabilities,
 ) -> CrossEntropy:
-    log_floor = active_config().scientific.metrics.probability_log_floor
     total = 0.0
     for probability in true_class_probabilities.values:
-        total += -math.log(max(probability.value, log_floor))
+        total += example_cross_entropy(probability).value
     return CrossEntropy(total / len(true_class_probabilities.values))
 
 
 def macro_cross_entropy(class_entropies: ClassEntropySet) -> CrossEntropy:
     return CrossEntropy(statistics.fmean(entry.value for entry in class_entropies.values))
+
+
+@dataclass(frozen=True, slots=True)
+class RelativeMacroCeGain:
+    relative: RelativeGain | None
+    absolute: Estimate
+
+
+def relative_macro_ce_gain(reference: CrossEntropy, method: CrossEntropy) -> RelativeMacroCeGain:
+    denominator_floor = active_config().scientific.metrics.relative_macro_ce_denominator_floor
+    absolute: Estimate = reference.value - method.value
+    if reference.value < denominator_floor:
+        return RelativeMacroCeGain(None, absolute)
+    relative: RelativeGain = absolute / max(reference.value, denominator_floor)
+    return RelativeMacroCeGain(relative, absolute)
 
 
 def precision_from_counts(true_positives: Index, false_positives: Index) -> Fraction:

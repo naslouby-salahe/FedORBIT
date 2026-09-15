@@ -50,7 +50,6 @@ from fedorbit.infrastructure.preparation import (
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
     implementation_fingerprint,
-    runtime_fingerprint,
     stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
@@ -118,6 +117,7 @@ from fedorbit.types import (
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
+    ImplementationIdentity,
     InvalidReason,
     OverwritePolicy,
     ReportColumnName,
@@ -220,7 +220,7 @@ def execute_source_response_estimator_pilot(
         seed,
         lambda fingerprint: _source_response_estimator_payload(layout, request, fingerprint),
         _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
-        __name__,
+        ImplementationIdentity.TRAINING_V1,
         ArtifactName("source-response-pilot"),
     )
 
@@ -233,7 +233,7 @@ def _source_response_estimator_payload(
     return _source_response_estimator_client_results(layout, request, fingerprint)
 
 
-def _execute_final_source_response_band_validation(
+def _perform_final_source_response_band_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> None:
@@ -277,7 +277,7 @@ def _execute_final_source_response_band_validation(
                 node_classes = tuple(group.native_class_indices for group in groups)
                 model = create_classifier(
                     dataset,
-                    materialized.splits[Split.TRAIN].features.shape[1],
+                    materialized.feature_count,
                     materialized.class_manifest.class_count,
                     checkpoint.selected_hyperparameters.dropout_probability,
                     seed,
@@ -286,7 +286,7 @@ def _execute_final_source_response_band_validation(
                 packet = construct_source_packet(
                     PacketConstructionContext(
                         dataset,
-                        materialized.splits[Split.TRAIN].features.shape[1],
+                        materialized.feature_count,
                         materialized.class_manifest.class_count,
                         coarse_group,
                         tuple(AnonymousNodeDisplayId(group.concept.value) for group in groups),
@@ -381,7 +381,7 @@ def _source_response_estimator_client_results(
             checkpoint = load_base_checkpoint(path)
             model = create_classifier(
                 dataset,
-                materialized.splits[Split.TRAIN].features.shape[1],
+                materialized.feature_count,
                 materialized.class_manifest.class_count,
                 checkpoint.selected_hyperparameters.dropout_probability,
                 seed,
@@ -456,7 +456,7 @@ def execute_final_source_response_band_validation(
     layout: WorkspaceLayout,
     request: ExperimentExecutionRequest,
 ) -> ReusableArtifactManifest:
-    _execute_final_source_response_band_validation(layout, request)
+    _perform_final_source_response_band_validation(layout, request)
     return persist_synthetic_experiment_payload(
         store,
         layout,
@@ -471,7 +471,7 @@ def execute_final_source_response_band_validation(
             ),
         ),
         frozenset({ConfigurationSection.RESPONSE, ConfigurationSection.MODELS}),
-        __name__,
+        ImplementationIdentity.TRAINING_V1,
         ArtifactName("source-response-band-validation"),
     )
 
@@ -651,7 +651,7 @@ def execute_client_base_model_pilot(
                 relevance,
                 (),
                 BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-                __name__,
+                ImplementationIdentity.TRAINING_V1,
             )
             if overwrite_policy == OverwritePolicy.REUSE:
                 existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
@@ -689,7 +689,7 @@ def execute_client_base_model_pilot(
             with principal_determinism(), measure_efficiency() as efficiency:
                 model = create_classifier(
                     dataset,
-                    train.features.shape[1],
+                    materialized.feature_count,
                     n_classes,
                     selection.configuration.dropout,
                     seed,
@@ -787,7 +787,7 @@ def _persist_base_checkpoint(
             relevance,
             (),
             BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
-            __name__,
+            ImplementationIdentity.TRAINING_V1,
         )
     )
     if overwrite_policy == OverwritePolicy.REUSE:
@@ -807,8 +807,7 @@ def _persist_base_checkpoint(
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
     )
-    code_sha256 = Sha256Digest(implementation_fingerprint(__name__))
-    runtime_sha256 = Sha256Digest(runtime_fingerprint(stage).sha256)
+    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.TRAINING_V1))
     completion = build_completion_manifest(
         coordinates,
         fingerprint,
@@ -816,7 +815,6 @@ def _persist_base_checkpoint(
         payload_sha256,
         configuration_sha256,
         code_sha256,
-        runtime_sha256,
         stage=stage,
     )
     manifest = ReusableArtifactManifest.model_validate(
@@ -836,7 +834,6 @@ def _persist_base_checkpoint(
             upstream_artifact_ids=(),
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
-            material_runtime_sha256=runtime_sha256,
             payload_paths=(str(payload_path),),
             payload_sha256=payload_sha256,
             schema_version=ArtifactSchemaVersion.V1,

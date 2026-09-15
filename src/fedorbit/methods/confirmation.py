@@ -6,6 +6,12 @@ from dataclasses import dataclass
 
 import torch
 
+from fedorbit.analysis.metrics import (
+    ClassEntropySet,
+    CrossEntropy,
+    macro_cross_entropy,
+    relative_macro_ce_gain,
+)
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
 from fedorbit.response.estimation import shadow_batch_schedule
@@ -75,12 +81,13 @@ def _macro_ce_from_losses(
 ) -> Score:
     if len(resample_indices) != len(losses_by_class):
         raise ConfirmationError("class resampling must cover every evaluation class")
-    class_entropies = [
-        _tensor_mean(losses[indices])
-        for losses, indices in zip(losses_by_class, resample_indices, strict=True)
-    ]
-    macro_ce: Score = statistics.fmean(class_entropies)
-    return macro_ce
+    class_entropies = ClassEntropySet(
+        tuple(
+            CrossEntropy(_tensor_mean(losses[indices]))
+            for losses, indices in zip(losses_by_class, resample_indices, strict=True)
+        )
+    )
+    return macro_cross_entropy(class_entropies).value
 
 
 def hierarchical_bootstrap_relative_gains(
@@ -90,7 +97,6 @@ def hierarchical_bootstrap_relative_gains(
 ) -> RelativeGainSamples:
     config = active_config()
     confirmation = config.scientific.confirmation
-    denominator_floor = config.scientific.metrics.relative_macro_ce_denominator_floor
     if not replicate_outcomes:
         raise ConfirmationError("hierarchical bootstrap requires at least one replicate")
     replicate_count = len(replicate_outcomes)
@@ -113,10 +119,15 @@ def hierarchical_bootstrap_relative_gains(
             curriculum = _macro_ce_from_losses(
                 outcomes.curriculum_losses_by_class, resample_indices
             )
-            replicate_gain: RelativeGain = (baseline - curriculum) / max(
-                baseline, denominator_floor
+            replicate_gain = relative_macro_ce_gain(
+                CrossEntropy(baseline), CrossEntropy(curriculum)
             )
-            replicate_gains.append(replicate_gain)
+            if replicate_gain.relative is None:
+                raise ConfirmationError(
+                    "relative macro-CE gain is unavailable: the reference macro-CE is below "
+                    "the registered denominator floor"
+                )
+            replicate_gains.append(replicate_gain.relative)
         replicate_mean_gain: RelativeGain = statistics.fmean(replicate_gains)
         collected_gains.append(replicate_mean_gain)
     return tuple(collected_gains)

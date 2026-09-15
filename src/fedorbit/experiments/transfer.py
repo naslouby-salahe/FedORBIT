@@ -8,7 +8,13 @@ from typing import cast
 
 import torch
 
-from fedorbit.analysis.metrics import harm_indicator
+from fedorbit.analysis.metrics import (
+    CrossEntropy,
+    InvalidEvaluationDataError,
+    RelativeMacroCeGain,
+    harm_indicator,
+    relative_macro_ce_gain,
+)
 from fedorbit.analysis.records import (
     MetricDirection,
 )
@@ -25,6 +31,7 @@ from fedorbit.experiments.scoring import (
     WeakSignalPerturbation,
     action_sha256,
     assemble_principal_action,
+    assess_pair_seed_structure,
     ci_half_width_perturbation,
     common_eligible_groups,
     curriculum_multipliers_from_action,
@@ -59,6 +66,7 @@ from fedorbit.experiments.scoring import (
     solve_matched_resource_rectangular_action,
 )
 from fedorbit.experiments.solvers import persist_synthetic_diagnostic_metric
+from fedorbit.experiments.synthesis import completed_experiment_metric_records
 from fedorbit.experiments.training import execute_client_base_model_pilot
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
@@ -92,6 +100,7 @@ from fedorbit.methods.assimilation import (
 )
 from fedorbit.methods.target import (
     SourceProposal,
+    TargetOptimizerStepLedger,
     assert_target_diagnostic_reserve,
     rank_source_proposals,
     select_source_sequentially,
@@ -119,7 +128,9 @@ from fedorbit.oracle import authorize_oracle_access
 from fedorbit.types import (
     PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
+    CellUnavailabilityReason,
     ClassCount,
+    ClientRole,
     ConceptCount,
     ContrastCoordinates,
     DatasetId,
@@ -130,10 +141,13 @@ from fedorbit.types import (
     ExperimentLocalMethod,
     ExperimentName,
     FilesystemSlug,
+    InvalidReason,
     MetricId,
     MetricUnit,
     MutableCell,
+    PairSeedIneligibilityReason,
     RngNamespace,
+    ScientificAlgorithmicFailureError,
     Score,
     SemanticPartitionId,
     SourceClientName,
@@ -142,6 +156,7 @@ from fedorbit.types import (
     SupportSize,
     TransferMethod,
     WeakSignalBoundaryDimension,
+    directed_pair_name,
 )
 
 
@@ -155,6 +170,7 @@ def _persist_ineligible_methods(
     seed: RandomSeed,
     methods: tuple[TransferMethod, ...],
     condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
+    pair_seed_ineligibility_reason: PairSeedIneligibilityReason | None = None,
 ) -> None:
     for method in methods:
         persist_ineligible_transfer_cell(
@@ -168,7 +184,46 @@ def _persist_ineligible_methods(
             seed,
             request.overwrite_policy,
             condition,
+            pair_seed_ineligibility_reason,
         )
+
+
+def _assess_or_persist_cross_pair_ineligibility(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: DirectedPairName,
+    source: DatasetId,
+    target: DatasetId,
+    source_materialized: MaterializedClient,
+    target_materialized: MaterializedClient,
+    seed: RandomSeed,
+    methods: tuple[TransferMethod, ...],
+    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
+) -> bool:
+    structure = assess_pair_seed_structure(
+        layout,
+        source,
+        target,
+        source_materialized,
+        target_materialized,
+        seed,
+    )
+    if structure.is_eligible:
+        return True
+    _persist_ineligible_methods(
+        store,
+        layout,
+        request,
+        pair_direction,
+        source,
+        target,
+        seed,
+        methods,
+        condition,
+        structure.ineligibility_reason,
+    )
+    return False
 
 
 def _reuse_principal_transfer_metrics(
@@ -220,6 +275,39 @@ def _reuse_principal_transfer_metrics(
     return True
 
 
+def _persist_unavailable_method_cell(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: DirectedPairName,
+    source: DatasetId,
+    target: DatasetId,
+    method: TransferMethod,
+    seed: RandomSeed,
+    reason: InvalidReason,
+    category: CellUnavailabilityReason,
+) -> None:
+    persist_primary_transfer_metric(
+        store,
+        layout,
+        request.experiment,
+        pair_direction,
+        source,
+        target,
+        method,
+        seed,
+        MetricId.ABSTENTION_INDICATOR,
+        None,
+        MetricUnit.BOOLEAN,
+        MetricDirection.DESCRIPTIVE,
+        (ArtifactIdentifier(category.value),),
+        request.overwrite_policy,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+        valid=False,
+        invalid_reason=reason,
+    )
+
+
 def execute_primary_strict_cross_telemetry_transfer(
     store: ArtifactStore,
     layout: WorkspaceLayout,
@@ -227,6 +315,14 @@ def execute_primary_strict_cross_telemetry_transfer(
 ) -> None:
     raw_root = raw_dataset_root()
     device = execution_device()
+    authorize_oracle_access(
+        request.experiment,
+        tuple(
+            method
+            for method in request.definition.methods
+            if isinstance(method, (TransferMethod, ExperimentLocalMethod))
+        ),
+    )
     confirmatory_seeds = active_config().scientific.randomness.confirmatory_seeds
     primary_pairs = active_config().scientific.datasets.primary_directed_pairs
     materialized_by_target: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
@@ -302,6 +398,33 @@ def execute_primary_strict_cross_telemetry_transfer(
                     input_artifact_ids,
                 )
             if source_materialized is not None:
+                pair_seed_structure = assess_pair_seed_structure(
+                    layout,
+                    source,
+                    target,
+                    source_materialized,
+                    materialized,
+                    seed,
+                )
+                if not pair_seed_structure.is_eligible:
+                    _persist_ineligible_methods(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        seed,
+                        (
+                            TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+                            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                            TransferMethod.GENERIC_EXACT_QAP,
+                            TransferMethod.EXACT_MAP_ORACLE,
+                        ),
+                        pair_seed_ineligibility_reason=pair_seed_structure.ineligibility_reason,
+                    )
+                    continue
                 matched_resource_rectangular = score_matched_resource_rectangular_cell(
                     store,
                     layout,
@@ -484,7 +607,7 @@ def execute_mechanism_ablations(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair_name(source, target)
         if source_materialized is None or target_materialized is None:
             for seed in confirmatory_seeds:
                 _persist_ineligible_methods(
@@ -499,10 +622,46 @@ def execute_mechanism_ablations(
                 )
             continue
         for seed in confirmatory_seeds:
+            cross_pair_eligible = _assess_or_persist_cross_pair_ineligibility(
+                store,
+                layout,
+                request,
+                pair_direction,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                tuple(method for method, _scorer in scorers if method != TransferMethod.LOCAL_SIR),
+            )
             for method, scorer in scorers:
-                if (
-                    method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
-                    and _reuse_principal_transfer_metrics(
+                if method != TransferMethod.LOCAL_SIR and not cross_pair_eligible:
+                    continue
+                if _reuse_principal_transfer_metrics(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    method,
+                    seed,
+                    PRINCIPAL_EVALUATION_CONDITION.name,
+                ):
+                    continue
+                try:
+                    scored = scorer(
+                        store,
+                        layout,
+                        source,
+                        target,
+                        source_materialized,
+                        target_materialized,
+                        seed,
+                        device,
+                    )
+                except InvalidEvaluationDataError as error:
+                    _persist_unavailable_method_cell(
                         store,
                         layout,
                         request,
@@ -511,20 +670,24 @@ def execute_mechanism_ablations(
                         target,
                         method,
                         seed,
-                        PRINCIPAL_EVALUATION_CONDITION.name,
+                        error.reason,
+                        CellUnavailabilityReason.INVALID_EVALUATION_DATA,
                     )
-                ):
                     continue
-                scored = scorer(
-                    store,
-                    layout,
-                    source,
-                    target,
-                    source_materialized,
-                    target_materialized,
-                    seed,
-                    device,
-                )
+                except ScientificAlgorithmicFailureError as error:
+                    _persist_unavailable_method_cell(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        InvalidReason(f"{type(error).__name__}: {error}"),
+                        CellUnavailabilityReason.SCIENTIFIC_ALGORITHMIC_FAILURE,
+                    )
+                    continue
                 if scored is None:
                     continue
                 score, n_classes, input_artifact_ids = scored
@@ -543,6 +706,27 @@ def execute_mechanism_ablations(
                 )
 
 
+def _principal_local_only_macro_ce(
+    store: ArtifactStore,
+    pair_direction: DirectedPairName,
+    seed: RandomSeed,
+) -> float | None:
+    records = completed_experiment_metric_records(
+        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER
+    )
+    values = tuple(
+        record.metric_value
+        for record in records
+        if record.pair == pair_direction
+        and record.seed == seed
+        and record.method == TransferMethod.LOCAL_ONLY
+        and record.metric_name == MetricId.MACRO_CROSS_ENTROPY
+        and record.valid
+        and record.metric_value is not None
+    )
+    return values[0] if values else None
+
+
 def _persist_confirmation_safety_indicators(
     store: ArtifactStore,
     layout: WorkspaceLayout,
@@ -551,40 +735,136 @@ def _persist_confirmation_safety_indicators(
     source: DatasetId,
     target: DatasetId,
     seed: RandomSeed,
-    local_score: ScoreArtifact,
+    local_ce: CrossEntropy,
     with_score: ScoreArtifact,
     without_score: ScoreArtifact | None,
     verdicts: list[ConfirmationVerdict],
     input_artifact_ids: tuple[ArtifactIdentifier, ...],
 ) -> None:
     materiality = active_config().scientific.materiality
-    local_ce = float(local_score.macro_cross_entropy.value)
-    with_ce = float(with_score.macro_cross_entropy.value)
-    with_gain = 0.0 if local_ce == 0.0 else (local_ce - with_ce) / local_ce
-    accepted = bool(verdicts and verdicts[-1].accepted)
-    harmful = harm_indicator(with_gain, materiality.harmful_transfer_relative_macro_ce_gain)
-    useful = with_gain >= materiality.useful_transfer_relative_macro_ce_gain
-    indicators: list[tuple[MetricId, float]] = [
-        (MetricId.HARMFUL_ACCEPTED_RATE, 1.0 if accepted and harmful else 0.0),
-        (MetricId.USEFUL_ACCEPTED_RATE, 1.0 if accepted and useful else 0.0),
-        (MetricId.BENEFICIAL_REJECTED_RATE, 1.0 if (not accepted) and useful else 0.0),
-        (MetricId.COVERAGE_CONFIRM, 1.0 if accepted else 0.0),
-        (MetricId.HARM_RATE_CONFIRM, 1.0 if harmful else 0.0),
-    ]
-    if without_score is not None:
-        without_ce = float(without_score.macro_cross_entropy.value)
-        without_gain = 0.0 if local_ce == 0.0 else (local_ce - without_ce) / local_ce
-        without_harmful = harm_indicator(
-            without_gain, materiality.harmful_transfer_relative_macro_ce_gain
+    if not verdicts:
+        no_proposal = InvalidReason(
+            "no proposal-eligible target decision: confirmation coverage and safety rates are "
+            "reported separately and are not defined for this seed"
         )
-        harm_confirm = 1.0 if harmful else 0.0
-        harm_no = 1.0 if without_harmful else 0.0
-        indicators.append((MetricId.HARM_RATE_NO_CONFIRM, harm_no))
-        indicators.append((MetricId.ABSOLUTE_RISK_REDUCTION, harm_no - harm_confirm))
-        if harm_no > 0.0:
-            indicators.append(
-                (MetricId.RELATIVE_RISK_REDUCTION, (harm_no - harm_confirm) / harm_no)
+        for metric_name in (
+            MetricId.COVERAGE_CONFIRM,
+            MetricId.HARM_RATE_CONFIRM,
+            MetricId.HARMFUL_ACCEPTED_RATE,
+            MetricId.USEFUL_ACCEPTED_RATE,
+            MetricId.BENEFICIAL_REJECTED_RATE,
+        ):
+            persist_primary_transfer_metric(
+                store,
+                layout,
+                request.experiment,
+                pair_direction,
+                source,
+                target,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                seed,
+                metric_name,
+                None,
+                MetricUnit.FRACTION,
+                MetricDirection.DESCRIPTIVE,
+                input_artifact_ids,
+                request.overwrite_policy,
+                valid=False,
+                invalid_reason=no_proposal,
             )
+        return
+    accepted = bool(verdicts[-1].accepted)
+    with_gain = relative_macro_ce_gain(local_ce, with_score.macro_cross_entropy)
+    unavailable = InvalidReason(
+        "relative macro-CE gain is unavailable: reference macro-CE is below the registered "
+        "denominator floor"
+    )
+    _persist_relative_gain_metric(
+        store,
+        layout,
+        request,
+        pair_direction,
+        source,
+        target,
+        seed,
+        with_gain,
+        unavailable,
+        input_artifact_ids,
+    )
+    indicators: list[tuple[MetricId, float]] = []
+    if with_gain.relative is None:
+        for metric_name in (
+            MetricId.HARMFUL_ACCEPTED_RATE,
+            MetricId.USEFUL_ACCEPTED_RATE,
+            MetricId.BENEFICIAL_REJECTED_RATE,
+            MetricId.HARM_RATE_CONFIRM,
+            MetricId.COVERAGE_CONFIRM,
+        ):
+            persist_primary_transfer_metric(
+                store,
+                layout,
+                request.experiment,
+                pair_direction,
+                source,
+                target,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                seed,
+                metric_name,
+                None,
+                MetricUnit.FRACTION,
+                MetricDirection.DESCRIPTIVE,
+                input_artifact_ids,
+                request.overwrite_policy,
+                valid=False,
+                invalid_reason=unavailable,
+            )
+        return
+    harmful = harm_indicator(
+        with_gain.relative, materiality.harmful_transfer_relative_macro_ce_gain
+    )
+    useful = with_gain.relative >= materiality.useful_transfer_relative_macro_ce_gain
+    indicators.extend(
+        (
+            (MetricId.HARMFUL_ACCEPTED_RATE, 1.0 if accepted and harmful else 0.0),
+            (MetricId.USEFUL_ACCEPTED_RATE, 1.0 if accepted and useful else 0.0),
+            (MetricId.BENEFICIAL_REJECTED_RATE, 1.0 if (not accepted) and useful else 0.0),
+            (MetricId.COVERAGE_CONFIRM, 1.0 if accepted else 0.0),
+            (MetricId.HARM_RATE_CONFIRM, 1.0 if harmful else 0.0),
+        )
+    )
+    if without_score is not None:
+        without_gain = relative_macro_ce_gain(local_ce, without_score.macro_cross_entropy)
+        if without_gain.relative is None:
+            persist_primary_transfer_metric(
+                store,
+                layout,
+                request.experiment,
+                pair_direction,
+                source,
+                target,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                seed,
+                MetricId.HARM_RATE_NO_CONFIRM,
+                None,
+                MetricUnit.FRACTION,
+                MetricDirection.DESCRIPTIVE,
+                input_artifact_ids,
+                request.overwrite_policy,
+                valid=False,
+                invalid_reason=unavailable,
+            )
+        else:
+            without_harmful = harm_indicator(
+                without_gain.relative, materiality.harmful_transfer_relative_macro_ce_gain
+            )
+            harm_confirm = 1.0 if harmful else 0.0
+            harm_no = 1.0 if without_harmful else 0.0
+            indicators.append((MetricId.HARM_RATE_NO_CONFIRM, harm_no))
+            indicators.append((MetricId.ABSOLUTE_RISK_REDUCTION, harm_no - harm_confirm))
+            if harm_no > 0.0:
+                indicators.append(
+                    (MetricId.RELATIVE_RISK_REDUCTION, (harm_no - harm_confirm) / harm_no)
+                )
     for metric_name, metric_value in indicators:
         persist_primary_transfer_metric(
             store,
@@ -602,6 +882,56 @@ def _persist_confirmation_safety_indicators(
             input_artifact_ids,
             request.overwrite_policy,
         )
+
+
+def _persist_relative_gain_metric(
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    request: ExperimentExecutionRequest,
+    pair_direction: DirectedPairName,
+    source: DatasetId,
+    target: DatasetId,
+    seed: RandomSeed,
+    gain: RelativeMacroCeGain,
+    unavailable: InvalidReason,
+    input_artifact_ids: tuple[ArtifactIdentifier, ...],
+) -> None:
+    if gain.relative is None:
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            request.experiment,
+            pair_direction,
+            source,
+            target,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.RELATIVE_MACRO_CE_GAIN,
+            None,
+            MetricUnit.FRACTION,
+            MetricDirection.HIGHER_IS_BETTER,
+            input_artifact_ids,
+            request.overwrite_policy,
+            valid=False,
+            invalid_reason=unavailable,
+        )
+        return
+    persist_primary_transfer_metric(
+        store,
+        layout,
+        request.experiment,
+        pair_direction,
+        source,
+        target,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        seed,
+        MetricId.RELATIVE_MACRO_CE_GAIN,
+        gain.relative,
+        MetricUnit.FRACTION,
+        MetricDirection.HIGHER_IS_BETTER,
+        input_artifact_ids,
+        request.overwrite_policy,
+    )
 
 
 def execute_target_confirmation_and_portability(
@@ -640,26 +970,39 @@ def execute_target_confirmation_and_portability(
                 len(concept_groups) for concept_groups in target_eligible.values()
             )
             assert_target_diagnostic_reserve(target_concepts)
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair_name(source, target)
         for seed in confirmatory_seeds:
-            local_only = score_local_only_cell(
-                store, layout, target, target_materialized, seed, device
-            )
-            if local_only is not None:
-                score, n_classes, checkpoint_id = local_only
-                persist_primary_transfer_cell_metrics(
+            local_only_ce = _principal_local_only_macro_ce(store, pair_direction, seed)
+            if local_only_ce is None:
+                _persist_unavailable_method_cell(
                     store,
                     layout,
                     request,
                     pair_direction,
                     source,
                     target,
-                    TransferMethod.LOCAL_ONLY,
+                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
                     seed,
-                    score,
-                    n_classes,
-                    (checkpoint_id,),
+                    InvalidReason("principal Local-Only reference unavailable for this pair-seed"),
+                    CellUnavailabilityReason.INELIGIBLE_OR_ABSTAIN,
                 )
+                continue
+            if not _assess_or_persist_cross_pair_ineligibility(
+                store,
+                layout,
+                request,
+                pair_direction,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                (
+                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                    TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION,
+                ),
+            ):
+                continue
             verdict_sink: MutableCell[ConfirmationVerdict] = MutableCell()
             with_confirmation = score_fedorbit_with_confirmation_verdict_cell(
                 store,
@@ -730,7 +1073,7 @@ def execute_target_confirmation_and_portability(
                     n_classes,
                     input_artifact_ids,
                 )
-            if local_only is not None and with_confirmation is not None:
+            if with_confirmation is not None:
                 _persist_confirmation_safety_indicators(
                     store,
                     layout,
@@ -739,7 +1082,7 @@ def execute_target_confirmation_and_portability(
                     source,
                     target,
                     seed,
-                    local_only[0],
+                    CrossEntropy(local_only_ce),
                     with_confirmation[0],
                     None if without_confirmation is None else without_confirmation[0],
                     verdicts,
@@ -783,19 +1126,73 @@ def execute_secondary_cross_modality_generalization(
         target_materialized = materialized(target)
         if source_materialized is None or target_materialized is None:
             continue
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair_name(source, target)
         for seed in confirmatory_seeds:
+            cross_pair_eligible = _assess_or_persist_cross_pair_ineligibility(
+                store,
+                layout,
+                request,
+                pair_direction,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                tuple(
+                    method
+                    for method, _scorer in scorers
+                    if method not in (TransferMethod.LOCAL_ONLY, TransferMethod.LOCAL_SIR)
+                ),
+            )
             for method, scorer in scorers:
-                scored = scorer(
-                    store,
-                    layout,
-                    source,
-                    target,
-                    source_materialized,
-                    target_materialized,
-                    seed,
-                    device,
-                )
+                if (
+                    method
+                    not in (
+                        TransferMethod.LOCAL_ONLY,
+                        TransferMethod.LOCAL_SIR,
+                    )
+                    and not cross_pair_eligible
+                ):
+                    continue
+                try:
+                    scored = scorer(
+                        store,
+                        layout,
+                        source,
+                        target,
+                        source_materialized,
+                        target_materialized,
+                        seed,
+                        device,
+                    )
+                except InvalidEvaluationDataError as error:
+                    _persist_unavailable_method_cell(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        error.reason,
+                        CellUnavailabilityReason.INVALID_EVALUATION_DATA,
+                    )
+                    continue
+                except ScientificAlgorithmicFailureError as error:
+                    _persist_unavailable_method_cell(
+                        store,
+                        layout,
+                        request,
+                        pair_direction,
+                        source,
+                        target,
+                        method,
+                        seed,
+                        InvalidReason(f"{type(error).__name__}: {error}"),
+                        CellUnavailabilityReason.SCIENTIFIC_ALGORITHMIC_FAILURE,
+                    )
+                    continue
                 if scored is None:
                     continue
                 score, n_classes, input_artifact_ids = scored
@@ -886,6 +1283,20 @@ def execute_sparsity_and_dense_fallback(
         principal_condition = EvaluationCondition.exact_sparse(SupportSize(principal_support)).name
         for seed in confirmatory_seeds:
             for condition_name, method, solve_action in conditions:
+                if not _assess_or_persist_cross_pair_ineligibility(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    (method,),
+                    condition_name,
+                ):
+                    continue
                 if (
                     method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
                     and condition_name == principal_condition
@@ -958,7 +1369,7 @@ def execute_real_packet_coupling_mechanism_validation(
         target = directed_pair.target
         source_materialized = materialized(source)
         target_materialized = materialized(target)
-        pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+        pair_direction = directed_pair_name(source, target)
         if source_materialized is None or target_materialized is None:
             for seed in confirmatory_seeds:
                 _persist_ineligible_methods(
@@ -973,6 +1384,19 @@ def execute_real_packet_coupling_mechanism_validation(
                 )
             continue
         for seed in confirmatory_seeds:
+            if not _assess_or_persist_cross_pair_ineligibility(
+                store,
+                layout,
+                request,
+                pair_direction,
+                source,
+                target,
+                source_materialized,
+                target_materialized,
+                seed,
+                (TransferMethod.MATCHED_RESOURCE_RECTANGULAR,),
+            ):
+                continue
             assembly = assemble_principal_action(
                 store,
                 layout,
@@ -992,7 +1416,10 @@ def execute_real_packet_coupling_mechanism_validation(
                 assembly.problem.lower_response_matrix,
                 assembly.problem.upper_response_matrix,
             )
-            candidates = (assembly.action, zero_action(assembly.problem))
+            rectangular_action = solve_matched_resource_rectangular_action(assembly.problem, seed)
+            if rectangular_action is None:
+                continue
+            candidates = (assembly.action, rectangular_action, zero_action(assembly.problem))
             for metric_name, metric_value in (
                 (
                     MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
@@ -1006,7 +1433,16 @@ def execute_real_packet_coupling_mechanism_validation(
                     MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
                     rectangular_value_over_candidates(candidates, assembly.problem, hull),
                 ),
+                (
+                    MetricId.COUPLING_ACTION_SET_SUPPORT,
+                    float(assembly.problem.principal_support),
+                ),
             ):
+                metric_unit = (
+                    MetricUnit.COUNT
+                    if metric_name is MetricId.COUPLING_ACTION_SET_SUPPORT
+                    else MetricUnit.SCORE
+                )
                 persist_primary_transfer_metric(
                     store,
                     layout,
@@ -1018,7 +1454,7 @@ def execute_real_packet_coupling_mechanism_validation(
                     seed,
                     metric_name,
                     float(metric_value),
-                    MetricUnit.SCORE,
+                    metric_unit,
                     MetricDirection.DESCRIPTIVE,
                     assembly.input_artifact_ids,
                     request.overwrite_policy,
@@ -1049,13 +1485,31 @@ def execute_multi_source_selection_validation(
         target_materialized = materialized(target)
         if target_materialized is None:
             continue
-        candidate_sources = tuple(client for client in all_clients if client != target)
+        candidate_sources = tuple(
+            client
+            for client, specification in all_clients.items()
+            if client != target and specification.role is ClientRole.PRIMARY
+        )
         for seed in confirmatory_seeds:
             assemblies_by_source: OrderedDict[DatasetId, PrincipalActionAssembly] = OrderedDict()
             proposals: list[SourceProposal] = []
             for source in candidate_sources:
                 source_materialized = materialized(source)
                 if source_materialized is None:
+                    continue
+                pair_direction = directed_pair_name(source, target)
+                if not _assess_or_persist_cross_pair_ineligibility(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,),
+                ):
                     continue
                 assembly = assemble_principal_action(
                     store,
@@ -1102,6 +1556,11 @@ def execute_multi_source_selection_validation(
                 contrast_coordinates = ContrastCoordinates(
                     f"multi-source-selection:{source.value}-to-{target.value}:{seed}"
                 )
+                optimizer_step_ledger = TargetOptimizerStepLedger(
+                    TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                    directed_pair_name(source, target),
+                    seed,
+                )
                 verdict = run_proposal_confirmation(
                     ConfirmationRequest(
                         assembly.model,
@@ -1116,7 +1575,8 @@ def execute_multi_source_selection_validation(
                         assembly.checkpoint.selected_hyperparameters,
                         seed,
                         contrast_coordinates,
-                    )
+                    ),
+                    optimizer_step_ledger,
                 )
                 if verdict.accepted:
                     apply_accepted_assimilation(
@@ -1130,13 +1590,14 @@ def execute_multi_source_selection_validation(
                         seed,
                         AssimilationCoordinates(
                             target_client=SourceClientName(target.value),
-                            directed_pair=DirectedPairName(f"{source.value} -> {target.value}"),
+                            directed_pair=directed_pair_name(source, target),
                             condition=PRINCIPAL_EVALUATION_CONDITION.name,
                             seed=seed,
                             clean_pretransfer_checkpoint_artifact_id=assembly.checkpoint_artifact_id,
                             source_packet_artifact_id=assembly.first_packet_artifact_id,
                             action_artifact_sha256=action_sha256(assembly.action),
                         ),
+                        optimizer_step_ledger,
                     )
                 else:
                     settle_rejected_proposal(assembly.model, optimizer, pre_confirm.baseline)
@@ -1214,8 +1675,22 @@ def execute_semantic_sufficiency_frontier(
             target_materialized = materialized(target)
             if source_materialized is None or target_materialized is None:
                 continue
-            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+            pair_direction = directed_pair_name(source, target)
             for seed in confirmatory_seeds:
+                if not _assess_or_persist_cross_pair_ineligibility(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    tuple(method for method, _solve_action in scorers),
+                    condition,
+                ):
+                    continue
                 for method, solve_action in scorers:
                     certified_value_sink: MutableCell[Score] = MutableCell()
                     action_sink: MutableCell[CurriculumAction] = MutableCell()
@@ -1294,8 +1769,10 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
 
     conditions: list[
         tuple[EvaluationConditionName, WeakSignalPerturbation | None, SupportCount | None]
-    ] = []
+    ] = [(PRINCIPAL_EVALUATION_CONDITION.name, None, None)]
     for scale in config.response_scales:
+        if scale == config.baseline_response_scale:
+            continue
         conditions.append(
             (
                 EvaluationConditionName(f"{WeakSignalBoundaryDimension.RESPONSE_SCALE}-{scale}"),
@@ -1304,6 +1781,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             )
         )
     for multiplier in config.ci_half_width_multipliers:
+        if multiplier == config.baseline_ci_half_width_multiplier:
+            continue
         conditions.append(
             (
                 EvaluationConditionName(
@@ -1314,6 +1793,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             )
         )
     for multiplier in config.response_heterogeneity_multipliers:
+        if multiplier == config.baseline_response_heterogeneity_multiplier:
+            continue
         conditions.append(
             (
                 EvaluationConditionName(
@@ -1324,6 +1805,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             )
         )
     for support in config.support_budgets:
+        if support == config.baseline_support_budget:
+            continue
         conditions.append(
             (
                 EvaluationConditionName(f"{WeakSignalBoundaryDimension.SUPPORT_BUDGET}-{support}"),
@@ -1331,6 +1814,12 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 support,
             )
         )
+    target_support_condition_count = sum(
+        fraction != config.baseline_target_usable_support_fraction
+        for fraction in config.target_usable_support_fractions
+    )
+    if len(conditions) + target_support_condition_count != config.distinct_condition_count():
+        raise ExecutionError("weak-signal condition grid does not match its registered contract")
 
     for directed_pair in primary_pairs:
         source = directed_pair.source
@@ -1358,6 +1847,22 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                     else solve_fedorbit_exact_sparse_action
                 )
                 condition = condition_name
+                cross_pair_eligible = _assess_or_persist_cross_pair_ineligibility(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    source_materialized,
+                    target_materialized,
+                    seed,
+                    (
+                        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                    ),
+                    condition,
+                )
                 for method, solve_action in (
                     (TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, exact_sparse_solve),
                     (
@@ -1365,6 +1870,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         solve_matched_resource_rectangular_action,
                     ),
                 ):
+                    if not cross_pair_eligible:
+                        continue
                     certified_value_sink: MutableCell[Score] = MutableCell()
                     action_sink: MutableCell[CurriculumAction] = MutableCell()
                     confirmation_verdict_sink: MutableCell[bool] = MutableCell()
@@ -1448,6 +1955,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                     )
 
     for fraction in config.target_usable_support_fractions:
+        if fraction == config.baseline_target_usable_support_fraction:
+            continue
         condition = EvaluationConditionName(
             f"{WeakSignalBoundaryDimension.TARGET_USABLE_SUPPORT_FRACTION}-{fraction}"
         )
@@ -1458,7 +1967,7 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
             target_materialized = materialized(target)
             if source_materialized is None or target_materialized is None:
                 continue
-            pair_direction = DirectedPairName(f"{source.value} -> {target.value}")
+            pair_direction = directed_pair_name(source, target)
             subsample_seed: RandomSeed = derive_seed32(
                 SeedDerivationRequest(
                     confirmatory_seeds[0],
@@ -1488,6 +1997,22 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                 local_only = score_local_only_cell(
                     store, layout, target, subsampled_target, seed, device, request.experiment
                 )
+                cross_pair_eligible = _assess_or_persist_cross_pair_ineligibility(
+                    store,
+                    layout,
+                    request,
+                    pair_direction,
+                    source,
+                    target,
+                    source_materialized,
+                    subsampled_target,
+                    seed,
+                    (
+                        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                        TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                    ),
+                    condition,
+                )
                 for method, solve_action in (
                     (
                         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
@@ -1498,6 +2023,8 @@ def execute_weak_signal_support_and_heterogeneity_boundaries(
                         solve_matched_resource_rectangular_action,
                     ),
                 ):
+                    if not cross_pair_eligible:
+                        continue
                     certified_value_sink: MutableCell[Score] = MutableCell()
                     action_sink: MutableCell[CurriculumAction] = MutableCell()
                     confirmation_verdict_sink: MutableCell[bool] = MutableCell()

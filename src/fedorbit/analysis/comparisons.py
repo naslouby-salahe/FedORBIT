@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from enum import StrEnum
 
 from fedorbit.types import (
     ArtifactIdentifier,
@@ -27,6 +28,28 @@ type IndexedPairedObservations = tuple[tuple[PairSeedIdentity, PairedObservation
 
 class PairingError(ValueError):
     pass
+
+
+class PairingField(StrEnum):
+    RAW_DATASET_LINEAGE = "raw dataset lineage"
+    DIRECTED_PAIR = "directed pair"
+    SEED = "seed"
+    SPLIT = "split"
+    TARGET_PRE_TRANSFER_CHECKPOINT = "target pre-transfer checkpoint"
+    TARGET_IMPORTANCE = "target importance"
+    SOURCE_PACKET = "source packet"
+    ACTION_BUDGET = "action budget"
+    SUPPORT_BUDGET = "support budget"
+    CONFIRMATION_BUDGET = "confirmation budget"
+    ENVIRONMENT_LINEAGE = "environment lineage"
+
+
+class PairingMismatchError(PairingError):
+    field: PairingField
+
+    def __init__(self, field: PairingField) -> None:
+        self.field = field
+        super().__init__(f"paired comparison cells disagree on {field.value}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +92,35 @@ class PairedObservation:
     def __post_init__(self) -> None:
         if not math.isfinite(self.value):
             raise PairingError("paired observation value must be finite")
+
+
+def require_matching_lineage(first: PairedObservation, second: PairedObservation) -> None:
+    left = first.lineage
+    right = second.lineage
+    if left.raw_dataset_lineage_sha256 != right.raw_dataset_lineage_sha256:
+        raise PairingMismatchError(PairingField.RAW_DATASET_LINEAGE)
+    if left.directed_pair != right.directed_pair:
+        raise PairingMismatchError(PairingField.DIRECTED_PAIR)
+    if left.seed != right.seed:
+        raise PairingMismatchError(PairingField.SEED)
+    if left.split != right.split:
+        raise PairingMismatchError(PairingField.SPLIT)
+    if left.target_pre_transfer_checkpoint_artifact_id != (
+        right.target_pre_transfer_checkpoint_artifact_id
+    ):
+        raise PairingMismatchError(PairingField.TARGET_PRE_TRANSFER_CHECKPOINT)
+    if left.target_importance_artifact_id != right.target_importance_artifact_id:
+        raise PairingMismatchError(PairingField.TARGET_IMPORTANCE)
+    if left.source_packet_artifact_id != right.source_packet_artifact_id:
+        raise PairingMismatchError(PairingField.SOURCE_PACKET)
+    if left.action_budget != right.action_budget:
+        raise PairingMismatchError(PairingField.ACTION_BUDGET)
+    if left.support_budget != right.support_budget:
+        raise PairingMismatchError(PairingField.SUPPORT_BUDGET)
+    if left.confirmation_budget != right.confirmation_budget:
+        raise PairingMismatchError(PairingField.CONFIRMATION_BUDGET)
+    if left.environment_lineage_sha256 != right.environment_lineage_sha256:
+        raise PairingMismatchError(PairingField.ENVIRONMENT_LINEAGE)
 
 
 @dataclass(frozen=True, slots=True)

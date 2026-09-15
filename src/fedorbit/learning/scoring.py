@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import torch
@@ -9,12 +8,14 @@ from torch import nn
 from fedorbit.analysis.metrics import (
     ClassEntropySet,
     CrossEntropy,
+    InvalidEvaluationDataError,
     Probability,
     TrueClassProbabilities,
+    class_conditional_cross_entropy,
+    example_cross_entropy,
     macro_cross_entropy,
 )
-from fedorbit.config.loading import active_config
-from fedorbit.types import ConceptCount, Index
+from fedorbit.types import ClassIndex, ConceptCount, Index
 
 
 class ScoringError(ValueError):
@@ -81,33 +82,39 @@ def score_model(request: ScoringRequest) -> ScoreArtifact:
     target_values = targets.to(dtype=torch.long).cpu()
     if probabilities.shape != (features.shape[0], n_classes):
         raise ScoringError("model output dimension differs from registered local class count")
-    selected = probabilities.gather(1, target_values.unsqueeze(1)).squeeze(1)
-    log_floor = active_config().scientific.metrics.probability_log_floor
-    losses = -torch.log(torch.clamp(selected, min=log_floor))
     predictions = probabilities.argmax(dim=1)
-    class_risks: list[CrossEntropy] = []
+    row_probabilities = tuple(
+        TrueClassProbabilities(tuple(Probability(float(value)) for value in probabilities[index]))
+        for index in range(features.shape[0])
+    )
+    true_class_probabilities = tuple(
+        Probability(float(value))
+        for value in probabilities.gather(1, target_values.unsqueeze(1)).squeeze(1)
+    )
+    membership = tuple(int(value) for value in target_values)
+    class_entropies: list[CrossEntropy] = []
     for class_index in range(n_classes):
-        mask = target_values == class_index
-        class_risks.append(
-            CrossEntropy(float(losses[mask].mean())) if bool(mask.any()) else CrossEntropy(math.nan)
+        members = tuple(
+            probability
+            for probability, target_class in zip(true_class_probabilities, membership, strict=True)
+            if target_class == class_index
         )
-    present_risks = tuple(value for value in class_risks if math.isfinite(value.value))
-    if not present_risks:
-        raise ScoringError("no evaluation classes are present")
+        if not members:
+            raise InvalidEvaluationDataError(ClassIndex(class_index))
+        class_entropies.append(class_conditional_cross_entropy(TrueClassProbabilities(members)))
+    entropy_set = ClassEntropySet(tuple(class_entropies))
     rows = tuple(
         ScoreRow(
             row_index=ScoreRowIndex(index),
             target=LocalClassIndex(int(target_values[index])),
             predicted_class=LocalClassIndex(int(predictions[index])),
-            probabilities=TrueClassProbabilities(
-                tuple(Probability(float(value)) for value in probabilities[index])
-            ),
-            cross_entropy=CrossEntropy(float(losses[index])),
+            probabilities=row_probabilities[index],
+            cross_entropy=example_cross_entropy(true_class_probabilities[index]),
         )
         for index in range(features.shape[0])
     )
     return ScoreArtifact(
         rows=rows,
-        class_conditional_cross_entropy=ClassEntropySet(tuple(class_risks)),
-        macro_cross_entropy=macro_cross_entropy(ClassEntropySet(tuple(present_risks))),
+        class_conditional_cross_entropy=entropy_set,
+        macro_cross_entropy=macro_cross_entropy(entropy_set),
     )

@@ -4,6 +4,7 @@ import statistics
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 
 from fedorbit.analysis.metrics import (
@@ -151,17 +152,8 @@ def _linear_quantile(
 ) -> RelativeGain:
     if not 0.0 <= probability <= 1.0:
         raise ConfirmationError(f"quantile probability outside [0,1]: {probability}")
-    count = len(sorted_values)
-    if count == 1:
-        return sorted_values[0]
-    position = probability * (count - 1)
-    lower_index = int(position // 1)
-    upper_index = min(lower_index + 1, count - 1)
-    fraction = position - lower_index
-    interpolated: RelativeGain = sorted_values[lower_index] + fraction * (
-        sorted_values[upper_index] - sorted_values[lower_index]
-    )
-    return interpolated
+    quantile_value: RelativeGain = float(np.quantile(sorted_values, probability, method="linear"))
+    return quantile_value
 
 
 def confirmation_decision(

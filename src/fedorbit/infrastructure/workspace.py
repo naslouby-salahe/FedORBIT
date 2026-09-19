@@ -26,7 +26,6 @@ from fedorbit.types import (
     ClientComponentName,
     DatasetId,
     DatasetRelativePath,
-    DatasetReleaseIdentity,
     ExperimentName,
     FilesystemSlug,
     RawDatasetDirectory,
@@ -170,7 +169,6 @@ class RawInventoryError(ValueError):
 class RawInventoryRequest:
     dataset: DatasetId
     raw_root: Path
-    release_identity: DatasetReleaseIdentity | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,25 +184,10 @@ class RawDatasetInventory:
     dataset: DatasetId
     files: tuple[RawFileInventory, ...]
     component: ClientComponentName | None = None
-    release_identity: DatasetReleaseIdentity | None = None
 
     def __post_init__(self) -> None:
         if not self.files:
             raise RawInventoryError("raw dataset inventory requires at least one file")
-
-    def release_payload(self) -> StableJsonPayload:
-        identity = self.release_identity
-        if identity is None:
-            return cast(StableJsonPayload, None)
-        return cast(
-            StableJsonPayload,
-            OrderedDict[str, StableJsonPayload](
-                release=identity.release,
-                acquisition_source=identity.acquisition_source,
-                acquisition_timestamp=identity.acquisition_timestamp,
-                license_note=identity.license_note,
-            ),
-        )
 
     def fingerprint(self) -> Sha256Digest:
         return Sha256Digest(
@@ -230,7 +213,6 @@ class RawDatasetInventory:
             OrderedDict[str, StableJsonPayload](
                 dataset=self.dataset.value,
                 component=self.component,
-                release_identity=self.release_payload(),
                 files=file_entries,
             ),
         )
@@ -381,7 +363,6 @@ def inspect_raw_inventory(request: RawInventoryRequest) -> RawDatasetInventory:
             if request.dataset == DatasetId.EDGE_IIOTSET_NETWORK
             else ClientComponentName(component_for(request.dataset).component_name)
         ),
-        release_identity=request.release_identity,
         files=tuple(
             RawFileInventory(
                 relative_path=entry.relative_path,

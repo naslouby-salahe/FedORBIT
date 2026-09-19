@@ -527,14 +527,20 @@ def _csv_bytes(columns: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> b
     return _tabular_frame(columns, rows).to_csv(index=False, lineterminator="\n").encode("utf-8")
 
 
+def _exported_table_cell(cell: TableScalar) -> str:
+    if cell is None:
+        return UNAVAILABLE_CELL_TEXT
+    if isinstance(cell, str):
+        return cell
+    if isinstance(cell, bool):
+        return "true" if cell else "false"
+    if isinstance(cell, int):
+        return format_integer(float(cell))
+    return format_scientific_metric(float(cell))
+
+
 def _table_csv_bytes(table: EvidenceTable) -> bytes:
-    rendered = tuple(
-        tuple(
-            UNAVAILABLE_CELL_TEXT if cell is None else cell if isinstance(cell, str) else str(cell)
-            for cell in row
-        )
-        for row in table.rows
-    )
+    rendered = tuple(tuple(_exported_table_cell(cell) for cell in row) for row in table.rows)
     return _csv_bytes(table.columns, rendered)
 
 

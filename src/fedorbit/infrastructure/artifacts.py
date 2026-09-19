@@ -522,7 +522,7 @@ class ArtifactStore:
         payload = serialized_payload_bytes(request.serialized)
         payload_digest = payload_sha256(payload)
         payload_path = request.payload_path.value
-        if payload_path.is_file():
+        if payload_path.is_file() and overwrite_policy is not OverwritePolicy.REPLACE:
             verify_payload_bytes(payload_digest, payload_path.read_bytes())
         manifest = ReusableArtifactManifest.model_validate(
             OrderedDict(
@@ -565,11 +565,33 @@ class ArtifactStore:
             payload,
             self.staging_area(manifest.artifact_id),
         )
-        return self.promote_artifact(
+        superseded = self._completed_manifests_at_coordinates(
+            request.artifact_type, request.stage, request.semantic_coordinates
+        )
+        promoted = self.promote_artifact(
             manifest,
             completion,
             staged_payloads=(StagedPayload(staged, payload_path),),
             access=request.access,
+        )
+        for prior in superseded:
+            if prior.artifact_id != promoted.artifact_id:
+                self.retire_superseded_parent(prior.artifact_id, promoted.artifact_id)
+        return promoted
+
+    def _completed_manifests_at_coordinates(
+        self,
+        artifact_type: ArtifactType,
+        stage: ArtifactStage,
+        semantic_coordinates: SemanticCoordinateText,
+    ) -> tuple[ReusableArtifactManifest, ...]:
+        return tuple(
+            manifest
+            for manifest in self.all_manifests()
+            if manifest.artifact_type == artifact_type
+            and manifest.producer_stage == stage
+            and manifest.semantic_producer_coordinates == semantic_coordinates
+            and self.artifact_state(manifest.artifact_id).state is ArtifactState.COMPLETED
         )
 
     def unconsumed_artifacts(self) -> tuple[ArtifactIdentifier, ...]:

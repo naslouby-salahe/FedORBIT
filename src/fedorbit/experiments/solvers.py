@@ -23,11 +23,11 @@ from fedorbit.datasets.common import (
 from fedorbit.datasets.materialization import (
     MaterializationError,
 )
+from fedorbit.experiments.assembly import assemble_principal_action
 from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
+from fedorbit.experiments.metric_persistence import build_completion_manifest
 from fedorbit.experiments.scoring import (
-    assemble_principal_action,
-    build_completion_manifest,
     solve_fedorbit_exact_sparse_action,
 )
 from fedorbit.experiments.synthetic import (
@@ -79,12 +79,12 @@ from fedorbit.infrastructure.workspace import (
 )
 from fedorbit.methods.baselines import (
     coupling_destroyed_matrices,
+    coupling_upper_bound_diagnostic,
     optimize_against_fixed_matrix,
 )
 from fedorbit.optimization.certificates import (
     RectangularHull,
     build_rectangular_hull,
-    rectangular_value_over_candidates,
     robust_coupling_gap,
     verify_exactness_certificate,
 )
@@ -165,6 +165,7 @@ from fedorbit.types import (
 _THEOREM_VALIDATION_CONFIGURATION_SECTIONS = frozenset(
     {ConfigurationSection.ACTION, ConfigurationSection.GENERATORS, ConfigurationSection.SOLVERS}
 )
+_SYNTHETIC_GENERATOR_INPUT_IDS: ArtifactIdentifiers = (ArtifactIdentifier("synthetic-generator"),)
 
 
 def persist_synthetic_benchmark_metric(
@@ -640,6 +641,21 @@ def score_synthetic_solver_benchmark_cell(
             seed,
             MetricId.TIMEOUT_INDICATOR,
             1.0 if qap_result.terminal_state == TerminalState.TIME_LIMIT else 0.0,
+            MetricUnit.BOOLEAN,
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            overwrite_policy,
+        )
+        persist_synthetic_benchmark_metric(
+            store,
+            layout,
+            experiment,
+            condition,
+            support,
+            TransferMethod.GENERIC_EXACT_QAP,
+            seed,
+            MetricId.RESOURCE_LIMIT_INDICATOR,
+            1.0 if qap_result.terminal_state == TerminalState.RESOURCE_LIMIT else 0.0,
             MetricUnit.BOOLEAN,
             MetricDirection.DESCRIPTIVE,
             input_artifact_ids,
@@ -1134,6 +1150,8 @@ def _persist_work_structure_summary(
         ImplementationIdentity.SOLVERS_V1,
         ArtifactName("work-structure-trend"),
         EvaluationCondition(EvaluationConditionKind.WORK_STRUCTURE).name,
+        upstream_artifact_ids=tuple(dict.fromkeys(input_artifact_ids)),
+        declare_no_upstream_inputs=not input_artifact_ids,
     )
 
 
@@ -1522,7 +1540,7 @@ def persist_coupling_mechanism_metrics(
         ),
         (
             MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC,
-            rectangular_value_over_candidates(candidates, problem, hull),
+            coupling_upper_bound_diagnostic(problem, hull),
         ),
         (
             MetricId.COUPLING_ACTION_SET_SUPPORT,
@@ -1562,12 +1580,15 @@ def persist_exact_orbit_coupling_cell(
     orbit: tuple[BlockCorrespondence, ...],
     alpha: CurriculumAction,
     hull: RectangularHull,
+    input_artifact_ids: ArtifactIdentifiers = _SYNTHETIC_GENERATOR_INPUT_IDS,
+    declare_no_upstream_inputs: bool = True,
 ) -> None:
     from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 
     exact_action = solve_robust_action(problem).selected_action
     rectangular_action = optimize_against_fixed_matrix(problem, hull.lower_bounds).selected_action
     candidates = (exact_action, rectangular_action, zero_action(problem))
+    recorded_inputs = [identifier.value for identifier in input_artifact_ids]
     persist_synthetic_experiment_payload(
         store,
         layout,
@@ -1598,7 +1619,7 @@ def persist_exact_orbit_coupling_cell(
                         ),
                         (
                             MetricId.COUPLING_UPPER_BOUND_DIAGNOSTIC.value,
-                            float(rectangular_value_over_candidates(candidates, problem, hull)),
+                            float(coupling_upper_bound_diagnostic(problem, hull)),
                         ),
                         (
                             MetricId.COUPLING_ACTION_SET_SUPPORT.value,
@@ -1606,7 +1627,7 @@ def persist_exact_orbit_coupling_cell(
                         ),
                     )
                 ),
-                input_artifact_ids=[ArtifactIdentifier("synthetic-generator").value],
+                input_artifact_ids=recorded_inputs,
             ),
         ),
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
@@ -1614,6 +1635,8 @@ def persist_exact_orbit_coupling_cell(
         ArtifactName(f"exact-orbit.{condition}.support-{support}.{seed}"),
         condition,
         SupportSize(support),
+        declare_no_upstream_inputs=declare_no_upstream_inputs,
+        upstream_artifact_ids=() if declare_no_upstream_inputs else input_artifact_ids,
     )
 
 

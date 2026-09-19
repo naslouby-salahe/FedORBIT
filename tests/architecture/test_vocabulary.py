@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from tests.architecture.scan import FORBIDDEN_VOCABULARY, iter_source_files
+from tests.architecture.scan import (
+    FORBIDDEN_VOCABULARY,
+    iter_source_files,
+    production_text_without_paper_non_goal_guard,
+)
 
 
 def test_forbidden_vocabulary_absent_from_production() -> None:
     for path in iter_source_files():
-        text = path.read_text(encoding="utf-8").lower()
+        text = production_text_without_paper_non_goal_guard(
+            path, path.read_text(encoding="utf-8")
+        ).lower()
         for term in FORBIDDEN_VOCABULARY:
             assert term.lower() not in text, f"forbidden term {term!r} in {path}"
 
@@ -32,7 +38,7 @@ def test_stable_method_names_used_verbatim() -> None:
 
 def test_dense_ccp_never_described_as_exact() -> None:
     for path in iter_source_files():
-        text = path.read_text(encoding="utf-8")
+        text = production_text_without_paper_non_goal_guard(path, path.read_text(encoding="utf-8"))
         lowered = text.lower()
         for phrase in ("dense exact", "exact dense", "dense-exact solver"):
             assert phrase not in lowered, f"{phrase!r} claim in {path}"

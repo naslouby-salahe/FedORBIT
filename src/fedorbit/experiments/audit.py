@@ -19,15 +19,15 @@ from fedorbit.datasets.materialization import (
     MaterializationError,
     MaterializedClient,
 )
-from fedorbit.experiments.catalogue import ExperimentExecutionRequest
-from fedorbit.experiments.scoring import (
+from fedorbit.experiments.assembly import (
     assemble_cross_client_response_matrix,
     assemble_target_response_matrix,
     common_eligible_groups,
     cross_client_padded_blocks,
     load_dataset_source_packet,
-    persist_primary_transfer_metric,
 )
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest
+from fedorbit.experiments.metric_persistence import persist_primary_transfer_metric
 from fedorbit.experiments.solvers import (
     registered_transfer_method,
 )
@@ -73,6 +73,7 @@ from fedorbit.response.packet import (
     SourcePacket,
 )
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactDirectorySegment,
     ArtifactIdentifier,
     CoarseGroup,
@@ -301,6 +302,7 @@ def execute_map_availability_applicability_audit(
                     MetricDirection.HIGHER_IS_BETTER,
                     attempt.input_artifact_ids,
                     request.overwrite_policy,
+                    PRINCIPAL_EVALUATION_CONDITION.name,
                     valid=unavailability is None,
                     invalid_reason=(
                         None if unavailability is None else InvalidReason(unavailability.value)

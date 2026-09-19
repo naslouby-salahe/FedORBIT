@@ -38,6 +38,7 @@ from fedorbit.response.estimation import (
 )
 from fedorbit.response.packet import (
     PacketConstructionContext,
+    PacketError,
     PacketField,
     SourcePacket,
     anonymized_response_estimate,
@@ -48,7 +49,10 @@ from fedorbit.response.pilot import ResponseCandidate
 from fedorbit.response.uncertainty import (
     FinalResponseEntry,
     FinalResponseEstimate,
+    build_final_response_entries,
+    final_response_stability,
     max_t_critical_value,
+    response_entry_is_useful,
 )
 from fedorbit.types import (
     AnonymousNodeDisplayId,
@@ -58,6 +62,7 @@ from fedorbit.types import (
     DatasetId,
     ExposedCoarseGroupId,
     Rfc3339UtcTimestamp,
+    SerializedPacket,
     Sha256Digest,
     StableJsonPayload,
 )
@@ -111,6 +116,20 @@ def test_timestamp_does_not_change_scientific_integrity() -> None:
     second = _packet(Rfc3339UtcTimestamp("2026-08-23T00:00:00Z"))
     assert first.packet_integrity_sha256 == second.packet_integrity_sha256
     assert first.payload_sha256() != second.payload_sha256()
+
+
+def test_from_serialized_rejects_noncanonical_payload_bytes() -> None:
+    import json
+
+    packet = _packet()
+    canonical = packet.serialized()
+    restored = SourcePacket.from_serialized(canonical)
+    assert restored.payload_sha256() == packet.payload_sha256()
+    document = json.loads(canonical)
+    rewritten = json.dumps({key: document[key] for key in reversed(tuple(document))})
+    assert rewritten != canonical
+    with pytest.raises(PacketError, match="payload SHA-256"):
+        SourcePacket.from_serialized(SerializedPacket(rewritten))
 
 
 def test_packet_rejects_semantic_or_nonstable_node_ids() -> None:
@@ -395,3 +414,39 @@ def test_constructed_packet_payload_is_entirely_in_the_registered_anonymous_orde
     for name in semantic_node_names:
         assert name not in serialized
     assert packet.registered_node_order(102).permutation != order.permutation
+
+
+def test_useful_entry_requires_magnitude_and_interval_excluding_zero() -> None:
+    from fedorbit.config.loading import active_config
+
+    threshold = active_config().scientific.source_response_final.useful_response_magnitude_threshold
+    assert response_entry_is_useful(0.02, 0.01, 0.03, threshold)
+    assert not response_entry_is_useful(threshold / 2, -0.001, 0.002, threshold)
+    assert not response_entry_is_useful(0.02, -0.01, 0.03, threshold)
+
+
+def test_final_response_stability_requires_two_useful_columns_and_ratio_bound() -> None:
+    from fedorbit.config.loading import active_config
+
+    final = active_config().scientific.source_response_final
+    built = build_final_response_entries(
+        1,
+        2,
+        (0.2, 0.2),
+        (0.01, 0.01),
+        1.0,
+    )
+    assert built.useful_intervention_columns == frozenset({0, 1})
+    ratio, passed = final_response_stability(built.entries, 2)
+    assert passed
+    assert ratio <= final.median_band_width_to_median_absolute_mean_response_maximum
+    one_column = build_final_response_entries(1, 1, (0.2,), (0.01,), 1.0)
+    _, one_column_passed = final_response_stability(one_column.entries, 1)
+    assert not one_column_passed
+    wide_entries = (
+        FinalResponseEntry(0, 0, 0.01, 0.1, -0.2, 0.22, True),
+        FinalResponseEntry(0, 1, 0.01, 0.1, -0.2, 0.22, True),
+    )
+    wide_ratio, wide_passed = final_response_stability(wide_entries, 2)
+    assert wide_ratio > final.median_band_width_to_median_absolute_mean_response_maximum
+    assert not wide_passed

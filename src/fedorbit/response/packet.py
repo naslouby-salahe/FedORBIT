@@ -248,6 +248,9 @@ class SourcePacket:
             technical_creation_timestamp=document.technical_creation_timestamp,
         )
         packet.validate()
+        observed_payload_sha256 = Sha256Digest(hashlib.sha256(payload.encode("utf-8")).hexdigest())
+        if observed_payload_sha256 != packet.payload_sha256():
+            raise PacketError("packet file payload SHA-256 mismatch")
         return packet
 
     def compute_integrity_sha256(self) -> Sha256Digest:

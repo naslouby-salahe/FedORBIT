@@ -10,6 +10,12 @@ from typing import cast
 
 from pydantic import JsonValue
 
+from fedorbit.analysis.comparisons import (
+    PairedObservation,
+    PairingError,
+    PairingLineage,
+    require_matching_lineage,
+)
 from fedorbit.analysis.metrics import (
     CrossEntropy,
     harm_indicator,
@@ -38,18 +44,15 @@ from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import (
     file_sha256,
 )
-from fedorbit.datasets.materialization import (
-    MaterializedClient,
-)
-from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY, transfer_concept_for, transfer_eligibility
 from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.scoring import build_completion_manifest, latest_completed_manifest
+from fedorbit.experiments.metric_persistence import (
+    build_completion_manifest,
+)
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
 )
 from fedorbit.infrastructure.environment import environment_snapshot
-from fedorbit.infrastructure.evidence import TableScalar
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,
@@ -94,25 +97,21 @@ from fedorbit.types import (
     ExperimentLocalMethod,
     ExperimentName,
     ExperimentSeed,
-    FineLabel,
     ImplementationIdentity,
     Index,
     MethodName,
     MetricId,
     MultiplicityFamily,
-    OracleTransferConcept,
     OverwritePolicy,
     Probability,
     PValueName,
     RelativeGain,
-    ReportColumnName,
     ResampleCount,
     SampleCount,
     SemanticCell,
     SemanticCoordinateText,
     Sha256Digest,
     SignificanceLevel,
-    Split,
     StableJsonPayload,
     StatisticalTestName,
     StorageLayoutSegment,
@@ -123,71 +122,6 @@ from fedorbit.types import (
     parse_directed_pair_name,
 )
 
-
-def _concept_split_support(
-    client: MaterializedClient, concept: OracleTransferConcept, split: Split
-) -> Index:
-    total: Index = sum(
-        client.class_row_counts[label][split]
-        for label in client.class_manifest.class_names
-        if transfer_concept_for(client.dataset, FineLabel(label)) == concept
-    )
-    return total
-
-
-def transfer_ontology_null_padding_rows(
-    pair: DirectedPairName,
-    source_client: MaterializedClient,
-    target_client: MaterializedClient,
-) -> tuple[StableJsonPayload, ...]:
-    rows: list[StableJsonPayload] = []
-    for concept in OracleTransferConcept:
-        coarse_group, _, _ = TRANSFER_ONTOLOGY[concept]
-        source_train = _concept_split_support(source_client, concept, Split.TRAIN)
-        source_meta = _concept_split_support(source_client, concept, Split.META)
-        target_meta = _concept_split_support(target_client, concept, Split.META)
-        target_confirm = _concept_split_support(target_client, concept, Split.CONFIRM)
-        target_test = _concept_split_support(target_client, concept, Split.TEST)
-        source_real = (source_train + source_meta) > 0
-        target_real = (target_meta + target_confirm + target_test) > 0
-        eligibility = transfer_eligibility(
-            source_train, source_meta, target_meta, target_confirm, target_test
-        )
-        action_eligible = eligibility.source_eligible and eligibility.target_eligible
-        null_reason: str | None = None
-        if not source_real:
-            null_reason = f"{concept.value} absent from source dataset"
-        elif not target_real:
-            null_reason = f"{concept.value} absent from target dataset"
-        elif not action_eligible:
-            null_reason = f"{concept.value} present but below configured support minimum"
-        rows.append(
-            cast(
-                StableJsonPayload,
-                OrderedDict(
-                    candidate_concept=concept.value,
-                    pair=pair,
-                    coarse_group=coarse_group.value,
-                    source_real=source_real,
-                    target_real=target_real,
-                    support_counts=cast(
-                        StableJsonPayload,
-                        OrderedDict(
-                            source_train=source_train,
-                            source_meta=source_meta,
-                            target_meta=target_meta,
-                            target_confirm=target_confirm,
-                            target_test=target_test,
-                        ),
-                    ),
-                    action_eligibility=action_eligible,
-                    null_reason=null_reason,
-                ),
-            )
-        )
-    return tuple(rows)
-
-
 _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.METRICS})
 
 
@@ -195,12 +129,12 @@ _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS = frozenset({ConfigurationSection.
 class _SeedMetric:
     value: Estimate
     artifact_id: ArtifactIdentifier
+    lineage: PairingLineage | None = None
 
 
-def _iter_completed_json_payloads(
+def _iter_completed_json_documents(
     store: ArtifactStore,
     experiment: ExperimentName,
-    payload_key: str,
 ) -> Iterator[tuple[ReusableArtifactManifest, Mapping[str, StableJsonPayload]]]:
     experiment_value = experiment.value
     for manifest in store.all_manifests():
@@ -217,9 +151,19 @@ def _iter_completed_json_payloads(
             if not path.is_file():
                 continue
             payload = json.loads(path.read_text(encoding="utf-8"))
-            record_payload = payload.get(payload_key)
-            if record_payload is not None:
-                yield resolved, record_payload
+            if isinstance(payload, dict):
+                yield resolved, cast(Mapping[str, StableJsonPayload], payload)
+
+
+def _iter_completed_json_payloads(
+    store: ArtifactStore,
+    experiment: ExperimentName,
+    payload_key: str,
+) -> Iterator[tuple[ReusableArtifactManifest, Mapping[str, StableJsonPayload]]]:
+    for resolved, payload in _iter_completed_json_documents(store, experiment):
+        record_payload = payload.get(payload_key)
+        if record_payload is not None:
+            yield resolved, cast(Mapping[str, StableJsonPayload], record_payload)
 
 
 def completed_experiment_metric_records(
@@ -254,81 +198,6 @@ def completed_experiment_metric_records_with_support(
     return tuple(results)
 
 
-def transfer_ontology_and_null_padding_rows(
-    store: ArtifactStore,
-) -> tuple[
-    Mapping[ReportColumnName, TableScalar],
-    ...,
-]:
-    manifest = latest_completed_manifest(
-        store, ExperimentName.DATASET_CLIENT_AND_STRICT_RESOURCE_VALIDATION
-    )
-    if manifest is None or len(manifest.payload_paths) != 1:
-        return ()
-    payload_path = Path(manifest.payload_paths[0])
-    if not payload_path.is_file():
-        return ()
-    payload = cast(Mapping[str, JsonValue], json.loads(payload_path.read_text(encoding="utf-8")))
-    rows: list[Mapping[ReportColumnName, TableScalar]] = []
-    for pair_entry in cast(list[Mapping[str, JsonValue]], payload.get("primary_pairs", [])):
-        for ontology_row in cast(
-            list[Mapping[str, JsonValue]],
-            pair_entry.get("transfer_ontology", []),
-        ):
-            support = cast(
-                Mapping[str, JsonValue],
-                ontology_row.get(
-                    "support_counts",
-                    OrderedDict[str, JsonValue](),
-                ),
-            )
-            rows.append(
-                OrderedDict(
-                    (
-                        (
-                            ReportColumnName.CANDIDATE_CONCEPT,
-                            cast(str | None, ontology_row.get("candidate_concept")),
-                        ),
-                        (
-                            ReportColumnName.PAIR,
-                            cast(str | None, ontology_row.get("pair")),
-                        ),
-                        (
-                            ReportColumnName.COARSE_GROUP,
-                            cast(str | None, ontology_row.get("coarse_group")),
-                        ),
-                        (
-                            ReportColumnName.SOURCE_REAL_OR_NULL,
-                            ("real" if ontology_row.get("source_real") else "null"),
-                        ),
-                        (
-                            ReportColumnName.TARGET_REAL_OR_NULL,
-                            ("real" if ontology_row.get("target_real") else "null"),
-                        ),
-                        (
-                            ReportColumnName.SUPPORT_COUNTS,
-                            (
-                                f"source_train={support.get('source_train')},"
-                                f"source_meta={support.get('source_meta')},"
-                                f"target_meta={support.get('target_meta')},"
-                                f"target_confirm={support.get('target_confirm')},"
-                                f"target_test={support.get('target_test')}"
-                            ),
-                        ),
-                        (
-                            ReportColumnName.ACTION_ELIGIBILITY,
-                            cast(bool | None, ontology_row.get("action_eligibility")),
-                        ),
-                        (
-                            ReportColumnName.NULL_REASON,
-                            cast(str | None, ontology_row.get("null_reason")),
-                        ),
-                    )
-                )
-            )
-    return tuple(rows)
-
-
 def completed_primary_transfer_metric_records(store: ArtifactStore) -> tuple[MetricRecord, ...]:
     return tuple(
         MetricRecord.model_validate(payload)
@@ -353,17 +222,26 @@ def completed_primary_transfer_comparison_records(
     )
 
 
+def _lineage_from_payload(payload: Mapping[str, StableJsonPayload]) -> PairingLineage | None:
+    recorded = payload.get("pairing_lineage")
+    if not isinstance(recorded, Mapping):
+        return None
+    return PairingLineage.from_payload(cast(Mapping[str, JsonValue], recorded))
+
+
 def _completed_primary_transfer_macro_ce(
     store: ArtifactStore,
 ) -> Mapping[tuple[DirectedPairName, TransferMethod, RandomSeed], _SeedMetric]:
     result: OrderedDict[tuple[DirectedPairName, TransferMethod, RandomSeed], _SeedMetric] = (
         OrderedDict()
     )
-    for resolved, record_payload in _iter_completed_json_payloads(
+    for resolved, payload in _iter_completed_json_documents(
         store,
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-        "metric_record",
     ):
+        record_payload = payload.get("metric_record")
+        if record_payload is None:
+            continue
         record = MetricRecord.model_validate(record_payload)
         if (
             record.metric_name != MetricId.MACRO_CROSS_ENTROPY
@@ -372,7 +250,9 @@ def _completed_primary_transfer_macro_ce(
         ):
             continue
         result[(record.pair, record.method, record.seed)] = _SeedMetric(
-            record.metric_value, resolved.artifact_id
+            record.metric_value,
+            resolved.artifact_id,
+            _lineage_from_payload(payload),
         )
     return result
 
@@ -488,13 +368,51 @@ def persist_primary_transfer_comparison(
 PRIMARY_TRANSFER_CONTRAST_METHOD = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
 
 
+def require_paired_seed_lineage(
+    reference: _SeedMetric,
+    counterpart: _SeedMetric,
+    reference_method: TransferMethod,
+    counterpart_method: TransferMethod,
+) -> None:
+    if reference.lineage is None or counterpart.lineage is None:
+        raise PairingError("paired comparison cells require pairing lineage before statistics")
+    require_matching_lineage(
+        PairedObservation(reference_method, reference.value, reference.lineage),
+        PairedObservation(counterpart_method, counterpart.value, counterpart.lineage),
+    )
+
+
+def _require_shared_seed_lineage(
+    reference_values: Mapping[RandomSeed, _SeedMetric],
+    counterpart_values: Mapping[RandomSeed, _SeedMetric],
+    shared_seeds: Sequence[RandomSeed],
+    reference_method: TransferMethod,
+    counterpart_method: TransferMethod,
+) -> None:
+    for seed in shared_seeds:
+        require_paired_seed_lineage(
+            reference_values[seed],
+            counterpart_values[seed],
+            reference_method,
+            counterpart_method,
+        )
+
+
 def _paired_relative_gains(
     reference_values: Mapping[RandomSeed, _SeedMetric],
     method_values: Mapping[RandomSeed, _SeedMetric],
     shared_seeds: Sequence[RandomSeed],
+    reference_method: TransferMethod = TransferMethod.LOCAL_ONLY,
+    counterpart_method: TransferMethod = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
 ) -> tuple[RelativeGain, ...]:
     gains: list[RelativeGain] = []
     for seed in shared_seeds:
+        require_paired_seed_lineage(
+            reference_values[seed],
+            method_values[seed],
+            reference_method,
+            counterpart_method,
+        )
         gain = relative_macro_ce_gain(
             CrossEntropy(reference_values[seed].value),
             CrossEntropy(method_values[seed].value),
@@ -506,6 +424,10 @@ def _paired_relative_gains(
 
 class StatisticsError(ValueError):
     pass
+
+
+SeedMetric = _SeedMetric
+completed_primary_transfer_macro_ce = _completed_primary_transfer_macro_ce
 
 
 _FAMILY_CONTRAST_MULTIPLICITY_PER_PAIR: Mapping[MultiplicityFamily, Index] = OrderedDict(
@@ -604,6 +526,7 @@ def persist_family_definition_lock(
         _STATISTICAL_SYNTHESIS_CONFIGURATION_SECTIONS,
         ImplementationIdentity.SYNTHESIS_V1,
         ArtifactName("family-definition-lock"),
+        declare_no_upstream_inputs=True,
     )
 
 
@@ -615,6 +538,25 @@ def enforce_observed_family_membership(store: ArtifactStore) -> None:
         family = MultiplicityFamily(str(payload.get("family")))
         observed[family] = observed.get(family, 0) + 1
     enforce_registered_family_membership(observed)
+
+
+def coupling_mechanism_decision(
+    mean_difference: RelativeGain,
+    bca_low: RelativeGain | None,
+    holm_p: SignificanceLevel | None,
+    holm_adjusted_p_maximum: SignificanceLevel,
+    material: RelativeGain,
+) -> ComparisonDecision:
+    if bca_low is None:
+        return ComparisonDecision.DEGENERATE
+    if (
+        holm_p is not None
+        and holm_p <= holm_adjusted_p_maximum
+        and bca_low > 0.0
+        and mean_difference >= material
+    ):
+        return ComparisonDecision.SUPERIOR
+    return ComparisonDecision.NOT_SUPPORTED
 
 
 def execute_statistical_synthesis(
@@ -655,6 +597,12 @@ def execute_statistical_synthesis(
             shared_seeds = sorted(set(local_only_seeds) & set(method_seeds))
             relative_gains: OrderedDict[RandomSeed, RelativeGain] = OrderedDict()
             for seed in shared_seeds:
+                require_paired_seed_lineage(
+                    local_only_seeds[seed],
+                    method_seeds[seed],
+                    TransferMethod.LOCAL_ONLY,
+                    method,
+                )
                 gain = relative_macro_ce_gain(
                     CrossEntropy(local_only_seeds[seed].value),
                     CrossEntropy(method_seeds[seed].value),
@@ -844,16 +792,13 @@ def execute_statistical_synthesis(
         else:
             raw_p = coupling_raw_p_by_pair[pair]
             holm_p = coupling_holm_adjusted.value_of(PValueName(pair))
-            if bca_low is None:
-                decision = ComparisonDecision.DEGENERATE
-            elif (
-                holm_p is not None
-                and holm_p <= coupling_criteria.holm_adjusted_p_maximum
-                and bca_low > 0.0
-            ):
-                decision = ComparisonDecision.SUPERIOR
-            else:
-                decision = ComparisonDecision.NOT_SUPPORTED
+            decision = coupling_mechanism_decision(
+                mean_difference,
+                bca_low,
+                holm_p,
+                coupling_criteria.holm_adjusted_p_maximum,
+                active_config().scientific.materiality.coupling_objective_units,
+            )
         if not input_ids:
             continue
         coupling_comparison_manifest = persist_coupling_mechanism_comparison(
@@ -934,6 +879,13 @@ def execute_statistical_synthesis(
             and candidate_method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         )
         shared_seeds = sorted(set(local_sir_seeds) & set(fedorbit_seeds))
+        _require_shared_seed_lineage(
+            local_sir_seeds,
+            fedorbit_seeds,
+            shared_seeds,
+            TransferMethod.LOCAL_SIR,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        )
         paired_seed_count: Index = len(shared_seeds)
         input_ids = tuple(
             identifier
@@ -1168,6 +1120,13 @@ def execute_statistical_synthesis(
             and candidate_method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
         )
         shared_seeds = sorted(set(commitment_seeds) & set(fedorbit_seeds))
+        _require_shared_seed_lineage(
+            commitment_seeds,
+            fedorbit_seeds,
+            shared_seeds,
+            TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        )
         paired_seed_count: Index = len(shared_seeds)
         input_ids = tuple(
             identifier
@@ -1414,6 +1373,13 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
             and condition == PRINCIPAL_EVALUATION_CONDITION.name
         )
         shared_seeds = sorted(set(full_seeds) & set(destroyed_seeds))
+        _require_shared_seed_lineage(
+            full_seeds,
+            destroyed_seeds,
+            shared_seeds,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            TransferMethod.COUPLING_DESTROYED_FEDORBIT,
+        )
         paired_seed_count: Index = len(shared_seeds)
         input_ids = tuple(
             identifier
@@ -1676,6 +1642,20 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
                 if candidate_pair == pair and condition == condition_b
             )
             shared_seeds = sorted(set(local_only_seeds) & set(seeds_a) & set(seeds_b))
+            _require_shared_seed_lineage(
+                local_only_seeds,
+                seeds_a,
+                shared_seeds,
+                TransferMethod.LOCAL_ONLY,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            )
+            _require_shared_seed_lineage(
+                local_only_seeds,
+                seeds_b,
+                shared_seeds,
+                TransferMethod.LOCAL_ONLY,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            )
             paired_seed_count = len(shared_seeds)
             input_ids = tuple(
                 identifier
@@ -1857,6 +1837,20 @@ def _execute_ablation_and_sparsity_and_confirmation_statistical_synthesis(
         shared_seeds = sorted(
             set(local_only_seeds) & set(with_confirm_seeds) & set(without_confirm_seeds)
         )
+        _require_shared_seed_lineage(
+            local_only_seeds,
+            with_confirm_seeds,
+            shared_seeds,
+            TransferMethod.LOCAL_ONLY,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        )
+        _require_shared_seed_lineage(
+            local_only_seeds,
+            without_confirm_seeds,
+            shared_seeds,
+            TransferMethod.LOCAL_ONLY,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        )
         paired_seed_count = len(shared_seeds)
         input_ids = tuple(
             identifier
@@ -2019,11 +2013,10 @@ def _completed_condition_macro_ce(
     result: OrderedDict[
         tuple[DirectedPairName, TransferMethod, EvaluationConditionName, RandomSeed], _SeedMetric
     ] = OrderedDict()
-    for resolved, record_payload in _iter_completed_json_payloads(
-        store,
-        experiment,
-        "metric_record",
-    ):
+    for resolved, payload in _iter_completed_json_documents(store, experiment):
+        record_payload = payload.get("metric_record")
+        if record_payload is None:
+            continue
         record = MetricRecord.model_validate(record_payload)
         if (
             record.metric_name != MetricId.MACRO_CROSS_ENTROPY
@@ -2032,7 +2025,9 @@ def _completed_condition_macro_ce(
         ):
             continue
         result[(record.pair, record.method, record.condition, record.seed)] = _SeedMetric(
-            record.metric_value, resolved.artifact_id
+            record.metric_value,
+            resolved.artifact_id,
+            _lineage_from_payload(payload),
         )
     return result
 

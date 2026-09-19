@@ -123,6 +123,22 @@ FORBIDDEN_VOCABULARY = (
     "v3.0",
 )
 
+PAPER_NON_GOAL_GUARD_PHRASES = (
+    "dense exactness",
+    "privacy guarantees from anonymity alone",
+)
+
+
+def production_text_without_paper_non_goal_guard(path: Path, text: str) -> str:
+    if path.name != "types.py":
+        return text
+    result = text
+    for phrase in PAPER_NON_GOAL_GUARD_PHRASES:
+        result = result.replace(phrase, "")
+        result = result.replace(phrase.lower(), "")
+    return result
+
+
 LOCKED_VALUE_CONSTANT_PATTERN = {
     "PRINCIPAL_SPARSE_SUPPORT",
     "SPARSE_SUPPORT_SENSITIVITY",

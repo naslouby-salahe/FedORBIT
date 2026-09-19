@@ -31,15 +31,24 @@ from fedorbit.datasets.materialization import (
 from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
 from fedorbit.experiments.catalogue import ExperimentExecutionRequest
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.scoring import build_completion_manifest, persist_diagnostic_metric
+from fedorbit.experiments.metric_persistence import (
+    build_completion_manifest,
+    persist_diagnostic_metric,
+)
 from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import (
+    ArtifactAccessContext,
+    ArtifactPayloadRequest,
     ArtifactStore,
     ExecutionError,
+    StagedPayload,
 )
-from fedorbit.infrastructure.environment import environment_snapshot
+from fedorbit.infrastructure.environment import environment_snapshot, observed_hardware
 from fedorbit.infrastructure.evidence import TableScalar
 from fedorbit.infrastructure.manifests import (
+    ArtifactProvenance,
+    ProvenanceAccessEvent,
+    ProvenanceFamilyEvidence,
     ReusableArtifactManifest,
     artifact_id,
 )
@@ -66,7 +75,7 @@ from fedorbit.infrastructure.runtime import (
     measure_efficiency,
     principal_determinism,
 )
-from fedorbit.infrastructure.storage import atomic_write_bytes, atomic_write_json
+from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
     experiment_workspace,
@@ -90,6 +99,7 @@ from fedorbit.learning.training import (
     SelectedHyperparameters,
     train_base_model,
 )
+from fedorbit.response.estimation import source_response_optimizer_steps
 from fedorbit.response.packet import (
     PacketConstructionContext,
     construct_source_packet,
@@ -119,6 +129,7 @@ from fedorbit.types import (
     DatasetId,
     EvaluationConditionName,
     ExecutionAction,
+    ExecutionEventName,
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
@@ -127,12 +138,16 @@ from fedorbit.types import (
     MetricId,
     MetricUnit,
     OverwritePolicy,
+    ProvenanceAccessRole,
+    ProvenanceArtifactFamily,
     ReportColumnName,
     Rfc3339UtcTimestamp,
+    ScientificSubsystem,
     SemanticCell,
     SemanticCoordinate,
     SemanticCoordinates,
     SemanticCoordinateText,
+    SerializedPacket,
     Sha256Digest,
     Split,
     StableJsonPayload,
@@ -229,6 +244,7 @@ def execute_source_response_estimator_pilot(
         _SOURCE_RESPONSE_PILOT_CONFIGURATION_SECTIONS,
         ImplementationIdentity.TRAINING_V1,
         ArtifactName("source-response-pilot"),
+        declare_no_upstream_inputs=True,
     )
 
 
@@ -321,6 +337,7 @@ def _perform_final_source_response_band_validation(
                     Rfc3339UtcTimestamp(datetime.now(UTC).isoformat().replace("+00:00", "Z")),
                 )
                 packet = constructed.packet
+                serialized_packet = packet.serialized()
                 persist_diagnostic_metric(
                     store,
                     layout,
@@ -338,6 +355,46 @@ def _perform_final_source_response_band_validation(
                     ),
                     request.overwrite_policy,
                 )
+                persist_diagnostic_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    dataset,
+                    EvaluationConditionName(coarse_group.value),
+                    seed,
+                    MetricId.PACKET_SERIALIZED_BYTE_COUNT,
+                    float(len(serialized_packet.encode("utf-8"))),
+                    MetricUnit.BYTES,
+                    MetricDirection.DESCRIPTIVE,
+                    (
+                        ArtifactIdentifier(checkpoint_sha256),
+                        ArtifactIdentifier(response_configuration_sha256),
+                    ),
+                    request.overwrite_policy,
+                )
+                persist_diagnostic_metric(
+                    store,
+                    layout,
+                    request.experiment,
+                    dataset,
+                    EvaluationConditionName(coarse_group.value),
+                    seed,
+                    MetricId.SOURCE_RESPONSE_OPTIMIZER_STEPS,
+                    float(
+                        source_response_optimizer_steps(
+                            candidate.optimizer_step_horizon,
+                            len(node_classes),
+                            active_config().scientific.source_response_final.paired_replicates_per_intervention,
+                        )
+                    ),
+                    MetricUnit.COUNT,
+                    MetricDirection.DESCRIPTIVE,
+                    (
+                        ArtifactIdentifier(checkpoint_sha256),
+                        ArtifactIdentifier(response_configuration_sha256),
+                    ),
+                    request.overwrite_policy,
+                )
                 destination = (
                     experiment_workspace(layout, request.experiment)
                     / StorageLayoutSegment.ARTIFACTS
@@ -346,7 +403,73 @@ def _perform_final_source_response_band_validation(
                     / f"seed-{seed}"
                     / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
                 )
-                atomic_write_bytes(destination, (packet.serialized() + "\n").encode("utf-8"))
+                packet_digest = packet.payload_sha256()
+                cell = SemanticCell(
+                    experiment=request.experiment,
+                    dataset=dataset,
+                    seed=ExperimentSeed(seed),
+                    condition=EvaluationConditionName(coarse_group.value),
+                )
+                execution_logger().event(
+                    ExecutionEventName.PACKET_CONSTRUCTION,
+                    dataset=dataset.value,
+                    seed=seed,
+                    coarse_group=coarse_group.value,
+                    payload_sha256=packet_digest,
+                )
+                store.register_artifact_payload(
+                    ArtifactPayloadRequest(
+                        artifact_type=ArtifactType.RESPONSE_PACKET,
+                        coordinates=cast(
+                            StableJsonPayload,
+                            OrderedDict(
+                                dataset=dataset.value,
+                                seed=seed,
+                                coarse_group=coarse_group.value,
+                            ),
+                        ),
+                        semantic_coordinates=SemanticCoordinateText(
+                            cell.identity_json(experiment_relevance(request.experiment))
+                        ),
+                        stage=ArtifactStage.RESPONSE,
+                        payload_path=ArtifactPath(destination),
+                        serialized=SerializedPacket(serialized_packet),
+                        upstream_artifact_ids=(
+                            ArtifactIdentifier(checkpoint_sha256),
+                            ArtifactIdentifier(response_configuration_sha256),
+                        ),
+                        access=ArtifactAccessContext(
+                            subsystem=ScientificSubsystem.SOURCE_RESPONSE,
+                            artifacts_read=(ArtifactIdentifier(checkpoint_sha256),),
+                            provenance=ArtifactProvenance(
+                                family_evidence=(
+                                    ProvenanceFamilyEvidence(
+                                        family=ProvenanceArtifactFamily.BASE_CHECKPOINT,
+                                        sha256=Sha256Digest(checkpoint_sha256),
+                                    ),
+                                    ProvenanceFamilyEvidence(
+                                        family=ProvenanceArtifactFamily.RESPONSE_PACKET,
+                                        sha256=packet_digest,
+                                    ),
+                                ),
+                                access_trace=(
+                                    ProvenanceAccessEvent(
+                                        family=ProvenanceArtifactFamily.BASE_CHECKPOINT,
+                                        sha256=Sha256Digest(checkpoint_sha256),
+                                        role=ProvenanceAccessRole.INPUT,
+                                    ),
+                                    ProvenanceAccessEvent(
+                                        family=ProvenanceArtifactFamily.RESPONSE_PACKET,
+                                        sha256=packet_digest,
+                                        role=ProvenanceAccessRole.OUTPUT,
+                                    ),
+                                ),
+                                hardware=observed_hardware(),
+                            ),
+                        ),
+                    ),
+                    request.overwrite_policy,
+                )
 
 
 def _source_response_estimator_client_results(
@@ -503,6 +626,7 @@ def execute_final_source_response_band_validation(
         frozenset({ConfigurationSection.RESPONSE, ConfigurationSection.MODELS}),
         ImplementationIdentity.TRAINING_V1,
         ArtifactName("source-response-band-validation"),
+        declare_no_upstream_inputs=True,
     )
 
 
@@ -832,8 +956,11 @@ def _persist_base_checkpoint(
         / f"seed-{seed}"
         / CheckpointFileName.CHECKPOINT
     )
-    save_base_checkpoint(checkpoint, payload_path)
-    payload_sha256 = file_sha256(payload_path)
+    staging_root = layout.staging / f"checkpoint-{dataset.value}-seed-{seed}"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    staged_path = staging_root / CheckpointFileName.CHECKPOINT
+    save_base_checkpoint(checkpoint, staged_path)
+    payload_sha256 = file_sha256(staged_path)
     configuration_sha256 = Sha256Digest(
         configuration_subset_digest(BASE_MODEL_PILOT_CONFIGURATION_SECTIONS)
     )
@@ -846,6 +973,7 @@ def _persist_base_checkpoint(
         configuration_sha256,
         code_sha256,
         stage=stage,
+        has_no_upstream_inputs=True,
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -872,6 +1000,11 @@ def _persist_base_checkpoint(
             state=ArtifactState.COMPLETED,
             completion_required=True,
             completion_manifest_sha256=completion.completion_manifest_sha256,
+            has_no_upstream_inputs=True,
         )
     )
-    store.write_completed(manifest, completion)
+    store.promote_artifact(
+        manifest,
+        completion,
+        staged_payloads=(StagedPayload(staged_path, payload_path),),
+    )

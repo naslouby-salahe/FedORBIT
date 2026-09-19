@@ -21,6 +21,8 @@ from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.types import (
+    EVIDENCE_SUPPORT_BY_HYPOTHESIS,
+    PAPER_FORBIDDEN_WORDING,
     ArtifactIdentifier,
     ArtifactName,
     ArtifactState,
@@ -62,12 +64,71 @@ def test_evidence_classification_records_not_tested_without_synthesis(tmp_path: 
     assert {row["final_state"] for row in statuses} == {EvidenceStatus.NOT_TESTED.value}
 
 
+def test_evidence_classification_scope_and_supporting_table_are_claim_specific(
+    tmp_path: Path,
+) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    request = ExperimentExecutionRequest(
+        experiment=ExperimentName.EVIDENCE_CLASSIFICATION,
+        definition=catalogue.definition(ExperimentName.EVIDENCE_CLASSIFICATION),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    manifest = execute_evidence_classification(store, layout, request)
+    payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
+    rows = {row["question"]: row for row in payload["statuses"]}
+    assert (
+        rows[EvidenceHypothesis.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY.value]["scope"]
+        == "six primary benchmark directions under masked fine semantics"
+    )
+    assert (
+        rows[EvidenceHypothesis.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY.value]["supporting_table"]
+        == "primary-strict-transfer-results"
+    )
+    assert (
+        rows[EvidenceHypothesis.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT.value]["scope"]
+        == "measured problem sizes/hardware"
+    )
+    assert (
+        rows[EvidenceHypothesis.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT.value]["supporting_table"]
+        == "scalability-results"
+    )
+    assert (
+        rows[EvidenceHypothesis.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT.value]["supporting_figure"]
+        == "scalability-figure"
+    )
+    exactness = rows[EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS.value]
+    action = rows[EvidenceHypothesis.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION.value]
+    assert exactness["supporting_table"] == "exact-solver-results"
+    assert exactness["supporting_figure"] is None
+    assert action["supporting_table"] is None
+    assert action["supporting_figure"] == "map-value-bound-figure"
+    scopes = {row["scope"] for row in payload["statuses"]}
+    assert len(scopes) == len(EvidenceHypothesis)
+    assert {row["forbidden_wording"] for row in payload["statuses"]} == {PAPER_FORBIDDEN_WORDING}
+    assert "dense exactness" in PAPER_FORBIDDEN_WORDING
+    assert "privacy guarantees from anonymity alone" in PAPER_FORBIDDEN_WORDING
+    assert "Byzantine-source robustness" in PAPER_FORBIDDEN_WORDING
+    assert "universal cross-schema transfer" in PAPER_FORBIDDEN_WORDING
+    assert "deployment readiness beyond measured evidence" in PAPER_FORBIDDEN_WORDING
+
+
+def test_claim_support_mapping_covers_every_hypothesis() -> None:
+    assert tuple(EVIDENCE_SUPPORT_BY_HYPOTHESIS) == tuple(EvidenceHypothesis)
+    for spec in EVIDENCE_SUPPORT_BY_HYPOTHESIS.values():
+        assert spec.forbidden_wording == PAPER_FORBIDDEN_WORDING
+        assert spec.scope
+        assert spec.supporting_table is not None or spec.supporting_figure is not None
+
+
 def _contrast(
     pair: str,
     decision: ComparisonDecision,
     mean_difference: float,
     holm_p: float,
     bca_low: float,
+    paired_seed_count: int = 8,
 ) -> PairedComparisonRecord:
     digest = Sha256Digest("a" * 64)
     return PairedComparisonRecord(
@@ -77,7 +138,7 @@ def _contrast(
         method_a=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         method_b=TransferMethod.LOCAL_ONLY,
         metric=MetricId.RELATIVE_MACRO_CE_GAIN,
-        paired_seed_count=8,
+        paired_seed_count=paired_seed_count,
         mean_difference=mean_difference,
         median_difference=mean_difference,
         bca_ci_low=bca_low,
@@ -151,6 +212,86 @@ def test_utility_family_supported_partial_null_and_harm() -> None:
         False,
     )
     assert harmful.status == EvidenceStatus.NOT_SUPPORTED
+
+
+def test_utility_family_full_scope_success_requires_equal_pair_mean_materiality() -> None:
+    required = 4
+    holm = 0.05
+    bca = 0.0
+    threshold = active_config().scientific.materiality.realized_relative_macro_ce
+    successful = tuple(
+        _contrast(f"pair-{index}", ComparisonDecision.SUPERIOR, threshold + 0.001, 0.01, 0.02)
+        for index in range(required)
+    )
+    diluting = tuple(
+        _contrast(f"low-{index}", ComparisonDecision.NOT_SUPPORTED, -threshold + 0.0001, 0.4, -0.02)
+        for index in range(4)
+    )
+    result = utility_family_status(
+        successful + diluting,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        TransferMethod.LOCAL_ONLY,
+        holm,
+        bca,
+        required,
+        False,
+    )
+    assert result.status != EvidenceStatus.SUPPORTED
+
+
+def test_utility_family_conditional_requires_a_recorded_pre_outcome_seed_exclusion() -> None:
+    required = 4
+    holm = 0.05
+    bca = 0.0
+    minimum_seeds = active_config().scientific.statistics.minimum_valid_paired_seeds
+    eligible = tuple(
+        _contrast(f"pair-{index}", ComparisonDecision.SUPERIOR, 0.05, 0.01, 0.02)
+        for index in range(3)
+    )
+    unblocked_shortfall = utility_family_status(
+        eligible,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        TransferMethod.LOCAL_ONLY,
+        holm,
+        bca,
+        required,
+        False,
+    )
+    assert unblocked_shortfall.status != EvidenceStatus.CONDITIONAL
+    excluded = tuple(
+        PairedComparisonRecord(
+            contrast_name=ContrastName(f"excluded-{index}"),
+            family=MultiplicityFamily.PRIMARY_TRANSFER_VS_LOCAL_ONLY,
+            pair=DirectedPairName(f"excluded-{index}"),
+            method_a=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            method_b=TransferMethod.LOCAL_ONLY,
+            metric=MetricId.RELATIVE_MACRO_CE_GAIN,
+            paired_seed_count=minimum_seeds - 1,
+            mean_difference=None,
+            median_difference=None,
+            bca_ci_low=None,
+            bca_ci_high=None,
+            raw_p=None,
+            holm_p=None,
+            materiality_threshold=0.01,
+            equivalence_margin_low=None,
+            equivalence_margin_high=None,
+            input_metric_artifact_ids=(ArtifactIdentifier("metric"),),
+            dependency_fingerprint_sha256=Sha256Digest("a" * 64),
+            decision=ComparisonDecision.INSUFFICIENT_EVIDENCE,
+        )
+        for index in range(3)
+    )
+    conditional = utility_family_status(
+        eligible + excluded,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        TransferMethod.LOCAL_ONLY,
+        holm,
+        bca,
+        required,
+        False,
+    )
+    assert conditional.status == EvidenceStatus.CONDITIONAL
 
 
 def _local_sir_contrast(

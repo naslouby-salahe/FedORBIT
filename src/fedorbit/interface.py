@@ -109,6 +109,20 @@ def anonymous_node_order(
     return AnonymousNodeOrder(permutation, display_ids)
 
 
+def validate_independent_anonymous_orders(
+    source_order: AnonymousNodeOrder,
+    target_order: AnonymousNodeOrder,
+) -> None:
+    if len(source_order.permutation) != len(target_order.permutation):
+        return
+    if len(source_order.permutation) <= 1:
+        return
+    if source_order.permutation == target_order.permutation:
+        raise StrictResourceViolationError(
+            "source and target anonymous node orders must be independently shuffled"
+        )
+
+
 class ResourceKind(StrEnum):
     TRAIN = "TRAIN"
     META = "META"
@@ -338,12 +352,16 @@ def validate_static_leakage_scan(
         raise StrictResourceViolationError(f"static leakage scan found forbidden terms: {findings}")
 
 
-def validate_dynamic_access_log_scan(trace: AccessTrace) -> None:
+def validate_dynamic_access_log_scan(
+    trace: AccessTrace,
+    catalogue_resources: frozenset[ResourceKind],
+) -> None:
     policy = StrictResourcePolicy()
     for event in trace.events:
         policy.assert_role_allowed(
             event.role, event.resource, transfer_finalized=event.transfer_finalized
         )
+    validate_resource_manifest_equality(frozenset(trace.resources()), catalogue_resources)
 
 
 def validate_rfc3339_utc(

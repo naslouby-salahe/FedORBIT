@@ -91,9 +91,24 @@ def test_dynamic_access_log_scan_reuses_the_resource_policy() -> None:
     valid_trace = AccessTrace(
         (AccessEvent(ClientRole.SOURCE, ResourceKind.TRAIN, transfer_finalized=False),)
     )
-    validate_dynamic_access_log_scan(valid_trace)
+    validate_dynamic_access_log_scan(valid_trace, frozenset({ResourceKind.TRAIN}))
     invalid_trace = AccessTrace(
         (AccessEvent(ClientRole.SOURCE, ResourceKind.CONFIRM, transfer_finalized=False),)
     )
     with pytest.raises(StrictResourceViolationError):
-        validate_dynamic_access_log_scan(invalid_trace)
+        validate_dynamic_access_log_scan(invalid_trace, frozenset({ResourceKind.TRAIN}))
+
+
+def test_dynamic_access_log_scan_rejects_resources_outside_the_method_catalogue() -> None:
+    observed = AccessTrace(
+        (
+            AccessEvent(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True),
+            AccessEvent(ClientRole.TARGET, ResourceKind.TRAIN, transfer_finalized=False),
+        )
+    )
+    with pytest.raises(StrictResourceViolationError):
+        validate_dynamic_access_log_scan(observed, frozenset({ResourceKind.TEST}))
+    validate_dynamic_access_log_scan(
+        AccessTrace((AccessEvent(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True),)),
+        frozenset({ResourceKind.TEST}),
+    )

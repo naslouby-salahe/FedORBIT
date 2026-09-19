@@ -134,6 +134,14 @@ ARTIFACT_FAMILY_REGISTRATION: Mapping[ArtifactType, ArtifactFamilyRegistration] 
             ),
         ),
         (
+            ArtifactType.SEMANTIC_CELL,
+            ArtifactFamilyRegistration(
+                ArtifactStage.EVALUATION,
+                frozenset({ConfigurationSection.METRICS}),
+                ImplementationIdentity.SCORING_V1,
+            ),
+        ),
+        (
             ArtifactType.STATISTICAL_RESULT,
             ArtifactFamilyRegistration(
                 ArtifactStage.STATISTICS,

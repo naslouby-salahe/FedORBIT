@@ -33,6 +33,7 @@ from fedorbit.infrastructure.evidence import (
 )
 from fedorbit.infrastructure.manifests import DatasetManifest
 from fedorbit.types import (
+    EVIDENCE_SUPPORT_BY_HYPOTHESIS,
     PRINCIPAL_EVALUATION_CONDITION,
     BoundaryReportState,
     ClientRole,
@@ -742,59 +743,10 @@ def confirmation_results_table(
     )
 
 
-EVIDENCE_SUPPORT_ARTIFACTS: Mapping[
-    EvidenceHypothesis, tuple[ReportArtifactName, ReportArtifactName]
-] = OrderedDict(
-    (
-        (
-            EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS,
-            (ReportArtifactName.EXACT_SOLVER_RESULTS, ReportArtifactName.SCALABILITY_FIGURE),
-        ),
-        (
-            EvidenceHypothesis.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,
-            (
-                ReportArtifactName.COUPLING_MECHANISM_RESULTS,
-                ReportArtifactName.COUPLING_GAP_PHASE_FIGURE,
-            ),
-        ),
-        (
-            EvidenceHypothesis.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,
-            (ReportArtifactName.EXACT_SOLVER_RESULTS, ReportArtifactName.MAP_VALUE_BOUND_FIGURE),
-        ),
-        (
-            EvidenceHypothesis.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,
-            (
-                ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
-                ReportArtifactName.REAL_TRANSFER_GAIN_FOREST_PLOT,
-            ),
-        ),
-        (
-            EvidenceHypothesis.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE,
-            (
-                ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
-                ReportArtifactName.BASELINE_PAIRED_DIFFERENCE_PLOT,
-            ),
-        ),
-        (
-            EvidenceHypothesis.OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT,
-            (
-                ReportArtifactName.SPARSITY_AND_DENSE_RESULTS,
-                ReportArtifactName.SPARSITY_UTILITY_EFFICIENCY_FIGURE,
-            ),
-        ),
-        (
-            EvidenceHypothesis.TARGET_CONFIRMATION_SAFETY,
-            (
-                ReportArtifactName.CONFIRMATION_RESULTS,
-                ReportArtifactName.CONFIRMATION_SAFETY_COVERAGE_FIGURE,
-            ),
-        ),
-        (
-            EvidenceHypothesis.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT,
-            (ReportArtifactName.SCALABILITY_RESULTS, ReportArtifactName.SCALABILITY_FIGURE),
-        ),
-    )
-)
+def _evidence_support_artifact_cell(name: ReportArtifactName | None) -> TableScalar:
+    if name is None:
+        return UNAVAILABLE_CELL_TEXT
+    return name.value
 
 
 def evidence_status_table(
@@ -840,10 +792,14 @@ def _evidence_support_row(
     completed[ReportColumnName.QUESTION] = question.value
     if completed.get(ReportColumnName.FINAL_STATE) is None:
         completed[ReportColumnName.FINAL_STATE] = UNAVAILABLE_CELL_TEXT
-    artifacts = EVIDENCE_SUPPORT_ARTIFACTS.get(question)
-    if artifacts is not None:
-        completed[ReportColumnName.SUPPORTING_TABLE] = artifacts[0]
-        completed[ReportColumnName.SUPPORTING_FIGURE] = artifacts[1]
+    spec = EVIDENCE_SUPPORT_BY_HYPOTHESIS[question]
+    completed[ReportColumnName.SUPPORTING_TABLE] = _evidence_support_artifact_cell(
+        spec.supporting_table
+    )
+    completed[ReportColumnName.SUPPORTING_FIGURE] = _evidence_support_artifact_cell(
+        spec.supporting_figure
+    )
+    completed[ReportColumnName.FORBIDDEN_WORDING] = spec.forbidden_wording
     return completed
 
 
@@ -945,10 +901,13 @@ def _figure(
     separate_panels: bool = False,
     y_tick_labels: tuple[ReportSeriesName, ...] | None = None,
 ) -> EvidenceFigure:
+    resolved = tuple(series)
+    if not resolved:
+        resolved = (_unavailable_series("no stored series"),)
     return EvidenceFigure(
         x_label=x_label,
         y_label=y_label,
-        series=tuple(series),
+        series=resolved,
         vertical_reference_lines=vertical_reference_lines,
         horizontal_reference_lines=horizontal_reference_lines,
         log_x=log_x,

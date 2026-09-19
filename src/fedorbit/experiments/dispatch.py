@@ -92,6 +92,7 @@ from fedorbit.interface import (
     ResourceKind,
     StrictResourcePolicy,
     anonymous_node_order,
+    validate_independent_anonymous_orders,
 )
 from fedorbit.methods.assimilation import (
     capture_pre_confirm_pair,
@@ -224,14 +225,14 @@ def _validate_smoke_semantic_idempotency(seed: RandomSeed) -> None:
         )
     )
     first = anonymous_node_order(
-        cast(ClientCount, 2),
+        cast(ClientCount, 8),
         seed,
         ClientRole.SOURCE,
         CoarseGroup.DISRUPTION,
         coordinate,
     )
     second = anonymous_node_order(
-        cast(ClientCount, 2),
+        cast(ClientCount, 8),
         seed,
         ClientRole.SOURCE,
         CoarseGroup.DISRUPTION,
@@ -239,6 +240,17 @@ def _validate_smoke_semantic_idempotency(seed: RandomSeed) -> None:
     )
     if first != second:
         raise ExecutionError("smoke semantic identity is not deterministic")
+    target = anonymous_node_order(
+        cast(ClientCount, 8),
+        seed,
+        ClientRole.TARGET,
+        CoarseGroup.DISRUPTION,
+        coordinate,
+    )
+    try:
+        validate_independent_anonymous_orders(first, target)
+    except StrictResourceViolationError as error:
+        raise ExecutionError(str(error)) from error
 
 
 def _validate_smoke_crash_recovery() -> None:

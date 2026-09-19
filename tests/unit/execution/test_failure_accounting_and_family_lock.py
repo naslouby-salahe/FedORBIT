@@ -12,7 +12,7 @@ from fedorbit.experiments.classification import (
     utility_family_status,
 )
 from fedorbit.experiments.dispatch import ExperimentExecutionRequest
-from fedorbit.experiments.scoring import persist_primary_transfer_metric
+from fedorbit.experiments.metric_persistence import persist_primary_transfer_metric
 from fedorbit.experiments.synthesis import (
     StatisticsError,
     persist_family_definition_lock,
@@ -21,6 +21,7 @@ from fedorbit.experiments.synthesis import (
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import WorkspaceLayout, build_layout
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
     CellUnavailabilityReason,
     ContrastName,
@@ -62,6 +63,7 @@ def _persist_abstention(
         MetricDirection.DESCRIPTIVE,
         (ArtifactIdentifier(category.value),),
         OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
         valid=False,
         invalid_reason=InvalidReason(f"ScientificAlgorithmicFailureError: seed {seed}"),
     )

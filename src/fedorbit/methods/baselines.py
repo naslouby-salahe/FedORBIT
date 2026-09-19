@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 import numpy as np
@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from fedorbit.config.loading import active_config
 from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
+from fedorbit.optimization.certificates import RectangularHull
 from fedorbit.optimization.correspondence import PaddedBlockStructure
 from fedorbit.optimization.diagnostics import analytic_orbit_mean
 from fedorbit.optimization.objective import (
@@ -217,6 +218,17 @@ def optimize_against_fixed_matrix(
         ),
     )
     return FixedMatrixActionSolution(selected_action=winning_action, objective_value=winner_value)
+
+
+def coupling_upper_bound_diagnostic(
+    problem: RobustActionProblem,
+    hull: RectangularHull,
+    support_limit: SupportCount | None = None,
+) -> Score:
+    zero_cost_problem = replace(problem, linear_costs=np.zeros_like(problem.linear_costs))
+    spread = hull.upper_bounds - hull.lower_bounds
+    solution = optimize_against_fixed_matrix(zero_cost_problem, spread, support_limit)
+    return solution.objective_value
 
 
 def local_sir_action(

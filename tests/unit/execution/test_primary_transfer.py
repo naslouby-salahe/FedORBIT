@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 import torch
 
-import fedorbit.experiments.scoring as scoring
+import fedorbit.experiments.assembly as assembly
+from fedorbit.analysis.comparisons import PairingMismatchError
 from fedorbit.analysis.metrics import (
     ClassEntropySet,
     Probability,
@@ -22,27 +23,41 @@ from fedorbit.analysis.metrics import (
 from fedorbit.analysis.records import (
     MetricDirection,
 )
+from fedorbit.config.loading import active_config
 from fedorbit.datasets.common import AdapterSchema, FieldRole
 from fedorbit.datasets.materialization import MaterializedClient, TransferConceptGroup
-from fedorbit.experiments.scoring import (
+from fedorbit.experiments.assembly import (
     assemble_cross_client_response_matrix,
     assemble_self_response_matrix,
     assemble_target_response_matrix,
     assess_pair_seed_structure,
-    class_metric_sets,
     cross_client_padded_blocks,
     curriculum_multipliers_from_action,
     eligible_groups_by_coarse,
     pair_seed_structure,
+    self_padded_blocks,
+    strict_pair_resource_validity,
+    target_node_risks,
+)
+from fedorbit.experiments.catalogue import ExperimentExecutionRequest, build_catalogue
+from fedorbit.experiments.metric_persistence import (
+    class_metric_sets,
     persist_ineligible_transfer_cell,
     persist_primary_transfer_metric,
-    self_padded_blocks,
+)
+from fedorbit.experiments.scoring import (
     solve_coarse_block_mean_action,
     solve_coarse_block_min_action,
     solve_coupling_destroyed_action,
     solve_orbit_mean_action,
-    strict_pair_resource_validity,
-    target_node_risks,
+)
+from fedorbit.experiments.synthesis import (
+    completed_primary_transfer_metric_records,
+    require_paired_seed_lineage,
+)
+from fedorbit.experiments.transfer import (
+    persist_predicted_realized_spearman_correlations,
+    reuse_principal_transfer_metrics,
 )
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import WorkspaceLayout, build_layout
@@ -57,6 +72,7 @@ from fedorbit.optimization.objective import ActionSpaceError, CurriculumAction, 
 from fedorbit.response.packet import SourcePacket, build_source_packet
 from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     AnonymousNodeDisplayId,
     ArtifactIdentifier,
     ClassCount,
@@ -135,6 +151,7 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
         MetricDirection.LOWER_IS_BETTER,
         (ArtifactIdentifier("checkpoint-stub"),),
         OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
     )
     assert manifest is not None
     resolved = store.resolve(manifest.artifact_id)
@@ -156,9 +173,123 @@ def test_persist_primary_transfer_metric_round_trips_and_dedupes(tmp_path: Path)
         MetricDirection.LOWER_IS_BETTER,
         (ArtifactIdentifier("checkpoint-stub"),),
         OverwritePolicy.REUSE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
     )
     assert reused is not None
     assert reused.artifact_id == manifest.artifact_id
+    recorded = json.loads(payload_path.read_text(encoding="utf-8"))
+    assert "pairing_lineage" in recorded
+    assert recorded["pairing_lineage"]["directed_pair"] == (
+        "ton_iot_linux_process_host -> ton_iot_windows10_host"
+    )
+    assert recorded["pairing_lineage"]["seed"] == 3319
+
+
+def test_statistical_pairing_rejects_mismatched_checkpoint_lineage(tmp_path: Path) -> None:
+    from fedorbit.analysis.comparisons import pair_seed_pairing_lineage
+
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    persist_primary_transfer_metric(
+        store,
+        layout,
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        pair,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.LOCAL_ONLY,
+        3319,
+        MetricId.MACRO_CROSS_ENTROPY,
+        0.42,
+        MetricUnit("nats"),
+        MetricDirection.LOWER_IS_BETTER,
+        (ArtifactIdentifier("checkpoint-a"),),
+        OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+        pairing_lineage=pair_seed_pairing_lineage(pair, 3319, ArtifactIdentifier("checkpoint-a")),
+    )
+    persist_primary_transfer_metric(
+        store,
+        layout,
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        pair,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        3319,
+        MetricId.MACRO_CROSS_ENTROPY,
+        0.31,
+        MetricUnit("nats"),
+        MetricDirection.LOWER_IS_BETTER,
+        (ArtifactIdentifier("checkpoint-b"),),
+        OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+        pairing_lineage=pair_seed_pairing_lineage(pair, 3319, ArtifactIdentifier("checkpoint-b")),
+    )
+    from fedorbit.experiments.synthesis import completed_primary_transfer_macro_ce
+
+    metrics = completed_primary_transfer_macro_ce(store)
+    local_only = metrics[(pair, TransferMethod.LOCAL_ONLY, 3319)]
+    fedorbit = metrics[(pair, TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 3319)]
+    with pytest.raises(PairingMismatchError):
+        require_paired_seed_lineage(
+            local_only,
+            fedorbit,
+            TransferMethod.LOCAL_ONLY,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+        )
+
+
+def test_principal_metric_reuse_is_method_generic(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    request = ExperimentExecutionRequest(
+        experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        definition=catalogue.definition(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER),
+        overwrite_policy=OverwritePolicy.REUSE,
+    )
+    pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    persist_primary_transfer_metric(
+        store,
+        layout,
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        pair,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.LOCAL_ONLY,
+        3319,
+        MetricId.MACRO_CROSS_ENTROPY,
+        0.42,
+        MetricUnit("nats"),
+        MetricDirection.LOWER_IS_BETTER,
+        (ArtifactIdentifier("checkpoint-stub"),),
+        OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+    )
+    assert reuse_principal_transfer_metrics(
+        store,
+        layout,
+        request,
+        pair,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.LOCAL_ONLY,
+        3319,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+    )
+    assert not reuse_principal_transfer_metrics(
+        store,
+        layout,
+        request,
+        pair,
+        DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+        DatasetId.TON_IOT_WINDOWS10_HOST,
+        TransferMethod.ORBIT_MEAN,
+        3319,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+    )
 
 
 def test_ineligible_transfer_cell_persists_typed_pair_seed_reason(tmp_path: Path) -> None:
@@ -176,6 +307,7 @@ def test_ineligible_transfer_cell_persists_typed_pair_seed_reason(tmp_path: Path
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         3319,
         OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
         pair_seed_ineligibility_reason=reason,
     )
 
@@ -202,6 +334,7 @@ def test_persist_primary_transfer_metric_keeps_distinct_metric_identities(tmp_pa
         MetricDirection.LOWER_IS_BETTER,
         (ArtifactIdentifier("checkpoint-stub"),),
         OverwritePolicy.REUSE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
     )
     second = persist_primary_transfer_metric(
         store,
@@ -218,11 +351,88 @@ def test_persist_primary_transfer_metric_keeps_distinct_metric_identities(tmp_pa
         MetricDirection.HIGHER_IS_BETTER,
         (ArtifactIdentifier("checkpoint-stub"),),
         OverwritePolicy.REUSE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
     )
     assert first is not None
     assert second is not None
     assert first.artifact_id != second.artifact_id
     assert len(store.all_manifests()) == 2
+
+
+def _request(experiment: ExperimentName) -> ExperimentExecutionRequest:
+    catalogue = build_catalogue()
+    return ExperimentExecutionRequest(
+        experiment=experiment,
+        definition=catalogue.definition(experiment),
+        overwrite_policy=OverwritePolicy.REPLACE,
+    )
+
+
+def test_predicted_realized_spearman_correlations_are_persisted_per_pair(
+    tmp_path: Path,
+) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    request = _request(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
+    seeded_pair = DirectedPairName("ton_iot_windows10_host -> ton_iot_linux_process_host")
+    seeds = active_config().scientific.randomness.confirmatory_seeds[:5]
+    for index, seed in enumerate(seeds):
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            seeded_pair,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
+            float(index),
+            MetricUnit("score"),
+            MetricDirection.DESCRIPTIVE,
+            (ArtifactIdentifier(f"certified-{index}"),),
+            OverwritePolicy.REPLACE,
+            PRINCIPAL_EVALUATION_CONDITION.name,
+        )
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+            seeded_pair,
+            DatasetId.TON_IOT_WINDOWS10_HOST,
+            DatasetId.TON_IOT_LINUX_PROCESS_HOST,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.RELATIVE_MACRO_CE_GAIN,
+            float(index),
+            MetricUnit("fraction"),
+            MetricDirection.HIGHER_IS_BETTER,
+            (ArtifactIdentifier(f"realized-{index}"),),
+            OverwritePolicy.REPLACE,
+            PRINCIPAL_EVALUATION_CONDITION.name,
+        )
+    persist_predicted_realized_spearman_correlations(store, layout, request)
+    records = tuple(
+        record
+        for record in completed_primary_transfer_metric_records(store)
+        if record.metric_name is MetricId.PREDICTED_REALIZED_SPEARMAN
+    )
+    assert len(records) == len(active_config().scientific.datasets.primary_directed_pairs)
+    by_pair = {record.pair: record for record in records}
+    seeded = by_pair[seeded_pair]
+    assert seeded.valid
+    assert seeded.metric_value == pytest.approx(1.0)
+    assert set(seeded.input_artifact_ids) == {
+        ArtifactIdentifier(f"{prefix}-{index}")
+        for index in range(5)
+        for prefix in ("certified", "realized")
+    }
+    unseeded_pair = DirectedPairName("ton_iot_linux_process_host -> ton_iot_windows10_host")
+    unseeded = by_pair[unseeded_pair]
+    assert not unseeded.valid
+    assert unseeded.metric_value is None
+    assert unseeded.invalid_reason is not None
+    assert "fewer than" in unseeded.invalid_reason
 
 
 def _synthetic_packet(node_count: int, base_value: float) -> SourcePacket:
@@ -393,7 +603,7 @@ def test_eligible_groups_apply_role_specific_support_predicates(
     ) -> tuple[TransferConceptGroup, ...]:
         return (group,)
 
-    monkeypatch.setattr(scoring, "transfer_concept_groups", fixed_groups)
+    monkeypatch.setattr(assembly, "transfer_concept_groups", fixed_groups)
 
     source_groups = eligible_groups_by_coarse(
         DatasetId.TON_IOT_NETWORK, materialized, ClientRole.SOURCE
@@ -453,7 +663,7 @@ def test_pair_seed_structure_requires_configured_target_concepts_and_real_respon
         minimum_nontrivial_block_size=2,
     )
     monkeypatch.setattr(
-        scoring,
+        assembly,
         "active_config",
         lambda: SimpleNamespace(scientific=SimpleNamespace(transfer_support=minimums)),
     )
@@ -549,9 +759,9 @@ def test_assess_pair_seed_structure_records_missing_source_response_block(
     ) -> None:
         return None
 
-    monkeypatch.setattr(scoring, "common_eligible_groups", common_groups)
-    monkeypatch.setattr(scoring, "strict_pair_resource_validity", strict_resources)
-    monkeypatch.setattr(scoring, "load_dataset_source_packet", no_source_packet)
+    monkeypatch.setattr(assembly, "common_eligible_groups", common_groups)
+    monkeypatch.setattr(assembly, "strict_pair_resource_validity", strict_resources)
+    monkeypatch.setattr(assembly, "load_dataset_source_packet", no_source_packet)
 
     result = assess_pair_seed_structure(
         build_layout(root=tmp_path),

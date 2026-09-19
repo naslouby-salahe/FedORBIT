@@ -56,6 +56,7 @@ from fedorbit.reporting import (
     transfer_ontology_and_null_padding_table,
 )
 from fedorbit.types import (
+    PAPER_FORBIDDEN_WORDING,
     PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
     ClientRole,
@@ -664,7 +665,22 @@ def test_claim_support_table_renders_every_registered_question() -> None:
         _question_row(table, sparsity, ReportColumnName.SUPPORTING_FIGURE)
         == ReportArtifactName.SPARSITY_UTILITY_EFFICIENCY_FIGURE
     )
-    assert _question_row(table, sparsity, ReportColumnName.FORBIDDEN_WORDING) is None
+    assert (
+        _question_row(table, sparsity, ReportColumnName.FORBIDDEN_WORDING)
+        == PAPER_FORBIDDEN_WORDING
+    )
+    exactness = EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS
+    action = EvidenceHypothesis.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION
+    assert _question_row(table, exactness, ReportColumnName.SUPPORTING_FIGURE) == "NA"
+    assert (
+        _question_row(table, exactness, ReportColumnName.SUPPORTING_TABLE)
+        == ReportArtifactName.EXACT_SOLVER_RESULTS
+    )
+    assert _question_row(table, action, ReportColumnName.SUPPORTING_TABLE) == "NA"
+    assert (
+        _question_row(table, action, ReportColumnName.SUPPORTING_FIGURE)
+        == ReportArtifactName.MAP_VALUE_BOUND_FIGURE
+    )
 
 
 def test_primary_strict_transfer_table_consumes_stored_gain_and_statistics() -> None:
@@ -1082,6 +1098,12 @@ def test_predicted_vs_realized_figure_consumes_the_stored_spearman_correlation()
     assert all("0.881" not in name for name in names)
 
 
+def test_predicted_vs_realized_figure_emits_unavailable_series_without_metrics() -> None:
+    figure = predicted_vs_realized_transfer_figure()
+    assert figure.series
+    assert str(figure.series[0].name) == "no stored series"
+
+
 def test_map_value_bound_figure_marks_ineligible_conditions() -> None:
     figure = map_value_bound_figure(metric_records=_map_value_records())
     names = tuple(str(item.name) for item in figure.series)
@@ -1089,3 +1111,20 @@ def test_map_value_bound_figure_marks_ineligible_conditions() -> None:
     assert names[1].startswith("ineligible map-value bound cells | unavailable n=1")
     assert figure.series[0].x == (0.4,)
     assert figure.series[0].y == (0.25,)
+
+
+def test_baseline_paired_difference_series_consumes_stored_relative_gain() -> None:
+    from fedorbit.experiments.report_rows import baseline_paired_difference_series
+
+    local_ce = _metric_record(MetricId.MACRO_CROSS_ENTROPY, 2.0, method=TransferMethod.LOCAL_ONLY)
+    method_ce = _metric_record(MetricId.MACRO_CROSS_ENTROPY, 9.0, method=TransferMethod.LOCAL_SIR)
+    stored_gain = _metric_record(
+        MetricId.RELATIVE_MACRO_CE_GAIN,
+        0.25,
+        metric_unit=MetricUnit.FRACTION,
+        method=TransferMethod.LOCAL_SIR,
+    )
+    series = baseline_paired_difference_series((local_ce, method_ce, stored_gain))
+    assert len(series) == 1
+    assert series[0].y == (0.25,)
+    assert series[0].name == ReportSeriesName(TransferMethod.LOCAL_SIR.value)

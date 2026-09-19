@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pytest
+from pydantic import JsonValue
 
 from fedorbit.config.models import FedorbitConfig
 from fedorbit.datasets.common import (
     DatasetInspectionError,
     FieldRole,
+    RawFileDigestCache,
+    RawFileDigestEntry,
     infer_feature_type,
     reconcile_component_columns,
 )
@@ -28,6 +33,7 @@ from fedorbit.types import (
     CategoryName,
     NumericFeatureValue,
     RawCellText,
+    Sha256Digest,
     TabularColumnName,
 )
 
@@ -193,3 +199,16 @@ def test_categorical_rare_threshold_is_strict() -> None:
     assert CategoryName("boundary") in boundary.vocabulary
     assert CategoryName("rare") in rare.rare_categories
     assert transform_categorical(RawCellText("rare"), rare) == PreprocessingToken.RARE
+
+
+def test_raw_file_digest_cache_round_trips_and_rejects_malformed_entries() -> None:
+    entry = RawFileDigestEntry(1024, 1_700_000_000_000_000_000, Sha256Digest("a" * 64))
+    cache = RawFileDigestCache.empty().with_entry("raw/windows.csv", entry)
+    restored = RawFileDigestCache.from_json(cast(JsonValue, cache.to_json()))
+    restored_entry = restored.entry_for("raw/windows.csv")
+    assert restored_entry == entry
+
+    assert RawFileDigestEntry.from_json({"size": -1, "mtime_ns": 0, "sha256": "a" * 64}) is None
+    assert RawFileDigestEntry.from_json({"size": 1, "mtime_ns": 0, "sha256": "too-short"}) is None
+    assert RawFileDigestEntry.from_json({"size": True, "mtime_ns": 0, "sha256": "a" * 64}) is None
+    assert RawFileDigestCache.from_json("not-a-mapping").entry_for("missing") is None

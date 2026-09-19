@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import pytest
+
 from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
     anonymous_node_order,
+    validate_independent_anonymous_orders,
 )
-from fedorbit.types import ClientRole, CoarseGroup
+from fedorbit.types import ClientRole, CoarseGroup, StrictResourceViolationError
 
 
 def _coordinate(name: str, value: str) -> AnonymityCoordinate:
@@ -51,6 +54,9 @@ def test_source_and_target_orders_use_independent_streams() -> None:
     )
     assert source.permutation != target.permutation
     assert source.display_ids == target.display_ids
+    validate_independent_anonymous_orders(source, target)
+    with pytest.raises(StrictResourceViolationError):
+        validate_independent_anonymous_orders(source, source)
 
 
 def test_reorder_never_emits_semantic_names_as_ids() -> None:

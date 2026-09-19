@@ -7,15 +7,12 @@ import pytest
 from typer.testing import CliRunner
 
 import fedorbit.cli as cli
-from fedorbit.analysis.records import MetricRecord
 from fedorbit.cli import app
 from fedorbit.infrastructure.runtime import ReproducibilityIdentity
 from fedorbit.infrastructure.workspace import WorkspaceLayout
 from fedorbit.types import (
     ExitStatus,
     ExperimentName,
-    MetricId,
-    TransferMethod,
 )
 
 runner = CliRunner()
@@ -53,6 +50,18 @@ def test_no_scientific_override_options_exist() -> None:
         assert result.exit_code == ExitStatus.USAGE
 
 
+def test_percentile_95_matches_an_independent_numpy_linear_quantile() -> None:
+    import numpy as np
+
+    values = (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0)
+    expected = float(np.quantile(values, 0.95, method="linear"))
+    from fedorbit.experiments.report_rows import percentile_95
+
+    assert percentile_95(values) == pytest.approx(expected)
+    assert percentile_95((3.0,)) == 3.0
+    assert percentile_95(()) is None
+
+
 def test_plan_is_read_only_and_derives_catalogue() -> None:
     result = runner.invoke(app, ["plan"])
     assert result.exit_code == 0
@@ -61,44 +70,6 @@ def test_plan_is_read_only_and_derives_catalogue() -> None:
     assert "semantic scope:" in result.output
     assert "prerequisites:" in result.output
     assert "resume boundary:" in result.output
-
-
-def test_predicted_vs_realized_series_reports_spearman_point_count_or_unavailable() -> None:
-    pair = "source -> target"
-
-    def record(metric: MetricId, seed: int, value: float) -> MetricRecord:
-        return cast(
-            MetricRecord,
-            SimpleNamespace(
-                valid=True,
-                metric_value=value,
-                pair=pair,
-                seed=seed,
-                method=TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
-                metric_name=metric,
-            ),
-        )
-
-    insufficient = cli.predicted_vs_realized_series(
-        (
-            record(MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, 1, 0.1),
-            record(MetricId.RELATIVE_MACRO_CE_GAIN, 1, 0.2),
-        )
-    )
-    eligible = cli.predicted_vs_realized_series(
-        tuple(
-            item
-            for seed in range(5)
-            for item in (
-                record(MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE, seed, float(seed)),
-                record(MetricId.RELATIVE_MACRO_CE_GAIN, seed, float(seed)),
-            )
-        )
-    )
-
-    assert insufficient[0].name == "source -> target | Spearman unavailable; n=1"
-    assert "rho=" in eligible[0].name
-    assert "n=5" in eligible[0].name
 
 
 def test_report_rejects_invented_experiment() -> None:

@@ -12,6 +12,7 @@ from fedorbit.config.models import FrozenModel
 from fedorbit.datasets.common import FieldRole
 from fedorbit.infrastructure.environment import HardwareIdentity
 from fedorbit.types import (
+    AnonymousNodeDisplayId,
     ArtifactIdentifier,
     ArtifactIdentifiers,
     ArtifactLineage,
@@ -22,10 +23,14 @@ from fedorbit.types import (
     ArtifactState,
     ArtifactType,
     ClientComponentName,
+    CoarseGroup,
     CompletionValidationState,
     DatasetId,
     DatasetPreprocessingState,
+    DirectedPairName,
+    EvaluationConditionName,
     ExperimentName,
+    ExperimentSeed,
     FeatureCount,
     FieldDescription,
     FineLabel,
@@ -40,16 +45,71 @@ from fedorbit.types import (
     SerializedPacket,
     Sha256Digest,
     StableJsonPayload,
+    SupportSize,
     TabularColumnName,
     TabularColumns,
     TerminalState,
     TimestampRange,
+    TransferMethod,
     ValidationReason,
     stable_json,
 )
 
 NATIVE_CLASS_IDS_FIELD = "native_local_class_ids"
 FINE_CONCEPT_FIELD = "fine_concept"
+
+
+class MethodReadableTransferEligibility(FrozenModel):
+    client: DatasetId
+    seed: ExperimentSeed
+    coarse_group: CoarseGroup
+    anonymous_node_id: AnonymousNodeDisplayId
+    present: bool
+    train_count: Index
+    meta_count: Index
+    confirm_count: Index
+    test_count: Index
+    source_eligible: bool
+    target_eligible: bool
+    null_reason: FieldDescription | None = None
+
+    @property
+    def native_local_class_ids(self) -> None:
+        return None
+
+    @property
+    def fine_concept(self) -> None:
+        return None
+
+
+class SemanticCellManifest(FrozenModel):
+    experiment: ExperimentName
+    dataset: DatasetId | None = None
+    source_client: DatasetId | None = None
+    target_client: DatasetId | None = None
+    directed_pair: DirectedPairName | None = None
+    method: TransferMethod | None = None
+    condition: EvaluationConditionName | None = None
+    support: SupportSize | None = None
+    seed: ExperimentSeed | None = None
+    scientific_configuration_sha256: Sha256Digest
+    dependency_fingerprint_sha256: Sha256Digest
+    producer_stage: ArtifactStage
+    upstream_artifact_ids: ArtifactIdentifiers
+    dataset_manifest_sha256: Sha256Digest | None = None
+    split_sha256: Sha256Digest | None = None
+    preprocessing_sha256: Sha256Digest | None = None
+    source_checkpoint_sha256: Sha256Digest | None = None
+    response_packet_sha256: Sha256Digest | None = None
+    target_checkpoint_sha256: Sha256Digest | None = None
+    importance_vector_sha256: Sha256Digest | None = None
+    resource_manifest_sha256: Sha256Digest | None = None
+    relevant_code_sha256: Sha256Digest
+    material_runtime_sha256: Sha256Digest
+    git_commit: GitRevision
+    environment_sha256: Sha256Digest
+    state: ArtifactState
+    state_reason: FieldDescription | None = None
 
 
 class ProvenanceFamilyEvidence(FrozenModel):
@@ -100,6 +160,7 @@ class CompletionManifest(FrozenModel):
     completion_validation_state: CompletionValidationState
     completion_written_last: bool
     completion_manifest_sha256: Sha256Digest
+    has_no_upstream_inputs: bool = False
 
 
 class ReusableArtifactManifest(FrozenModel):
@@ -119,6 +180,7 @@ class ReusableArtifactManifest(FrozenModel):
     state: ArtifactState
     completion_required: bool = False
     completion_manifest_sha256: Sha256Digest
+    has_no_upstream_inputs: bool = False
 
 
 class FeatureQualityManifest(FrozenModel):
@@ -201,6 +263,7 @@ def build_artifact_completion(
     stage: ArtifactStage,
     upstream_artifact_ids: ArtifactIdentifiers = (),
     provenance: ArtifactProvenance | None = None,
+    has_no_upstream_inputs: bool = False,
 ) -> CompletionManifest:
     lineage = ArtifactLineageRecord(
         upstream_artifact_ids=upstream_artifact_ids,
@@ -222,6 +285,7 @@ def build_artifact_completion(
             completion_validation_state=CompletionValidationState.VALIDATED,
             completion_written_last=True,
             completion_manifest_sha256="",
+            has_no_upstream_inputs=has_no_upstream_inputs,
         )
     )
     return draft.model_copy(

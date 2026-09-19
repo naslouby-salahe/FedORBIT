@@ -10,7 +10,7 @@ from fedorbit.config.models import FedorbitConfig
 from fedorbit.experiments import solvers as experiment_solvers
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.experiments.dispatch import ExperimentExecutionRequest
-from fedorbit.experiments.scoring import persist_ineligible_transfer_cell
+from fedorbit.experiments.metric_persistence import persist_ineligible_transfer_cell
 from fedorbit.experiments.solvers import (
     execute_exact_sparse_solver_benchmark,
     execute_map_dependent_action_boundary,
@@ -29,6 +29,7 @@ from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.optimization.exact_qap import QapSeparatorResult, QapUncertifiedError
 from fedorbit.optimization.objective import CurriculumAction, RobustActionProblem
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactState,
     DatasetId,
     DirectedPairName,
@@ -182,6 +183,7 @@ def test_boundary_and_abstention_outcomes_complete_instead_of_failing(
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         1103,
         OverwritePolicy.REPLACE,
+        PRINCIPAL_EVALUATION_CONDITION.name,
         pair_seed_ineligibility_reason=PairSeedIneligibilityReason.NO_NONTRIVIAL_TARGET_BLOCK,
     )
     abstentions = tuple(

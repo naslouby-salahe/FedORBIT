@@ -250,29 +250,22 @@ def estimate_response_bands(
         confidence_level=confidence_level,
         standard_error_floor=final.response_standard_error_floor,
     )
-    built = _build_final_entries(
+    built = build_final_response_entries(
         outcome_count,
         intervention_count,
         means,
         standard_errors,
         critical,
     )
-    entries = built.entries
-    useful_columns = built.useful_intervention_columns
-    useful_entries = tuple(entry for entry in entries if entry.useful)
-    if not useful_entries:
-        return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), math.nan, False)
-    band_widths = tuple(entry.upper - entry.lower for entry in useful_entries)
-    absolute_means = tuple(abs(entry.a_hat) for entry in useful_entries)
-    ratio = statistics.median(band_widths) / max(
-        statistics.median(absolute_means),
-        final.useful_response_magnitude_threshold,
+    useful_column_count: ConceptCount = len(built.useful_intervention_columns)
+    ratio, stable = final_response_stability(built.entries, useful_column_count)
+    return FinalResponseEstimate(
+        built.entries,
+        critical,
+        useful_column_count,
+        ratio,
+        stable,
     )
-    stable = (
-        len(useful_columns) >= final.minimum_useful_intervention_columns
-        and ratio <= final.median_band_width_to_median_absolute_mean_response_maximum
-    )
-    return FinalResponseEstimate(tuple(entries), critical, len(useful_columns), ratio, stable)
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,7 +274,38 @@ class FinalResponseEntries:
     useful_intervention_columns: frozenset[Index]
 
 
-def _build_final_entries(
+def response_entry_is_useful(
+    a_hat: Estimate,
+    lower: Estimate,
+    upper: Estimate,
+    magnitude_threshold: Estimate,
+) -> bool:
+    return abs(a_hat) >= magnitude_threshold and (lower > 0.0 or upper < 0.0)
+
+
+def final_response_stability(
+    entries: tuple[FinalResponseEntry, ...],
+    useful_intervention_columns: ConceptCount,
+) -> tuple[Coefficient, bool]:
+    final = active_config().scientific.source_response_final
+    useful_entries = tuple(entry for entry in entries if entry.useful)
+    if not useful_entries:
+        nan_ratio: Coefficient = math.nan
+        return nan_ratio, False
+    band_widths = tuple(entry.upper - entry.lower for entry in useful_entries)
+    absolute_means = tuple(abs(entry.a_hat) for entry in useful_entries)
+    ratio: Coefficient = statistics.median(band_widths) / max(
+        statistics.median(absolute_means),
+        final.useful_response_magnitude_threshold,
+    )
+    stable = (
+        useful_intervention_columns >= final.minimum_useful_intervention_columns
+        and ratio <= final.median_band_width_to_median_absolute_mean_response_maximum
+    )
+    return ratio, stable
+
+
+def build_final_response_entries(
     outcome_count: ConceptCount,
     intervention_count: ConceptCount,
     means: DerivativeSeries,
@@ -298,8 +322,11 @@ def _build_final_entries(
             se = standard_errors[entry_index]
             lower = a_hat - critical * se
             upper = a_hat + critical * se
-            useful = abs(a_hat) >= final.useful_response_magnitude_threshold and (
-                lower > 0.0 or upper < 0.0
+            useful = response_entry_is_useful(
+                a_hat,
+                lower,
+                upper,
+                final.useful_response_magnitude_threshold,
             )
             if useful:
                 useful_columns.add(intervention)

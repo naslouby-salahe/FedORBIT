@@ -10,11 +10,15 @@ from numpy.random import PCG64, Generator
 from scipy import stats as scipy_stats
 
 from fedorbit.analysis.statistics import (
+    McNemarMode,
     NamedPValue,
     PValueSet,
     StatisticsError,
     exact_sign_flip_test,
     holm_step_down,
+    mcnemar_asymptotic_continuity_corrected_p,
+    mcnemar_exact_p,
+    mcnemar_test,
     minimum_valid_seeds_met,
     paired_bca_interval,
     sign_flip_p_value,
@@ -320,3 +324,48 @@ def test_minimum_valid_paired_seed_boundary_comes_from_configuration(
     minimum = fedorbit_config.scientific.statistics.minimum_valid_paired_seeds
     assert minimum_valid_seeds_met(minimum)
     assert not minimum_valid_seeds_met(minimum - 1)
+
+
+def test_mcnemar_exact_p_matches_an_independent_binomial_tail_sum() -> None:
+    discordant = 10
+    count = 2
+    reference = min(
+        1.0,
+        2.0 * sum(math.comb(discordant, k) for k in range(count + 1)) / 2**discordant,
+    )
+    assert mcnemar_exact_p(count, discordant - count) == pytest.approx(reference)
+    assert reference == pytest.approx(0.109375)
+    assert mcnemar_exact_p(discordant - count, count) == pytest.approx(reference)
+
+
+def test_mcnemar_exact_p_is_one_when_concordant() -> None:
+    assert mcnemar_exact_p(0, 0) == 1.0
+
+
+def test_mcnemar_exact_p_rejects_negative_counts() -> None:
+    with pytest.raises(StatisticsError):
+        mcnemar_exact_p(-1, 5)
+
+
+def test_mcnemar_asymptotic_matches_an_independent_scipy_chi_square_survival() -> None:
+    b01, b10 = 5, 21
+    discordant = b01 + b10
+    chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
+    reference = 1.0 - float(scipy_stats.chi2.cdf(chi_square, df=1))
+    assert mcnemar_asymptotic_continuity_corrected_p(b01, b10) == pytest.approx(reference)
+
+
+def test_mcnemar_test_routes_exact_at_and_asymptotic_above_the_configured_switch(
+    fedorbit_config: FedorbitConfig,
+) -> None:
+    switch = (
+        fedorbit_config.scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
+    )
+    at_switch = mcnemar_test(switch // 2, switch - switch // 2)
+    above_switch = mcnemar_test(switch // 2, switch - switch // 2 + 1)
+    assert at_switch.mode == McNemarMode.EXACT
+    assert above_switch.mode == McNemarMode.ASYMPTOTIC
+    assert at_switch.p_value == pytest.approx(mcnemar_exact_p(switch // 2, switch - switch // 2))
+    assert above_switch.p_value == pytest.approx(
+        mcnemar_asymptotic_continuity_corrected_p(switch // 2, switch - switch // 2 + 1)
+    )

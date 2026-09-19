@@ -1908,7 +1908,7 @@ Full training executions are timed once per scientific cell. Training is not rep
 
 ## 4.27 Environment configuration
 
-Dependency version identifiers are configuration data. The resolved-lockfile requirement and the prohibition on dependency upgrades once evidence-bearing confirmatory execution has begun are fixed reproducibility rules.
+Dependency version identifiers are configuration data. The resolved-lockfile requirement is a fixed reproducibility rule.
 
 The implementation environment is fixed to:
 
@@ -1931,7 +1931,12 @@ The implementation environment is fixed to:
 
 The repository must contain a fully resolved lockfile containing transitive package versions and package hashes.
 
-No dependency upgrade is permitted after the first evidence-bearing confirmatory cell has begun execution.
+*(2026-09-15, user-directed: removed the prohibition on dependency upgrades after the first
+evidence-bearing confirmatory cell begins, and the execution-state guard it would have required.
+Consistent with the same-session decision to remove per-stage runtime/dependency fingerprinting from
+every artifact as unnecessary provenance machinery — a dedicated lock-hash guard would be the same
+class of machinery. The resolved-lockfile requirement above remains: `pyproject.toml`/`uv.lock` still
+pin and fully hash every dependency.)*
 
 ## 4.28 Reporting specification
 
@@ -2716,18 +2721,22 @@ The transfer ontology is a subset of these retained classes.
 
 For every raw file record:
 
-* dataset/release;
 * component;
 * canonical relative path;
 * byte size;
-* SHA-256;
-* acquisition source descriptor;
-* acquisition timestamp;
-* license/use note.
-
-After successful raw inventory, the raw dataset tree becomes read-only.
+* SHA-256.
 
 A checksum change produces a different raw-data lineage and invalidates dependent preprocessing.
+
+*(2026-09-15, user-directed: the raw-file record no longer requires dataset/release identity,
+acquisition source descriptor, acquisition timestamp, or license/use note. These are external
+administrative facts about how the raw data was obtained, not derivable from the repository, its
+tests, or its code, and out of scope for this project's raw-data lineage contract. The filesystem
+read-only requirement is also dropped: the raw data directory is shared across other projects
+outside FedORBIT, and chmod'ing any part of it is out of scope here. Lineage integrity is already
+enforced without it — the raw inventory fingerprint is content-derived (SHA-256 per file), so any
+checksum change is detected and invalidates dependent preprocessing through the existing
+fingerprint-keyed cache regardless of filesystem permissions.)*
 
 ## 6.7 Universal cleaning order
 
@@ -2841,6 +2850,19 @@ chronology result is asserted here. On acquisition, preprocessing must verify `t
 every selected file, require a single consistent schema within each logical client, and
 record the observed parse result. It must not fall back to file order, row order, or an
 inferred timestamp.
+
+### Observed preprocessing, 2026-09-19
+
+`fedorbit preprocess` against the acquired immutable tables completed with resource-blocked
+count 0. Terminal states:
+
+* ToN-IoT Windows 10 Host: Ready; chronology valid.
+* Edge-IIoTset Network: Invalid Data; `unparseable_event_time`.
+* ToN-IoT Linux Process Host: Invalid Data; duplicate group `0003ed57c811cdc7` has
+  conflicting labels `ddos`/`injection`.
+* ToN-IoT Network: Invalid Data; duplicate group `0000425d8b2bda7c` has conflicting
+  labels `ddos`/`scanning`. This supersedes earlier host-specific memory-budget blocking
+  of Network materialization on this workstation.
 
 # 7. Local Models and Procedural-Response Estimation
 
@@ -3468,6 +3490,15 @@ For genuinely binary paired observations:
 * continuity-corrected asymptotic McNemar otherwise.
 
 Confirmation safety rates with potentially multiple proposals per seed are analyzed as seed-level continuous rate differences with the exact sign-flip test, not McNemar.
+
+*(2026-09-15: an audit of the currently registered claim set found no outcome that is genuinely a
+single binary paired observation per seed — the only candidate resembling one, the harmful/useful
+confirmation indicator, is the confirmation-safety-rate case this section explicitly excludes above.
+This section therefore documents required statistical-engine capability for a binary-paired outcome
+shape rather than mandating a currently-existing caller; `analysis/statistics.py::mcnemar_test` and
+its exact/asymptotic components are implemented and independently numerically verified
+(`tests/unit/analysis/test_statistics.py`) so the rule is ready to apply the moment any future
+registered claim introduces a genuinely single binary paired outcome.)*
 
 ## 13.5 Equivalence
 
@@ -5944,7 +5975,7 @@ If any scientific input referenced by an active table, figure, metric summary, s
 * Generalization Results Table — rows: secondary pair × method; same predictive metrics as the primary table and explicitly labeled secondary.
 * Failure-Boundary Results Table — boundary dimension, setting, pair, method, certified value, realized gain, abstention, null-node count, confirmation coverage, state.
 * Scalability Results Table — K, block, support, method, $N_S$, LAP calls, cuts, runtime median/p95, RSS, CUDA memory, timeout, exactness status.
-* Claim Support Table — claim, final state, materiality result, statistical result, evidence completeness, scope, supporting table, supporting figure, forbidden wording.
+* Claim Support Table — claim, final state, materiality result, statistical result, evidence completeness, scope, supporting table, supporting figure, forbidden wording. Forbidden wording is the paper-level §1.5 non-goal list on every row. Exact Sparse Separator Exactness has no dedicated §23.2 figure; Action Certification Without Fine-Map Identification has no dedicated §23.1 table; those cells are unavailable rather than a borrowed artifact.
 
 ## 23.2 Required figures
 

@@ -6,7 +6,11 @@ from types import SimpleNamespace
 from typing import cast
 
 from fedorbit.config.loading import active_config
-from fedorbit.datasets.materialization import MaterializedClient, transfer_concept_groups
+from fedorbit.datasets.materialization import (
+    MaterializedClient,
+    method_readable_transfer_eligibility,
+    transfer_concept_groups,
+)
 from fedorbit.datasets.ontology import (
     NORMAL_LABEL,
     TRANSFER_ONTOLOGY,
@@ -15,11 +19,12 @@ from fedorbit.datasets.ontology import (
     transfer_concept_for,
     transfer_eligibility,
 )
-from fedorbit.experiments.synthesis import transfer_ontology_null_padding_rows
+from fedorbit.experiments.report_rows import transfer_ontology_null_padding_rows
 from fedorbit.types import (
     DatasetId,
     DatasetLabel,
     DirectedPairName,
+    ExperimentSeed,
     FineLabel,
     OracleTransferConcept,
     Split,
@@ -83,6 +88,29 @@ def test_null_padding_records_the_reason_for_present_but_under_supported_concept
     assert ddos["source_real"] and ddos["target_real"]
     assert not ddos["action_eligibility"]
     assert ddos["null_reason"] == "DDoS present but below configured support minimum"
+
+
+def test_method_readable_eligibility_omits_native_class_ids_and_fine_concepts() -> None:
+    label = FineLabel(TonNativeLabel.DDOS)
+    support_by_split = OrderedDict((split, 1) for split in Split)
+    materialized = cast(
+        MaterializedClient,
+        SimpleNamespace(
+            dataset=DatasetId.TON_IOT_NETWORK,
+            class_manifest=SimpleNamespace(class_names=(label,)),
+            class_row_counts={label: support_by_split},
+        ),
+    )
+    rows = method_readable_transfer_eligibility(
+        DatasetId.TON_IOT_NETWORK, materialized, ExperimentSeed(1103)
+    )
+    assert rows
+    payload = json.loads(stable_json(rows[0]))
+    assert "native_local_class_ids" not in payload
+    assert "fine_concept" not in payload
+    assert "candidate_concept" not in payload
+    assert payload["anonymous_node_id"].startswith("node-")
+    assert payload["coarse_group"]
 
 
 def test_transfer_ontology_is_closed_and_sums_support_across_native_classes() -> None:

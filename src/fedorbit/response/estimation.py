@@ -22,9 +22,11 @@ from fedorbit.types import (
     ClassIndex,
     Coefficient,
     Floor,
+    Index,
     InterventionMagnitude,
     LearningRate,
     RandomSeed,
+    ReplicateCount,
     SampleCount,
     Score,
     StandardError,
@@ -37,9 +39,25 @@ type ShadowRiskTriple = tuple[Score, Score, Score]
 type ShadowRiskTriples = tuple[ShadowRiskTriple, ...]
 type RiskSeries = tuple[Score, ...]
 
+SHADOW_DIRECTIONS_PER_PAIR: Index = 2
+
 
 class ResponseEstimationError(ValueError):
     pass
+
+
+def source_response_optimizer_steps(
+    horizon: StepCount,
+    intervention_count: Index,
+    replicate_count: ReplicateCount,
+) -> StepCount:
+    if horizon <= 0:
+        raise ResponseEstimationError("shadow optimizer horizon must be positive")
+    if intervention_count <= 0:
+        raise ResponseEstimationError("intervention count must be positive")
+    if replicate_count < 2:
+        raise ResponseEstimationError("response estimation requires at least two paired replicates")
+    return horizon * SHADOW_DIRECTIONS_PER_PAIR * intervention_count * replicate_count
 
 
 class NonFiniteShadowLossError(ResponseEstimationError):

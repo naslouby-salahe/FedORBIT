@@ -21,6 +21,7 @@ from fedorbit.datasets.common import (
 )
 from fedorbit.datasets.ontology import (
     NORMAL_LABEL,
+    TRANSFER_ONTOLOGY,
     normalize_label,
     transfer_concept_for,
     transfer_eligibility,
@@ -49,15 +50,18 @@ from fedorbit.datasets.ton_iot.components import component_for, ton_iot_adapter
 from fedorbit.datasets.ton_iot.loader import discover_ton_iot_component_files
 from fedorbit.infrastructure.runtime import estimate_memory_budget
 from fedorbit.types import (
+    AnonymousNodeDisplayId,
     ByteCount,
     ClassCount,
     ClassIndex,
     ClientComponentName,
+    CoarseGroup,
     ComponentColumns,
     DatasetId,
     DatasetLabel,
     DuplicateGroupIdentifier,
     ExcludedLocalClasses,
+    ExperimentSeed,
     FeatureCount,
     FeatureName,
     FeatureNames,
@@ -704,6 +708,22 @@ class TransferConceptGroup:
     target_eligible: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class MethodReadableTransferEligibility:
+    client: DatasetId
+    seed: ExperimentSeed
+    coarse_group: CoarseGroup
+    anonymous_node_id: AnonymousNodeDisplayId
+    present: bool
+    train_count: Index
+    meta_count: Index
+    confirm_count: Index
+    test_count: Index
+    source_eligible: bool
+    target_eligible: bool
+    null_reason: str | None = None
+
+
 def transfer_concept_groups(
     dataset: DatasetId,
     materialized: MaterializedClient,
@@ -762,3 +782,38 @@ def transfer_concept_groups(
             )
         )
     return tuple(groups)
+
+
+def method_readable_transfer_eligibility(
+    dataset: DatasetId,
+    materialized: MaterializedClient,
+    seed: ExperimentSeed,
+) -> tuple[MethodReadableTransferEligibility, ...]:
+    rows: list[MethodReadableTransferEligibility] = []
+    for node_index, group in enumerate(transfer_concept_groups(dataset, materialized), start=1):
+        coarse_group, _, _ = TRANSFER_ONTOLOGY[group.concept]
+        present = (
+            group.train_support + group.meta_support + group.confirm_support + group.test_support
+        ) > 0
+        null_reason: str | None = None
+        if not present:
+            null_reason = f"{group.concept.value} absent from dataset"
+        elif not (group.source_eligible or group.target_eligible):
+            null_reason = f"{group.concept.value} present but below configured support minimum"
+        rows.append(
+            MethodReadableTransferEligibility(
+                client=dataset,
+                seed=seed,
+                coarse_group=coarse_group,
+                anonymous_node_id=AnonymousNodeDisplayId(f"node-{node_index:04d}"),
+                present=present,
+                train_count=group.train_support,
+                meta_count=group.meta_support,
+                confirm_count=group.confirm_support,
+                test_count=group.test_support,
+                source_eligible=group.source_eligible,
+                target_eligible=group.target_eligible,
+                null_reason=null_reason,
+            )
+        )
+    return tuple(rows)

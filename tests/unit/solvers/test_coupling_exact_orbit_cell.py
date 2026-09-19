@@ -19,6 +19,8 @@ from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.optimization.correspondence import enumerate_block_permutations
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
+    ArtifactIdentifier,
     ArtifactState,
     EvaluationConditionName,
     ExperimentLocalMethod,
@@ -111,3 +113,47 @@ def test_exact_orbit_cell_reuses_the_same_artifact_for_identical_inputs(tmp_path
         store, layout, request, condition, 2, 2207, problem, orbit, alpha, hull
     )
     assert len(store.all_manifests()) == 1
+
+
+def test_exact_orbit_cell_records_real_packet_upstream_identities(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    request = ExperimentExecutionRequest(
+        experiment=ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
+        definition=catalogue.definition(ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION),
+        overwrite_policy=OverwritePolicy.REPLACE,
+    )
+    instance = generate_coupling_instance(
+        CouplingInstanceRequest(
+            compatibility=CouplingCompatibility.JOINTLY_REALIZABLE,
+            response_heterogeneity=1.0,
+            directed_asymmetry=0.0,
+            response_sparsity=1.0,
+            block_pattern=(2, 2),
+            support_size=2,
+            seed=1103,
+            instance_index=0,
+        )
+    )
+    problem, orbit, alpha, hull = synthetic_coupling_problem(instance, 2)
+    persist_exact_orbit_coupling_cell(
+        store,
+        layout,
+        request,
+        PRINCIPAL_EVALUATION_CONDITION.name,
+        2,
+        1103,
+        problem,
+        orbit,
+        alpha,
+        hull,
+        input_artifact_ids=(ArtifactIdentifier("source-packet"),),
+        declare_no_upstream_inputs=False,
+    )
+    manifest = store.all_manifests()[0]
+    assert manifest.has_no_upstream_inputs is False
+    assert manifest.upstream_artifact_ids == (ArtifactIdentifier("source-packet"),)
+    payload = json.loads(Path(manifest.payload_paths[0]).read_text(encoding="utf-8"))
+    assert payload["method"] == ExperimentLocalMethod.EXACT_ORBIT.value
+    assert payload["input_artifact_ids"] == ["source-packet"]

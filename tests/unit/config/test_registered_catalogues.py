@@ -255,6 +255,21 @@ def test_weak_signal_baselines_must_be_registered_grid_values(
         type(weak).model_validate(payload)
 
 
+def test_multi_source_candidate_pool_excludes_the_external_only_client(
+    fedorbit_config: FedorbitConfig,
+) -> None:
+    all_clients = fedorbit_config.scientific.datasets.clients
+    config = fedorbit_config.experiments.multi_source_selection_validation
+    for target in config.targets:
+        candidates = tuple(
+            client
+            for client, specification in all_clients.items()
+            if client != target and specification.role is ClientRole.PRIMARY
+        )
+        assert DatasetId.EDGE_IIOTSET_NETWORK not in candidates
+        assert all(all_clients[client].role is ClientRole.PRIMARY for client in candidates)
+
+
 def test_metric_catalogue_identities() -> None:
     assert MetricId.MACRO_CROSS_ENTROPY == "Macro Cross-Entropy"
     assert MetricId.RELATIVE_MACRO_CE_GAIN == "Relative Macro-CE Gain"

@@ -374,11 +374,15 @@ class ExecutionEventName(StrEnum):
     EVIDENCE_CLASSIFICATION_START = "evidence_classification_start"
     EXPERIMENT_END = "experiment_end"
     EXPERIMENT_START = "experiment_start"
+    PACKET_CONSTRUCTION = "packet_construction"
     PREPARED_CLIENT_LOAD = "prepared_client_load"
     PREPARED_CLIENT_MISS = "prepared_client_miss"
     PREPROCESS_END = "preprocess_end"
     PREPROCESS_START = "preprocess_start"
     REAL_TIMING_CELL = "real_timing_cell"
+    REPORT_END = "report_end"
+    REPORT_START = "report_start"
+    SCORING_CELL = "scoring_cell"
     SOLVER_CELL_START = "solver_cell_start"
 
 
@@ -406,19 +410,6 @@ class RawInventoryArtifact(StrEnum):
     MANIFEST_JSON = "manifest.json"
     CHECKSUMS_JSON = "checksums.json"
     SCHEMA_JSON = "schema.json"
-
-
-DatasetReleaseName = NewType("DatasetReleaseName", str)
-AcquisitionSourceDescriptor = NewType("AcquisitionSourceDescriptor", str)
-LicenseUseNote = NewType("LicenseUseNote", str)
-
-
-@dataclass(frozen=True, slots=True)
-class DatasetReleaseIdentity:
-    release: DatasetReleaseName
-    acquisition_source: AcquisitionSourceDescriptor
-    acquisition_timestamp: Rfc3339UtcTimestamp
-    license_note: LicenseUseNote
 
 
 class ProvenanceArtifactFamily(StrEnum):
@@ -720,6 +711,107 @@ class EvidenceHypothesis(StrEnum):
     SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT = "Sparse Solver Work-Structure Agreement"
 
 
+PAPER_FORBIDDEN_WORDING = FieldDescription(
+    "generic action-identifiability theory as new; "
+    "generic non-rectangular robust optimization as new; "
+    "generic QAP, RLT, McCormick, CCP, assignment-polytope, or linear-assignment machinery as new; "
+    "dense exactness; "
+    "privacy guarantees from anonymity alone; "
+    "Byzantine-source robustness; "
+    "natural unavailability of fine labels in the public benchmark datasets; "
+    "universal cross-schema transfer; "
+    "deployment readiness beyond measured evidence; "
+    "validity outside the tested telemetry families, support regimes, semantic partitions, "
+    "and strict information interface"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceSupportSpec:
+    scope: FieldDescription
+    supporting_table: ReportArtifactName | None
+    supporting_figure: ReportArtifactName | None
+    forbidden_wording: FieldDescription
+
+
+EVIDENCE_SUPPORT_BY_HYPOTHESIS: Mapping[EvidenceHypothesis, EvidenceSupportSpec] = OrderedDict(
+    (
+        (
+            EvidenceHypothesis.EXACT_SPARSE_SEPARATOR_EXACTNESS,
+            EvidenceSupportSpec(
+                FieldDescription("theorem assumptions and tested sparse supports"),
+                ReportArtifactName.EXACT_SOLVER_RESULTS,
+                None,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.JOINT_CORRESPONDENCE_AVOIDS_RECTANGULAR_PESSIMISM,
+            EvidenceSupportSpec(
+                FieldDescription("declared orbit/packet regimes"),
+                ReportArtifactName.COUPLING_MECHANISM_RESULTS,
+                ReportArtifactName.COUPLING_GAP_PHASE_FIGURE,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.ACTION_CERTIFICATION_WITHOUT_FINE_MAP_IDENTIFICATION,
+            EvidenceSupportSpec(
+                FieldDescription("controlled/theorem regime"),
+                None,
+                ReportArtifactName.MAP_VALUE_BOUND_FIGURE,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.STRICT_CROSS_TELEMETRY_TRANSFER_UTILITY,
+            EvidenceSupportSpec(
+                FieldDescription("six primary benchmark directions under masked fine semantics"),
+                ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
+                ReportArtifactName.REAL_TRANSFER_GAIN_FOREST_PLOT,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.VALUE_OF_EXTERNAL_PROCEDURAL_EVIDENCE,
+            EvidenceSupportSpec(
+                FieldDescription("six primary directions"),
+                ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
+                ReportArtifactName.BASELINE_PAIRED_DIFFERENCE_PLOT,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.OPERATIONAL_RELEVANCE_OF_SPARSE_SUPPORT,
+            EvidenceSupportSpec(
+                FieldDescription("tested support/action ranges"),
+                ReportArtifactName.SPARSITY_AND_DENSE_RESULTS,
+                ReportArtifactName.SPARSITY_UTILITY_EFFICIENCY_FIGURE,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.TARGET_CONFIRMATION_SAFETY,
+            EvidenceSupportSpec(
+                FieldDescription("tested pairs and confirmation budget"),
+                ReportArtifactName.CONFIRMATION_RESULTS,
+                ReportArtifactName.CONFIRMATION_SAFETY_COVERAGE_FIGURE,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+        (
+            EvidenceHypothesis.SPARSE_SOLVER_WORK_STRUCTURE_AGREEMENT,
+            EvidenceSupportSpec(
+                FieldDescription("measured problem sizes/hardware"),
+                ReportArtifactName.SCALABILITY_RESULTS,
+                ReportArtifactName.SCALABILITY_FIGURE,
+                PAPER_FORBIDDEN_WORDING,
+            ),
+        ),
+    )
+)
+
+
 class OracleTransferConcept(StrEnum):
     DDOS = "DDoS"
     RANSOMWARE = "Ransomware"
@@ -956,6 +1048,7 @@ class ArtifactType(StrEnum):
     TARGET_IMPORTANCE = "target_importance"
     SOLVER_RESULT = "solver_result"
     CONFIRMATION_INPUT = "confirmation_input"
+    SEMANTIC_CELL = "semantic_cell"
     STATISTICAL_RESULT = "statistical_result"
     EVIDENCE = "evidence"
     OTHER = "other"

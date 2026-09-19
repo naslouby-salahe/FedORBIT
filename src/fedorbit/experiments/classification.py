@@ -12,6 +12,7 @@ from fedorbit.analysis.records import (
     ComparisonDecision,
     PairedComparisonRecord,
 )
+from fedorbit.analysis.statistics import minimum_valid_seeds_met
 from fedorbit.config.loading import active_config
 from fedorbit.experiments.catalogue import ExperimentExecutionRequest, build_catalogue
 from fedorbit.experiments.synthesis import (
@@ -30,14 +31,20 @@ from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
 )
 from fedorbit.types import (
+    EVIDENCE_SUPPORT_BY_HYPOTHESIS,
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactIdentifier,
     ArtifactName,
     ArtifactState,
     CellUnavailabilityReason,
+    ConceptCount,
     ConfigurationSection,
     DirectedPairName,
     DomainModel,
     Estimate,
+    EvaluationCondition,
+    EvaluationConditionKind,
+    EvaluationConditionName,
     EvidenceAdjudication,
     EvidenceCompleteness,
     EvidenceHypothesis,
@@ -52,14 +59,23 @@ from fedorbit.types import (
     MetricId,
     MultiplicityFamily,
     PairCount,
+    RandomSeed,
     RelativeGain,
     ReportArtifactName,
+    Score,
     SignificanceLevel,
     SimplificationRuleName,
     SimplificationRuleState,
     StableJsonPayload,
+    SupportCount,
+    SupportSize,
     TransferMethod,
 )
+
+_SPARSE_SUPPORT_CONDITIONS: Mapping[SupportCount, EvaluationConditionName] = OrderedDict(
+    (support, EvaluationCondition.exact_sparse(SupportSize(support)).name) for support in (1, 2, 3)
+)
+_DENSE_FALLBACK_CONDITION = EvaluationCondition(EvaluationConditionKind.DENSE_CCP).name
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,17 +167,36 @@ def _null_result(
     )
 
 
-def _cell_bool_field(
-    cell: Mapping[str, int | float | str | list[int]],
-    key: str,
-) -> bool:
-    return bool(cell.get(key, False))
+@dataclass(frozen=True, slots=True)
+class TheoremCellRecord:
+    block_pattern: tuple[ConceptCount, ...]
+    support: SupportCount
+    seed: RandomSeed
+    instance_index: Index
+    absolute_objective_error: Score
+    exact_minima: bool
+    valid_certificate: bool
+
+
+def _parse_theorem_cell(payload: Mapping[str, StableJsonPayload]) -> TheoremCellRecord:
+    block_pattern = payload["block_pattern"]
+    if not isinstance(block_pattern, list):
+        raise ValueError("theorem cell block_pattern must be a list")
+    return TheoremCellRecord(
+        block_pattern=tuple(cast(int, size) for size in block_pattern),
+        support=cast(int, payload["support"]),
+        seed=cast(int, payload["seed"]),
+        instance_index=cast(int, payload["instance_index"]),
+        absolute_objective_error=cast(float, payload["absolute_objective_error"]),
+        exact_minima=bool(payload["exact_minima"]),
+        valid_certificate=bool(payload["valid_certificate"]),
+    )
 
 
 def _theorem_cells(
     store: ArtifactStore,
-) -> tuple[Mapping[str, int | float | str | list[int]], ...]:
-    cells: list[Mapping[str, int | float | str | list[int]]] = []
+) -> tuple[TheoremCellRecord, ...]:
+    cells: list[TheoremCellRecord] = []
     for manifest in store.all_manifests():
         if (
             ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION.value
@@ -177,7 +212,7 @@ def _theorem_cells(
         payload = json.loads(Path(resolved.payload_paths[0]).read_text(encoding="utf-8"))
         cell = payload.get("cell")
         if isinstance(cell, dict):
-            cells.append(cast(Mapping[str, int | float | str | list[int]], cell))
+            cells.append(_parse_theorem_cell(cast(Mapping[str, StableJsonPayload], cell)))
     return tuple(cells)
 
 
@@ -297,6 +332,24 @@ def pairs_blocked_by_scientific_failure(store: ArtifactStore) -> frozenset[Direc
     )
 
 
+def _pairs_with_insufficient_valid_seeds(
+    records: tuple[PairedComparisonRecord, ...],
+) -> frozenset[DirectedPairName]:
+    return frozenset(
+        record.pair for record in records if not minimum_valid_seeds_met(record.paired_seed_count)
+    )
+
+
+def _equal_pair_mean(records: tuple[PairedComparisonRecord, ...]) -> RelativeGain | None:
+    means: OrderedDict[DirectedPairName, RelativeGain] = OrderedDict()
+    for record in records:
+        if record.mean_difference is not None:
+            means[record.pair] = record.mean_difference
+    if not means:
+        return None
+    return sum(means.values()) / len(means)
+
+
 def utility_family_status(
     comparisons: tuple[PairedComparisonRecord, ...],
     method_a: TransferMethod,
@@ -308,20 +361,29 @@ def utility_family_status(
     blocked_pairs: frozenset[DirectedPairName] = frozenset(),
 ) -> EvidenceAdjudication:
     all_records = _pair_records(comparisons, method_a, method_b)
-    records = tuple(record for record in all_records if record.pair not in blocked_pairs)
+    excluded_pairs = blocked_pairs | _pairs_with_insufficient_valid_seeds(all_records)
+    records = tuple(record for record in all_records if record.pair not in excluded_pairs)
     if not records:
         if all_records:
             return _not_supported(
-                "excluded by the scientific-algorithmic-failure rule",
-                "more than one failed confirmatory seed in every eligible pair",
+                "excluded by the scientific-algorithmic-failure or insufficient-valid-seed rule",
+                "no eligible pair remains before principal outcome inspection",
             )
         return _not_tested("no contrasts")
     harmful = _harmful_pairs(records)
     if harmful:
         return _not_supported("material harm on a primary pair", "failure rule")
     successful = _successful_pairs(records, holm_maximum, bca_floor)
-    if len(successful) >= required_pairs:
-        return _supported("material", "holm and BCa satisfied")
+    equal_pair_mean = _equal_pair_mean(records)
+    materiality = active_config().scientific.materiality.realized_relative_macro_ce
+    full_scope = not excluded_pairs
+    if (
+        full_scope
+        and len(successful) >= required_pairs
+        and equal_pair_mean is not None
+        and equal_pair_mean >= materiality
+    ):
+        return _supported("material", "holm, BCa, and equal-pair mean satisfied")
     if kill_local_reference and not successful:
         dominant = _local_reference_dominant_pairs(records, holm_maximum)
         if len(dominant) >= required_pairs:
@@ -330,9 +392,12 @@ def utility_family_status(
             )
     analyzable = len({record.pair for record in records})
     if (
-        analyzable == 3
+        not full_scope
+        and analyzable == 3
         and len(successful) == 3
         and len(active_config().scientific.datasets.primary_directed_pairs) == 6
+        and equal_pair_mean is not None
+        and equal_pair_mean >= materiality
     ):
         return _conditional("three eligible pairs", "pre-outcome scope reduction")
     if successful:
@@ -344,8 +409,8 @@ def _classify_exactness(store: ArtifactStore) -> EvidenceAdjudication:
     cells = _theorem_cells(store)
     if not cells:
         return _not_tested("no theorem cells")
-    wrong = sum(1 for cell in cells if not _cell_bool_field(cell, "exact_minima"))
-    invalid = sum(1 for cell in cells if not _cell_bool_field(cell, "valid_certificate"))
+    wrong = sum(1 for cell in cells if not cell.exact_minima)
+    invalid = sum(1 for cell in cells if not cell.valid_certificate)
     if wrong != 0 or invalid != 0:
         return _not_supported("wrong minima or invalid certificates", "exactness failed")
     required = (
@@ -435,7 +500,7 @@ def _classify_joint_correspondence(
         return _not_supported("coupling destruction retains gain", "mechanism attribution fails")
     synthetic_fraction = sum(1 for gap in synthetic if gap > material) / len(synthetic)
     accuracy = criteria.theorem_zero_strict_classification_accuracy_required
-    synthetic_pass = synthetic_fraction >= accuracy or any(gap > material for gap in synthetic)
+    synthetic_pass = synthetic_fraction >= accuracy
     if not synthetic_pass:
         return _not_supported("synthetic mechanism criterion failed", "gap fraction unmet")
     real_gaps = _metric_values(
@@ -482,10 +547,10 @@ def _classify_action_certification(
     )
     if not common and not robust:
         return _not_tested("no unresolved-map fixtures")
-    bound_valid = True
-    if bounds and values:
-        count = min(len(values), len(bounds))
-        bound_valid = all(values[index] <= bounds[index] + tolerance for index in range(count))
+    if not (bounds and values):
+        return _not_tested("no map-value bound evidence")
+    count = min(len(values), len(bounds))
+    bound_valid = all(values[index] <= bounds[index] + tolerance for index in range(count))
     if not bound_valid:
         return _not_supported("orbit-radius bound violated", "map-value bound failure")
     common_ok = bool(common) and all(abs(value) <= tolerance for value in common)
@@ -497,28 +562,126 @@ def _classify_action_certification(
     return _not_supported("exact map recovery required", "neither controlled family holds")
 
 
+def _sparse_fallback_gains_by_unit(
+    store: ArtifactStore,
+) -> tuple[
+    Mapping[SupportCount, Mapping[tuple[DirectedPairName, RandomSeed], RelativeGain]],
+    Mapping[tuple[DirectedPairName, RandomSeed], RelativeGain],
+]:
+    from fedorbit.experiments.synthesis import completed_experiment_metric_records
+
+    local_only: OrderedDict[tuple[DirectedPairName, RandomSeed], CrossEntropy] = OrderedDict()
+    for record in completed_experiment_metric_records(
+        store, ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER
+    ):
+        if (
+            record.method == TransferMethod.LOCAL_ONLY
+            and record.condition == PRINCIPAL_EVALUATION_CONDITION.name
+            and record.metric_name == MetricId.MACRO_CROSS_ENTROPY
+            and record.valid
+            and record.metric_value is not None
+        ):
+            local_only[(record.pair, record.seed)] = CrossEntropy(record.metric_value)
+
+    def gains_for(
+        method: TransferMethod, condition: EvaluationConditionName
+    ) -> Mapping[tuple[DirectedPairName, RandomSeed], RelativeGain]:
+        result: OrderedDict[tuple[DirectedPairName, RandomSeed], RelativeGain] = OrderedDict()
+        for record in completed_experiment_metric_records(
+            store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK
+        ):
+            if (
+                record.method != method
+                or record.condition != condition
+                or record.metric_name != MetricId.MACRO_CROSS_ENTROPY
+                or not record.valid
+                or record.metric_value is None
+            ):
+                continue
+            key = (record.pair, record.seed)
+            reference = local_only.get(key)
+            if reference is None:
+                continue
+            gain = relative_macro_ce_gain(reference, CrossEntropy(record.metric_value)).relative
+            if gain is None:
+                continue
+            result[key] = gain
+        return result
+
+    sparse_gains: OrderedDict[
+        SupportCount, Mapping[tuple[DirectedPairName, RandomSeed], RelativeGain]
+    ] = OrderedDict(
+        (support, gains_for(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, condition))
+        for support, condition in _SPARSE_SUPPORT_CONDITIONS.items()
+    )
+    dense_gains = gains_for(TransferMethod.FEDORBIT_DENSE_CCP_FALLBACK, _DENSE_FALLBACK_CONDITION)
+    return sparse_gains, dense_gains
+
+
 def _classify_sparse_operational(
     store: ArtifactStore,
 ) -> EvidenceAdjudication:
     required = active_config().scientific.evaluation_criteria.sparse_operational_relevance
-    useful_floor = active_config().scientific.materiality.useful_transfer_relative_macro_ce_gain
-    sparse = _metric_values(
-        store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
-    )
-    if not sparse:
+    useful_floor = active_config().scientific.materiality.realized_relative_macro_ce
+    sparse_gains, dense_gains = _sparse_fallback_gains_by_unit(store)
+    compared_gains = sparse_gains.get(required.compared_sparse_support, {})
+    shared_units = sorted(set(dense_gains) & set(compared_gains))
+    if not shared_units:
         return _not_tested("no sparsity metrics")
     kill = _sparse_irrelevance_applied(store)
     if kill:
         return _not_supported("dense dominates sparse supports", "sparse-irrelevance kill")
-    useful = sum(1 for gain in sparse if gain > useful_floor)
-    if useful >= required.primary_pairs_with_useful_gain_required:
-        return _supported("sparse support retains useful gain", "pair threshold met")
-    if useful:
+    within_ceiling = sum(
+        1
+        for unit in shared_units
+        if dense_gains[unit] - compared_gains[unit] <= required.dense_minus_sparse_gain_maximum
+    )
+    ceiling_met = (within_ceiling / len(shared_units)) >= required.valid_unit_fraction_required
+    useful_pairs_by_support: dict[SupportCount, set[DirectedPairName]] = {}
+    for support in (2, 3):
+        pair_values: dict[DirectedPairName, list[RelativeGain]] = {}
+        for (pair, _seed), gain in sparse_gains.get(support, {}).items():
+            pair_values.setdefault(pair, []).append(gain)
+        useful_pairs_by_support[support] = {
+            pair
+            for pair, values in pair_values.items()
+            if sum(values) / len(values) >= useful_floor
+        }
+    useful_pairs_met = any(
+        len(pairs) >= required.primary_pairs_with_useful_gain_required
+        for pairs in useful_pairs_by_support.values()
+    )
+    if ceiling_met and useful_pairs_met:
+        return _supported(
+            "sparse support retains useful gain within dense ceiling",
+            "pair and unit thresholds met",
+        )
+    if useful_pairs_met or any(useful_pairs_by_support.values()):
         return _partial("at least one sparse support useful", "full operational rule unmet")
     return _null_result("no useful sparse support", "irrelevance kill not fired")
 
 
+def _pair_mean_metric_values(
+    store: ArtifactStore, experiment: ExperimentName, metric_name: MetricId
+) -> Mapping[DirectedPairName, Estimate]:
+    from fedorbit.experiments.synthesis import completed_experiment_metric_records
+
+    grouped: OrderedDict[DirectedPairName, list[Estimate]] = OrderedDict()
+    for record in completed_experiment_metric_records(store, experiment):
+        if (
+            record.metric_name != metric_name
+            or record.method != TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+            or record.condition != PRINCIPAL_EVALUATION_CONDITION.name
+            or not record.valid
+            or record.metric_value is None
+        ):
+            continue
+        grouped.setdefault(record.pair, []).append(record.metric_value)
+    return OrderedDict((pair, sum(values) / len(values)) for pair, values in grouped.items())
+
+
 def _classify_confirmation(
+    store: ArtifactStore,
     comparisons: tuple[PairedComparisonRecord, ...],
     blocked_pairs: frozenset[DirectedPairName] = frozenset(),
 ) -> EvidenceAdjudication:
@@ -539,22 +702,72 @@ def _classify_confirmation(
     )
     if worsening:
         return _not_supported("harmful-rate worsening", "safety failure")
-    successful = sum(1 for record in rows if record.decision == ComparisonDecision.SUPERIOR)
-    if successful >= required.qualifying_primary_pairs_required:
-        return _supported("confirmation reduces harmful rate", "ARR criterion met")
+    coverage_confirm_by_pair = _pair_mean_metric_values(
+        store, ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY, MetricId.COVERAGE_CONFIRM
+    )
+    coverage_loss_by_pair = OrderedDict(
+        (pair, 1.0 - value)
+        for pair, value in coverage_confirm_by_pair.items()
+        if pair not in blocked_pairs
+    )
+    if any(loss > required.pair_coverage_loss_maximum for loss in coverage_loss_by_pair.values()):
+        return _not_supported("coverage-loss ceiling exceeded", "safety failure")
+    successful = tuple(record for record in rows if record.decision == ComparisonDecision.SUPERIOR)
+    qualifying_losses = tuple(
+        coverage_loss_by_pair[record.pair]
+        for record in successful
+        if record.pair in coverage_loss_by_pair
+    )
+    if qualifying_losses:
+        qualifying_mean_loss = sum(qualifying_losses) / len(qualifying_losses)
+        if qualifying_mean_loss > required.qualifying_pair_coverage_loss_maximum:
+            return _not_supported("qualifying-pair mean coverage loss exceeded", "safety failure")
+    primary_pairs_registered = len(active_config().scientific.datasets.primary_directed_pairs)
+    harm_confirm_by_pair = _pair_mean_metric_values(
+        store, ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY, MetricId.HARM_RATE_CONFIRM
+    )
+    harm_no_confirm_by_pair = _pair_mean_metric_values(
+        store, ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY, MetricId.HARM_RATE_NO_CONFIRM
+    )
+    equal_pair_qualifies = False
+    if (
+        len(harm_confirm_by_pair) == primary_pairs_registered
+        and len(harm_no_confirm_by_pair) == primary_pairs_registered
+    ):
+        equal_harm_confirm = sum(harm_confirm_by_pair.values()) / primary_pairs_registered
+        equal_harm_no_confirm = sum(harm_no_confirm_by_pair.values()) / primary_pairs_registered
+        equal_arr = equal_harm_no_confirm - equal_harm_confirm
+        equal_rrr = equal_arr / equal_harm_no_confirm if equal_harm_no_confirm > 0.0 else None
+        equal_pair_qualifies = equal_arr >= required.equal_pair_absolute_risk_reduction_minimum or (
+            equal_rrr is not None
+            and equal_rrr >= required.equal_pair_relative_risk_reduction_minimum
+        )
+    if len(successful) >= required.qualifying_primary_pairs_required and equal_pair_qualifies:
+        return _supported(
+            "confirmation reduces harmful rate", "ARR/RRR and equal-pair criteria met"
+        )
     if successful:
-        return _partial("subset of pairs meet ARR/RRR", "qualifying-pair threshold unmet")
+        return _partial(
+            "subset of pairs meet ARR/RRR", "qualifying-pair or equal-pair threshold unmet"
+        )
     return _null_result("no pair meets harm reduction", "no worsening")
 
 
 def _classify_work_structure(store: ArtifactStore) -> EvidenceAdjudication:
+    from fedorbit.experiments.synthesis import completed_experiment_metric_records
+
     values = _metric_values(
         store, ExperimentName.SCALABILITY_AND_EFFICIENCY, MetricId.WORK_STRUCTURE_SPEARMAN
     )
-    certificates = _metric_values(
-        store,
-        ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
-        MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY,
+    certificates = tuple(
+        record.metric_value
+        for record in completed_experiment_metric_records(
+            store, ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK
+        )
+        if record.metric_name == MetricId.CORRESPONDENCE_CERTIFICATE_VALIDITY
+        and record.method == TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER
+        and record.valid
+        and record.metric_value is not None
     )
     if not values and not certificates:
         return _not_tested("no work-structure Spearman")
@@ -727,7 +940,7 @@ def target_confirmation_safety_evidence(
             "confirmation-safety kill rule",
         )
     blocked_pairs = pairs_blocked_by_scientific_failure(store)
-    return _classify_confirmation(comparisons, blocked_pairs)
+    return _classify_confirmation(store, comparisons, blocked_pairs)
 
 
 def sparse_solver_work_structure_agreement_evidence(store: ArtifactStore) -> EvidenceAdjudication:
@@ -759,16 +972,32 @@ def _median(
 
 
 def _sparse_irrelevance_applied(store: ArtifactStore) -> bool:
-    gains = _metric_values(
-        store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
-    )
-    if not gains:
+    sparse_gains, dense_gains = _sparse_fallback_gains_by_unit(store)
+    support_3_gains = sparse_gains.get(3, {})
+    shared_units = sorted(set(dense_gains) & set(support_3_gains))
+    if not shared_units:
         return False
-    scientific = active_config().scientific
-    rule = scientific.simplification_rules.sparse_support_is_operationally_irrelevant
+    rule = (
+        active_config().scientific.simplification_rules.sparse_support_is_operationally_irrelevant
+    )
     useful_floor = active_config().scientific.materiality.useful_transfer_relative_macro_ce_gain
-    useful_fraction = sum(1 for gain in gains if gain > useful_floor) / len(gains)
-    return useful_fraction < rule.valid_primary_unit_fraction_minimum
+    advantage_units = tuple(
+        unit
+        for unit in shared_units
+        if dense_gains[unit] - support_3_gains[unit]
+        >= rule.dense_gain_advantage_over_support_3_minimum
+    )
+    if not advantage_units:
+        return False
+    if len(advantage_units) / len(shared_units) < rule.valid_primary_unit_fraction_minimum:
+        return False
+    for support in rule.sparse_supports_that_must_fail_useful_materiality:
+        gains = sparse_gains.get(support, {})
+        for unit in advantage_units:
+            gain = gains.get(unit)
+            if gain is None or gain >= useful_floor:
+                return False
+    return True
 
 
 def _generic_qap_rule(
@@ -1213,10 +1442,8 @@ def simplification_rule_states(
         rectangular = RuleVerdict(
             SimplificationRuleState.NOT_TESTED, FieldDescription("no real-packet coupling gaps")
         )
-    sparse_gains = _metric_values(
-        store, ExperimentName.SPARSITY_AND_DENSE_FALLBACK, MetricId.RELATIVE_MACRO_CE_GAIN
-    )
-    if sparse_gains:
+    sparse_support_gains, dense_fallback_gains = _sparse_fallback_gains_by_unit(store)
+    if dense_fallback_gains and sparse_support_gains.get(3):
         sparse = RuleVerdict(
             SimplificationRuleState.APPLIED
             if _sparse_irrelevance_applied(store)
@@ -1308,6 +1535,7 @@ def execute_evidence_classification(
     )
     rows: list[StableJsonPayload] = []
     for hypothesis, adjudication in evaluated:
+        spec = EVIDENCE_SUPPORT_BY_HYPOTHESIS[hypothesis]
         rows.append(
             cast(
                 StableJsonPayload,
@@ -1317,10 +1545,10 @@ def execute_evidence_classification(
                     materiality_result=adjudication.materiality,
                     statistical_result=adjudication.statistical,
                     evidence_completeness=adjudication.completeness,
-                    scope="registered primary evidence",
-                    supporting_table=ReportArtifactName.EVIDENCE_STATUS,
-                    supporting_figure=ReportArtifactName.REAL_TRANSFER_GAIN_FOREST_PLOT,
-                    forbidden_wording="",
+                    scope=spec.scope,
+                    supporting_table=spec.supporting_table,
+                    supporting_figure=spec.supporting_figure,
+                    forbidden_wording=spec.forbidden_wording,
                 ),
             )
         )
@@ -1344,6 +1572,8 @@ def execute_evidence_classification(
         frozenset({ConfigurationSection.METRICS}),
         ImplementationIdentity.CLASSIFICATION_V1,
         ArtifactName("evidence-classification"),
+        upstream_artifact_ids=() if synthesis is None else (synthesis.artifact_id,),
+        declare_no_upstream_inputs=synthesis is None,
     )
 
 
@@ -1354,8 +1584,8 @@ class EvidenceStatusRow(DomainModel):
     statistical_result: FieldDescription
     evidence_completeness: EvidenceCompleteness
     scope: FieldDescription
-    supporting_table: ReportArtifactName
-    supporting_figure: ReportArtifactName
+    supporting_table: ReportArtifactName | None
+    supporting_figure: ReportArtifactName | None
     forbidden_wording: FieldDescription
 
 

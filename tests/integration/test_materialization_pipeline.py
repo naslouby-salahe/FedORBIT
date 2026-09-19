@@ -225,3 +225,118 @@ def test_staged_artifact_promotion_is_atomic_and_torn_records_are_never_reusable
     assert store.is_reusable(torn_manifest.artifact_id) is False
     with pytest.raises(ArtifactValidationError):
         store.resolve(torn_manifest.artifact_id)
+
+
+def test_adapter_through_padding_packet_action_confirmation_and_promotion_chain(
+    tmp_path: Path,
+) -> None:
+    from fedorbit.methods.assimilation import PreTestLifecycle, PreTestPhase
+    from fedorbit.optimization.objective import CurriculumAction, RobustActionProblem
+    from fedorbit.response.packet import build_source_packet
+    from fedorbit.response.uncertainty import FinalResponseEntry, FinalResponseEstimate
+    from fedorbit.types import (
+        AnonymousNodeDisplayId,
+        CoarseGroup,
+        ExposedCoarseGroupId,
+        Rfc3339UtcTimestamp,
+    )
+
+    schema = _schema()
+    rows = (
+        _row(0.10, "normal", "1.0", "http"),
+        _row(0.20, "normal", "2.0", "http"),
+        _row(0.30, "attack", "3.0", "dns"),
+        _row(0.40, "attack", "4.0", "dns"),
+        _row(0.60, "normal", "5.0", "http"),
+        _row(0.75, "attack", "6.0", "dns"),
+        _row(0.85, "normal", "7.0", "http"),
+        _row(0.95, "attack", "8.0", "dns"),
+    )
+    split_result = normalize_and_split_training_rows(schema, rows)
+    assert split_result.duplicate_groups.groups
+    train_duration = np.asarray([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float64)
+    quality = evaluate_feature_quality(
+        (_DURATION,),
+        frozenset(),
+        TrainingFeatureValues({_DURATION: train_duration}),
+    )
+    assert quality.client_invalid is False
+    fitted = fit_numeric_preprocessor(train_duration)
+    transformed = transform_numeric(np.asarray([4.0], dtype=np.float64), fitted)
+    assert transformed.shape == (1,)
+    blocks = build_padded_block_structure(
+        (CoarseGroup.DISRUPTION,),
+        {CoarseGroup.DISRUPTION: 2},
+        {CoarseGroup.DISRUPTION: 1},
+    )
+    assert blocks.total_padded_nodes == 2
+    size = blocks.total_padded_nodes
+    problem = RobustActionProblem(
+        blocks,
+        np.zeros((size, size), dtype=np.float64),
+        np.ones((size, size), dtype=np.float64),
+        np.asarray([1.0, 0.0], dtype=np.float64),
+        np.asarray([0.25, 0.0], dtype=np.float64),
+        np.asarray([0.01, 0.0], dtype=np.float64),
+        0.50,
+        1,
+    )
+    action = CurriculumAction(problem, np.asarray([0.25, 0.0], dtype=np.float64))
+    estimate = FinalResponseEstimate(
+        entries=(
+            FinalResponseEntry(0, 0, 0.3, 0.05, 0.1, 0.5, True),
+            FinalResponseEntry(0, 1, 0.0, 0.0, 0.0, 0.0, False),
+            FinalResponseEntry(1, 0, -0.2, 0.04, -0.4, -0.01, True),
+            FinalResponseEntry(1, 1, 0.0, 0.0, 0.0, 0.0, False),
+        ),
+        critical_value=4.0,
+        useful_intervention_columns=1,
+        median_band_width_ratio=1.3,
+        stability_rule_passed=True,
+    )
+    packet = build_source_packet(
+        estimate,
+        anonymous_fine_node_ids=(
+            AnonymousNodeDisplayId("node-0001"),
+            AnonymousNodeDisplayId("node-0002"),
+        ),
+        exposed_coarse_group_id=ExposedCoarseGroupId("Disruption"),
+        per_node_train_support=(120, 90),
+        per_node_meta_support=(30, 20),
+        per_node_effective_replicate_count=(24, 24),
+        source_checkpoint_sha256=Sha256Digest("a" * 64),
+        response_configuration_sha256=Sha256Digest("b" * 64),
+        creation_timestamp=Rfc3339UtcTimestamp("2026-08-22T00:00:00Z"),
+    )
+    assert packet.payload_sha256()
+    lifecycle = PreTestLifecycle()
+    lifecycle.complete_phase(PreTestPhase.SOURCE_SELECTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.ACTION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.CONFIRMATION_DECISION_FINALIZED)
+    lifecycle.complete_phase(PreTestPhase.ASSIMILATION_SETTLED)
+    lifecycle.complete_phase(PreTestPhase.PRE_TEST_ARTIFACTS_COMMITTED)
+    lifecycle.open_test()
+    lifecycle.assert_opened()
+    store = ArtifactStore(tmp_path / "outputs")
+    payload_bytes = packet.serialized().encode("utf-8")
+    draft_directory = store.staging_dir() / "chain-draft"
+    draft_directory.mkdir(parents=True, exist_ok=True)
+    draft = draft_directory / "packet.json"
+    draft.write_bytes(payload_bytes)
+    active = store.root / "artifacts" / "packet.json"
+    manifest = artifact_manifest(draft, Sha256Digest("4" * 64), ArtifactStage.RAW).model_copy(
+        update={"payload_paths": (str(active),)}
+    )
+    staged_directory = store.staging_area(manifest.artifact_id)
+    staged_directory.mkdir(parents=True, exist_ok=True)
+    staged = staged_directory / "packet.json"
+    staged.write_bytes(payload_bytes)
+    draft.unlink()
+    store.promote_artifact(
+        manifest,
+        artifact_completion(manifest),
+        staged_payloads=(StagedPayload(staged, active),),
+    )
+    assert store.is_reusable(manifest.artifact_id) is True
+    assert action.coordinates[0] == 0.25
+    assert packet.exposed_coarse_group_id == ExposedCoarseGroupId("Disruption")

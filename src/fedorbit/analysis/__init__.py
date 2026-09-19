@@ -3,8 +3,11 @@ from __future__ import annotations
 from fedorbit.analysis.comparisons import (
     PairContrastEvidence,
     PairContrastEvidenceSet,
+    PairingError,
     PairingField,
+    PairingLineage,
     PairingMismatchError,
+    pair_seed_pairing_lineage,
     require_matching_lineage,
 )
 from fedorbit.analysis.metrics import (
@@ -40,7 +43,9 @@ __all__ = [
     "PValueSet",
     "PairContrastEvidence",
     "PairContrastEvidenceSet",
+    "PairingError",
     "PairingField",
+    "PairingLineage",
     "PairingMismatchError",
     "RelativeMacroCeGain",
     "SignFlipResult",
@@ -54,6 +59,7 @@ __all__ = [
     "minimum_valid_seeds_met",
     "nominal_alpha",
     "one_sided_sign_flip_p_value",
+    "pair_seed_pairing_lineage",
     "paired_bca_interval",
     "relative_macro_ce_gain",
     "require_matching_lineage",

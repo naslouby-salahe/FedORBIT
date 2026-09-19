@@ -30,6 +30,7 @@ from fedorbit.datasets.common import (
 from fedorbit.datasets.materialization import (
     MaterializationError,
     MaterializedClient,
+    method_readable_transfer_eligibility,
     transfer_concept_groups,
 )
 from fedorbit.experiments.catalogue import (
@@ -39,17 +40,17 @@ from fedorbit.experiments.catalogue import (
     method_resource_manifest,
 )
 from fedorbit.experiments.cells import experiment_relevance
-from fedorbit.experiments.scoring import (
+from fedorbit.experiments.metric_persistence import (
     build_completion_manifest,
     persist_primary_transfer_metric,
 )
+from fedorbit.experiments.report_rows import transfer_ontology_null_padding_rows
 from fedorbit.experiments.solvers import (
     persist_synthetic_diagnostic_metric,
     registered_transfer_method,
     solver_benchmark_reference_truth,
     synthetic_solver_instance,
 )
-from fedorbit.experiments.synthesis import transfer_ontology_null_padding_rows
 from fedorbit.experiments.synthetic import (
     CouplingGenerationError,
     CouplingInstanceRequest,
@@ -131,8 +132,10 @@ from fedorbit.optimization.objective import (
 )
 from fedorbit.oracle import ORACLE_METHOD
 from fedorbit.types import (
+    PRINCIPAL_EVALUATION_CONDITION,
     ArtifactFingerprint,
     ArtifactIdentifier,
+    ArtifactIdentifiers,
     ArtifactName,
     ArtifactPath,
     ArtifactSchemaVersion,
@@ -308,6 +311,7 @@ def execute_dataset_client_and_resource_validation(
         _persist_blocked_experiment(layout, request, blocked)
     raw_root = raw_dataset_root()
     config = active_config()
+    seed = ExperimentSeed(config.scientific.randomness.confirmatory_seeds[0])
     datasets: list[StableJsonPayload] = []
     materialized: OrderedDict[DatasetId, MaterializedClient] = OrderedDict()
     registered_clients = config.scientific.datasets.clients
@@ -370,6 +374,29 @@ def execute_dataset_client_and_resource_validation(
                         source,
                         target,
                     ),
+                    method_readable_eligibility=tuple(
+                        cast(
+                            StableJsonPayload,
+                            OrderedDict(
+                                client=row.client.value,
+                                seed=seed.value,
+                                coarse_group=row.coarse_group.value,
+                                anonymous_node_id=row.anonymous_node_id,
+                                present=row.present,
+                                train_count=row.train_count,
+                                meta_count=row.meta_count,
+                                confirm_count=row.confirm_count,
+                                test_count=row.test_count,
+                                source_eligible=row.source_eligible,
+                                target_eligible=row.target_eligible,
+                                null_reason=row.null_reason,
+                            ),
+                        )
+                        for row in (
+                            *method_readable_transfer_eligibility(pair.source, source, seed),
+                            *method_readable_transfer_eligibility(pair.target, target, seed),
+                        )
+                    ),
                 ),
             )
         )
@@ -384,7 +411,6 @@ def execute_dataset_client_and_resource_validation(
         config.scientific.datasets.primary_directed_pairs,
         config.scientific.randomness.confirmatory_seeds,
     )
-    seed = ExperimentSeed(config.scientific.randomness.confirmatory_seeds[0])
     return persist_synthetic_experiment_payload(
         store,
         layout,
@@ -404,6 +430,7 @@ def execute_dataset_client_and_resource_validation(
         frozenset(),
         ImplementationIdentity.VALIDATION_V1,
         ArtifactName("dataset-client-resource-validation"),
+        declare_no_upstream_inputs=True,
     )
 
 
@@ -460,6 +487,8 @@ def persist_synthetic_experiment_payload(
     artifact_name: ArtifactName,
     condition: EvaluationConditionName | None = None,
     support: SupportSize | None = None,
+    upstream_artifact_ids: ArtifactIdentifiers = (),
+    declare_no_upstream_inputs: bool = False,
 ) -> ReusableArtifactManifest:
     cell = SemanticCell(
         experiment=request.experiment,
@@ -474,7 +503,7 @@ def persist_synthetic_experiment_payload(
             ArtifactStage.EVALUATION,
             cell,
             relevance,
-            (),
+            upstream_artifact_ids,
             configuration_sections,
             implementation_identity,
         )
@@ -501,6 +530,8 @@ def persist_synthetic_experiment_payload(
         payload_sha256,
         configuration_sha256,
         code_sha256,
+        upstream_artifact_ids=upstream_artifact_ids,
+        has_no_upstream_inputs=not upstream_artifact_ids and declare_no_upstream_inputs,
     )
     manifest = ReusableArtifactManifest.model_validate(
         OrderedDict(
@@ -509,7 +540,7 @@ def persist_synthetic_experiment_payload(
             semantic_producer_coordinates=coordinates,
             producer_stage=ArtifactStage.EVALUATION,
             dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=(),
+            upstream_artifact_ids=upstream_artifact_ids,
             applicable_configuration_sha256=configuration_sha256,
             relevant_code_sha256=code_sha256,
             payload_paths=(str(payload_path),),
@@ -520,6 +551,7 @@ def persist_synthetic_experiment_payload(
             state=ArtifactState.COMPLETED,
             completion_required=True,
             completion_manifest_sha256=completion.completion_manifest_sha256,
+            has_no_upstream_inputs=not upstream_artifact_ids and declare_no_upstream_inputs,
         )
     )
     store.write_completed(manifest, completion)
@@ -599,6 +631,7 @@ def execute_exact_sparse_theorem_exhaustive_validation(
                             f"pattern-{pattern_key}-seed{seed}-instance{instance_index}"
                         ),
                         SupportSize(support),
+                        declare_no_upstream_inputs=True,
                     )
                     instance_artifact_ids.append(manifest.artifact_id)
     return persist_synthetic_experiment_payload(
@@ -618,6 +651,8 @@ def execute_exact_sparse_theorem_exhaustive_validation(
         _THEOREM_VALIDATION_CONFIGURATION_SECTIONS,
         ImplementationIdentity.VALIDATION_V1,
         ArtifactName("theorem-exhaustive-validation"),
+        upstream_artifact_ids=tuple(dict.fromkeys(instance_artifact_ids)),
+        declare_no_upstream_inputs=not instance_artifact_ids,
     )
 
 
@@ -766,6 +801,7 @@ def execute_coupling_and_map_bound_validation(
                                 ArtifactName(f"coupling-validation.{condition_label}.s{support}"),
                                 EvaluationConditionName(condition_label),
                                 SupportSize(support),
+                                declare_no_upstream_inputs=True,
                             )
                             cell_artifact_ids.append(manifest.artifact_id)
                             payload = json.loads(Path(manifest.payload_paths[0]).read_text())
@@ -810,6 +846,8 @@ def execute_coupling_and_map_bound_validation(
         _COUPLING_VALIDATION_CONFIGURATION_SECTIONS,
         ImplementationIdentity.VALIDATION_V1,
         ArtifactName("coupling-and-map-bound-validation"),
+        upstream_artifact_ids=tuple(dict.fromkeys(cell_artifact_ids)),
+        declare_no_upstream_inputs=not cell_artifact_ids,
     )
 
 
@@ -1166,6 +1204,7 @@ def persist_real_pair_baseline_validation(
                     MetricDirection.HIGHER_IS_BETTER,
                     (ArtifactIdentifier("materialized-client-schema"),),
                     request.overwrite_policy,
+                    PRINCIPAL_EVALUATION_CONDITION.name,
                     valid=unavailable_reason is None,
                     invalid_reason=unavailable_reason,
                 )
@@ -1185,7 +1224,7 @@ _CONFIGURATION_SECTIONS = frozenset(
 def execute_primitive_validation(
     store: ArtifactStore,
     layout: WorkspaceLayout,
-    overwrite_policy: OverwritePolicy = OverwritePolicy.REUSE,
+    overwrite_policy: OverwritePolicy,
 ) -> ReusableArtifactManifest:
     configuration = active_config()
     definition = build_catalogue().definition(_EXPERIMENT)

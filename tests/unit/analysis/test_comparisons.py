@@ -123,3 +123,27 @@ def test_single_field_lineage_mismatch_is_rejected(
         require_matching_lineage(_observation(), counterpart)
     assert raised.value.field is field
     assert field.value in str(raised.value)
+
+
+def test_pair_seed_pairing_lineage_is_shared_across_methods_of_the_same_seed(
+    config: FedorbitConfig,
+) -> None:
+    from fedorbit.analysis.comparisons import pair_seed_pairing_lineage
+    from fedorbit.types import ArtifactIdentifier, DirectedPairName
+
+    del config
+    pair = DirectedPairName("client-a -> client-b")
+    checkpoint = ArtifactIdentifier("checkpoint-a")
+    left = pair_seed_pairing_lineage(pair, 1103, checkpoint)
+    right = pair_seed_pairing_lineage(pair, 1103, checkpoint)
+    require_matching_lineage(
+        PairedObservation(TransferMethod.LOCAL_ONLY, 0.4, left),
+        PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.3, right),
+    )
+    mismatched = pair_seed_pairing_lineage(pair, 1103, ArtifactIdentifier("checkpoint-b"))
+    with pytest.raises(PairingMismatchError) as raised:
+        require_matching_lineage(
+            PairedObservation(TransferMethod.LOCAL_ONLY, 0.4, left),
+            PairedObservation(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER, 0.3, mismatched),
+        )
+    assert raised.value.field is PairingField.TARGET_PRE_TRANSFER_CHECKPOINT

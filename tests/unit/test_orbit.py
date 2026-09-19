@@ -8,14 +8,23 @@ import numpy as np
 import pytest
 
 from fedorbit.datasets.materialization import TransferConceptGroup
-from fedorbit.experiments.scoring import registered_exact_correspondence
+from fedorbit.experiments.assembly import registered_exact_correspondence
 from fedorbit.infrastructure.runtime import RandomSeed
 from fedorbit.interface import (
     AnonymityCoordinate,
     AnonymityCoordinateEntry,
     anonymous_node_order,
 )
-from fedorbit.optimization.certificates import build_rectangular_hull
+from fedorbit.methods.baselines import (
+    coupling_upper_bound_diagnostic,
+    optimize_against_fixed_matrix,
+)
+from fedorbit.optimization.certificates import (
+    build_rectangular_hull,
+    orbit_value_over_candidates,
+    rectangular_value_over_candidates,
+    robust_coupling_gap,
+)
 from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     BlockNodeCounts,
@@ -28,12 +37,14 @@ from fedorbit.optimization.correspondence import (
     falling_factorial,
 )
 from fedorbit.optimization.diagnostics import fixed_action_rectangularization_gap
+from fedorbit.optimization.exact_sparse import solve_robust_action
 from fedorbit.optimization.objective import (
     CurriculumAction,
     RobustActionProblem,
     evaluate_objective,
     h_orb,
     h_rect,
+    zero_action,
 )
 from fedorbit.response.packet import (
     PacketField,
@@ -270,6 +281,49 @@ def test_fixed_action_rectangularization_gap_matches_direct_orbit_minimum() -> N
         expected_gap, abs=1e-12
     )
     assert expected_gap >= 0.0
+
+
+def test_coupling_upper_bound_diagnostic_matches_independent_knapsack_optimum() -> None:
+    problem, lower_response = _rectangular_hull_fixture()
+    hull = build_rectangular_hull(problem.blocks, lower_response, problem.upper_response_matrix)
+
+    spread = hull.upper_bounds - hull.lower_bounds
+    objective_row = problem.target_importance @ spread
+    order = sorted(range(len(objective_row)), key=lambda index: objective_row[index], reverse=True)
+    remaining_budget = problem.total_budget
+    expected = 0.0
+    for index in order:
+        allocation = min(problem.coordinate_caps[index], remaining_budget)
+        expected += objective_row[index] * allocation
+        remaining_budget -= allocation
+        if remaining_budget <= 0.0:
+            break
+
+    assert coupling_upper_bound_diagnostic(problem, hull) == pytest.approx(expected, abs=1e-9)
+
+
+def test_robust_coupling_gap_candidate_triple_matches_each_solvers_own_certified_optimum() -> None:
+    problem, lower_response = _rectangular_hull_fixture()
+    orbit = tuple(enumerate_block_permutations(problem.blocks))
+    hull = build_rectangular_hull(problem.blocks, lower_response, problem.upper_response_matrix)
+
+    exact_solution = solve_robust_action(problem)
+    rectangular_solution = optimize_against_fixed_matrix(problem, hull.lower_bounds)
+    candidates = (
+        exact_solution.selected_action,
+        rectangular_solution.selected_action,
+        zero_action(problem),
+    )
+
+    assert orbit_value_over_candidates(
+        (exact_solution.selected_action,), problem, orbit
+    ) == pytest.approx(exact_solution.certified_robust_value, abs=1e-9)
+    assert rectangular_value_over_candidates(
+        (rectangular_solution.selected_action,), problem, hull
+    ) == pytest.approx(rectangular_solution.objective_value, abs=1e-9)
+    assert robust_coupling_gap(candidates, problem, orbit, hull) == pytest.approx(
+        exact_solution.certified_robust_value - rectangular_solution.objective_value, abs=1e-9
+    )
 
 
 def _block_keyed(

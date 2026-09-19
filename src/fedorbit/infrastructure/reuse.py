@@ -123,6 +123,18 @@ def validate_stage_lineage_completeness(
 ) -> None:
     if not STAGE_DEPENDENCIES.get(manifest.producer_stage):
         return
+    if manifest.has_no_upstream_inputs != completion.has_no_upstream_inputs:
+        raise ArtifactValidationError(
+            f"artifact {manifest.artifact_id} at stage {manifest.producer_stage.value} disagrees "
+            "with its completion record on has_no_upstream_inputs"
+        )
+    if manifest.has_no_upstream_inputs:
+        if manifest.upstream_artifact_ids or recorded_upstream_artifact_ids(completion):
+            raise ArtifactValidationError(
+                f"artifact {manifest.artifact_id} at stage {manifest.producer_stage.value} "
+                "declares has_no_upstream_inputs but records upstream artifact identities"
+            )
+        return
     if not manifest.upstream_artifact_ids:
         raise ArtifactValidationError(
             f"artifact {manifest.artifact_id} at stage {manifest.producer_stage.value} does not "

@@ -1,85 +1,55 @@
 from __future__ import annotations
 
 import hashlib
-import math
-import statistics
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from pathlib import Path
-from typing import cast
 
-import numpy as np
 import torch
-from numpy.typing import NDArray
 
-from fedorbit.analysis.metrics import (
-    ClassF1,
-    ClassF1Set,
-    ClassRecall,
-    ClassRecallSet,
-    balanced_accuracy,
-    confusion_counts,
-    f1_from_counts,
-    macro_f1,
-    recall_from_counts,
-)
 from fedorbit.analysis.records import (
-    DiagnosticMetricRecord,
-    DiagnosticMetricRecordCollection,
     MetricDirection,
-    MetricRecord,
-    MetricRecordCollection,
-    validate_diagnostic_metric_records,
-    validate_metric_records,
 )
 from fedorbit.config.loading import active_config
-from fedorbit.datasets.common import (
-    FieldRole,
-    file_sha256,
-)
 from fedorbit.datasets.materialization import (
     MaterializedClient,
     SplitTensors,
-    TransferConceptGroup,
-    transfer_concept_groups,
 )
-from fedorbit.datasets.ontology import TRANSFER_ONTOLOGY
-from fedorbit.experiments.catalogue import ExperimentExecutionRequest, method_resource_manifest
-from fedorbit.experiments.cells import experiment_relevance
+from fedorbit.experiments.assembly import (
+    assemble_cross_client_response_matrix,
+    assemble_principal_action,
+    assemble_self_response_matrix,
+    assemble_target_response_matrix,
+    common_eligible_groups,
+    cross_client_padded_blocks,
+    curriculum_multipliers_from_action,
+    eligible_groups_by_coarse,
+    load_dataset_source_packet,
+    pair_seed_structure,
+    persist_or_reuse_target_importance,
+    resolve_checkpoint_artifact_id,
+    self_padded_blocks,
+    strict_pair_resource_validity,
+    target_confirmatory_checkpoint_path,
+    target_node_risks,
+)
+from fedorbit.experiments.catalogue import method_resource_manifest
+from fedorbit.experiments.metric_persistence import (
+    persist_primary_transfer_metric,
+)
 from fedorbit.infrastructure.artifacts import (
     ArtifactStore,
-    ExecutionError,
-)
-from fedorbit.infrastructure.environment import environment_snapshot
-from fedorbit.infrastructure.manifests import (
-    CompletionManifest,
-    ReusableArtifactManifest,
-    artifact_id,
-    build_artifact_completion,
-)
-from fedorbit.infrastructure.provenance import (
-    configuration_subset_digest,
-    implementation_fingerprint,
-    stage_dependency_fingerprint,
 )
 from fedorbit.infrastructure.runtime import (
     RandomSeed,
-    current_code_revision,
+    execution_logger,
 )
-from fedorbit.infrastructure.storage import atomic_write_json
 from fedorbit.infrastructure.workspace import (
     WorkspaceLayout,
-    experiment_workspace,
 )
 from fedorbit.interface import (
     AccessLogger,
     ResourceKind,
-    validate_disjoint_feature_namespaces,
     validate_dynamic_access_log_scan,
-    validate_no_cross_client_entity_ids,
-    validate_no_cross_client_timestamp_pairing,
-    validate_resource_manifest_equality,
 )
 from fedorbit.learning.checkpoints import load_base_checkpoint
 from fedorbit.learning.pilot import (
@@ -111,10 +81,8 @@ from fedorbit.methods.baselines import (
 )
 from fedorbit.methods.target import (
     CurriculumMultipliers,
-    TargetImportanceError,
+    TargetOptimizerBudgetCategory,
     TargetOptimizerStepLedger,
-    TransferNodeRisk,
-    build_target_importance,
 )
 from fedorbit.optimization.certificates import (
     build_rectangular_hull,
@@ -123,8 +91,6 @@ from fedorbit.optimization.correspondence import (
     BlockCorrespondence,
     PaddedBlockStructure,
     ResponseMatrix,
-    build_padded_block_structure,
-    correspondence_block_id,
 )
 from fedorbit.optimization.dense_ccp import solve_dense_ccp
 from fedorbit.optimization.exact_qap import (
@@ -144,121 +110,28 @@ from fedorbit.response.packet import (
 )
 from fedorbit.types import (
     PRINCIPAL_EVALUATION_CONDITION,
-    ArtifactDirectorySegment,
-    ArtifactFingerprint,
     ArtifactIdentifier,
-    ArtifactIdentifiers,
-    ArtifactPath,
-    ArtifactSchemaVersion,
-    ArtifactStage,
-    ArtifactState,
-    ArtifactType,
-    CheckpointDirectorySegment,
-    CheckpointFileName,
     ClassCount,
-    ClassIndex,
     ClientRole,
     CoarseGroup,
-    ConfigurationSection,
     ContrastCoordinates,
-    CorrespondenceBlockId,
     DatasetId,
-    DirectedPair,
-    DirectedPairName,
-    Estimate,
-    EvaluationConditionName,
+    ExecutionEventName,
     ExperimentName,
-    ExperimentSeed,
     FilesystemSlug,
-    ImplementationIdentity,
-    Index,
-    InvalidReason,
     MetricId,
     MetricUnit,
     MutableCell,
-    OracleTransferConcept,
     OverwritePolicy,
-    PairSeedIneligibilityReason,
-    SampleCount,
-    ScaleFactor,
     Score,
-    SemanticCell,
     SemanticCoordinates,
-    SemanticCoordinateText,
-    SemanticPartitionId,
-    SemanticPartitionSpecification,
-    SerializedPacket,
     Sha256Digest,
     SourceClientName,
     Split,
-    StableJsonPayload,
-    StorageLayoutSegment,
-    StrictResourceValidity,
-    StrictResourceViolationError,
     SupportCount,
-    TabularColumnName,
     TransferMethod,
     directed_pair_name,
 )
-
-
-def build_completion_manifest(
-    coordinates: SemanticCoordinateText,
-    fingerprint: Sha256Digest,
-    payload_path: ArtifactPath,
-    payload_sha256: Sha256Digest,
-    configuration_sha256: Sha256Digest,
-    code_sha256: Sha256Digest,
-    stage: ArtifactStage = ArtifactStage.EVALUATION,
-    upstream_artifact_ids: ArtifactIdentifiers = (),
-) -> CompletionManifest:
-    return build_artifact_completion(
-        coordinates,
-        fingerprint,
-        payload_path,
-        payload_sha256,
-        configuration_sha256,
-        code_sha256,
-        stage,
-        upstream_artifact_ids=upstream_artifact_ids,
-    )
-
-
-def latest_completed_manifest(
-    store: ArtifactStore, experiment: ExperimentName
-) -> ReusableArtifactManifest | None:
-    return store.current_completed_manifest(experiment.value)
-
-
-_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS = frozenset(
-    {ConfigurationSection.MODELS, ConfigurationSection.METRICS}
-)
-
-
-def _target_confirmatory_checkpoint_path(
-    layout: WorkspaceLayout,
-    target: DatasetId,
-    seed: RandomSeed,
-    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
-) -> Path:
-    return (
-        experiment_workspace(layout, checkpoint_source_experiment)
-        / StorageLayoutSegment.CHECKPOINTS
-        / CheckpointDirectorySegment.TRAINING
-        / target.value
-        / f"seed-{seed}"
-        / CheckpointFileName.CHECKPOINT
-    )
-
-
-def _checkpoint_artifact_id(
-    store: ArtifactStore, checkpoint_path: Path
-) -> ArtifactIdentifier | None:
-    target_path = str(checkpoint_path)
-    for manifest in store.all_manifests():
-        if manifest.payload_paths == (target_path,):
-            return manifest.artifact_id
-    return None
 
 
 def score_local_only_cell(
@@ -270,12 +143,12 @@ def score_local_only_cell(
     device: torch.device,
     checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
 ) -> tuple[ScoreArtifact, ClassCount, ArtifactIdentifier] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(
+    checkpoint_path = target_confirmatory_checkpoint_path(
         layout, target, seed, checkpoint_source_experiment
     )
     if not checkpoint_path.is_file():
         return None
-    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    checkpoint_artifact_id = resolve_checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
     checkpoint = load_base_checkpoint(checkpoint_path)
@@ -290,557 +163,21 @@ def score_local_only_cell(
         device,
     )
     checkpoint.state_dict.load_into(model)
+    access = AccessLogger()
+    access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
+    validate_dynamic_access_log_scan(
+        access.trace(), method_resource_manifest(TransferMethod.LOCAL_ONLY)
+    )
+    execution_logger().event(
+        ExecutionEventName.SCORING_CELL,
+        method=TransferMethod.LOCAL_ONLY.value,
+        dataset=target.value,
+        seed=seed,
+    )
     score = score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
     return score, n_classes, checkpoint_artifact_id
-
-
-def class_metric_sets(
-    score: ScoreArtifact, n_classes: ClassCount
-) -> tuple[ClassF1Set, ClassRecallSet]:
-    predicted = tuple(ClassIndex(row.predicted_class.value) for row in score.rows)
-    actual = tuple(ClassIndex(row.target.value) for row in score.rows)
-    f1_values: list[ClassF1] = []
-    recall_values: list[ClassRecall] = []
-    for class_index in range(n_classes):
-        counts = confusion_counts(predicted, actual, ClassIndex(class_index))
-        recall_values.append(
-            ClassRecall(recall_from_counts(counts.true_positives, counts.false_negatives))
-        )
-        f1_values.append(
-            ClassF1(
-                f1_from_counts(
-                    counts.true_positives, counts.false_positives, counts.false_negatives
-                )
-            )
-        )
-    return ClassF1Set(tuple(f1_values)), ClassRecallSet(tuple(recall_values))
-
-
-def persist_primary_transfer_metric(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    experiment: ExperimentName,
-    pair_direction: DirectedPairName,
-    directed_pair_source: DatasetId,
-    directed_pair_target: DatasetId,
-    method: TransferMethod,
-    seed: RandomSeed,
-    metric_name: MetricId,
-    metric_value: Estimate | None,
-    metric_unit: MetricUnit,
-    direction: MetricDirection,
-    input_artifact_ids: ArtifactIdentifiers,
-    overwrite_policy: OverwritePolicy,
-    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
-    valid: bool = True,
-    invalid_reason: InvalidReason | None = None,
-) -> ReusableArtifactManifest | None:
-    relevance = experiment_relevance(experiment)
-    cell = SemanticCell(
-        experiment=experiment,
-        directed_pair=DirectedPair(source=directed_pair_source, target=directed_pair_target),
-        method=method,
-        condition=condition,
-        seed=ExperimentSeed(seed),
-    )
-    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
-    fingerprint = Sha256Digest(
-        stage_dependency_fingerprint(
-            ArtifactStage.EVALUATION,
-            cell,
-            relevance,
-            input_artifact_ids,
-            _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
-            ImplementationIdentity.SCORING_V1,
-            metric_name=metric_name,
-        )
-    )
-    if overwrite_policy == OverwritePolicy.REUSE:
-        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
-        if existing is not None:
-            return existing
-    metric = MetricRecord(
-        experiment=experiment,
-        pair=pair_direction,
-        method=method,
-        condition=condition,
-        seed=seed,
-        metric_name=metric_name,
-        metric_value=metric_value,
-        metric_unit=metric_unit,
-        direction=direction,
-        evaluation_class_set_sha256=Sha256Digest(
-            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
-        ),
-        input_artifact_ids=tuple(input_artifact_ids),
-        dependency_fingerprint_sha256=fingerprint,
-        valid=valid,
-        invalid_reason=invalid_reason,
-    )
-    validate_metric_records(MetricRecordCollection((metric,)))
-    payload_path = (
-        experiment_workspace(layout, experiment)
-        / StorageLayoutSegment.ARTIFACTS
-        / StorageLayoutSegment.DERIVED
-        / (
-            f"metric.{directed_pair_source.value}-{directed_pair_target.value}"
-            f".{method.value}.{condition}.{seed}.{metric_name.value}.json"
-        )
-    )
-    payload = cast(StableJsonPayload, OrderedDict(metric_record=metric.model_dump(mode="json")))
-    atomic_write_json(payload_path, payload)
-    payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = Sha256Digest(
-        configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
-    )
-    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SCORING_V1))
-    completion = build_completion_manifest(
-        coordinates,
-        fingerprint,
-        ArtifactPath(payload_path),
-        payload_sha256,
-        configuration_sha256,
-        code_sha256,
-        stage=ArtifactStage.EVALUATION,
-        upstream_artifact_ids=tuple(input_artifact_ids),
-    )
-    manifest = ReusableArtifactManifest.model_validate(
-        OrderedDict(
-            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
-            artifact_type=ArtifactType.PREDICTION,
-            semantic_producer_coordinates=coordinates,
-            producer_stage=ArtifactStage.EVALUATION,
-            dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=tuple(input_artifact_ids),
-            applicable_configuration_sha256=configuration_sha256,
-            relevant_code_sha256=code_sha256,
-            payload_paths=(str(payload_path),),
-            payload_sha256=payload_sha256,
-            schema_version=ArtifactSchemaVersion.V1,
-            created_git_commit=current_code_revision().commit,
-            created_environment_sha256=environment_snapshot().fingerprint_sha256,
-            state=ArtifactState.COMPLETED,
-            completion_required=True,
-            completion_manifest_sha256=completion.completion_manifest_sha256,
-        )
-    )
-    store.write_completed(manifest, completion)
-    return manifest
-
-
-def persist_diagnostic_metric(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    experiment: ExperimentName,
-    dataset: DatasetId,
-    condition: EvaluationConditionName,
-    seed: RandomSeed,
-    metric_name: MetricId,
-    metric_value: Estimate | None,
-    metric_unit: MetricUnit,
-    direction: MetricDirection,
-    input_artifact_ids: ArtifactIdentifiers,
-    overwrite_policy: OverwritePolicy,
-    valid: bool = True,
-    invalid_reason: InvalidReason | None = None,
-) -> ReusableArtifactManifest | None:
-    relevance = experiment_relevance(experiment)
-    cell = SemanticCell(
-        experiment=experiment,
-        dataset=dataset,
-        condition=condition,
-        seed=ExperimentSeed(seed),
-    )
-    coordinates = SemanticCoordinateText(cell.identity_json(relevance))
-    fingerprint = Sha256Digest(
-        stage_dependency_fingerprint(
-            ArtifactStage.EVALUATION,
-            cell,
-            relevance,
-            input_artifact_ids,
-            _PRIMARY_TRANSFER_CONFIGURATION_SECTIONS,
-            ImplementationIdentity.SCORING_V1,
-            metric_name=metric_name,
-        )
-    )
-    if overwrite_policy == OverwritePolicy.REUSE:
-        existing = store.find_by_fingerprint(ArtifactFingerprint(fingerprint))
-        if existing is not None:
-            return existing
-    metric = DiagnosticMetricRecord(
-        experiment=experiment,
-        dataset=dataset,
-        condition=condition,
-        seed=seed,
-        metric_name=metric_name,
-        metric_value=metric_value,
-        metric_unit=metric_unit,
-        direction=direction,
-        evaluation_class_set_sha256=Sha256Digest(
-            hashlib.sha256(coordinates.encode("utf-8")).hexdigest()
-        ),
-        input_artifact_ids=tuple(input_artifact_ids),
-        dependency_fingerprint_sha256=fingerprint,
-        valid=valid,
-        invalid_reason=invalid_reason,
-    )
-    validate_diagnostic_metric_records(DiagnosticMetricRecordCollection((metric,)))
-    payload_path = (
-        experiment_workspace(layout, experiment)
-        / StorageLayoutSegment.ARTIFACTS
-        / StorageLayoutSegment.DERIVED
-        / f"diagnostic.{dataset.value}.{condition}.{seed}.{metric_name.value}.json"
-    )
-    payload = cast(
-        StableJsonPayload, OrderedDict(diagnostic_metric_record=metric.model_dump(mode="json"))
-    )
-    atomic_write_json(payload_path, payload)
-    payload_sha256 = file_sha256(payload_path)
-    configuration_sha256 = Sha256Digest(
-        configuration_subset_digest(_PRIMARY_TRANSFER_CONFIGURATION_SECTIONS)
-    )
-    code_sha256 = Sha256Digest(implementation_fingerprint(ImplementationIdentity.SCORING_V1))
-    completion = build_completion_manifest(
-        coordinates,
-        fingerprint,
-        ArtifactPath(payload_path),
-        payload_sha256,
-        configuration_sha256,
-        code_sha256,
-        stage=ArtifactStage.EVALUATION,
-        upstream_artifact_ids=tuple(input_artifact_ids),
-    )
-    manifest = ReusableArtifactManifest.model_validate(
-        OrderedDict(
-            artifact_id=artifact_id(ArtifactType.PREDICTION, payload, Sha256Digest(fingerprint)),
-            artifact_type=ArtifactType.PREDICTION,
-            semantic_producer_coordinates=coordinates,
-            producer_stage=ArtifactStage.EVALUATION,
-            dependency_fingerprint_sha256=fingerprint,
-            upstream_artifact_ids=tuple(input_artifact_ids),
-            applicable_configuration_sha256=configuration_sha256,
-            relevant_code_sha256=code_sha256,
-            payload_paths=(str(payload_path),),
-            payload_sha256=payload_sha256,
-            schema_version=ArtifactSchemaVersion.V1,
-            created_git_commit=current_code_revision().commit,
-            created_environment_sha256=environment_snapshot().fingerprint_sha256,
-            state=ArtifactState.COMPLETED,
-            completion_required=True,
-            completion_manifest_sha256=completion.completion_manifest_sha256,
-        )
-    )
-    store.write_completed(manifest, completion)
-    return manifest
-
-
-def persist_ineligible_transfer_cell(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    experiment: ExperimentName,
-    pair_direction: DirectedPairName,
-    directed_pair_source: DatasetId,
-    directed_pair_target: DatasetId,
-    method: TransferMethod,
-    seed: RandomSeed,
-    overwrite_policy: OverwritePolicy,
-    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
-    pair_seed_ineligibility_reason: PairSeedIneligibilityReason | None = None,
-) -> ReusableArtifactManifest | None:
-    return persist_primary_transfer_metric(
-        store,
-        layout,
-        experiment,
-        pair_direction,
-        directed_pair_source,
-        directed_pair_target,
-        method,
-        seed,
-        MetricId.ABSTENTION_INDICATOR,
-        None,
-        MetricUnit.BOOLEAN,
-        MetricDirection.DESCRIPTIVE,
-        (ArtifactIdentifier("ineligible-cell"),),
-        overwrite_policy,
-        condition,
-        valid=False,
-        invalid_reason=(
-            InvalidReason("INELIGIBLE/ABSTAIN")
-            if pair_seed_ineligibility_reason is None
-            else InvalidReason(pair_seed_ineligibility_reason.value)
-        ),
-    )
-
-
-def persist_primary_transfer_cell_metrics(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    request: ExperimentExecutionRequest,
-    pair_direction: DirectedPairName,
-    source: DatasetId,
-    target: DatasetId,
-    method: TransferMethod,
-    seed: RandomSeed,
-    score: ScoreArtifact,
-    n_classes: ClassCount,
-    input_artifact_ids: tuple[ArtifactIdentifier, ...],
-    condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
-) -> None:
-    f1_set, recall_set = class_metric_sets(score, n_classes)
-    for metric_name, metric_value, metric_unit, direction in (
-        (
-            MetricId.MACRO_CROSS_ENTROPY,
-            float(score.macro_cross_entropy.value),
-            MetricUnit.NATS,
-            MetricDirection.LOWER_IS_BETTER,
-        ),
-        (
-            MetricId.MACRO_F1,
-            float(macro_f1(f1_set).value),
-            MetricUnit.FRACTION,
-            MetricDirection.HIGHER_IS_BETTER,
-        ),
-        (
-            MetricId.BALANCED_ACCURACY,
-            float(balanced_accuracy(recall_set).value),
-            MetricUnit.FRACTION,
-            MetricDirection.HIGHER_IS_BETTER,
-        ),
-    ):
-        persist_primary_transfer_metric(
-            store,
-            layout,
-            request.experiment,
-            pair_direction,
-            source,
-            target,
-            method,
-            seed,
-            metric_name,
-            metric_value,
-            metric_unit,
-            direction,
-            input_artifact_ids,
-            request.overwrite_policy,
-            condition,
-        )
-
-
-def persist_boundary_diagnostic_metrics(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    request: ExperimentExecutionRequest,
-    pair_direction: DirectedPairName,
-    source: DatasetId,
-    target: DatasetId,
-    method: TransferMethod,
-    seed: RandomSeed,
-    input_artifact_ids: tuple[ArtifactIdentifier, ...],
-    condition: EvaluationConditionName,
-    certified_value: Score | None,
-    action: CurriculumAction | None,
-    confirmation_accepted: bool | None,
-) -> None:
-    diagnostics: list[tuple[MetricId, float, MetricUnit, MetricDirection]] = []
-    if certified_value is not None:
-        diagnostics.append(
-            (
-                MetricId.CERTIFIED_ROBUST_PREDICTED_VALUE,
-                float(certified_value),
-                MetricUnit.SCORE,
-                MetricDirection.DESCRIPTIVE,
-            )
-        )
-    if action is not None:
-        abstained = 1.0 if bool(np.all(action.coordinates == 0.0)) else 0.0
-        diagnostics.append(
-            (
-                MetricId.ABSTENTION_INDICATOR,
-                abstained,
-                MetricUnit.BOOLEAN,
-                MetricDirection.DESCRIPTIVE,
-            )
-        )
-        zero_cap_mask: NDArray[np.bool_] = action.problem.coordinate_caps == 0.0
-        null_node_count = float(np.sum(zero_cap_mask))
-        diagnostics.append(
-            (
-                MetricId.NULL_NODE_COUNT,
-                null_node_count,
-                MetricUnit.COUNT,
-                MetricDirection.DESCRIPTIVE,
-            )
-        )
-        diagnostics.append(
-            (
-                MetricId.ORBIT_SIZE,
-                float(action.problem.blocks.orbit_size),
-                MetricUnit.COUNT,
-                MetricDirection.DESCRIPTIVE,
-            )
-        )
-    if confirmation_accepted is not None:
-        diagnostics.append(
-            (
-                MetricId.PROPOSAL_ACCEPTANCE_RATE,
-                1.0 if confirmation_accepted else 0.0,
-                MetricUnit.FRACTION,
-                MetricDirection.HIGHER_IS_BETTER,
-            )
-        )
-    for metric_name, metric_value, metric_unit, direction in diagnostics:
-        persist_primary_transfer_metric(
-            store,
-            layout,
-            request.experiment,
-            pair_direction,
-            source,
-            target,
-            method,
-            seed,
-            metric_name,
-            metric_value,
-            metric_unit,
-            direction,
-            input_artifact_ids,
-            request.overwrite_policy,
-            condition,
-        )
-
-
-def eligible_groups_by_coarse(
-    dataset: DatasetId,
-    materialized: MaterializedClient,
-    role: ClientRole,
-) -> Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]:
-    eligible_by_group: OrderedDict[CoarseGroup, list[TransferConceptGroup]] = OrderedDict()
-    for group in transfer_concept_groups(dataset, materialized):
-        eligible = group.source_eligible if role is ClientRole.SOURCE else group.target_eligible
-        if eligible:
-            eligible_by_group.setdefault(TRANSFER_ONTOLOGY[group.concept][0], []).append(group)
-    return OrderedDict((coarse, tuple(groups)) for coarse, groups in eligible_by_group.items())
-
-
-def self_padded_blocks(
-    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-) -> PaddedBlockStructure:
-    coarse_groups = tuple(eligible_groups_by_coarse.keys())
-    counts = OrderedDict(
-        (coarse, len(groups)) for coarse, groups in eligible_groups_by_coarse.items()
-    )
-    return build_padded_block_structure(coarse_groups, counts, counts)
-
-
-def load_dataset_source_packet(
-    layout: WorkspaceLayout,
-    target: DatasetId,
-    seed: RandomSeed,
-    coarse_group: CoarseGroup,
-) -> SourcePacket | None:
-    path = (
-        experiment_workspace(layout, ExperimentName.FINAL_SOURCE_RESPONSE_BAND_VALIDATION)
-        / StorageLayoutSegment.ARTIFACTS
-        / ArtifactDirectorySegment.PACKETS
-        / target.value
-        / f"seed-{seed}"
-        / f"{coarse_group.value.casefold().replace(' ', '-')}.json"
-    )
-    if not path.is_file():
-        return None
-    return SourcePacket.from_serialized(SerializedPacket(path.read_text(encoding="utf-8")))
-
-
-def _packet_for_block(
-    packets_by_coarse_group: Mapping[CoarseGroup, SourcePacket],
-    block: CorrespondenceBlockId,
-) -> SourcePacket | None:
-    for key, packet in packets_by_coarse_group.items():
-        if correspondence_block_id(key) == block:
-            return packet
-    return None
-
-
-def assemble_self_response_matrix(
-    blocks: PaddedBlockStructure,
-    packets_by_coarse_group: Mapping[CoarseGroup, SourcePacket],
-) -> ResponseMatrix:
-    size = blocks.total_padded_nodes
-    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
-    for block_index, coarse_group in enumerate(blocks.coarse_groups):
-        packet = _packet_for_block(packets_by_coarse_group, coarse_group)
-        if packet is None:
-            continue
-        block_range = blocks.block_index_range(block_index)
-        block_size = block_range.stop - block_range.start
-        submatrix = packet.lower_matrix()
-        if submatrix.shape != (block_size, block_size):
-            raise ExecutionError(
-                f"source packet for {coarse_group} has shape {submatrix.shape}, "
-                f"expected {(block_size, block_size)}"
-            )
-        matrix[block_range.start : block_range.stop, block_range.start : block_range.stop] = (
-            submatrix
-        )
-    return matrix
-
-
-def _eligible_groups_for_block(
-    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-    | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
-    block: CorrespondenceBlockId,
-) -> tuple[TransferConceptGroup, ...]:
-    for key, groups in eligible_groups_by_coarse.items():
-        if correspondence_block_id(key) == block:
-            return groups
-    return ()
-
-
-def target_node_risks(
-    blocks: PaddedBlockStructure,
-    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-    | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
-    class_conditional_cross_entropy: tuple[Estimate, ...],
-) -> tuple[TransferNodeRisk, ...]:
-    risks: list[TransferNodeRisk] = []
-    for block_index, coarse_group in enumerate(blocks.coarse_groups):
-        groups = _eligible_groups_for_block(eligible_groups_by_coarse, coarse_group)
-        block_range = blocks.block_index_range(block_index)
-        for offset, node_index in enumerate(block_range):
-            if offset < len(groups):
-                relevant = [
-                    class_conditional_cross_entropy[class_index]
-                    for class_index in groups[offset].native_class_indices
-                    if math.isfinite(class_conditional_cross_entropy[class_index])
-                ]
-                risk = statistics.fmean(relevant) if relevant else 0.0
-                risks.append(TransferNodeRisk(node_index, True, risk))
-            else:
-                risks.append(TransferNodeRisk(node_index, False, 0.0))
-    return tuple(risks)
-
-
-def curriculum_multipliers_from_action(
-    action: CurriculumAction,
-    blocks: PaddedBlockStructure,
-    eligible_groups_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-    | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
-    n_classes: ClassCount,
-) -> CurriculumMultipliers:
-    values = torch.ones(n_classes, dtype=torch.float64)
-    for block_index, coarse_group in enumerate(blocks.coarse_groups):
-        groups = _eligible_groups_for_block(eligible_groups_by_coarse, coarse_group)
-        block_range = blocks.block_index_range(block_index)
-        for offset, node_index in enumerate(block_range):
-            if offset >= len(groups):
-                continue
-            alpha = float(action.coordinates[node_index])
-            if alpha <= 0.0:
-                continue
-            for class_index in groups[offset].native_class_indices:
-                values[class_index] = 1.0 + alpha
-    return CurriculumMultipliers(values)
 
 
 def _confirm_assimilate_and_score(
@@ -913,10 +250,7 @@ def _confirm_assimilate_and_score(
     lifecycle.open_test()
     lifecycle.assert_opened()
     access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
-    validate_dynamic_access_log_scan(access.trace())
-    validate_resource_manifest_equality(
-        frozenset(access.trace().resources()), method_resource_manifest(method)
-    )
+    validate_dynamic_access_log_scan(access.trace(), method_resource_manifest(method))
     return score_model(
         ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
     )
@@ -938,10 +272,10 @@ def score_local_sir_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    checkpoint_path = target_confirmatory_checkpoint_path(layout, target, seed)
     if not checkpoint_path.is_file():
         return None
-    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    checkpoint_artifact_id = resolve_checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
     eligible_by_coarse = eligible_groups_by_coarse(target, materialized, ClientRole.TARGET)
@@ -978,9 +312,16 @@ def score_local_sir_cell(
         entry.value for entry in meta_score.class_conditional_cross_entropy.values
     )
     node_risks = target_node_risks(blocks, eligible_by_coarse, meta_class_ce)
-    try:
-        target_importance = build_target_importance(node_risks)
-    except TargetImportanceError:
+    target_importance = persist_or_reuse_target_importance(
+        store,
+        layout,
+        target,
+        seed,
+        node_risks,
+        OverwritePolicy.REUSE,
+        (checkpoint_artifact_id,),
+    )
+    if target_importance is None:
         return None
     actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
     problem = build_robust_action_problem(
@@ -1031,340 +372,6 @@ def score_local_sir_cell(
     return score, n_classes, input_artifact_ids
 
 
-def common_eligible_groups(
-    source: DatasetId,
-    target: DatasetId,
-    source_materialized: MaterializedClient,
-    target_materialized: MaterializedClient,
-) -> (
-    tuple[
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    ]
-    | None
-):
-    target_eligible_all = eligible_groups_by_coarse(target, target_materialized, ClientRole.TARGET)
-    source_eligible_all = eligible_groups_by_coarse(source, source_materialized, ClientRole.SOURCE)
-    common_coarse = tuple(group for group in target_eligible_all if group in source_eligible_all)
-    if not common_coarse:
-        return None
-    source_eligible = OrderedDict((group, source_eligible_all[group]) for group in common_coarse)
-    target_eligible = OrderedDict((group, target_eligible_all[group]) for group in common_coarse)
-    return source_eligible, target_eligible
-
-
-@dataclass(frozen=True, slots=True)
-class PairSeedStructure:
-    source_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-    target_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-    ineligibility_reason: PairSeedIneligibilityReason | None
-
-    @property
-    def is_eligible(self) -> bool:
-        return self.ineligibility_reason is None
-
-
-def pair_seed_structure(
-    source_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    target_eligible: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    available_response_blocks: frozenset[CoarseGroup],
-    strict_resource_validity: StrictResourceValidity,
-) -> PairSeedStructure:
-    common_coarse = tuple(
-        coarse
-        for coarse in target_eligible
-        if coarse in source_eligible and coarse in available_response_blocks
-    )
-    selected_source = OrderedDict((coarse, source_eligible[coarse]) for coarse in common_coarse)
-    selected_target = OrderedDict((coarse, target_eligible[coarse]) for coarse in common_coarse)
-    if not strict_resource_validity:
-        return PairSeedStructure(
-            selected_source,
-            selected_target,
-            PairSeedIneligibilityReason.STRICT_RESOURCE_VIOLATION,
-        )
-    if not common_coarse:
-        return PairSeedStructure(
-            selected_source,
-            selected_target,
-            PairSeedIneligibilityReason.NO_SHARED_ELIGIBLE_COARSE_GROUP,
-        )
-    support = active_config().scientific.transfer_support
-    target_concept_count = sum(len(groups) for groups in selected_target.values())
-    if target_concept_count < support.minimum_actionable_target_concepts:
-        return PairSeedStructure(
-            selected_source,
-            selected_target,
-            PairSeedIneligibilityReason.INSUFFICIENT_ACTIONABLE_TARGET_CONCEPTS,
-        )
-    if not any(
-        len(groups) >= support.minimum_nontrivial_block_size for groups in selected_target.values()
-    ):
-        return PairSeedStructure(
-            selected_source,
-            selected_target,
-            PairSeedIneligibilityReason.NO_NONTRIVIAL_TARGET_BLOCK,
-        )
-    if not any(
-        len(groups) >= support.minimum_nontrivial_block_size for groups in selected_source.values()
-    ):
-        return PairSeedStructure(
-            selected_source,
-            selected_target,
-            PairSeedIneligibilityReason.NO_NONTRIVIAL_SOURCE_RESPONSE_BLOCK,
-        )
-    return PairSeedStructure(selected_source, selected_target, None)
-
-
-def strict_pair_resource_validity(
-    source_materialized: MaterializedClient,
-    target_materialized: MaterializedClient,
-) -> StrictResourceValidity:
-    source_identity_columns = frozenset(
-        column
-        for column, role in source_materialized.schema.roles.items()
-        if role is FieldRole.FORBIDDEN_IDENTITY
-    )
-    target_identity_columns = frozenset(
-        column
-        for column, role in target_materialized.schema.roles.items()
-        if role is FieldRole.FORBIDDEN_IDENTITY
-    )
-    source_timestamp_columns: frozenset[TabularColumnName] = (
-        frozenset()
-        if source_materialized.schema.timestamp_column is None
-        else frozenset({source_materialized.schema.timestamp_column})
-    )
-    target_timestamp_columns: frozenset[TabularColumnName] = (
-        frozenset()
-        if target_materialized.schema.timestamp_column is None
-        else frozenset({target_materialized.schema.timestamp_column})
-    )
-    try:
-        validate_disjoint_feature_namespaces(
-            frozenset(source_materialized.feature_names),
-            frozenset(target_materialized.feature_names),
-        )
-        validate_no_cross_client_entity_ids(source_identity_columns, target_identity_columns)
-        validate_no_cross_client_timestamp_pairing(
-            source_timestamp_columns,
-            target_timestamp_columns,
-        )
-    except StrictResourceViolationError:
-        return StrictResourceValidity(False)
-    return StrictResourceValidity(True)
-
-
-def assess_pair_seed_structure(
-    layout: WorkspaceLayout,
-    source: DatasetId,
-    target: DatasetId,
-    source_materialized: MaterializedClient,
-    target_materialized: MaterializedClient,
-    seed: RandomSeed,
-) -> PairSeedStructure:
-    common = common_eligible_groups(
-        source,
-        target,
-        source_materialized,
-        target_materialized,
-    )
-    if common is None:
-        return PairSeedStructure(
-            OrderedDict(),
-            OrderedDict(),
-            PairSeedIneligibilityReason.NO_SHARED_ELIGIBLE_COARSE_GROUP,
-        )
-    source_eligible, target_eligible = common
-    available_response_blocks = frozenset(
-        coarse
-        for coarse in target_eligible
-        if load_dataset_source_packet(layout, source, seed, coarse) is not None
-    )
-    return pair_seed_structure(
-        source_eligible,
-        target_eligible,
-        available_response_blocks,
-        strict_pair_resource_validity(source_materialized, target_materialized),
-    )
-
-
-def _block_keyed_eligible_groups(
-    eligible_by_coarse: (
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-        | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
-    ),
-) -> Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]:
-    return OrderedDict(
-        (correspondence_block_id(group), groups) for group, groups in eligible_by_coarse.items()
-    )
-
-
-def registered_exact_correspondence(
-    blocks: PaddedBlockStructure,
-    source_eligible_by_coarse: Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
-    target_eligible_by_coarse: Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]],
-    source_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
-    seed: RandomSeed,
-) -> BlockCorrespondence:
-    images: list[Index] = []
-    for block_index, block_id in enumerate(blocks.coarse_groups):
-        coarse_group = CoarseGroup(str(block_id))
-        block_range = blocks.block_index_range(block_index)
-        block_key = correspondence_block_id(coarse_group)
-        source_groups = source_eligible_by_coarse.get(block_key, ())
-        target_groups = target_eligible_by_coarse.get(block_key, ())
-        packet = source_packets_by_coarse.get(coarse_group)
-        source_concept_positions: OrderedDict[OracleTransferConcept, Index] = OrderedDict()
-        if packet is not None:
-            positions = packet.registered_node_order(seed).anonymous_position_of_semantic_index()
-            for semantic_index, group in enumerate(source_groups):
-                if semantic_index < len(positions):
-                    source_concept_positions[group.concept] = positions[semantic_index]
-        assigned: OrderedDict[Index, Index] = OrderedDict()
-        for target_offset, group in enumerate(target_groups):
-            source_offset = source_concept_positions.get(group.concept)
-            if source_offset is None or source_offset >= len(block_range):
-                continue
-            source_node = block_range.start + source_offset
-            if source_node in assigned.values():
-                continue
-            assigned[block_range.start + target_offset] = source_node
-        taken = set(assigned.values())
-        remaining_sources = [node for node in block_range if node not in taken]
-        remaining_targets = [node for node in block_range if node not in assigned]
-        for target_node, source_node in zip(remaining_targets, remaining_sources, strict=True):
-            assigned[target_node] = source_node
-        images.extend(assigned[node] for node in block_range)
-    return BlockCorrespondence(blocks=blocks, images=tuple(images))
-
-
-def cross_client_padded_blocks(
-    source_eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    target_eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-) -> PaddedBlockStructure:
-    coarse_groups = tuple(
-        group for group in target_eligible_by_coarse if group in source_eligible_by_coarse
-    )
-    source_counts = OrderedDict(
-        (group, len(source_eligible_by_coarse[group])) for group in coarse_groups
-    )
-    target_counts = OrderedDict(
-        (group, len(target_eligible_by_coarse[group])) for group in coarse_groups
-    )
-    return build_padded_block_structure(coarse_groups, source_counts, target_counts)
-
-
-def assemble_cross_client_response_matrix(
-    blocks: PaddedBlockStructure,
-    source_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
-    array_selector: Callable[[SourcePacket], ResponseMatrix],
-) -> ResponseMatrix:
-    size = blocks.total_padded_nodes
-    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
-    for block_index, coarse_group in enumerate(blocks.coarse_groups):
-        packet = _packet_for_block(source_packets_by_coarse, coarse_group)
-        if packet is None:
-            continue
-        block_range = blocks.block_index_range(block_index)
-        source_real = blocks.source_real_counts[block_index]
-        submatrix = array_selector(packet)
-        if submatrix.shape != (source_real, source_real):
-            raise ExecutionError(
-                f"source packet for {coarse_group} has shape {submatrix.shape}, "
-                f"expected {(source_real, source_real)}"
-            )
-        start = block_range.start
-        matrix[start : start + source_real, start : start + source_real] = submatrix
-    return matrix
-
-
-def _original_groups_for_bucket(
-    common_coarse: tuple[CoarseGroup, ...],
-    group_bucket_of: Mapping[CoarseGroup, CoarseGroup],
-) -> OrderedDict[CoarseGroup, tuple[CoarseGroup, ...]]:
-    by_bucket: OrderedDict[CoarseGroup, list[CoarseGroup]] = OrderedDict()
-    for group in common_coarse:
-        bucket = group_bucket_of.get(group, group)
-        by_bucket.setdefault(bucket, []).append(group)
-    return OrderedDict((bucket, tuple(groups)) for bucket, groups in by_bucket.items())
-
-
-def _regroup_eligible_groups(
-    eligible_by_coarse: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]],
-) -> OrderedDict[CoarseGroup, tuple[TransferConceptGroup, ...]]:
-    merged: OrderedDict[CoarseGroup, tuple[TransferConceptGroup, ...]] = OrderedDict()
-    for bucket, originals in groups_by_bucket.items():
-        combined: list[TransferConceptGroup] = []
-        for original in originals:
-            combined.extend(eligible_by_coarse[original])
-        merged[bucket] = tuple(combined)
-    return merged
-
-
-def assemble_merged_cross_client_response_matrix(
-    blocks: PaddedBlockStructure,
-    groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]],
-    source_eligible_original: Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]],
-    packets_by_original_group: Mapping[CoarseGroup, SourcePacket],
-    array_selector: Callable[[SourcePacket], ResponseMatrix],
-) -> ResponseMatrix:
-    size = blocks.total_padded_nodes
-    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
-    for block_index, bucket in enumerate(blocks.coarse_groups):
-        block_range = blocks.block_index_range(block_index)
-        offset = 0
-        originals = next(
-            (
-                groups
-                for key, groups in groups_by_bucket.items()
-                if correspondence_block_id(key) == bucket
-            ),
-            (),
-        )
-        for original in originals:
-            original_source_real = len(source_eligible_original[original])
-            packet = packets_by_original_group.get(original)
-            if packet is not None:
-                submatrix = array_selector(packet)
-                if submatrix.shape != (original_source_real, original_source_real):
-                    raise ExecutionError(
-                        f"source packet for {original.value} has shape {submatrix.shape}, "
-                        f"expected {(original_source_real, original_source_real)}"
-                    )
-                start = block_range.start + offset
-                matrix[
-                    start : start + original_source_real, start : start + original_source_real
-                ] = submatrix
-            offset += original_source_real
-    return matrix
-
-
-def assemble_target_response_matrix(
-    blocks: PaddedBlockStructure,
-    target_packets_by_coarse: Mapping[CoarseGroup, SourcePacket],
-    array_selector: Callable[[SourcePacket], ResponseMatrix],
-) -> ResponseMatrix:
-    size = blocks.total_padded_nodes
-    matrix: ResponseMatrix = np.zeros((size, size), dtype=np.float64)
-    for block_index, coarse_group in enumerate(blocks.coarse_groups):
-        packet = _packet_for_block(target_packets_by_coarse, coarse_group)
-        if packet is None:
-            continue
-        block_range = blocks.block_index_range(block_index)
-        target_real = blocks.target_real_counts[block_index]
-        submatrix = array_selector(packet)
-        if submatrix.shape != (target_real, target_real):
-            raise ExecutionError(
-                f"target packet for {coarse_group} has shape {submatrix.shape}, "
-                f"expected {(target_real, target_real)}"
-            )
-        start = block_range.start
-        matrix[start : start + target_real, start : start + target_real] = submatrix
-    return matrix
-
-
 def score_matched_resource_rectangular_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
@@ -1375,10 +382,10 @@ def score_matched_resource_rectangular_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    checkpoint_path = target_confirmatory_checkpoint_path(layout, target, seed)
     if not checkpoint_path.is_file():
         return None
-    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    checkpoint_artifact_id = resolve_checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
     common = common_eligible_groups(source, target, source_materialized, target_materialized)
@@ -1433,9 +440,16 @@ def score_matched_resource_rectangular_cell(
         entry.value for entry in meta_score.class_conditional_cross_entropy.values
     )
     node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
-    try:
-        target_importance = build_target_importance(node_risks)
-    except TargetImportanceError:
+    target_importance = persist_or_reuse_target_importance(
+        store,
+        layout,
+        target,
+        seed,
+        node_risks,
+        OverwritePolicy.REUSE,
+        (checkpoint_artifact_id,),
+    )
+    if target_importance is None:
         return None
     actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
     problem = build_robust_action_problem(
@@ -1499,10 +513,10 @@ def score_point_correspondence_commitment_cell(
     seed: RandomSeed,
     device: torch.device,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(layout, target, seed)
+    checkpoint_path = target_confirmatory_checkpoint_path(layout, target, seed)
     if not checkpoint_path.is_file():
         return None
-    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
+    checkpoint_artifact_id = resolve_checkpoint_artifact_id(store, checkpoint_path)
     if checkpoint_artifact_id is None:
         return None
     common = common_eligible_groups(source, target, source_materialized, target_materialized)
@@ -1564,9 +578,16 @@ def score_point_correspondence_commitment_cell(
         entry.value for entry in meta_score.class_conditional_cross_entropy.values
     )
     node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
-    try:
-        target_importance = build_target_importance(node_risks)
-    except TargetImportanceError:
+    target_importance = persist_or_reuse_target_importance(
+        store,
+        layout,
+        target,
+        seed,
+        node_risks,
+        OverwritePolicy.REUSE,
+        (checkpoint_artifact_id,),
+    )
+    if target_importance is None:
         return None
     actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
     problem = build_robust_action_problem(
@@ -1619,247 +640,6 @@ def score_point_correspondence_commitment_cell(
         TransferMethod.POINT_CORRESPONDENCE_COMMITMENT,
     )
     return score, n_classes, input_artifact_ids
-
-
-@dataclass(frozen=True, slots=True)
-class PrincipalActionAssembly:
-    problem: RobustActionProblem
-    blocks: PaddedBlockStructure
-    action: CurriculumAction
-    checkpoint: BaseCheckpoint
-    checkpoint_artifact_id: ArtifactIdentifier
-    model: torch.nn.Module
-    train: SplitTensors
-    confirm: SplitTensors
-    test: SplitTensors
-    n_classes: ClassCount
-    target_eligible: (
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-        | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
-    )
-    input_artifact_ids: tuple[ArtifactIdentifier, ...]
-    first_packet_artifact_id: ArtifactIdentifier
-
-
-def assemble_principal_action(
-    store: ArtifactStore,
-    layout: WorkspaceLayout,
-    source: DatasetId,
-    target: DatasetId,
-    source_materialized: MaterializedClient,
-    target_materialized: MaterializedClient,
-    seed: RandomSeed,
-    device: torch.device,
-    solve_action: Callable[[RobustActionProblem, RandomSeed], CurriculumAction | None],
-    group_bucket_of: Mapping[CoarseGroup, CoarseGroup] | None = None,
-    perturb: Callable[
-        [PaddedBlockStructure, ResponseMatrix, ResponseMatrix],
-        tuple[ResponseMatrix, ResponseMatrix],
-    ]
-    | None = None,
-    checkpoint_source_experiment: ExperimentName = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT,
-    fine_singleton: bool = False,
-    uses_registered_exact_map: bool = False,
-) -> PrincipalActionAssembly | None:
-    checkpoint_path = _target_confirmatory_checkpoint_path(
-        layout, target, seed, checkpoint_source_experiment
-    )
-    if not checkpoint_path.is_file():
-        return None
-    checkpoint_artifact_id = _checkpoint_artifact_id(store, checkpoint_path)
-    if checkpoint_artifact_id is None:
-        return None
-    common = common_eligible_groups(source, target, source_materialized, target_materialized)
-    if common is None:
-        return None
-    source_eligible_original, target_eligible_original = common
-    common_coarse = tuple(target_eligible_original)
-    packets_by_coarse: OrderedDict[CoarseGroup, SourcePacket] = OrderedDict()
-    for coarse_group in common_coarse:
-        packet = load_dataset_source_packet(layout, source, seed, coarse_group)
-        if packet is not None:
-            packets_by_coarse[coarse_group] = packet
-    pair_structure = pair_seed_structure(
-        source_eligible_original,
-        target_eligible_original,
-        frozenset(packets_by_coarse),
-        strict_pair_resource_validity(source_materialized, target_materialized),
-    )
-    if not pair_structure.is_eligible:
-        return None
-    source_eligible_original = pair_structure.source_eligible
-    target_eligible_original = pair_structure.target_eligible
-    common_coarse = tuple(target_eligible_original)
-    packets_by_coarse = OrderedDict((coarse, packets_by_coarse[coarse]) for coarse in common_coarse)
-    source_eligible: (
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-        | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
-    )
-    target_eligible: (
-        Mapping[CoarseGroup, tuple[TransferConceptGroup, ...]]
-        | Mapping[CorrespondenceBlockId, tuple[TransferConceptGroup, ...]]
-    )
-    if fine_singleton:
-        source_by_concept: OrderedDict[OracleTransferConcept, TransferConceptGroup] = OrderedDict()
-        target_by_concept: OrderedDict[OracleTransferConcept, TransferConceptGroup] = OrderedDict()
-        source_local_index: OrderedDict[OracleTransferConcept, Index] = OrderedDict()
-        for groups in source_eligible_original.values():
-            for local_index, group in enumerate(groups):
-                source_by_concept[group.concept] = group
-                source_local_index[group.concept] = local_index
-        for groups in target_eligible_original.values():
-            for group in groups:
-                target_by_concept[group.concept] = group
-        common_concepts = tuple(
-            concept
-            for concept in OracleTransferConcept
-            if concept in source_by_concept and concept in target_by_concept
-        )
-        if not common_concepts:
-            return None
-        block_ids = tuple(CorrespondenceBlockId(concept.value) for concept in common_concepts)
-        unit_counts: OrderedDict[CorrespondenceBlockId, SampleCount] = OrderedDict(
-            (block_id, 1) for block_id in block_ids
-        )
-        blocks = build_padded_block_structure(block_ids, unit_counts, unit_counts)
-        source_eligible = OrderedDict(
-            (CorrespondenceBlockId(concept.value), (source_by_concept[concept],))
-            for concept in common_concepts
-        )
-        target_eligible = OrderedDict(
-            (CorrespondenceBlockId(concept.value), (target_by_concept[concept],))
-            for concept in common_concepts
-        )
-        node_count = len(common_concepts)
-        lower_matrix = np.zeros((node_count, node_count), dtype=np.float64)
-        upper_matrix = np.zeros((node_count, node_count), dtype=np.float64)
-        for index, concept in enumerate(common_concepts):
-            coarse_group, _, _ = TRANSFER_ONTOLOGY[concept]
-            packet = packets_by_coarse.get(coarse_group)
-            if packet is None:
-                continue
-            semantic_index = source_local_index[concept]
-            anonymous_positions = packet.registered_node_order(
-                seed
-            ).anonymous_position_of_semantic_index()
-            local_index = anonymous_positions[semantic_index]
-            lower = packet.lower_matrix()
-            upper = packet.upper_matrix()
-            if local_index < lower.shape[0] and local_index < upper.shape[0]:
-                lower_matrix[index, index] = lower[local_index, local_index]
-                upper_matrix[index, index] = upper[local_index, local_index]
-    elif group_bucket_of is None:
-        source_eligible = source_eligible_original
-        target_eligible = target_eligible_original
-        groups_by_bucket: Mapping[CoarseGroup, tuple[CoarseGroup, ...]] = OrderedDict(
-            (group, (group,)) for group in common_coarse
-        )
-        blocks = cross_client_padded_blocks(source_eligible, target_eligible)
-        lower_matrix = assemble_merged_cross_client_response_matrix(
-            blocks,
-            groups_by_bucket,
-            source_eligible_original,
-            packets_by_coarse,
-            SourcePacket.lower_matrix,
-        )
-        upper_matrix = assemble_merged_cross_client_response_matrix(
-            blocks,
-            groups_by_bucket,
-            source_eligible_original,
-            packets_by_coarse,
-            SourcePacket.upper_matrix,
-        )
-    else:
-        groups_by_bucket = _original_groups_for_bucket(common_coarse, group_bucket_of)
-        source_eligible = _regroup_eligible_groups(source_eligible_original, groups_by_bucket)
-        target_eligible = _regroup_eligible_groups(target_eligible_original, groups_by_bucket)
-        blocks = cross_client_padded_blocks(source_eligible, target_eligible)
-        lower_matrix = assemble_merged_cross_client_response_matrix(
-            blocks,
-            groups_by_bucket,
-            source_eligible_original,
-            packets_by_coarse,
-            SourcePacket.lower_matrix,
-        )
-        upper_matrix = assemble_merged_cross_client_response_matrix(
-            blocks,
-            groups_by_bucket,
-            source_eligible_original,
-            packets_by_coarse,
-            SourcePacket.upper_matrix,
-        )
-    if perturb is not None:
-        lower_matrix, upper_matrix = perturb(blocks, lower_matrix, upper_matrix)
-    if uses_registered_exact_map and not fine_singleton:
-        exact_correspondence = registered_exact_correspondence(
-            blocks,
-            _block_keyed_eligible_groups(source_eligible),
-            _block_keyed_eligible_groups(target_eligible),
-            packets_by_coarse,
-            seed,
-        )
-        lower_matrix = exact_correspondence.permute_response_matrix(lower_matrix)
-        upper_matrix = exact_correspondence.permute_response_matrix(upper_matrix)
-    checkpoint = load_base_checkpoint(checkpoint_path)
-    n_classes = target_materialized.class_manifest.class_count
-    train = target_materialized.splits[Split.TRAIN]
-    meta = target_materialized.splits[Split.META]
-    confirm = target_materialized.splits[Split.CONFIRM]
-    test = target_materialized.splits[Split.TEST]
-    model = create_classifier(
-        target,
-        target_materialized.feature_count,
-        n_classes,
-        checkpoint.selected_hyperparameters.dropout_probability,
-        seed,
-        device,
-    )
-    checkpoint.state_dict.load_into(model)
-    meta_score = score_model(
-        ScoringRequest(model, meta.features, meta.targets, LocalClassCount(n_classes))
-    )
-    meta_class_ce = tuple(
-        entry.value for entry in meta_score.class_conditional_cross_entropy.values
-    )
-    node_risks = target_node_risks(blocks, target_eligible, meta_class_ce)
-    try:
-        target_importance = build_target_importance(node_risks)
-    except TargetImportanceError:
-        return None
-    actionable_nodes = tuple(risk.node_index for risk in node_risks if risk.is_actionable)
-    problem = build_robust_action_problem(
-        blocks,
-        lower_matrix,
-        upper_matrix,
-        target_importance.as_vector(blocks.total_padded_nodes),
-        actionable_nodes,
-    )
-    action = solve_action(problem, seed)
-    if action is None:
-        return None
-    input_artifact_ids: tuple[ArtifactIdentifier, ...] = (
-        checkpoint_artifact_id,
-        *(
-            ArtifactIdentifier(packet.packet_integrity_sha256)
-            for packet in packets_by_coarse.values()
-        ),
-    )
-    first_packet = next(iter(packets_by_coarse.values()))
-    return PrincipalActionAssembly(
-        problem=problem,
-        blocks=blocks,
-        action=action,
-        checkpoint=checkpoint,
-        checkpoint_artifact_id=checkpoint_artifact_id,
-        model=model,
-        train=train,
-        confirm=confirm,
-        test=test,
-        n_classes=n_classes,
-        target_eligible=target_eligible,
-        input_artifact_ids=input_artifact_ids,
-        first_packet_artifact_id=ArtifactIdentifier(first_packet.packet_integrity_sha256),
-    )
 
 
 def score_robust_action_cell(
@@ -2088,9 +868,8 @@ def _settle_without_confirmation_and_score(
     lifecycle.open_test()
     lifecycle.assert_opened()
     access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
-    validate_dynamic_access_log_scan(access.trace())
-    validate_resource_manifest_equality(
-        frozenset(access.trace().resources()),
+    validate_dynamic_access_log_scan(
+        access.trace(),
         method_resource_manifest(TransferMethod.FEDORBIT_WITHOUT_CONFIRMATION),
     )
     return score_model(
@@ -2338,6 +1117,12 @@ def score_local_sir_cell_adapter(
 
 def _confirm_assimilate_score_capturing_verdict(
     verdicts: MutableCell[ConfirmationVerdict],
+    store: ArtifactStore,
+    layout: WorkspaceLayout,
+    experiment: ExperimentName,
+    source: DatasetId,
+    target: DatasetId,
+    overwrite_policy: OverwritePolicy,
 ) -> Callable[
     [
         torch.nn.Module,
@@ -2423,11 +1208,45 @@ def _confirm_assimilate_score_capturing_verdict(
         lifecycle.open_test()
         lifecycle.assert_opened()
         access.record(ClientRole.TARGET, ResourceKind.TEST, transfer_finalized=True)
-        validate_dynamic_access_log_scan(access.trace())
-        validate_resource_manifest_equality(
-            frozenset(access.trace().resources()),
+        validate_dynamic_access_log_scan(
+            access.trace(),
             method_resource_manifest(TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER),
         )
+        reserved = active_config().scientific.target_optimizer_budget.reserved
+        step_input_ids = (
+            assimilation_coordinates.clean_pretransfer_checkpoint_artifact_id,
+            assimilation_coordinates.source_packet_artifact_id,
+        )
+        for metric_name, category, reserved_steps in (
+            (
+                MetricId.TARGET_CONFIRMATION_OPTIMIZER_STEPS,
+                TargetOptimizerBudgetCategory.CONFIRMATION_CANDIDATES,
+                reserved.confirmation_candidates,
+            ),
+            (
+                MetricId.LIVE_ASSIMILATION_OPTIMIZER_STEPS,
+                TargetOptimizerBudgetCategory.LIVE_ASSIMILATION,
+                reserved.live_assimilation,
+            ),
+        ):
+            consumed_steps = reserved_steps - optimizer_step_ledger.remaining(category)
+            persist_primary_transfer_metric(
+                store,
+                layout,
+                experiment,
+                assimilation_coordinates.directed_pair,
+                source,
+                target,
+                TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+                seed,
+                metric_name,
+                float(consumed_steps),
+                MetricUnit.COUNT,
+                MetricDirection.DESCRIPTIVE,
+                step_input_ids,
+                overwrite_policy,
+                assimilation_coordinates.condition,
+            )
         return score_model(
             ScoringRequest(model, test.features, test.targets, LocalClassCount(n_classes))
         )
@@ -2438,6 +1257,7 @@ def _confirm_assimilate_score_capturing_verdict(
 def score_fedorbit_with_confirmation_verdict_cell(
     store: ArtifactStore,
     layout: WorkspaceLayout,
+    experiment: ExperimentName,
     source: DatasetId,
     target: DatasetId,
     source_materialized: MaterializedClient,
@@ -2445,6 +1265,7 @@ def score_fedorbit_with_confirmation_verdict_cell(
     seed: RandomSeed,
     device: torch.device,
     verdicts: MutableCell[ConfirmationVerdict],
+    overwrite_policy: OverwritePolicy,
 ) -> tuple[ScoreArtifact, ClassCount, tuple[ArtifactIdentifier, ...]] | None:
     return score_robust_action_cell(
         store,
@@ -2458,7 +1279,9 @@ def score_fedorbit_with_confirmation_verdict_cell(
         FilesystemSlug("fedorbit-exact-sparse-solver"),
         TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
         solve_fedorbit_exact_sparse_action,
-        _confirm_assimilate_score_capturing_verdict(verdicts),
+        _confirm_assimilate_score_capturing_verdict(
+            verdicts, store, layout, experiment, source, target, overwrite_policy
+        ),
     )
 
 
@@ -2519,103 +1342,6 @@ def solve_matched_resource_rectangular_action(
     if certified_value_sink is not None:
         certified_value_sink.value = solution.objective_value
     return solution.selected_action
-
-
-_SEMANTIC_PARTITION_MERGE: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
-    (
-        (CoarseGroup.DISRUPTION, CoarseGroup.DISRUPTION),
-        (CoarseGroup.EXPLOITATION, CoarseGroup.DISRUPTION),
-        (CoarseGroup.ACCESS_AND_DISCOVERY, CoarseGroup.ACCESS_AND_DISCOVERY),
-    )
-)
-_SEMANTIC_PARTITION_SUPERGROUP: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
-    (group, CoarseGroup.DISRUPTION) for group in CoarseGroup
-)
-_SEMANTIC_PARTITION_PRINCIPAL: Mapping[CoarseGroup, CoarseGroup] = OrderedDict(
-    (group, group) for group in CoarseGroup
-)
-
-
-def semantic_partition_bucket_of(
-    partition: SemanticPartitionSpecification,
-) -> Mapping[CoarseGroup, CoarseGroup] | None:
-    if partition == SemanticPartitionId.PRINCIPAL_THREE_COARSE_GROUPS:
-        return _SEMANTIC_PARTITION_PRINCIPAL
-    if partition == SemanticPartitionId.ONE_ATTACK_SUPERGROUP:
-        return _SEMANTIC_PARTITION_SUPERGROUP
-    if isinstance(partition, tuple) and set(partition) == {
-        "Disruption or Exploitation",
-        "Access and Discovery",
-    }:
-        return _SEMANTIC_PARTITION_MERGE
-    return None
-
-
-def semantic_partition_label(
-    partition: SemanticPartitionSpecification,
-) -> EvaluationConditionName:
-    text = partition if isinstance(partition, str) else "|".join(partition)
-    return EvaluationConditionName(text)
-
-
-def response_scale_perturbation(
-    scale: ScaleFactor,
-) -> Callable[
-    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
-]:
-    def perturb(
-        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
-    ) -> tuple[ResponseMatrix, ResponseMatrix]:
-        del blocks
-        midpoint = (lower + upper) / 2.0
-        half_width = (upper - lower) / 2.0
-        return scale * midpoint - half_width, scale * midpoint + half_width
-
-    return perturb
-
-
-def ci_half_width_perturbation(
-    multiplier: float,
-) -> Callable[
-    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
-]:
-    def perturb(
-        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
-    ) -> tuple[ResponseMatrix, ResponseMatrix]:
-        del blocks
-        midpoint = (lower + upper) / 2.0
-        half_width = (upper - lower) / 2.0
-        return midpoint - multiplier * half_width, midpoint + multiplier * half_width
-
-    return perturb
-
-
-def response_heterogeneity_perturbation(
-    multiplier: float,
-) -> Callable[
-    [PaddedBlockStructure, ResponseMatrix, ResponseMatrix], tuple[ResponseMatrix, ResponseMatrix]
-]:
-    def perturb(
-        blocks: PaddedBlockStructure, lower: ResponseMatrix, upper: ResponseMatrix
-    ) -> tuple[ResponseMatrix, ResponseMatrix]:
-        midpoint = (lower + upper) / 2.0
-        half_width = (upper - lower) / 2.0
-        new_midpoint = midpoint.copy()
-        block_count = len(blocks.padded_size_tuple)
-        for row_block in range(block_count):
-            row_range = blocks.block_index_range(row_block)
-            for col_block in range(block_count):
-                col_range = blocks.block_index_range(col_block)
-                segment = midpoint[
-                    row_range.start : row_range.stop, col_range.start : col_range.stop
-                ]
-                block_mean = segment.mean()
-                new_midpoint[row_range.start : row_range.stop, col_range.start : col_range.stop] = (
-                    block_mean + multiplier * (segment - block_mean)
-                )
-        return new_midpoint - half_width, new_midpoint + half_width
-
-    return perturb
 
 
 WeakSignalPerturbation = Callable[

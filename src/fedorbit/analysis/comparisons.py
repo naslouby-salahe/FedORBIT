@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import math
+from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import cast
 
+from pydantic import JsonValue
+
+from fedorbit.config.loading import active_config
+from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.types import (
     ArtifactIdentifier,
     ConsumedBudget,
@@ -15,6 +23,7 @@ from fedorbit.types import (
     Sha256Digest,
     SignificanceLevel,
     Split,
+    StableJsonPayload,
     StrictResourceValidity,
     TransferMethod,
     is_sha256_digest,
@@ -81,6 +90,107 @@ class PairingLineage:
             raise PairingError("action budget must be finite and nonnegative")
         if self.support_budget < 0 or self.confirmation_budget < 0:
             raise PairingError("support and confirmation budgets must be nonnegative")
+
+    def payload(self) -> StableJsonPayload:
+        packet = self.source_packet_artifact_id
+        return cast(
+            StableJsonPayload,
+            OrderedDict(
+                raw_dataset_lineage_sha256=self.raw_dataset_lineage_sha256,
+                directed_pair=self.directed_pair,
+                seed=self.seed,
+                split=self.split.value,
+                target_pre_transfer_checkpoint_artifact_id=(
+                    self.target_pre_transfer_checkpoint_artifact_id
+                ),
+                target_importance_artifact_id=self.target_importance_artifact_id,
+                source_packet_artifact_id=None if packet is None else packet,
+                action_budget=self.action_budget,
+                support_budget=self.support_budget,
+                confirmation_budget=self.confirmation_budget,
+                environment_lineage_sha256=self.environment_lineage_sha256,
+            ),
+        )
+
+    @staticmethod
+    def from_payload(payload: Mapping[str, JsonValue]) -> PairingLineage:
+        packet = payload.get("source_packet_artifact_id")
+        return PairingLineage(
+            raw_dataset_lineage_sha256=Sha256Digest(str(payload["raw_dataset_lineage_sha256"])),
+            directed_pair=DirectedPairName(str(payload["directed_pair"])),
+            seed=_payload_int(payload["seed"]),
+            split=Split(str(payload["split"])),
+            target_pre_transfer_checkpoint_artifact_id=ArtifactIdentifier(
+                str(payload["target_pre_transfer_checkpoint_artifact_id"])
+            ),
+            target_importance_artifact_id=ArtifactIdentifier(
+                str(payload["target_importance_artifact_id"])
+            ),
+            source_packet_artifact_id=(None if packet is None else ArtifactIdentifier(str(packet))),
+            action_budget=_payload_float(payload["action_budget"]),
+            support_budget=_payload_int(payload["support_budget"]),
+            confirmation_budget=_payload_int(payload["confirmation_budget"]),
+            environment_lineage_sha256=Sha256Digest(str(payload["environment_lineage_sha256"])),
+        )
+
+
+def _payload_int(value: JsonValue) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise PairingError("pairing lineage integer field is invalid")
+    return value
+
+
+def _payload_float(value: JsonValue) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise PairingError("pairing lineage float field is invalid")
+    return float(value)
+
+
+def pair_seed_resource_identity(
+    directed_pair: DirectedPairName,
+    seed: RandomSeed,
+    resource: str,
+) -> ArtifactIdentifier:
+    digest = hashlib.sha256(f"{directed_pair}|{seed}|{resource}".encode()).hexdigest()
+    return ArtifactIdentifier(digest)
+
+
+def pair_seed_pairing_lineage(
+    directed_pair: DirectedPairName,
+    seed: RandomSeed,
+    checkpoint_artifact_id: ArtifactIdentifier,
+    source_packet_artifact_id: ArtifactIdentifier | None = None,
+    target_importance_artifact_id: ArtifactIdentifier | None = None,
+    raw_dataset_lineage_sha256: Sha256Digest | None = None,
+    environment_lineage_sha256: Sha256Digest | None = None,
+) -> PairingLineage:
+    action = active_config().scientific.action
+    confirmation = active_config().scientific.confirmation
+    raw_lineage = raw_dataset_lineage_sha256
+    if raw_lineage is None:
+        raw_lineage = Sha256Digest(hashlib.sha256(directed_pair.encode("utf-8")).hexdigest())
+    environment = environment_lineage_sha256
+    if environment is None:
+        environment = environment_snapshot().fingerprint_sha256
+    packet = source_packet_artifact_id
+    if packet is None:
+        packet = pair_seed_resource_identity(directed_pair, seed, "packet")
+    importance = target_importance_artifact_id
+    if importance is None:
+        importance = pair_seed_resource_identity(directed_pair, seed, "importance")
+    return PairingLineage(
+        raw_dataset_lineage_sha256=raw_lineage,
+        directed_pair=directed_pair,
+        seed=seed,
+        split=Split.TEST,
+        target_pre_transfer_checkpoint_artifact_id=checkpoint_artifact_id,
+        target_importance_artifact_id=importance,
+        source_packet_artifact_id=packet,
+        action_budget=action.total_curriculum_budget,
+        support_budget=action.principal_sparse_support,
+        confirmation_budget=confirmation.optimizer_steps_per_shadow,
+        environment_lineage_sha256=environment,
+    )
 
 
 @dataclass(frozen=True, slots=True)

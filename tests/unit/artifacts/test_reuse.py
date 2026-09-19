@@ -225,6 +225,41 @@ def test_stage_lineage_completeness_requires_upstream_identity(tmp_path: Path) -
     validate_stage_lineage_completeness(complete, normalized)
 
 
+def test_stage_lineage_completeness_accepts_the_declared_no_upstream_inputs_escape(
+    tmp_path: Path,
+) -> None:
+    path = _payload(tmp_path)
+    manifest = _manifest(path).model_copy(update={"has_no_upstream_inputs": True})
+    completion = _completion(manifest).model_copy(update={"has_no_upstream_inputs": True})
+    validate_stage_lineage_completeness(manifest, completion)
+
+
+def test_stage_lineage_completeness_rejects_mismatched_no_upstream_inputs_flag(
+    tmp_path: Path,
+) -> None:
+    path = _payload(tmp_path)
+    manifest = _manifest(path).model_copy(update={"has_no_upstream_inputs": True})
+    completion = _completion(manifest)
+    with pytest.raises(ArtifactValidationError, match="disagrees"):
+        validate_stage_lineage_completeness(manifest, completion)
+
+
+def test_stage_lineage_completeness_rejects_no_upstream_inputs_flag_with_real_upstream(
+    tmp_path: Path,
+) -> None:
+    path = _payload(tmp_path)
+    manifest = (
+        _manifest(path)
+        .model_copy(update={"upstream_artifact_ids": (_upstream(),)})
+        .model_copy(update={"has_no_upstream_inputs": True})
+    )
+    completion = normalize_completion_lineage(
+        manifest, _completion_with_upstream(manifest)
+    ).model_copy(update={"has_no_upstream_inputs": True})
+    with pytest.raises(ArtifactValidationError, match="records upstream artifact identities"):
+        validate_stage_lineage_completeness(manifest, completion)
+
+
 def test_payload_checksum_verification_is_reusable_for_staged_content(tmp_path: Path) -> None:
     path = _payload(tmp_path)
     manifest = _manifest(path)

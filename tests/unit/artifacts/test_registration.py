@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -127,6 +128,33 @@ def test_registered_payload_write_and_verify_round_trip(tmp_path: Path) -> None:
     assert recorded.upstream_artifact_ids == (upstream,)
 
 
+def test_registration_retires_stale_descendants_of_a_superseded_manifest(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    upstream_first = _published_upstream(store, fingerprint="1" * 64)
+    upstream_second = _published_upstream(store, fingerprint="2" * 64)
+    payload_path = store.root / "artifacts" / "packets" / "packet.json"
+    first = store.register_artifact_payload(
+        _packet_request(payload_path, (upstream_first,)), OverwritePolicy.REPLACE
+    )
+    downstream_path = store.root / "artifacts" / "packets" / "downstream.json"
+    downstream_request = replace(
+        _packet_request(downstream_path, (first.artifact_id,)),
+        semantic_coordinates=SemanticCoordinateText(
+            '{"experiment":"Final Source-Response Band Validation","downstream":true}'
+        ),
+    )
+    downstream = store.register_artifact_payload(downstream_request, OverwritePolicy.REPLACE)
+    second = store.register_artifact_payload(
+        _packet_request(payload_path, (upstream_second,)), OverwritePolicy.REPLACE
+    )
+    assert second.artifact_id != first.artifact_id
+    assert store.artifact_state(downstream.artifact_id).state is ArtifactState.STALE
+    assert store.artifact_state(first.artifact_id).state is ArtifactState.COMPLETED
+    assert store.artifact_state(second.artifact_id).state is ArtifactState.COMPLETED
+
+
 def test_registration_rejects_a_stage_that_disagrees_with_the_registered_family(
     tmp_path: Path,
 ) -> None:
@@ -154,7 +182,7 @@ def test_tampered_registered_payload_is_rejected_on_read(tmp_path: Path) -> None
     payload_path.write_bytes(b'{"tampered":true}\n')
     with pytest.raises(PayloadIntegrityError, match="checksum mismatch"):
         store.register_artifact_payload(
-            _packet_request(payload_path, (upstream,)), OverwritePolicy.REPLACE
+            _packet_request(payload_path, (upstream,)), OverwritePolicy.REUSE
         )
     assert store.artifact_state(manifest.artifact_id).state is ArtifactState.INVALID
     with pytest.raises(ValueError, match="checksum mismatch"):
@@ -274,11 +302,24 @@ def test_registered_write_promotes_from_staging_and_leaves_no_staged_payload(
     assert store.manifest_path(manifest.artifact_id).is_file()
 
 
+def test_replace_policy_overwrites_a_different_active_payload(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    upstream = _published_upstream(store)
+    payload_path = store.root / "artifacts" / "packets" / "packet.json"
+    payload_path.parent.mkdir(parents=True, exist_ok=True)
+    payload_path.write_bytes(b'{"preexisting":true}\n')
+    manifest = store.register_artifact_payload(
+        _packet_request(payload_path, (upstream,)), OverwritePolicy.REPLACE
+    )
+    assert payload_path.read_bytes() == serialized_payload_bytes(PACKET_SERIALIZED)
+    assert store.is_reusable(manifest.artifact_id) is True
+
+
 def test_failed_registration_leaves_no_active_payload(tmp_path: Path) -> None:
     store = _store(tmp_path)
     payload_path = store.root / "artifacts" / "packets" / "packet.json"
     payload_path.parent.mkdir(parents=True, exist_ok=True)
     payload_path.write_bytes(b'{"preexisting":true}\n')
     with pytest.raises(PayloadIntegrityError):
-        store.register_artifact_payload(_packet_request(payload_path), OverwritePolicy.REPLACE)
+        store.register_artifact_payload(_packet_request(payload_path), OverwritePolicy.REUSE)
     assert store.all_manifests() == ()

@@ -213,6 +213,21 @@ def test_project_evidence_table_is_written_as_canonical_csv(tmp_path: Path) -> N
     assert "0.1235" in rendered
 
 
+def test_project_evidence_table_applies_reporting_precision_to_numeric_cells(
+    tmp_path: Path,
+) -> None:
+    layout = build_layout(tmp_path)
+    writer = VerifiedEvidenceWriter(ArtifactStore(layout.execution_root), layout)
+    table = EvidenceTable(
+        columns=(ReportColumnName.PAIR, ReportColumnName.REALIZED_GAIN),
+        rows=(("edge_iiotset_network -> ton_iot_network", 0.123456),),
+    )
+    destination = writer.write_project_evidence_table(table, ReportArtifactName.ABLATION_RESULTS)
+    rendered = destination.read_text(encoding="utf-8")
+    assert format_scientific_metric(0.123456) in rendered
+    assert "0.123456" not in rendered
+
+
 def test_scientific_metric_uses_configured_decimals() -> None:
     assert format_scientific_metric(0.123456) == "0.1235"
     assert format_scientific_metric(1.0) == "1.0000"

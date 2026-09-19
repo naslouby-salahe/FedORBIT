@@ -56,6 +56,31 @@ def test_semantic_identity_excludes_irrelevant_dimensions() -> None:
     assert "seed" in identity
 
 
+def test_coupling_identity_varies_by_condition_and_support_not_pair() -> None:
+    from fedorbit.types import EvaluationConditionName
+
+    relevance = experiment_relevance(ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION)
+    assert SemanticCoordinate.CONDITION in relevance
+    assert SemanticCoordinate.SUPPORT in relevance
+    assert SemanticCoordinate.DIRECTED_PAIR not in relevance
+    first = SemanticCell(
+        experiment=ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
+        condition=EvaluationConditionName("jointly_realizable"),
+        support=SupportSize(1),
+        seed=ExperimentSeed(1103),
+    ).identity_json(relevance)
+    second = SemanticCell(
+        experiment=ExperimentName.COUPLING_AND_MAP_BOUND_VALIDATION,
+        condition=EvaluationConditionName("incompatible"),
+        support=SupportSize(2),
+        seed=ExperimentSeed(1103),
+    ).identity_json(relevance)
+    assert first != second
+    assert "condition" in first
+    assert "support" in first
+    assert "directed_pair" not in first
+
+
 def test_identity_contains_no_nonscientific_identifiers() -> None:
     relevance = experiment_relevance(ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER)
     identity = PRIMARY_CELL.identity_json(relevance)

@@ -51,6 +51,7 @@ from fedorbit.infrastructure.manifests import (
     ProvenanceFamilyEvidence,
     ReusableArtifactManifest,
     artifact_id,
+    recorded_experiment,
 )
 from fedorbit.infrastructure.preparation import (
     BASE_MODEL_PILOT_CONFIGURATION_SECTIONS,
@@ -633,11 +634,16 @@ def execute_final_source_response_band_validation(
 def _pilot_selected_hyperparameters(
     store: ArtifactStore, dataset: DatasetId
 ) -> SelectedHyperparameters | None:
-    experiment_value = ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT.value
     for manifest in store.all_manifests():
+        if recorded_experiment(manifest) is not ExperimentName.BASE_MODEL_HYPERPARAMETER_PILOT:
+            continue
+        try:
+            coordinates = json.loads(manifest.semantic_producer_coordinates)
+        except ValueError:
+            continue
         if (
-            experiment_value not in manifest.semantic_producer_coordinates
-            or dataset.value not in manifest.semantic_producer_coordinates
+            not isinstance(coordinates, dict)
+            or coordinates.get("dataset") != dataset.value
             or len(manifest.payload_paths) != 1
         ):
             continue

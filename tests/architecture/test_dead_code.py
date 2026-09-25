@@ -117,3 +117,22 @@ def test_no_unreferenced_production_symbols() -> None:
         if production[node.name] - declared[node.name] <= 0 and tests[node.name] == 0
     )
     assert not offenders, f"production symbols with no reference anywhere: {offenders}"
+
+
+def test_manifest_experiment_identity_is_not_selected_by_substring() -> None:
+    violations: list[str] = []
+    for path in _production_files():
+        tree = parse_module(path)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Compare):
+                continue
+            if not any(
+                isinstance(value, ast.Attribute) and value.attr == "semantic_producer_coordinates"
+                for value in (node.left, *node.comparators)
+            ):
+                continue
+            if any(isinstance(operator, (ast.In, ast.NotIn)) for operator in node.ops):
+                violations.append(f"{relative_module(path)}:{node.lineno}")
+    assert not violations, "experiment manifest selection must parse exact identity: " + ", ".join(
+        violations
+    )

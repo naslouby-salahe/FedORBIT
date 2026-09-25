@@ -100,11 +100,6 @@ _BOOTSTRAP = cast(Callable[..., _BootstrapResultLike], scipy_stats.bootstrap)
 _CHI_SQUARE_CDF = cast(Callable[..., Estimate], scipy_stats.chi2.cdf)
 
 
-def nominal_alpha() -> SignificanceLevel:
-    alpha: SignificanceLevel = 1.0 - active_config().scientific.statistics.confidence_level
-    return alpha
-
-
 def _mean(values: DifferenceSeries) -> RelativeGain:
     if not values:
         raise StatisticsError("statistical mean requires at least one value")

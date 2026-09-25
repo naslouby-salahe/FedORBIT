@@ -314,10 +314,12 @@ def iter_component_frame_chunks(
 def frame_to_raw_rows(frame: pd.DataFrame, columns: TabularColumns) -> RawTabularRows:
     reindexed = frame.reindex(columns=list(columns))
     column_arrays: list[RawTabularColumns] = [
-        [RawCellText(cast(str, value)) for value in reindexed[column].to_numpy(dtype=object)]
+        tuple(RawCellText(cast(str, value)) for value in reindexed[column].to_numpy(dtype=object))
         for column in columns
     ]
-    return [dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)]
+    return tuple(
+        dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)
+    )
 
 
 def iter_component_raw_row_chunks(
@@ -359,12 +361,12 @@ def _read_component_rows(
         ignore_index=True,
     )
     column_arrays: list[RawTabularColumns] = [
-        [RawCellText(cast(str, value)) for value in combined[column].to_numpy(dtype=object)]
+        tuple(RawCellText(cast(str, value)) for value in combined[column].to_numpy(dtype=object))
         for column in columns
     ]
-    rows: RawTabularRows = [
+    rows: RawTabularRows = tuple(
         dict(zip(columns, values, strict=True)) for values in zip(*column_arrays, strict=True)
-    ]
+    )
     return columns, rows, tuple(raw_files)
 
 

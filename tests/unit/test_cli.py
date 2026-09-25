@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -9,7 +10,7 @@ from typer.testing import CliRunner
 import fedorbit.cli as cli
 from fedorbit.cli import app
 from fedorbit.infrastructure.runtime import ReproducibilityIdentity
-from fedorbit.infrastructure.workspace import WorkspaceLayout
+from fedorbit.infrastructure.workspace import WorkspaceLayout, build_layout
 from fedorbit.types import (
     ExitStatus,
     ExperimentName,
@@ -75,6 +76,30 @@ def test_plan_is_read_only_and_derives_catalogue() -> None:
 def test_report_rejects_invented_experiment() -> None:
     result = runner.invoke(app, ["report", "Invented Experiment"])
     assert result.exit_code == ExitStatus.USAGE
+
+
+def test_report_does_not_create_result_exports_without_verified_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_event(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    layout = build_layout(tmp_path)
+    monkeypatch.setattr(cli, "build_layout", lambda: layout)
+    monkeypatch.setattr(
+        cli,
+        "execution_logger",
+        lambda: SimpleNamespace(event=fake_event),
+    )
+
+    result = runner.invoke(app, ["report"])
+
+    assert result.exit_code == 0
+    assert "no verified persisted evidence" in result.output
+    tables = layout.project_summary / "tables" / "main"
+    figures = layout.project_summary / "figures" / "main"
+    assert not (tables / "primary-strict-transfer-results.csv").exists()
+    assert not (figures / "predicted-vs-realized-transfer-figure.svg").exists()
 
 
 def test_preprocess_rejects_display_name() -> None:

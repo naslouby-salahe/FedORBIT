@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -12,6 +14,7 @@ from fedorbit.datasets.common import (
     FieldRole,
     RawFileDigestCache,
     RawFileDigestEntry,
+    file_sha256,
     infer_feature_type,
     reconcile_component_columns,
 )
@@ -205,10 +208,30 @@ def test_raw_file_digest_cache_round_trips_and_rejects_malformed_entries() -> No
     entry = RawFileDigestEntry(1024, 1_700_000_000_000_000_000, Sha256Digest("a" * 64))
     cache = RawFileDigestCache.empty().with_entry("raw/windows.csv", entry)
     restored = RawFileDigestCache.from_json(cast(JsonValue, cache.to_json()))
-    restored_entry = restored.entry_for("raw/windows.csv")
+    restored_entry = restored.entries.get("raw/windows.csv")
     assert restored_entry == entry
 
     assert RawFileDigestEntry.from_json({"size": -1, "mtime_ns": 0, "sha256": "a" * 64}) is None
     assert RawFileDigestEntry.from_json({"size": 1, "mtime_ns": 0, "sha256": "too-short"}) is None
     assert RawFileDigestEntry.from_json({"size": True, "mtime_ns": 0, "sha256": "a" * 64}) is None
-    assert RawFileDigestCache.from_json("not-a-mapping").entry_for("missing") is None
+    assert RawFileDigestCache.from_json("not-a-mapping").entries.get("missing") is None
+
+
+def test_file_sha256_detects_same_size_replacement_with_preserved_mtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import fedorbit.datasets.common as common
+
+    payload = tmp_path / "raw.csv"
+    payload.write_bytes(b"first")
+    cache_path = tmp_path / "cache.json"
+    monkeypatch.setattr(common, "_digest_cache_path", lambda: cache_path)
+    before = file_sha256(payload)
+    original_stat = payload.stat()
+
+    payload.write_bytes(b"other")
+    os.utime(payload, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+
+    assert payload.stat().st_size == original_stat.st_size
+    assert payload.stat().st_mtime_ns == original_stat.st_mtime_ns
+    assert file_sha256(payload) != before

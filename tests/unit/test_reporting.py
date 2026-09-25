@@ -5,6 +5,8 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 
+import pytest
+
 import fedorbit.infrastructure.evidence as evidence_module
 import fedorbit.reporting as reporting_module
 from fedorbit.analysis.records import (
@@ -18,6 +20,7 @@ from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.evidence import (
     EXPORT_LEDGER_KEY,
     UNAVAILABLE_CELL_TEXT,
+    EvidenceExportError,
     EvidenceFigure,
     EvidenceTable,
     FigureSeries,
@@ -812,6 +815,24 @@ def test_unavailable_cells_render_as_explicit_na_text(tmp_path: Path) -> None:
     assert rendered[1] == f"{PAIR},{UNAVAILABLE_CELL_TEXT}"
 
 
+def test_project_evidence_export_requires_overwrite_for_changed_content(tmp_path: Path) -> None:
+    layout = build_layout(tmp_path)
+    writer = VerifiedEvidenceWriter(ArtifactStore(layout.execution_root), layout)
+    name = ReportArtifactName.ABLATION_RESULTS
+    first = EvidenceTable(columns=(ReportColumnName.PAIR,), rows=(("first",),))
+    changed = EvidenceTable(columns=(ReportColumnName.PAIR,), rows=(("changed",),))
+    path = writer.write_project_evidence_table(first, name)
+
+    with pytest.raises(EvidenceExportError, match="use --overwrite"):
+        writer.write_project_evidence_table(changed, name)
+
+    replacement_writer = VerifiedEvidenceWriter(
+        ArtifactStore(layout.execution_root), layout, overwrite=True
+    )
+    replacement_writer.write_project_evidence_table(changed, name)
+    assert "changed" in path.read_text(encoding="utf-8")
+
+
 def test_export_fingerprints_are_recorded_per_registered_export(tmp_path: Path) -> None:
     layout = build_layout(tmp_path)
     writer = VerifiedEvidenceWriter(ArtifactStore(layout.execution_root), layout)
@@ -845,7 +866,14 @@ def test_changing_a_declared_dependency_changes_only_that_export(tmp_path: Path)
     initial = first.read_bytes()
     other_path = writer.write_project_evidence_table(tables[other], other)
     other_initial = other_path.read_bytes()
-    changed = writer.write_project_evidence_figure(figures[name], name, (ArtifactIdentifier("b"),))
+    with pytest.raises(EvidenceExportError, match="use --overwrite"):
+        writer.write_project_evidence_figure(figures[name], name, (ArtifactIdentifier("b"),))
+    overwrite_writer = VerifiedEvidenceWriter(
+        ArtifactStore(layout.execution_root), layout, overwrite=True
+    )
+    changed = overwrite_writer.write_project_evidence_figure(
+        figures[name], name, (ArtifactIdentifier("b"),)
+    )
     assert changed.read_bytes() != initial
     assert other_path.read_bytes() == other_initial
 

@@ -12,7 +12,11 @@ from typing import cast
 import numpy as np
 from pydantic import JsonValue
 
-from fedorbit.analysis.metrics import CrossEntropy, relative_macro_ce_gain
+from fedorbit.analysis.metrics import (
+    CrossEntropy,
+    confirmation_coverage,
+    relative_macro_ce_gain,
+)
 from fedorbit.analysis.records import MetricRecord, PairedComparisonRecord
 from fedorbit.config.loading import active_config
 from fedorbit.datasets.materialization import MaterializedClient
@@ -1141,10 +1145,7 @@ def _confirmation_coverage(
     if recorded:
         measured: Fraction = sum(recorded) / len(recorded)
         return measured
-    if proposals == 0:
-        return None
-    derived: Fraction = accepted / proposals
-    return derived
+    return confirmation_coverage(accepted, proposals)
 
 
 def confirmation_figure_series(

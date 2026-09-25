@@ -23,6 +23,7 @@ from fedorbit.infrastructure.artifacts import (
 )
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
+    recorded_experiment,
 )
 from fedorbit.infrastructure.runtime import (
     execution_logger,
@@ -199,8 +200,8 @@ def _theorem_cells(
     cells: list[TheoremCellRecord] = []
     for manifest in store.all_manifests():
         if (
-            ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION.value
-            not in manifest.semantic_producer_coordinates
+            recorded_experiment(manifest)
+            is not ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION
         ):
             continue
         try:

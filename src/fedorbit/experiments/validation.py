@@ -16,6 +16,7 @@ import torch
 from pydantic import JsonValue
 from torch import nn
 
+from fedorbit.analysis.metrics import absolute_objective_error
 from fedorbit.analysis.records import (
     MetricDirection,
 )
@@ -683,7 +684,7 @@ def theorem_exhaustive_validation_instance(
         problem, action, lap_objective_tie_tolerance, action_tie_tolerance
     )
     exhaustive_truth = min(evaluate_objective(action, correspondence) for correspondence in orbit)
-    error = abs(outcome.separator_objective - exhaustive_truth)
+    error = absolute_objective_error(outcome.separator_objective, exhaustive_truth)
     exact_minima = verify_exactness_certificate(
         outcome.separator_objective, exhaustive_truth, exact_validation_absolute_tolerance
     )
@@ -1398,7 +1399,7 @@ def _validation_payload(
         configuration.solvers.exact_sparse.action_tie_tolerance,
     )
     exhaustive_truth = min(evaluate_objective(action, correspondence) for correspondence in orbit)
-    fixture_error = abs(outcome.separator_objective - exhaustive_truth)
+    fixture_error = absolute_objective_error(outcome.separator_objective, exhaustive_truth)
     if fixture_error > fixture_tolerance:
         raise PrimitiveValidationError("fixture error exceeds registered tolerance")
     scoring = _score_deterministic_validation_batch()

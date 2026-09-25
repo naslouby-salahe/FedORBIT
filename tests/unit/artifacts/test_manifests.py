@@ -13,6 +13,7 @@ from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,
     completion_manifest_self_hash,
+    recorded_experiment,
 )
 from fedorbit.infrastructure.storage import StorageError
 from fedorbit.types import (
@@ -20,6 +21,7 @@ from fedorbit.types import (
     ArtifactStage,
     ArtifactState,
     ArtifactType,
+    ExperimentName,
     Sha256Digest,
     TerminalState,
 )
@@ -129,6 +131,26 @@ def test_completion_and_reusable_manifests_round_trip() -> None:
     reusable = ReusableArtifactManifest.model_validate(_reusable_payload())
     assert CompletionManifest.model_validate(completion.model_dump(mode="json")) == completion
     assert ReusableArtifactManifest.model_validate(reusable.model_dump(mode="json")) == reusable
+
+
+def test_recorded_experiment_matches_the_exact_coordinate() -> None:
+    requested = ExperimentName.MATHEMATICAL_PRIMITIVE_VALIDATION
+    other = ExperimentName.EXACT_SPARSE_THEOREM_EXHAUSTIVE_VALIDATION
+    payload = _reusable_payload()
+    payload["semantic_producer_coordinates"] = (
+        '{"experiment":"Exact Sparse Theorem Exhaustive Validation",'
+        '"condition":"Mathematical Primitive Validation"}'
+    )
+    manifest = ReusableArtifactManifest.model_validate(payload)
+    assert recorded_experiment(manifest) is other
+    assert recorded_experiment(manifest) is not requested
+
+
+def test_recorded_experiment_fails_closed_for_invalid_coordinates() -> None:
+    payload = _reusable_payload()
+    payload["semantic_producer_coordinates"] = "not-json"
+    manifest = ReusableArtifactManifest.model_validate(payload)
+    assert recorded_experiment(manifest) is None
 
 
 def test_completion_manifest_rejects_unknown_fields() -> None:

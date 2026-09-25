@@ -144,17 +144,29 @@ def test_cached_preparation_validates_terminal_states(
         DatasetObservationPersistenceRequest(observation, layout.preprocessing)
     )
     duplicate_path = validation_path.parent / "duplicates.parquet"
-    pd.DataFrame().to_parquet(duplicate_path, index=False)
+    pd.DataFrame(columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count")).to_parquet(
+        duplicate_path, index=False
+    )
     raw_fingerprint = Sha256Digest("a" * 64)
     contract_fingerprint = Sha256Digest("b" * 64)
     if requires_prepared:
-        for path in (
-            layout.preprocessing / "prepared" / dataset.value / "data.json",
-            layout.preprocessing / "prepared" / dataset.value / "client.pt",
-            layout.preprocessing / "features" / dataset.value / "data.json",
-        ):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.touch()
+        prepared_directory = layout.preprocessing / "prepared" / dataset.value
+        features_directory = layout.preprocessing / "features" / dataset.value
+        prepared_directory.mkdir(parents=True, exist_ok=True)
+        features_directory.mkdir(parents=True, exist_ok=True)
+        (prepared_directory / "data.json").write_text(
+            json.dumps({"dataset": dataset.value}), encoding="utf-8"
+        )
+        (prepared_directory / "client.pt").write_bytes(b"fixture-client-payload")
+        (features_directory / "data.json").write_text(
+            json.dumps({"feature_names": []}), encoding="utf-8"
+        )
+        for split in Split:
+            split_path = (
+                layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet"
+            )
+            split_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(columns=("target",)).to_parquet(split_path, index=False)
     persist_preparation_record(
         layout,
         raw_fingerprint,
@@ -180,6 +192,59 @@ def test_cached_preparation_validates_terminal_states(
     assert cached_invalid_reason is None
 
 
+def test_cached_preparation_rejects_changed_split_payload(tmp_path: Path) -> None:
+    layout = build_layout(root=tmp_path)
+    dataset = DatasetId.TON_IOT_WINDOWS10_HOST
+    observation = DatasetObservation(
+        dataset=dataset,
+        row_count=1,
+        observed_columns=(TabularColumnName("ts"),),
+        local_class_counts=(),
+        binary_label_counts=(),
+        inconsistent_binary_label_rows=0,
+        event_time=EventTimeInspection(
+            field=TabularColumnName("ts"),
+            observed_row_count=1,
+            timestamp_pattern_row_count=1,
+            unusable_row_count=0,
+            state=ChronologyValidationState.VALID,
+            reason=ValidationReason("fixture"),
+        ),
+    )
+    validation_path = persist_dataset_observation(
+        DatasetObservationPersistenceRequest(observation, layout.preprocessing)
+    )
+    duplicate_path = validation_path.parent / "duplicates.parquet"
+    pd.DataFrame(columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count")).to_parquet(
+        duplicate_path, index=False
+    )
+    prepared_directory = layout.preprocessing / "prepared" / dataset.value
+    features_directory = layout.preprocessing / "features" / dataset.value
+    prepared_directory.mkdir(parents=True, exist_ok=True)
+    features_directory.mkdir(parents=True, exist_ok=True)
+    (prepared_directory / "data.json").write_text(
+        json.dumps({"dataset": dataset.value}), encoding="utf-8"
+    )
+    (prepared_directory / "client.pt").write_bytes(b"fixture-client-payload")
+    (features_directory / "data.json").write_text(
+        json.dumps({"feature_names": []}), encoding="utf-8"
+    )
+    for split in Split:
+        split_path = layout.preprocessing / "splits" / dataset.value / split.value / "data.parquet"
+        split_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(columns=("target",)).to_parquet(split_path, index=False)
+    raw_fingerprint = Sha256Digest("a" * 64)
+    contract_fingerprint = Sha256Digest("b" * 64)
+    persist_preparation_record(layout, raw_fingerprint, contract_fingerprint, observation, None)
+
+    corrupt_split = (
+        layout.preprocessing / "splits" / dataset.value / Split.TRAIN.value / "data.parquet"
+    )
+    corrupt_split.write_bytes(b"corrupt")
+
+    assert load_cached_preparation(layout, raw_fingerprint, contract_fingerprint, dataset) is None
+
+
 def test_cached_preparation_preserves_materialization_invalid_reason(tmp_path: Path) -> None:
     layout = build_layout(root=tmp_path)
     dataset = DatasetId.TON_IOT_WINDOWS10_HOST
@@ -203,7 +268,9 @@ def test_cached_preparation_preserves_materialization_invalid_reason(tmp_path: P
         DatasetObservationPersistenceRequest(observation, layout.preprocessing)
     )
     duplicate_path = validation_path.parent / "duplicates.parquet"
-    pd.DataFrame().to_parquet(duplicate_path, index=False)
+    pd.DataFrame(columns=("raw_row_sha256", "occurrence_count", "duplicate_row_count")).to_parquet(
+        duplicate_path, index=False
+    )
     raw_fingerprint = Sha256Digest("a" * 64)
     contract_fingerprint = Sha256Digest("b" * 64)
     invalid_reason = ValidationReason("conflicting duplicate labels")

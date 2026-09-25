@@ -12,6 +12,7 @@ from fedorbit.analysis.metrics import (
     CrossEntropy,
     InvalidEvaluationDataError,
     RelativeMacroCeGain,
+    beneficial_rejected_rate,
     harm_indicator,
     relative_macro_ce_gain,
 )
@@ -152,6 +153,7 @@ from fedorbit.types import (
     ExperimentLocalMethod,
     ExperimentName,
     FilesystemSlug,
+    Fraction,
     InvalidReason,
     MetricId,
     MetricUnit,
@@ -1052,19 +1054,61 @@ def _persist_confirmation_safety_indicators(
     )
     useful = with_gain.relative >= materiality.useful_transfer_relative_macro_ce_gain
     coverage_confirm = 1.0 if accepted else 0.0
+    without_gain: RelativeMacroCeGain | None = None
+    beneficial_invalid_reason: InvalidReason | None = None
+    beneficial_rate: Fraction | None = None
+    if without_score is None:
+        beneficial_invalid_reason = InvalidReason(
+            "beneficial-rejection rate requires the exact paired no-confirm counterfactual"
+        )
+    else:
+        without_gain = relative_macro_ce_gain(local_ce, without_score.macro_cross_entropy)
+        if without_gain.relative is None:
+            beneficial_invalid_reason = InvalidReason(
+                "beneficial-rejection rate is unavailable because the counterfactual relative "
+                "gain denominator is below the registered floor"
+            )
+        else:
+            beneficial_rate = beneficial_rejected_rate(
+                int(
+                    not accepted
+                    and without_gain.relative >= materiality.useful_transfer_relative_macro_ce_gain
+                ),
+                len(verdicts),
+            )
     indicators.extend(
         (
             (MetricId.HARMFUL_ACCEPTED_RATE, 1.0 if accepted and harmful else 0.0),
             (MetricId.USEFUL_ACCEPTED_RATE, 1.0 if accepted and useful else 0.0),
-            (MetricId.BENEFICIAL_REJECTED_RATE, 1.0 if (not accepted) and useful else 0.0),
             (MetricId.COVERAGE_CONFIRM, coverage_confirm),
             (MetricId.COVERAGE_NO_CONFIRM, 1.0),
             (MetricId.COVERAGE_LOSS, 1.0 - coverage_confirm),
             (MetricId.HARM_RATE_CONFIRM, 1.0 if harmful else 0.0),
         )
     )
-    if without_score is not None:
-        without_gain = relative_macro_ce_gain(local_ce, without_score.macro_cross_entropy)
+    if beneficial_rate is not None:
+        indicators.append((MetricId.BENEFICIAL_REJECTED_RATE, beneficial_rate))
+    elif beneficial_invalid_reason is not None:
+        persist_primary_transfer_metric(
+            store,
+            layout,
+            request.experiment,
+            pair_direction,
+            source,
+            target,
+            TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
+            seed,
+            MetricId.BENEFICIAL_REJECTED_RATE,
+            None,
+            MetricUnit.FRACTION,
+            MetricDirection.DESCRIPTIVE,
+            input_artifact_ids,
+            request.overwrite_policy,
+            PRINCIPAL_EVALUATION_CONDITION.name,
+            valid=False,
+            invalid_reason=beneficial_invalid_reason,
+        )
+    if without_gain is not None:
         if without_gain.relative is None:
             persist_primary_transfer_metric(
                 store,

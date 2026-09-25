@@ -343,6 +343,18 @@ def solve_lifted_lp(
     highs.setOptionValue(HighsOption.SOLVER.value, HighsSolver.SIMPLEX.value)
     highs.setOptionValue(HighsOption.PRESOLVE.value, HighsPresolve.ON.value)
     highs.setOptionValue(HighsOption.THREADS.value, config.solvers.dense_ccp.lp_threads)
+    lp_settings = config.solvers.exact_sparse
+    highs.setOptionValue(
+        HighsOption.PRIMAL_FEASIBILITY_TOLERANCE.value,
+        lp_settings.lp_primal_feasibility_tolerance,
+    )
+    highs.setOptionValue(
+        HighsOption.DUAL_FEASIBILITY_TOLERANCE.value,
+        lp_settings.lp_dual_feasibility_tolerance,
+    )
+    highs.setOptionValue(
+        HighsOption.OPTIMALITY_TOLERANCE.value, lp_settings.lp_optimality_tolerance
+    )
     highs.passModel(lp)
     highs.run()
     status = highs.getModelStatus()

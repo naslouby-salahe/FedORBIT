@@ -256,9 +256,12 @@ def _metric_tabular_values(
 
 
 class VerifiedEvidenceWriter:
-    def __init__(self, store: ArtifactResolver, layout: WorkspaceLayout) -> None:
+    def __init__(
+        self, store: ArtifactResolver, layout: WorkspaceLayout, overwrite: bool = False
+    ) -> None:
         self._store = store
         self._layout = layout
+        self._overwrite = overwrite
 
     def write(
         self,
@@ -302,7 +305,7 @@ class VerifiedEvidenceWriter:
             / _experiment_metric_summary_directory()
             / ReportingPathSegment.SUMMARY_JSON
         )
-        atomic_write_json(summary, serialized)
+        self._promote_export(summary, (stable_json(serialized) + "\n").encode("utf-8"))
         columns, row = _metric_tabular_values(metric)
         csv_path = (
             workspace
@@ -310,7 +313,7 @@ class VerifiedEvidenceWriter:
             / _experiment_supplementary_table_directory()
             / ReportingPathSegment.METRIC_RECORDS_CSV
         )
-        atomic_write_bytes(csv_path, _csv_bytes(columns, (row,)))
+        self._promote_export(csv_path, _csv_bytes(columns, (row,)))
         figure_paths = self.write_metric_figure(experiment, artifact_id, metric)
         return (summary, csv_path, *figure_paths)
 
@@ -330,7 +333,7 @@ class VerifiedEvidenceWriter:
         )
         label = f"{metric.metric_name.value}: {format_metric_value(metric)} {metric.metric_unit}"
         svg_path = destination / ReportingPathSegment.METRIC_VALUE_SVG
-        atomic_write_bytes(svg_path, _metric_svg_bytes(label, metric.metric_value))
+        self._promote_export(svg_path, _metric_svg_bytes(label, metric.metric_value))
         return (svg_path,)
 
     def write_project_summary(
@@ -338,7 +341,7 @@ class VerifiedEvidenceWriter:
         manifests: tuple[ReusableArtifactManifest, ...],
         metrics: tuple[MetricRecord, ...],
     ) -> tuple[Path, ...]:
-        if not manifests:
+        if not manifests and not self._overwrite:
             return ()
         summary = self._layout.project_summary
         manifest_rows = tuple(
@@ -356,7 +359,7 @@ class VerifiedEvidenceWriter:
             / _project_main_table_directory()
             / ReportingPathSegment.EXPERIMENTS_CSV
         )
-        atomic_write_bytes(
+        self._promote_export(
             experiments,
             _csv_bytes(
                 (
@@ -379,21 +382,28 @@ class VerifiedEvidenceWriter:
             / _project_main_table_directory()
             / ReportingPathSegment.EVIDENCE_SUMMARY_CSV
         )
-        atomic_write_bytes(evidence_summary, _csv_bytes(metric_columns, metric_rows))
+        self._promote_export(evidence_summary, _csv_bytes(metric_columns, metric_rows))
         metrics_summary = (
             summary
             / ReportingPathSegment.METRICS
             / _project_metric_summary_directory()
             / ReportingPathSegment.SUMMARY_JSON
         )
-        atomic_write_json(
+        self._promote_export(
             metrics_summary,
-            cast(
-                StableJsonPayload,
-                OrderedDict(
-                    metric_records=tuple(metric.model_dump(mode="json") for metric in metrics)
-                ),
-            ),
+            (
+                stable_json(
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            metric_records=tuple(
+                                metric.model_dump(mode="json") for metric in metrics
+                            )
+                        ),
+                    )
+                )
+                + "\n"
+            ).encode("utf-8"),
         )
         configuration = (
             summary
@@ -401,16 +411,21 @@ class VerifiedEvidenceWriter:
             / _project_configuration_reproducibility_directory()
             / ReportingPathSegment.SCIENTIFIC_CONFIGURATION_JSON
         )
-        atomic_write_json(
+        self._promote_export(
             configuration,
-            cast(
-                StableJsonPayload,
-                OrderedDict(
-                    configuration_sha256=tuple(
-                        manifest.applicable_configuration_sha256 for manifest in manifests
+            (
+                stable_json(
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            configuration_sha256=tuple(
+                                manifest.applicable_configuration_sha256 for manifest in manifests
+                            )
+                        ),
                     )
-                ),
-            ),
+                )
+                + "\n"
+            ).encode("utf-8"),
         )
         execution = (
             summary
@@ -419,19 +434,26 @@ class VerifiedEvidenceWriter:
             / ReportingPathSegment.EXECUTION_JSON
         )
         identity = build_reproducibility_identity(environment_snapshot())
-        atomic_write_json(
+        self._promote_export(
             execution,
-            cast(
-                StableJsonPayload,
-                OrderedDict(
-                    completed_artifact_ids=tuple(manifest.artifact_id for manifest in manifests),
-                    dependency_fingerprints=tuple(
-                        manifest.dependency_fingerprint_sha256 for manifest in manifests
-                    ),
-                    reproducibility_identity=_identity_payload(identity),
-                    deterministic_backend=deterministic_backend_state(),
-                ),
-            ),
+            (
+                stable_json(
+                    cast(
+                        StableJsonPayload,
+                        OrderedDict(
+                            completed_artifact_ids=tuple(
+                                manifest.artifact_id for manifest in manifests
+                            ),
+                            dependency_fingerprints=tuple(
+                                manifest.dependency_fingerprint_sha256 for manifest in manifests
+                            ),
+                            reproducibility_identity=_identity_payload(identity),
+                            deterministic_backend=deterministic_backend_state(),
+                        ),
+                    )
+                )
+                + "\n"
+            ).encode("utf-8"),
         )
         return (experiments, evidence_summary, metrics_summary, configuration, execution)
 
@@ -476,6 +498,10 @@ class VerifiedEvidenceWriter:
     def _promote_export(self, destination: Path, rendered: bytes) -> Path:
         if destination.is_file() and destination.read_bytes() == rendered:
             return destination
+        if destination.is_file() and not self._overwrite:
+            raise EvidenceExportError(
+                "project evidence export already exists with different content; use --overwrite"
+            )
         atomic_write_bytes(destination, rendered)
         return destination
 

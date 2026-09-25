@@ -56,6 +56,7 @@ from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,
+    recorded_experiment,
 )
 from fedorbit.infrastructure.provenance import (
     configuration_subset_digest,
@@ -136,9 +137,8 @@ def _iter_completed_json_documents(
     store: ArtifactStore,
     experiment: ExperimentName,
 ) -> Iterator[tuple[ReusableArtifactManifest, Mapping[str, StableJsonPayload]]]:
-    experiment_value = experiment.value
     for manifest in store.all_manifests():
-        if experiment_value not in manifest.semantic_producer_coordinates:
+        if recorded_experiment(manifest) is not experiment:
             continue
         try:
             resolved = store.resolve(manifest.artifact_id)

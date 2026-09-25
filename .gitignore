@@ -218,6 +218,12 @@ tempCodeRunnerFile.py
 /docs/.refactor-audit/
 /docs/.graphify-audit/
 /docs/.audit/
+# Keep the concise audit notes; ignore generated graphs, logs, and working data.
+!/docs/.audit/
+/docs/.audit/*
+!/docs/.audit/README.md
+!/docs/.audit/findings.md
+!/docs/.audit/evidence.md
 
 # PyPI configuration file
 .pypirc

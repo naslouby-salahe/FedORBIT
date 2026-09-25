@@ -75,6 +75,7 @@ from fedorbit.types import (
     ArtifactType,
     ConfigurationSection,
     ExecutionEventName,
+    ExperimentName,
     FieldDescription,
     OverwritePolicy,
     ScientificSubsystem,
@@ -849,9 +850,13 @@ class ArtifactStore:
     def current_completed_manifest(
         self, semantic_producer_marker: str
     ) -> ReusableArtifactManifest | None:
+        try:
+            experiment = ExperimentName(semantic_producer_marker)
+        except ValueError:
+            return None
         current: list[ReusableArtifactManifest] = []
         for manifest in self.all_manifests():
-            if semantic_producer_marker not in manifest.semantic_producer_coordinates:
+            if recorded_experiment(manifest) != experiment:
                 continue
             if self.artifact_state(manifest.artifact_id).state is not ArtifactState.COMPLETED:
                 continue

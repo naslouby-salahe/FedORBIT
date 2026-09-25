@@ -196,16 +196,21 @@ def test_type_aliases_never_reintroduce_primitive_containers() -> None:
         module = relative_module(path)
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in tree.body:
+            alias_value: ast.expr | None = None
+            alias_name: str | None = None
             if isinstance(node, ast.Assign) and isinstance(node.value, (ast.Subscript, ast.Name)):
-                target_text = ast.unparse(node.value)
+                alias_value = node.value
+                if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    alias_name = node.targets[0].id
+            elif hasattr(ast, "TypeAlias") and isinstance(node, ast.TypeAlias):
+                alias_value = node.value
+                alias_name = ast.unparse(node.name)
+            if alias_value is not None:
+                target_text = ast.unparse(alias_value)
                 base = target_text.split("[")[0]
-                if base in {"dict", "list", "set", "object"}:
-                    for target in node.targets:
-                        if isinstance(target, ast.Name):
-                            qualified = f"{module}.{target.id}"
-                            violations.append(
-                                f"{path}:{node.lineno}: {qualified} = {target_text[:60]}"
-                            )
+                if base in {"dict", "list", "set", "object"} and alias_name is not None:
+                    qualified = f"{module}.{alias_name}"
+                    violations.append(f"{path}:{node.lineno}: {qualified} = {target_text[:60]}")
     assert not violations, "\n".join(violations)
 
 
@@ -286,3 +291,14 @@ def test_detector_catches_primitive_container_alias() -> None:
         if isinstance(node, ast.Assign) and isinstance(node.value, (ast.Subscript, ast.Name))
     ]
     assert aliases == ["dict"]
+
+
+def test_detector_catches_pep695_primitive_container_alias() -> None:
+    source = "type Values = list[int]\n"
+    tree = ast.parse(source)
+    aliases = [
+        ast.unparse(node.value).split("[")[0]
+        for node in tree.body
+        if hasattr(ast, "TypeAlias") and isinstance(node, ast.TypeAlias)
+    ]
+    assert aliases == ["list"]

@@ -5,7 +5,6 @@ from collections import OrderedDict
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import cast
 
 import torch
 
@@ -24,6 +23,7 @@ from fedorbit.learning.training import (
 )
 from fedorbit.methods.confirmation import (
     ConfirmReplicateOutcomes,
+    confirmation_schedule,
     hierarchical_bootstrap_lower_bound,
 )
 from fedorbit.methods.target import (
@@ -45,7 +45,6 @@ from fedorbit.types import (
     RngNamespace,
     Sha256Digest,
     SourceClientName,
-    StableJsonPayload,
     StepCount,
 )
 
@@ -146,21 +145,16 @@ def _confirmation_batches_for_replicate(
     replicate_index: ReplicateCount,
     horizon: StepCount,
 ) -> tuple[ShadowBatch, ...]:
-    rng_seed = derive_seed32(
-        SeedDerivationRequest(
-            seed,
-            RngNamespace.CONFIRMATION_SCHEDULE,
-            cast(
-                StableJsonPayload,
-                OrderedDict(coordinates=contrast_coordinates, replicate=replicate_index),
-            ),
-        )
-    )
-    generator = torch.Generator().manual_seed(rng_seed)
     train_size = int(features.shape[0])
     if train_size <= 0:
         raise AssimilationError("confirmation TRAIN split is empty")
-    schedule = shadow_batch_schedule(train_size, batch_size, generator)
+    schedule = confirmation_schedule(
+        train_size,
+        batch_size,
+        seed,
+        contrast_coordinates,
+        replicate_index,
+    )
     return tuple(
         ShadowBatch(features[indices], targets[indices])
         for indices in itertools.islice(schedule, horizon)
@@ -463,10 +457,6 @@ class PreTestLifecycle:
         if missing:
             raise TestOpeningRuleError(f"phases out of order; missing {missing} before {phase}")
         self._completed.append(phase)
-
-    @property
-    def opened(self) -> bool:
-        return self._opened
 
     def open_test(self) -> TestAccessGrant:
         missing = [name for name in _PRE_TEST_PHASES if name not in self._completed]

@@ -53,6 +53,7 @@ from fedorbit.infrastructure.environment import environment_snapshot
 from fedorbit.infrastructure.manifests import (
     ReusableArtifactManifest,
     artifact_id,
+    recorded_experiment,
 )
 from fedorbit.infrastructure.preparation import (
     load_or_materialize_client,
@@ -1000,10 +1001,7 @@ def completed_scalability_metric_artifacts(
 ) -> tuple[CompletedMetricArtifact, ...]:
     artifacts: list[CompletedMetricArtifact] = []
     for manifest in store.all_manifests():
-        if (
-            ExperimentName.SCALABILITY_AND_EFFICIENCY.value
-            not in manifest.semantic_producer_coordinates
-        ):
+        if recorded_experiment(manifest) is not ExperimentName.SCALABILITY_AND_EFFICIENCY:
             continue
         try:
             resolved = store.resolve(manifest.artifact_id)

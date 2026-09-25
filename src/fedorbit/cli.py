@@ -67,7 +67,7 @@ from fedorbit.infrastructure.environment import (
 )
 from fedorbit.infrastructure.evidence import recorded_execution_identity
 from fedorbit.infrastructure.failures import validation_failure_outcome
-from fedorbit.infrastructure.manifests import ReusableArtifactManifest
+from fedorbit.infrastructure.manifests import ReusableArtifactManifest, recorded_experiment
 from fedorbit.infrastructure.preparation import DatasetPreparationRequest, preprocess_datasets
 from fedorbit.infrastructure.runtime import (
     build_reproducibility_identity,
@@ -300,7 +300,7 @@ def _experiment_state(
     candidates = tuple(
         manifest
         for manifest in store.all_manifests()
-        if experiment.value in manifest.semantic_producer_coordinates
+        if recorded_experiment(manifest) is experiment
     )
     if not candidates:
         return ExperimentStateReport(
@@ -342,7 +342,7 @@ def report(
         )
         layout = build_layout()
         store = ArtifactStore(layout.execution_root)
-        writer = VerifiedEvidenceWriter(store, layout)
+        writer = VerifiedEvidenceWriter(store, layout, overwrite=overwrite)
         exported = 0
         exported_manifests: list[ReusableArtifactManifest] = []
         exported_metrics: list[MetricRecord] = []
@@ -439,16 +439,27 @@ def report(
                 )
             primary_transfer_metrics = completed_primary_transfer_metric_records(store)
             primary_transfer_comparisons = completed_primary_transfer_comparison_records(store)
-            typer.echo(
-                str(
-                    writer.write_project_evidence_table(
-                        primary_strict_transfer_results_table(
-                            primary_transfer_metrics, primary_transfer_comparisons
-                        ),
-                        ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
+            primary_transfer_artifact_ids = tuple(
+                identifier
+                for record in primary_transfer_metrics
+                for identifier in record.input_artifact_ids
+            ) + tuple(
+                identifier
+                for record in primary_transfer_comparisons
+                for identifier in record.input_metric_artifact_ids
+            )
+            if primary_transfer_metrics or primary_transfer_comparisons:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_table(
+                            primary_strict_transfer_results_table(
+                                primary_transfer_metrics, primary_transfer_comparisons
+                            ),
+                            ReportArtifactName.PRIMARY_STRICT_TRANSFER_RESULTS,
+                            primary_transfer_artifact_ids,
+                        )
                     )
                 )
-            )
             gain_figure = real_transfer_gain_series(primary_transfer_comparisons)
             if gain_figure.series:
                 typer.echo(
@@ -623,16 +634,22 @@ def report(
                         )
                     )
                 )
-            typer.echo(
-                str(
-                    writer.write_project_evidence_figure(
-                        predicted_vs_realized_transfer_figure(
-                            metric_records=primary_transfer_metrics
-                        ),
-                        ReportArtifactName.PREDICTED_VS_REALIZED_TRANSFER_FIGURE,
+            if primary_transfer_metrics:
+                typer.echo(
+                    str(
+                        writer.write_project_evidence_figure(
+                            predicted_vs_realized_transfer_figure(
+                                metric_records=primary_transfer_metrics
+                            ),
+                            ReportArtifactName.PREDICTED_VS_REALIZED_TRANSFER_FIGURE,
+                            tuple(
+                                identifier
+                                for record in primary_transfer_metrics
+                                for identifier in record.input_artifact_ids
+                            ),
+                        )
                     )
                 )
-            )
             sparsity_series = sparsity_figure_series(sparsity_and_dense_rows)
             if sparsity_series:
                 typer.echo(
@@ -694,7 +711,7 @@ def report(
         if exported == 0:
             typer.echo("no verified persisted evidence available for report generation")
         execution_logger().event(ExecutionEventName.REPORT_END, exported=exported)
-    except CliUsageError as error:
+    except (CliUsageError, ExecutionError, ValueError) as error:
         exit_from_error(error)
 
 

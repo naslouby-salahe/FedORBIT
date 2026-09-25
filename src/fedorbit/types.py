@@ -529,7 +529,7 @@ RetryCount = NonNegativeInt
 AnonymousNodeIndex = Index
 AnonymousNodeDisplayId = NewType("AnonymousNodeDisplayId", str)
 type NodeIndices = tuple[Index, ...]
-type NodeIndexList = list[Index]
+type NodeIndexSequence = Sequence[Index]
 type NodeImageMap = Mapping[Index, Index]
 
 
@@ -576,9 +576,9 @@ type ExcludedLocalClasses = tuple[tuple[FineLabel, ClassInstanceCount], ...]
 FeatureName = NewType("FeatureName", str)
 NumericFeatureValue = NewType("NumericFeatureValue", float)
 type FeatureNames = tuple[FeatureName, ...]
-type RawTabularRow = dict[TabularColumnName, RawCellText]
-type RawTabularRows = list[RawTabularRow]
-type RawTabularColumns = list[RawCellText]
+type RawTabularRow = Mapping[TabularColumnName, RawCellText]
+type RawTabularRows = tuple[RawTabularRow, ...]
+type RawTabularColumns = tuple[RawCellText, ...]
 TimestampSeconds = FiniteFloat
 type TimestampRange = tuple[TimestampSeconds, TimestampSeconds]
 type CategoryVocabulary = tuple[CategoryName, ...]

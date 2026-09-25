@@ -38,7 +38,7 @@ from fedorbit.types import (
     CutCount,
     Index,
     NodeImageMap,
-    NodeIndexList,
+    NodeIndexSequence,
     NodeIndices,
     SampleCount,
     ScientificAlgorithmicFailureError,
@@ -58,6 +58,7 @@ class HighsOption(StrEnum):
     RANDOM_SEED = "random_seed"
     PRIMAL_FEASIBILITY_TOLERANCE = "primal_feasibility_tolerance"
     DUAL_FEASIBILITY_TOLERANCE = "dual_feasibility_tolerance"
+    OPTIMALITY_TOLERANCE = "optimality_tolerance"
 
 
 class HighsSolver(StrEnum):
@@ -202,7 +203,7 @@ def _evaluate_active_image_map(
 def _lap_cost_entry(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    active_targets: NodeIndexList,
+    active_targets: NodeIndexSequence,
     image_by_target: NodeImageMap,
     target_node: Index,
     source_node: Index,
@@ -258,10 +259,10 @@ def _complete_with_blockwise_laps(
 def _solve_block_completion(
     problem: RobustActionProblem,
     alpha: CurriculumAction,
-    active_targets: NodeIndexList,
+    active_targets: NodeIndexSequence,
     image_by_target: NodeImageMap,
-    remaining_targets: NodeIndexList,
-    unused_sources: NodeIndexList,
+    remaining_targets: NodeIndexSequence,
+    unused_sources: NodeIndexSequence,
     lap_tie_tolerance: Tolerance,
 ):
     cost_matrix = np.zeros((len(remaining_targets), len(unused_sources)), dtype=np.float64)
@@ -392,6 +393,7 @@ def run_support_master_lp(
     highs.setOptionValue(
         HighsOption.DUAL_FEASIBILITY_TOLERANCE.value, settings.lp_dual_feasibility_tolerance
     )
+    highs.setOptionValue(HighsOption.OPTIMALITY_TOLERANCE.value, settings.lp_optimality_tolerance)
     highs.passModel(lp)
     highs.run()
     model_status = highs.getModelStatus()

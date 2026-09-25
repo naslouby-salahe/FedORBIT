@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import statistics
+from collections import OrderedDict
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 import torch
@@ -20,10 +22,12 @@ from fedorbit.types import (
     BatchSize,
     ContrastCoordinates,
     Fraction,
+    Index,
     RelativeGain,
     RngNamespace,
     SampleCount,
     Score,
+    StableJsonPayload,
 )
 
 type RelativeGainSamples = tuple[RelativeGain, ...]
@@ -59,13 +63,23 @@ def confirmation_schedule(
     batch_size: BatchSize,
     seed: RandomSeed,
     coordinates: ContrastCoordinates,
+    replicate_index: Index,
 ) -> Iterator[torch.Tensor]:
     if train_size <= 0:
         raise ConfirmationError("confirmation TRAIN set is empty")
     if batch_size <= 0:
         raise ConfirmationError("confirmation batch size must be positive")
     rng = torch.Generator().manual_seed(
-        derive_seed32(SeedDerivationRequest(seed, RngNamespace.CONFIRMATION_SCHEDULE, coordinates))
+        derive_seed32(
+            SeedDerivationRequest(
+                seed,
+                RngNamespace.CONFIRMATION_SCHEDULE,
+                cast(
+                    StableJsonPayload,
+                    OrderedDict(coordinates=coordinates, replicate=replicate_index),
+                ),
+            )
+        )
     )
     return shadow_batch_schedule(train_size, batch_size, rng)
 

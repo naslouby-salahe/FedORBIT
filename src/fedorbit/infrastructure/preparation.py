@@ -18,6 +18,7 @@ from fedorbit.datasets.common import (
     DatasetObservation,
     DatasetObservationPersistenceRequest,
     PreprocessingObservationArtifact,
+    file_sha256,
     inspect_dataset,
     persist_dataset_observation,
 )
@@ -81,6 +82,7 @@ from fedorbit.types import (
     ResourceLimitReason,
     SampleCount,
     Sha256Digest,
+    Split,
     StableJsonPayload,
     StorageLayoutSegment,
     ValidationReason,
@@ -101,14 +103,6 @@ class DatasetPreparationResult:
     duplicate_artifact_paths: tuple[ArtifactPath, ...]
     resource_blocked_datasets: tuple[tuple[DatasetId, ResourceLimitReason], ...] = ()
     invalid_datasets: tuple[tuple[DatasetId, ValidationReason], ...] = ()
-
-    @property
-    def blocked_datasets(self) -> tuple[DatasetId, ...]:
-        return tuple(
-            observation.dataset
-            for observation in self.observations
-            if not observation.valid_for_chronological_preprocessing
-        )
 
 
 _PREPARATION_RECORD_FILENAME = "preparation.json"
@@ -136,18 +130,55 @@ def _preparation_contract_sha256() -> Sha256Digest:
     return Sha256Digest(hashlib.sha256(stable_json(payload).encode("utf-8")).hexdigest())
 
 
-def _prepared_payloads_exist(layout: WorkspaceLayout, dataset: DatasetId) -> bool:
-    return all(
-        path.is_file()
-        for path in (
-            prepared_dataset_directory(layout, dataset)
-            / PreprocessingPayloadFileName.DATASET_MANIFEST,
-            prepared_dataset_directory(layout, dataset)
-            / PreprocessingPayloadFileName.MATERIALIZED_CLIENT,
-            feature_dataset_directory(layout, dataset)
-            / PreprocessingPayloadFileName.DATASET_MANIFEST,
-        )
+def _prepared_payload_paths(layout: WorkspaceLayout, dataset: DatasetId) -> tuple[Path, ...]:
+    return (
+        *(
+            split_dataset_directory(layout, dataset, split)
+            / PreprocessingPayloadFileName.SPLIT_PAYLOAD
+            for split in Split
+        ),
+        prepared_dataset_directory(layout, dataset) / PreprocessingPayloadFileName.DATASET_MANIFEST,
+        prepared_dataset_directory(layout, dataset)
+        / PreprocessingPayloadFileName.MATERIALIZED_CLIENT,
+        feature_dataset_directory(layout, dataset) / PreprocessingPayloadFileName.DATASET_MANIFEST,
     )
+
+
+def _prepared_payloads_match_record(
+    layout: WorkspaceLayout,
+    dataset: DatasetId,
+    payload_sha256s: JsonValue,
+) -> bool:
+    if not isinstance(payload_sha256s, dict):
+        return False
+    paths = _prepared_payload_paths(layout, dataset)
+    if not all(path.is_file() for path in paths):
+        return False
+    for path in paths:
+        recorded = payload_sha256s.get(str(path.relative_to(layout.preprocessing)))
+        if not isinstance(recorded, str) or file_sha256(path) != recorded:
+            return False
+    try:
+        dataset_manifest = json.loads(paths[-3].read_text(encoding="utf-8"))
+        feature_manifest = json.loads(paths[-1].read_text(encoding="utf-8"))
+        if (
+            not isinstance(dataset_manifest, dict)
+            or dataset_manifest.get("dataset") != dataset.value
+        ):
+            return False
+        if not isinstance(feature_manifest, dict) or not isinstance(
+            feature_manifest.get("feature_names"), list
+        ):
+            return False
+        if paths[-2].stat().st_size == 0:
+            return False
+        expected_columns = (*feature_manifest["feature_names"], "target")
+        for split_path in paths[: len(Split)]:
+            if tuple(pd.read_parquet(split_path).columns) != expected_columns:
+                return False
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+    return True
 
 
 def load_cached_preparation(
@@ -183,15 +214,23 @@ def load_cached_preparation(
     try:
         loaded = cast(Mapping[str, JsonValue], json.loads(record_path.read_text(encoding="utf-8")))
         if (
-            loaded.get("raw_inventory_fingerprint") != inventory_fingerprint
+            loaded.get("dataset") != dataset.value
+            or loaded.get("raw_inventory_fingerprint") != inventory_fingerprint
             or loaded.get("preparation_contract_sha256") != contract_sha256
         ):
             return None
+        if loaded.get("validation_sha256") != file_sha256(validation_path) or loaded.get(
+            "duplicates_sha256"
+        ) != file_sha256(duplicate_path):
+            return None
         observation_text = validation_path.read_text(encoding="utf-8")
         observation = _OBSERVATION_ADAPTER.validate_json(observation_text)
+        duplicate_columns = tuple(pd.read_parquet(duplicate_path).columns)
+        if duplicate_columns != ("raw_row_sha256", "occurrence_count", "duplicate_row_count"):
+            return None
         state = loaded.get("state")
-        if state == DatasetPreprocessingState.MATERIALIZED and not _prepared_payloads_exist(
-            layout, dataset
+        if state == DatasetPreprocessingState.MATERIALIZED and not _prepared_payloads_match_record(
+            layout, dataset, loaded.get("payload_sha256s")
         ):
             return None
         if state == DatasetPreprocessingState.MATERIALIZED:
@@ -244,9 +283,32 @@ def persist_preparation_record(
             dataset=observation.dataset.value,
             raw_inventory_fingerprint=inventory_fingerprint,
             preparation_contract_sha256=contract_sha256,
+            validation_sha256=file_sha256(
+                layout.preprocessing
+                / StorageLayoutSegment.VALIDATION
+                / observation.dataset.value
+                / PreprocessingObservationArtifact.VALIDATION
+            ),
+            duplicates_sha256=file_sha256(
+                layout.preprocessing
+                / StorageLayoutSegment.VALIDATION
+                / observation.dataset.value
+                / PreprocessingObservationArtifact.DUPLICATES
+            ),
             state=state.value,
             resource_block_reason=resource_block_reason,
             materialization_invalid_reason=materialization_invalid_reason,
+            payload_sha256s=(
+                OrderedDict(
+                    (
+                        str(path.relative_to(layout.preprocessing)),
+                        file_sha256(path),
+                    )
+                    for path in _prepared_payload_paths(layout, observation.dataset)
+                )
+                if state == DatasetPreprocessingState.MATERIALIZED
+                else None
+            ),
         ),
     )
     atomic_write_json(_preparation_record_path(layout, observation.dataset), payload)
@@ -439,7 +501,7 @@ def persist_dataset_manifest(
 def persist_materialized_client(
     layout: WorkspaceLayout,
     materialized: MaterializedClient,
-    overwrite_policy: OverwritePolicy,
+    _overwrite_policy: OverwritePolicy,
 ) -> tuple[Path, ...]:
     dataset = materialized.dataset
     split_paths: list[Path] = []
@@ -448,9 +510,6 @@ def persist_materialized_client(
             split_dataset_directory(layout, dataset, split)
             / PreprocessingPayloadFileName.SPLIT_PAYLOAD
         )
-        if overwrite_policy == OverwritePolicy.REUSE and destination.is_file():
-            split_paths.append(destination)
-            continue
         frame = pd.DataFrame(
             tensors.features.detach().cpu().numpy(),
             columns=materialized.feature_names,

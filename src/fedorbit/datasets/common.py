@@ -150,9 +150,6 @@ class RawFileDigestEntry:
     modification_nanoseconds: Index
     sha256: Sha256Digest
 
-    def matches(self, size: ByteCount, modification_nanoseconds: Index) -> bool:
-        return self.size == size and self.modification_nanoseconds == modification_nanoseconds
-
     @staticmethod
     def from_json(value: JsonValue) -> RawFileDigestEntry | None:
         if not isinstance(value, dict):
@@ -204,9 +201,6 @@ class RawFileDigestCache:
                 entries[path] = entry
         return RawFileDigestCache(entries)
 
-    def entry_for(self, resolved_path: str) -> RawFileDigestEntry | None:
-        return self.entries.get(resolved_path)
-
     def with_entry(self, resolved_path: str, entry: RawFileDigestEntry) -> RawFileDigestCache:
         updated: OrderedDict[str, RawFileDigestEntry] = OrderedDict(self.entries)
         updated[resolved_path] = entry
@@ -244,11 +238,8 @@ def file_sha256(path: Path) -> Sha256Digest:
     stat = path.stat()
     cache_path = _digest_cache_path()
     with FileLock(str(cache_path) + ".cachelock"):
-        cache = _load_digest_cache(cache_path)
-        entry = cache.entry_for(resolved)
-        if entry is not None and entry.matches(stat.st_size, stat.st_mtime_ns):
-            return entry.sha256
         digest = _hash_file_contents(path)
+        cache = _load_digest_cache(cache_path)
         recorded = cache.with_entry(
             resolved, RawFileDigestEntry(stat.st_size, stat.st_mtime_ns, digest)
         )

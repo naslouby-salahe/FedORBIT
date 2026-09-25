@@ -107,6 +107,8 @@ class HighsOption(StrEnum):
     THREADS = "threads"
     RANDOM_SEED = "random_seed"
     PRIMAL_FEASIBILITY_TOLERANCE = "primal_feasibility_tolerance"
+    DUAL_FEASIBILITY_TOLERANCE = "dual_feasibility_tolerance"
+    OPTIMALITY_TOLERANCE = "optimality_tolerance"
 
 
 class HighsSolver(StrEnum):
@@ -165,6 +167,11 @@ def _solve_support_lp(
         HighsOption.PRIMAL_FEASIBILITY_TOLERANCE.value,
         settings.lp_primal_feasibility_tolerance,
     )
+    highs.setOptionValue(
+        HighsOption.DUAL_FEASIBILITY_TOLERANCE.value,
+        settings.lp_dual_feasibility_tolerance,
+    )
+    highs.setOptionValue(HighsOption.OPTIMALITY_TOLERANCE.value, settings.lp_optimality_tolerance)
     highs.passModel(lp)
     highs.run()
     if highs.getModelStatus() != highspy.HighsModelStatus.kOptimal:

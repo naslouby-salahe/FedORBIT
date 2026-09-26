@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
+import io
+import tokenize
+from collections.abc import Iterator
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -9,76 +11,48 @@ SRC_ROOT = REPOSITORY_ROOT / "src" / "fedorbit"
 TESTS_ROOT = REPOSITORY_ROOT / "tests"
 
 ALLOWED_ROOT_ENTRIES = {
+    ".agents",
+    ".claude",
+    ".codex",
+    ".coverage",
     ".env",
     ".git",
     ".github",
-    "CLAUDE.md",
     ".gitignore",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
     ".vscode",
+    "CLAUDE.md",
     "LICENSE",
     "Makefile",
     "README.md",
+    "__pycache__",
     "configs",
     "data",
     "docs",
     "graphify-out",
     "noxfile.py",
+    "outputs",
     "pyproject.toml",
+    "results",
     "src",
-    "stubs",
     "tests",
     "uv.lock",
-    "vulture_whitelist.py",
 }
 
 PACKAGE_LAYERS: dict[str, int] = {
     "types": 0,
     "config": 1,
+    "infrastructure": 2,
     "datasets": 3,
-    "learning": 3,
-    "interface": 3,
-    "oracle": 4,
-    "response": 4,
-    "optimization": 4,
-    "methods": 4,
-    "analysis": 3,
-    "infrastructure": 5,
-    "experiments": 6,
+    "detection": 3,
+    "study": 4,
+    "analysis": 5,
+    "pipeline": 6,
     "reporting": 7,
     "cli": 8,
-}
-
-MODULE_LAYERS: dict[str, int] = {
-    "infrastructure.environment": 2,
-    "infrastructure.failures": 2,
-    "infrastructure.runtime": 2,
-    "infrastructure.storage": 2,
-    "infrastructure.artifacts": 5,
-    "infrastructure.preparation": 5,
-    "infrastructure.manifests": 5,
-    "infrastructure.provenance": 5,
-    "infrastructure.reuse": 5,
-    "infrastructure.workspace": 5,
-    "infrastructure.evidence": 5,
-}
-
-FORBIDDEN_EDGES: dict[str, frozenset[str]] = {
-    "reporting": frozenset(
-        {
-            "datasets",
-            "learning",
-            "interface",
-            "oracle",
-            "response",
-            "optimization",
-            "methods",
-            "experiments",
-            "cli",
-        }
-    ),
-    "infrastructure": frozenset({"reporting", "cli"}),
-    "config": frozenset({"cli", "reporting", "infrastructure"}),
-    "types": frozenset(PACKAGE_LAYERS.keys()) - {"types"},
 }
 
 VAGUE_MODULE_NAMES = {
@@ -91,11 +65,8 @@ VAGUE_MODULE_NAMES = {
     "misc",
     "tools",
     "shared",
-    "stuff",
-    "things",
     "util",
     "helper",
-    "misc_utils",
 }
 
 BANNED_NAME_FRAGMENTS = (
@@ -105,233 +76,59 @@ BANNED_NAME_FRAGMENTS = (
     "_old",
     "copy2",
     "tmp",
-    "temp_",
     "dummy",
     "placeholder",
     "wip",
 )
-
-FORBIDDEN_VOCABULARY = (
-    "dense exact solver",
-    "exact dense solver",
-    "dense-exact",
-    "privacy guarantee",
-    "byzantine-robust",
-    "universal transfer",
-    "federated learning",
-    "v2.0",
-    "v3.0",
-)
-
-PAPER_NON_GOAL_GUARD_PHRASES = (
-    "dense exactness",
-    "privacy guarantees from anonymity alone",
-)
+STALE_TERMS = ("orchestrator", "workflow engine", "response operator", "orbit map")
+RESIDUE_MARKERS = ("TODO", "FIXME", "HACK", "XXX")
 
 
-def production_text_without_paper_non_goal_guard(path: Path, text: str) -> str:
-    if path.name != "types.py":
-        return text
-    result = text
-    for phrase in PAPER_NON_GOAL_GUARD_PHRASES:
-        result = result.replace(phrase, "")
-        result = result.replace(phrase.lower(), "")
-    return result
+def iter_source_files() -> Iterator[Path]:
+    yield from sorted(SRC_ROOT.rglob("*.py"))
 
 
-LOCKED_VALUE_CONSTANT_PATTERN = {
-    "PRINCIPAL_SPARSE_SUPPORT",
-    "SPARSE_SUPPORT_SENSITIVITY",
-    "TOTAL_CURRICULUM_BUDGET",
-    "COORDINATE_CAP",
-    "LINEAR_COST_PER_ACTIONABLE_NODE",
-    "MAXIMUM_SOURCE_PROPOSALS_PER_TARGET",
-    "COUPLING_OBJECTIVE_UNITS",
-    "REALIZED_RELATIVE_MACRO_CE",
-    "MACRO_F1_ABSOLUTE",
-    "SOURCE_TRAIN_MINIMUM",
-    "SOURCE_META_MINIMUM",
-    "TARGET_META_MINIMUM",
-    "TARGET_CONFIRM_MINIMUM",
-    "TARGET_TEST_MINIMUM",
-    "MISSING_INDICATOR_TRAIN_RATE_THRESHOLD",
-    "RARE_CATEGORY_TRAIN_FREQUENCY_THRESHOLD",
-    "FEATURE_MISSING_OR_NONFINITE_DROP_THRESHOLD",
-    "CLIENT_INVALIDITY_DROPPED_FEATURE_FRACTION_THRESHOLD",
-    "MAXIMUM_EPOCHS",
-    "BATCH_SIZE",
-    "GRADIENT_CLIP_GLOBAL_L2_NORM",
-    "PATIENCE_COMPLETED_EPOCHS",
-    "MINIMUM_IMPROVEMENT",
-    "LABEL_SMOOTHING",
-    "DATALOADER_WORKERS",
-    "STATISTICAL_SEED",
-    "CONFIDENCE_LEVEL",
-    "CI_BOOTSTRAP_REPETITIONS",
-    "MINIMUM_VALID_PAIRED_SEEDS",
-    "TOST_ALPHA_PER_ONE_SIDED_TEST",
-    "SPEARMAN_MINIMUM_VALID_POINTS",
-    "MCNEMAR_EXACT_TO_ASYMPTOTIC_DISCORDANT_PAIR_SWITCH",
-    "LP_PRIMAL_FEASIBILITY_TOLERANCE",
-    "LP_DUAL_FEASIBILITY_TOLERANCE",
-    "LP_OPTIMALITY_TOLERANCE",
-    "SEPARATOR_CUT_STOPPING_TOLERANCE",
-    "EXACT_VALIDATION_ABSOLUTE_TOLERANCE",
-    "PERMUTATION_CERTIFICATE_RESIDUAL_TOLERANCE",
-    "ACTION_TIE_TOLERANCE",
-    "ACTION_TIE_COMPARISON_ROUNDING_PRECISION",
-    "LAP_OBJECTIVE_TIE_TOLERANCE",
-    "MAXIMUM_CUTS_PER_SUPPORT",
-    "LP_THREADS_PER_SOLVE",
-    "MAXIMUM_CONCURRENT_SUPPORTS",
-    "DETERMINISTIC_RANDOM_SEED",
-    "RETRIES_AFTER_INITIAL_INFRASTRUCTURE_FAILURE",
-    "SOLVER_CPU_WORKER_CEILING",
-    "HOST_RAM_CEILING_GIB_FOR_REGISTERED_EFFICIENCY_RUNS",
-    "DETERMINISTIC_KERNEL_WARMUPS",
-    "DETERMINISTIC_KERNEL_TIMED_REPETITIONS",
-    "SCIENTIFIC_METRIC_DECIMALS",
-    "MACRO_F1_DECIMALS",
-    "BALANCED_ACCURACY_DECIMALS",
-    "P_VALUE_DECIMALS",
-    "P_VALUE_LESS_THAN_THRESHOLD",
-    "RUNTIME_SECONDS_DECIMALS",
-    "MEMORY_DECIMALS",
-    "CLASS_RISK_FLOOR",
-    "PROBABILITY_LOG_FLOOR",
-}
-
-BOUNDARY_PACKAGES = frozenset({"types", "config", "infrastructure", "reporting", "cli"})
-
-TODO_MARKERS = ("TODO", "FIXME", "HACK", "XXX")
-
-SERIALIZATION_BOUNDARY_MODULES: frozenset[str] = frozenset()
-
-
-@dataclass(frozen=True, slots=True)
-class ImportEdge:
-    source_module: str
-    target_package: str
-    lineno: int
-
-
-def iter_source_files() -> tuple[Path, ...]:
-    return tuple(path for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
-
-
-def iter_test_files() -> tuple[Path, ...]:
-    return tuple(path for path in TESTS_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
-
-
-def relative_module(path: Path) -> str:
-    relative = path.relative_to(SRC_ROOT).with_suffix("")
-    return ".".join(relative.parts)
-
-
-def package_of(module_name: str) -> str:
-    parts = module_name.split(".")
-    if len(parts) >= 2 and parts[1] in PACKAGE_LAYERS:
-        return parts[1]
-    return parts[0]
-
-
-def layer_of(module_name: str) -> int:
-    return MODULE_LAYERS.get(module_name, PACKAGE_LAYERS[package_of(module_name)])
+def iter_test_files() -> Iterator[Path]:
+    yield from sorted(TESTS_ROOT.rglob("*.py"))
 
 
 def parse_module(path: Path) -> ast.Module:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    return tree
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
-def import_edges(path: Path) -> tuple[ImportEdge, ...]:
-    module = relative_module(path)
-    tree = parse_module(path)
-    edges: list[ImportEdge] = []
+def comment_tokens(path: Path) -> list[tokenize.TokenInfo]:
+    stream = io.StringIO(path.read_text(encoding="utf-8"))
+    return [
+        token
+        for token in tokenize.generate_tokens(stream.readline)
+        if token.type == tokenize.COMMENT
+    ]
+
+
+def docstring_nodes(tree: ast.Module) -> list[ast.AST]:
+    found: list[ast.AST] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                target = alias.name
-                if target == "fedorbit" or target.startswith("fedorbit."):
-                    parts = target.split(".")
-                    target_package = ".".join(parts[1:3]) if len(parts) > 2 else parts[1]
-                    edges.append(ImportEdge(module, target_package, node.lineno))
-        elif (
-            isinstance(node, ast.ImportFrom)
-            and node.module
-            and (node.module == "fedorbit" or node.module.startswith("fedorbit."))
-        ):
-            parts = node.module.split(".")
-            target_package = ".".join(parts[1:3]) if len(parts) > 2 else parts[1]
-            edges.append(ImportEdge(module, target_package, node.lineno))
-    return tuple(edges)
-
-
-def all_import_edges() -> tuple[ImportEdge, ...]:
-    edges: list[ImportEdge] = []
-    for path in iter_source_files():
-        edges.extend(import_edges(path))
-    return tuple(edges)
-
-
-def package_dependency_graph() -> dict[str, set[str]]:
-    graph: dict[str, set[str]] = {package: set() for package in PACKAGE_LAYERS}
-    for edge in all_import_edges():
-        source_package = package_of(edge.source_module)
-        if edge.target_package in PACKAGE_LAYERS:
-            graph[source_package].add(edge.target_package)
-    return graph
-
-
-def public_functions(module: ast.Module) -> tuple[ast.FunctionDef, ...]:
-    return tuple(
-        node
-        for node in module.body
-        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")
-    )
-
-
-def public_classes(module: ast.Module) -> tuple[ast.ClassDef, ...]:
-    return tuple(
-        node
-        for node in module.body
-        if isinstance(node, ast.ClassDef) and not node.name.startswith("_")
-    )
-
-
-def module_level_constants(module: ast.Module) -> tuple[ast.Assign, ...]:
-    return tuple(
-        node
-        for node in module.body
-        if isinstance(node, ast.Assign)
-        and len(node.targets) == 1
-        and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id.isupper()
-    )
-
-
-def comments_and_docstrings(module: ast.Module) -> tuple[int, ...]:
-    lines: list[int] = []
-    for node in ast.walk(module):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
             body = node.body
-            if (
-                body
-                and isinstance(body[0], ast.Expr)
-                and isinstance(body[0].value, ast.Constant)
-                and isinstance(body[0].value.value, str)
-            ):
-                lines.append(body[0].lineno)
-    return tuple(sorted(set(lines)))
+            if body and isinstance(body[0], ast.Expr):
+                value = body[0].value
+                if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    found.append(body[0])
+    return found
 
 
-def reexport_only_module(module: ast.Module) -> bool:
-    if not module.body:
-        return False
-    for node in module.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            continue
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-            continue
-        return False
-    return True
+def module_package(path: Path) -> str:
+    relative = path.relative_to(SRC_ROOT)
+    return relative.parts[0].removesuffix(".py")
+
+
+def imported_packages(tree: ast.Module) -> set[str]:
+    packages: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fedorbit."):
+            packages.add(node.module.split(".")[1])
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith("fedorbit."):
+                    packages.add(alias.name.split(".")[1])
+    return packages

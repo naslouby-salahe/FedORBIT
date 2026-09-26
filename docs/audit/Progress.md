@@ -155,3 +155,8 @@ Ran N-BaIoT/IoT-23 prior screens and a full CIC-IoT-2023 duplicate/conflict cens
 ## Convergence to selected study (2026-09-26)
 
 Screened Gotham2025, CIC-IoT-2022, Mon(IoT)r and re-used N-BaIoT with new cold-start POCs (results in `POC Results.md`, decision in `Scientific Decisions.md`). Selected: cold-start collaboration information-channel decomposition on nine physical N-BaIoT devices, with Gotham2025 as boundary evidence. Implementation plan: replace the legacy transfer/QAP code with a compact study package (config, datasets, detectors, channels, design/runner, analysis, artifacts, CLI), rewrite roadmap and tests to match, then smoke-validate.
+
+
+## Implementation and protocol lock (2026-09-27)
+
+The legacy transfer/QAP code, tests and configuration were removed and replaced by a compact study package (`config`, `datasets`, `detection`, `study`, `analysis`, `pipeline`, `infrastructure`, `reporting`, `cli`). Roadmap rewritten to the cold-start protocol; the 250-row ledger is retained as history with a current 14-row matrix on top. Real-data preprocessing of N-BaIoT (nine devices) and Gotham2025 (78 devices) is complete and found a feasibility fact that changed the design before confirmatory execution: after the exact-duplicate purge, six of Gotham's eight attack-observing devices have 2-17 benign test windows. A statistic-stability eligibility rule (worst-case AUROC standard error at most 0.05) was added, leaving two evaluable Gotham devices and making the Gotham experiment descriptive. All quality gates pass at protocol lock (Ruff, strict Pyright, Vulture, deptry, 140 tests at 98% coverage).

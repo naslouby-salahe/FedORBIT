@@ -23,8 +23,13 @@ def typecheck(session: nox.Session) -> None:
 
 
 @nox.session
-def contract(session: nox.Session) -> None:
-    uv_session(session, "pytest tests/unit/config -k contract -q")
+def dead_code(session: nox.Session) -> None:
+    uv_session(session, "vulture")
+
+
+@nox.session
+def dependencies(session: nox.Session) -> None:
+    uv_session(session, "deptry .")
 
 
 @nox.session
@@ -50,6 +55,11 @@ def e2e(session: nox.Session) -> None:
 @nox.session
 def smoke(session: nox.Session) -> None:
     session.run("uv", "run", "pytest", "tests/smoke", "-q", external=True, success_codes=[0, 5])
+
+
+@nox.session
+def coverage(session: nox.Session) -> None:
+    uv_session(session, "pytest tests -q --cov --cov-report=term-missing")
 
 
 @nox.session

@@ -1,59 +1,33 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Mapping
-from contextlib import contextmanager
-from contextvars import ContextVar, Token
-from functools import cache
+import hashlib
+import json
 from pathlib import Path
 
 import yaml
+from pydantic import BaseModel, JsonValue
 
 from fedorbit.config.models import FedorbitConfig
+from fedorbit.types import Sha256Digest
 
-_bound_config: ContextVar[FedorbitConfig | None] = ContextVar("fedorbit_config", default=None)
-
-
-def repository_root() -> Path:
-    current = Path(__file__).resolve()
-    for candidate in (current, *current.parents):
-        if (candidate / "pyproject.toml").is_file():
-            return candidate
-    raise FileNotFoundError("FedORBIT repository root not found from package location")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG_PATH = REPOSITORY_ROOT / "configs" / "fedorbit.yaml"
 
 
-def default_config_path() -> Path:
-    return repository_root() / "configs" / "fedorbit.yaml"
+def load_config(path: Path = DEFAULT_CONFIG_PATH) -> FedorbitConfig:
+    document: JsonValue = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return FedorbitConfig.model_validate(document)
 
 
-def raw_dataset_root() -> Path:
-    return repository_root() / active_config().paths.raw_dataset_relative_path
+def config_digest(config: FedorbitConfig) -> Sha256Digest:
+    canonical = json.dumps(config.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return Sha256Digest(hashlib.sha256(canonical.encode("utf-8")).hexdigest())
 
 
-def load_fedorbit_config(path: Path | None = None) -> FedorbitConfig:
-    config_path = Path(path) if path is not None else default_config_path()
-    if not config_path.is_file():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    text = config_path.read_text(encoding="utf-8")
-    raw = yaml.safe_load(text)
-    if not isinstance(raw, Mapping):
-        raise ValueError(f"Configuration file must contain a mapping: {config_path}")
-    return FedorbitConfig.model_validate(raw)
-
-
-@cache
-def application_config() -> FedorbitConfig:
-    return load_fedorbit_config()
-
-
-def active_config() -> FedorbitConfig:
-    bound = _bound_config.get()
-    return bound if bound is not None else application_config()
-
-
-@contextmanager
-def configured(config: FedorbitConfig) -> Generator[None]:
-    token: Token[FedorbitConfig | None] = _bound_config.set(config)
-    try:
-        yield
-    finally:
-        _bound_config.reset(token)
+def section_digest(*sections: BaseModel | int) -> Sha256Digest:
+    payload = [
+        section.model_dump(mode="json") if isinstance(section, BaseModel) else section
+        for section in sections
+    ]
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return Sha256Digest(hashlib.sha256(canonical.encode("utf-8")).hexdigest())

@@ -1,237 +1,127 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import pytest
-from pydantic import JsonValue
 
-from fedorbit.config.models import FedorbitConfig
-from fedorbit.datasets.common import (
-    DatasetInspectionError,
-    FieldRole,
-    RawFileDigestCache,
-    RawFileDigestEntry,
-    file_sha256,
-    infer_feature_type,
-    reconcile_component_columns,
+from fedorbit.config.models import GothamConfig
+from fedorbit.datasets.device_data import (
+    DatasetValidationError,
+    DeviceData,
+    chronological_split,
+    purge_exact_duplicates,
 )
-from fedorbit.datasets.preprocessing import (
-    MISSING_TOKEN_VOCABULARY,
-    PreprocessingToken,
-    TrainingFeatureValues,
-    categorical_vocabulary,
-    evaluate_feature_quality,
-    fit_categorical_preprocessor,
-    fit_numeric_preprocessor,
-    is_missing_token,
-    numeric_zero_is_not_missing,
-    one_hot,
-    transform_categorical,
-    transform_numeric,
-)
-from fedorbit.types import (
-    CategoryName,
-    NumericFeatureValue,
-    RawCellText,
-    Sha256Digest,
-    TabularColumnName,
+from fedorbit.datasets.gotham import PacketColumns, window_features
+from fedorbit.datasets.nbaiot import load_nbaiot_device, signed_log
+from fedorbit.datasets.preparation import parse_device, serialise_device
+from fedorbit.types import DatasetId, DeviceName, RandomSeed
+from tests.support import (
+    FIXTURE_DEVICES,
+    synthetic_config,
+    synthetic_device,
+    synthetic_nbaiot_directory,
 )
 
 
-def test_missing_token_contract_is_type_scoped() -> None:
-    assert frozenset({"", "0", "0.0", "nan", "none", "null"}) == MISSING_TOKEN_VOCABULARY
-    assert is_missing_token(RawCellText("0"), True)
-    assert not is_missing_token(RawCellText("0"), False)
-    assert numeric_zero_is_not_missing(NumericFeatureValue(0.0))
+def test_chronological_split_preserves_order() -> None:
+    rows = np.arange(30, dtype=np.float64).reshape(10, 3)
+    support, test = chronological_split(rows, 0.6)
+    assert len(support) == 6 and len(test) == 4
+    assert np.array_equal(np.vstack([support, test]), rows)
 
 
-def test_type_inference_requires_every_observed_value_to_be_losslessly_numeric() -> None:
-    assert infer_feature_type(("1", "2.5", "nan", None)) is FieldRole.BEHAVIORAL_NUMERIC
-    assert infer_feature_type(("1", "not-a-number")) is FieldRole.BEHAVIORAL_CATEGORICAL
-    assert infer_feature_type(("", None)) is FieldRole.BEHAVIORAL_CATEGORICAL
+def test_purge_removes_only_exact_duplicates_of_support_rows() -> None:
+    support = np.array([[1.0, 2.0], [3.0, 4.0]])
+    test = np.array([[1.0, 2.0], [1.0, 2.0000001], [5.0, 6.0]])
+    kept, purged = purge_exact_duplicates(support, test)
+    assert purged == 1
+    assert kept.tolist() == [[1.0, 2.0000001], [5.0, 6.0]]
 
 
-def test_component_schema_reconciliation_preserves_reference_order_and_rejects_drift() -> None:
-    timestamp = TabularColumnName("ts")
-    binary = TabularColumnName("label")
-    multiclass = TabularColumnName("type")
-    alpha = TabularColumnName("alpha")
-    beta = TabularColumnName("beta")
-    gamma = TabularColumnName("gamma")
+def test_device_data_rejects_non_finite_and_mismatched_widths() -> None:
+    good = np.ones((3, 2))
+    with pytest.raises(DatasetValidationError):
+        DeviceData(DatasetId.NBAIOT, DeviceName("d"), good, np.array([[np.nan, 1.0]]), good, 0)
+    with pytest.raises(DatasetValidationError):
+        DeviceData(DatasetId.NBAIOT, DeviceName("d"), good, np.ones((3, 3)), good, 0)
 
-    assert reconcile_component_columns(
-        ((timestamp, binary, multiclass, beta, alpha), (alpha, timestamp, beta, binary, multiclass))
-    ) == (timestamp, binary, multiclass, beta, alpha)
-    with pytest.raises(DatasetInspectionError, match="schema diverges"):
-        reconcile_component_columns(
-            ((timestamp, binary, multiclass, alpha), (timestamp, binary, multiclass, gamma))
+
+def test_target_requires_attack_and_benign_test_rows() -> None:
+    data = synthetic_device("a", 0, 1.0)
+    assert data.is_evaluation_target
+    benign_only = DeviceData(
+        DatasetId.GOTHAM, DeviceName("b"), data.support_pool, data.test_benign, np.zeros((0, 6)), 0
+    )
+    assert not benign_only.is_evaluation_target
+
+
+def test_signed_log_is_odd_and_monotone() -> None:
+    values = np.array([-5.0, 0.0, 5.0])
+    transformed = signed_log(values)
+    assert transformed[1] == 0.0
+    assert transformed[0] == -transformed[2]
+
+
+def test_prepared_round_trip() -> None:
+    data = synthetic_device("round_trip", 3, 2.0)
+    restored = parse_device(DatasetId.NBAIOT, data.device, serialise_device(data))
+    assert np.array_equal(restored.support_pool, data.support_pool)
+    assert np.array_equal(restored.test_attack, data.test_attack)
+    assert restored.purged_duplicate_rows == data.purged_duplicate_rows
+
+
+def test_nbaiot_loader_splits_purges_and_samples_deterministically(tmp_path: Path) -> None:
+    devices = FIXTURE_DEVICES[:2]
+    raw = synthetic_nbaiot_directory(tmp_path, devices, seed=5)
+    config = synthetic_config(devices)
+    first = load_nbaiot_device(raw, devices[0], config.datasets.nbaiot, RandomSeed(11))
+    second = load_nbaiot_device(raw, devices[0], config.datasets.nbaiot, RandomSeed(11))
+    other = load_nbaiot_device(raw, devices[0], config.datasets.nbaiot, RandomSeed(12))
+    assert len(first.support_pool) == int(900 * config.datasets.nbaiot.benign_support_fraction)
+    assert len(first.test_attack) == 10 * config.datasets.nbaiot.attack_rows_per_file
+    assert np.array_equal(first.test_attack, second.test_attack)
+    assert not np.array_equal(first.test_attack, other.test_attack)
+
+
+def test_window_features_on_a_hand_built_packet_stream() -> None:
+    packets = PacketColumns(
+        window=np.array([10, 10, 10, 11, 11], dtype=np.int64),
+        length=np.array([100.0, 200.0, 300.0, 50.0, 50.0]),
+        destination_code=np.array([0, 0, 1, -1, 2], dtype=np.int64),
+        protocol=np.array([6.0, 6.0, 17.0, 1.0, 6.0]),
+        syn_only=np.array([True, False, False, False, True]),
+        port_code=np.array([80, 80, 53, -1, 22], dtype=np.int64),
+        ttl=np.array([64.0, 64.0, 32.0, np.nan, np.nan]),
+        attack=np.array([False, False, False, True, True]),
+    )
+    matrix, attack_fraction = window_features(packets)
+    assert matrix.shape == (2, 11)
+    first = matrix[0]
+    assert first[0] == pytest.approx(np.log1p(3.0))
+    assert first[1] == pytest.approx(200.0)
+    assert first[2] == pytest.approx(100.0)
+    assert first[4] == pytest.approx(2.0 / 3.0)
+    assert first[5] == pytest.approx(1.0 / 3.0)
+    assert first[7] == pytest.approx(1.0 / 3.0)
+    assert first[8] == pytest.approx((64.0 + 64.0 + 32.0) / 3.0)
+    assert first[9] == pytest.approx(np.log1p(2.0))
+    assert first[10] == pytest.approx(np.log1p(2.0))
+    second = matrix[1]
+    assert second[8] == 0.0
+    assert second[9] == pytest.approx(np.log1p(1.0))
+    assert attack_fraction.tolist() == [0.0, 1.0]
+
+
+def test_gotham_configuration_bounds() -> None:
+    with pytest.raises(ValueError):
+        GothamConfig.model_validate(
+            {
+                "relative_directory": "x",
+                "window_seconds": 0,
+                "attack_window_minimum_fraction": 0.5,
+                "benign_support_fraction": 0.5,
+                "benign_label": "Benign",
+                "excluded_label": "Unknown",
+            }
         )
-
-
-def test_feature_quality_uses_raw_semantic_features_once() -> None:
-    good = TabularColumnName("good")
-    bad = TabularColumnName("bad")
-    category = TabularColumnName("category")
-    report = evaluate_feature_quality(
-        (good, bad, category),
-        frozenset({category}),
-        TrainingFeatureValues(
-            {
-                good: np.array([0.0, 1.0, 2.0]),
-                bad: np.array([np.nan, np.nan, 1.0]),
-                category: np.array(["a", "b", "c"], dtype=object),
-            }
-        ),
-    )
-    assert report.candidate_count_before_filtering == 3
-    bad = next(item for item in report.candidate_features if item.name == "bad")
-    assert bad.dropped
-
-
-def test_feature_quality_and_indicator_thresholds_are_strict_and_train_scoped() -> None:
-    threshold_feature = TabularColumnName("threshold_feature")
-    dropped_feature = TabularColumnName("dropped_feature")
-    retained_features = tuple(TabularColumnName(f"retained_{index}") for index in range(4))
-    at_drop_threshold = np.asarray([np.nan, *range(19)], dtype=np.float64)
-    above_drop_threshold = np.asarray([np.nan, np.nan, *range(18)], dtype=np.float64)
-    retained = np.zeros(20, dtype=np.float64)
-    report = evaluate_feature_quality(
-        (threshold_feature, dropped_feature, *retained_features),
-        frozenset(),
-        TrainingFeatureValues(
-            {
-                threshold_feature: at_drop_threshold,
-                dropped_feature: above_drop_threshold,
-                **dict.fromkeys(retained_features, retained),
-            }
-        ),
-    )
-    threshold_candidate, dropped_candidate, *_ = report.candidate_features
-
-    assert threshold_candidate.train_missing_fraction == 0.05
-    assert not threshold_candidate.dropped
-    assert threshold_candidate.missing_indicator
-    assert dropped_candidate.train_missing_fraction == 0.1
-    assert dropped_candidate.dropped
-    assert not report.client_invalid
-
-    invalid_report = evaluate_feature_quality(
-        (threshold_feature, dropped_feature, *retained_features),
-        frozenset(),
-        TrainingFeatureValues(
-            {
-                threshold_feature: above_drop_threshold,
-                dropped_feature: above_drop_threshold,
-                **dict.fromkeys(retained_features, retained),
-            }
-        ),
-    )
-
-    assert invalid_report.dropped_feature_count == 2
-    assert invalid_report.client_invalid
-
-    indicator_feature = TabularColumnName("indicator_feature")
-    indicator_report = evaluate_feature_quality(
-        (indicator_feature,),
-        frozenset(),
-        TrainingFeatureValues(
-            {indicator_feature: np.asarray([np.nan, *range(999)], dtype=np.float64)}
-        ),
-    )
-
-    indicator_candidate = indicator_report.candidate_features[0]
-    assert indicator_candidate.train_missing_fraction == 0.001
-    assert not indicator_candidate.dropped
-    assert indicator_candidate.missing_indicator
-
-
-def test_numeric_preprocessor_uses_linear_quartiles_and_configured_clip(
-    fedorbit_config: FedorbitConfig,
-) -> None:
-    fitted = fit_numeric_preprocessor(np.array([0.0, 1.0, 2.0, 3.0, np.nan]))
-    assert fitted.median == 1.5
-    assert fitted.iqr == 1.5
-    transformed = transform_numeric(
-        np.array([np.nan, -100.0, 100.0]),
-        fitted,
-    )
-    clip = fedorbit_config.scientific.preprocessing.numeric_clip
-    assert transformed[0] == 0.0
-    assert transformed[1] == clip.lower
-    assert transformed[2] == clip.upper
-
-
-def test_zero_iqr_constant_feature_is_identified() -> None:
-    fitted = fit_numeric_preprocessor(np.array([3.0, 3.0, np.nan]))
-    assert fitted.iqr == 0.0
-    assert fitted.scale == 1.0
-    assert fitted.constant_after_imputation
-
-
-def test_categorical_vocabulary_and_mapping_are_deterministic() -> None:
-    vocabulary = categorical_vocabulary((CategoryName("z"), CategoryName("a"), CategoryName("z")))
-    assert vocabulary == (
-        PreprocessingToken.ABSENT,
-        PreprocessingToken.RARE,
-        PreprocessingToken.UNKNOWN,
-        "a",
-        "z",
-    )
-    fitted = fit_categorical_preprocessor(
-        (RawCellText("a"), RawCellText("a"), RawCellText("b"), RawCellText(""))
-    )
-    assert transform_categorical(RawCellText(""), fitted) == PreprocessingToken.ABSENT
-    assert transform_categorical(RawCellText("never-seen"), fitted) == PreprocessingToken.UNKNOWN
-    encoded = one_hot(RawCellText("a"), fitted)
-    assert len(encoded) == len(fitted.vocabulary)
-    assert sum(encoded) == 1.0
-
-
-def test_categorical_rare_threshold_is_strict() -> None:
-    boundary = fit_categorical_preprocessor(
-        (*(RawCellText("common") for _ in range(999)), RawCellText("boundary"))
-    )
-    rare = fit_categorical_preprocessor(
-        (*(RawCellText("common") for _ in range(1000)), RawCellText("rare"))
-    )
-
-    assert CategoryName("boundary") not in boundary.rare_categories
-    assert CategoryName("boundary") in boundary.vocabulary
-    assert CategoryName("rare") in rare.rare_categories
-    assert transform_categorical(RawCellText("rare"), rare) == PreprocessingToken.RARE
-
-
-def test_raw_file_digest_cache_round_trips_and_rejects_malformed_entries() -> None:
-    entry = RawFileDigestEntry(1024, 1_700_000_000_000_000_000, Sha256Digest("a" * 64))
-    cache = RawFileDigestCache.empty().with_entry("raw/windows.csv", entry)
-    restored = RawFileDigestCache.from_json(cast(JsonValue, cache.to_json()))
-    restored_entry = restored.entries.get("raw/windows.csv")
-    assert restored_entry == entry
-
-    assert RawFileDigestEntry.from_json({"size": -1, "mtime_ns": 0, "sha256": "a" * 64}) is None
-    assert RawFileDigestEntry.from_json({"size": 1, "mtime_ns": 0, "sha256": "too-short"}) is None
-    assert RawFileDigestEntry.from_json({"size": True, "mtime_ns": 0, "sha256": "a" * 64}) is None
-    assert RawFileDigestCache.from_json("not-a-mapping").entries.get("missing") is None
-
-
-def test_file_sha256_detects_same_size_replacement_with_preserved_mtime(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import fedorbit.datasets.common as common
-
-    payload = tmp_path / "raw.csv"
-    payload.write_bytes(b"first")
-    cache_path = tmp_path / "cache.json"
-    monkeypatch.setattr(common, "_digest_cache_path", lambda: cache_path)
-    before = file_sha256(payload)
-    original_stat = payload.stat()
-
-    payload.write_bytes(b"other")
-    os.utime(payload, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
-
-    assert payload.stat().st_size == original_stat.st_size
-    assert payload.stat().st_mtime_ns == original_stat.st_mtime_ns
-    assert file_sha256(payload) != before

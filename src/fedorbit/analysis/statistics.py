@@ -1,397 +1,102 @@
 from __future__ import annotations
 
-import itertools
-import math
-import statistics
-import warnings
-from collections import OrderedDict
-from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum
-from typing import Protocol, cast
+from itertools import product
 
 import numpy as np
-from numpy.random import PCG64, Generator
-from numpy.typing import NDArray
-from scipy import stats as scipy_stats
 
-from fedorbit.analysis.records import StatisticalAlternative
-from fedorbit.config.loading import active_config
-from fedorbit.infrastructure.runtime import RandomSeed, SeedDerivationRequest, derive_seed32
-from fedorbit.types import (
-    ArrayAxis,
-    BootstrapDegeneracy,
-    BootstrapPurpose,
-    ContrastName,
-    DerivedSeed,
-    DirectedPairName,
-    Estimate,
-    Index,
-    MetricId,
-    MultiplicityFamily,
-    PValueName,
-    RelativeGain,
-    RngNamespace,
-    SampleCount,
-    Score,
-    SignificanceLevel,
-    StableJsonPayload,
-    Tolerance,
-)
+from fedorbit.types import ContrastDirection, FloatVector, RandomSeed
 
-FloatArray = NDArray[np.float64]
-type ScoreSeries = tuple[Score, ...]
-type DifferenceSeries = tuple[RelativeGain, ...]
+MAXIMUM_EXACT_DEVICES = 20
 
 
-class StatisticsError(ValueError):
+class InsufficientDevicesError(ValueError):
     pass
 
 
-class McNemarMode(StrEnum):
-    EXACT = "exact"
-    ASYMPTOTIC = "asymptotic"
+def _tail_probabilities(observed: float, null_values: FloatVector) -> tuple[float, float]:
+    upper = float(np.mean(null_values >= observed - 1e-12))
+    lower = float(np.mean(null_values <= observed + 1e-12))
+    return upper, lower
 
 
-@dataclass(frozen=True, slots=True)
-class NamedPValue:
-    name: PValueName
-    p_value: SignificanceLevel
-
-    def __post_init__(self) -> None:
-        if not self.name:
-            raise StatisticsError("p-value name must be non-empty")
-        if not math.isfinite(self.p_value) or not 0.0 <= self.p_value <= 1.0:
-            raise StatisticsError("p-value must be finite and lie in [0,1]")
+def _directional_p(upper: float, lower: float, direction: ContrastDirection) -> float:
+    if direction is ContrastDirection.GREATER:
+        return upper
+    if direction is ContrastDirection.LESS:
+        return lower
+    return min(1.0, 2.0 * min(upper, lower))
 
 
-@dataclass(frozen=True, slots=True)
-class PValueSet:
-    entries: tuple[NamedPValue, ...]
+def _nonzero(deltas: FloatVector) -> FloatVector:
+    nonzero = deltas[deltas != 0.0]
+    if len(nonzero) > MAXIMUM_EXACT_DEVICES:
+        raise InsufficientDevicesError("exact tests support at most 20 devices")
+    return nonzero
 
-    def __post_init__(self) -> None:
-        names = tuple(entry.name for entry in self.entries)
-        if len(set(names)) != len(names):
-            raise StatisticsError("p-value set contains duplicate names")
 
-    def value_of(self, name: PValueName) -> SignificanceLevel | None:
-        for entry in self.entries:
-            if entry.name == name:
-                return entry.p_value
+def exact_sign_test(deltas: FloatVector, direction: ContrastDirection) -> float | None:
+    nonzero = _nonzero(deltas)
+    count = len(nonzero)
+    if count == 0:
         return None
+    signs = np.array(list(product((0.0, 1.0), repeat=count))).sum(axis=1)
+    upper, lower = _tail_probabilities(float((nonzero > 0).sum()), signs)
+    return _directional_p(upper, lower, direction)
 
 
-@dataclass(frozen=True, slots=True)
-class McNemarResult:
-    mode: McNemarMode
-    p_value: SignificanceLevel
+def average_ranks(magnitudes: FloatVector) -> FloatVector:
+    order = np.argsort(magnitudes, kind="stable")
+    ranks = np.empty(len(magnitudes), dtype=np.float64)
+    position = 0
+    while position < len(order):
+        end = position
+        while end + 1 < len(order) and magnitudes[order[end + 1]] == magnitudes[order[position]]:
+            end += 1
+        ranks[order[position : end + 1]] = (position + end) / 2.0 + 1.0
+        position = end + 1
+    return ranks
 
 
-class _ConfidenceIntervalLike(Protocol):
-    low: Estimate
-    high: Estimate
+def exact_signed_rank_test(deltas: FloatVector, direction: ContrastDirection) -> float | None:
+    nonzero = _nonzero(deltas)
+    count = len(nonzero)
+    if count == 0:
+        return None
+    ranks = average_ranks(np.abs(nonzero))
+    assignments = np.array(list(product((0.0, 1.0), repeat=count)))
+    null_values = assignments @ ranks
+    observed = float(ranks[nonzero > 0].sum())
+    upper, lower = _tail_probabilities(observed, null_values)
+    return _directional_p(upper, lower, direction)
 
 
-class _BootstrapResultLike(Protocol):
-    confidence_interval: _ConfidenceIntervalLike
+def holm_adjust(p_values: list[float]) -> list[float]:
+    order = sorted(range(len(p_values)), key=lambda index: p_values[index])
+    adjusted = [0.0] * len(p_values)
+    running = 0.0
+    for rank, index in enumerate(order):
+        running = max(running, min(1.0, (len(p_values) - rank) * p_values[index]))
+        adjusted[index] = running
+    return adjusted
 
 
-_BOOTSTRAP = cast(Callable[..., _BootstrapResultLike], scipy_stats.bootstrap)
-_CHI_SQUARE_CDF = cast(Callable[..., Estimate], scipy_stats.chi2.cdf)
+def cluster_bootstrap_interval(
+    device_values: FloatVector, resamples: int, confidence: float, seed: RandomSeed
+) -> tuple[float, float]:
+    if len(device_values) == 0:
+        raise InsufficientDevicesError("bootstrap needs at least one device")
+    generator = np.random.default_rng(seed)
+    draws = generator.integers(0, len(device_values), size=(resamples, len(device_values)))
+    means = device_values[draws].mean(axis=1)
+    tail = (1.0 - confidence) / 2.0
+    return float(np.quantile(means, tail)), float(np.quantile(means, 1.0 - tail))
 
 
-def _mean(values: DifferenceSeries) -> RelativeGain:
-    if not values:
-        raise StatisticsError("statistical mean requires at least one value")
-    mean: RelativeGain = math.fsum(values) / len(values)
-    return mean
-
-
-def sign_flip_p_value(
-    differences: DifferenceSeries,
-    comparison_tolerance: Tolerance,
-) -> SignificanceLevel:
-    nonzero = tuple(value for value in differences if value != 0.0)
-    if not nonzero:
-        certain: SignificanceLevel = 1.0
-        return certain
-    observed_mean = _mean(nonzero)
-    extremes = 0
-    total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
-        permuted_mean = math.fsum(
-            sign * value for sign, value in zip(signs, nonzero, strict=True)
-        ) / len(nonzero)
-        if abs(permuted_mean) >= abs(observed_mean) - comparison_tolerance:
-            extremes += 1
-        total += 1
-    p_value: SignificanceLevel = extremes / total
-    return p_value
-
-
-def one_sided_sign_flip_p_value(
-    differences: DifferenceSeries,
-    alternative: StatisticalAlternative,
-    comparison_tolerance: Tolerance,
-) -> SignificanceLevel:
-    if alternative not in {StatisticalAlternative.GREATER, StatisticalAlternative.LESS}:
-        raise StatisticsError(f"unsupported one-sided alternative: {alternative}")
-    nonzero = tuple(value for value in differences if value != 0.0)
-    if not nonzero:
-        certain: SignificanceLevel = 1.0
-        return certain
-    observed_mean = _mean(nonzero)
-    extremes = 0
-    total = 0
-    for signs in itertools.product((1.0, -1.0), repeat=len(nonzero)):
-        permuted_mean = math.fsum(
-            sign * value for sign, value in zip(signs, nonzero, strict=True)
-        ) / len(nonzero)
-        if alternative == StatisticalAlternative.GREATER:
-            extreme = permuted_mean >= observed_mean - comparison_tolerance
-        else:
-            extreme = permuted_mean <= observed_mean + comparison_tolerance
-        extremes += int(extreme)
-        total += 1
-    p_value: SignificanceLevel = extremes / total
-    return p_value
-
-
-@dataclass(frozen=True, slots=True)
-class SignFlipResult:
-    p_value: SignificanceLevel
-    mean_difference: RelativeGain
-    median_difference: RelativeGain
-    nonzero_difference_count: Index
-
-
-def exact_sign_flip_test(
-    method_values: ScoreSeries,
-    reference_values: ScoreSeries,
-) -> SignFlipResult:
-    if len(method_values) != len(reference_values):
-        raise StatisticsError("paired sample sizes differ")
-    if not method_values:
-        raise StatisticsError("paired sign-flip test requires at least one pair")
-    differences: DifferenceSeries = tuple(
-        method - reference
-        for method, reference in zip(method_values, reference_values, strict=True)
-    )
-    nonzero_count = sum(value != 0.0 for value in differences)
-    statistics_config = active_config().scientific.statistics
-    maximum = statistics_config.exact_sign_flip_max_nonzero_differences_for_enumeration
-    if nonzero_count > maximum:
-        raise StatisticsError(
-            f"exact sign-flip enumeration has {nonzero_count} nonzero differences; "
-            f"maximum is {maximum}"
-        )
-    tolerance = statistics_config.exact_sign_flip_comparison_tolerance
-    median_difference: RelativeGain = statistics.median(differences)
-    nonzero_difference_count: Index = nonzero_count
-    return SignFlipResult(
-        p_value=sign_flip_p_value(differences, tolerance),
-        mean_difference=_mean(differences),
-        median_difference=median_difference,
-        nonzero_difference_count=nonzero_difference_count,
-    )
-
-
-def statistical_bootstrap_seed(
-    contrast_name: ContrastName,
-    family: MultiplicityFamily,
-    directed_pair: DirectedPairName,
-    metric: MetricId,
-    purpose: BootstrapPurpose,
-) -> DerivedSeed:
-    coordinates = cast(
-        StableJsonPayload,
-        OrderedDict(
-            contrast=contrast_name,
-            family=family.value,
-            metric=metric.value,
-            pair=directed_pair,
-            purpose=purpose,
-        ),
-    )
-    return derive_seed32(
-        SeedDerivationRequest(
-            active_config().scientific.randomness.statistical_seed,
-            RngNamespace.STATISTICAL_BOOTSTRAP,
-            coordinates,
-        )
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class BcaInterval:
-    lower: RelativeGain | None
-    upper: RelativeGain | None
-    point_estimate: RelativeGain
-    degenerate: BootstrapDegeneracy
-
-
-_LAST_AXIS = ArrayAxis(-1)
-
-
-def paired_bca_interval(
-    method_values: ScoreSeries,
-    reference_values: ScoreSeries,
-    bootstrap_seed: RandomSeed,
-) -> BcaInterval:
-    if len(method_values) != len(reference_values):
-        raise StatisticsError("paired sample sizes differ")
-    if not method_values:
-        raise StatisticsError("paired BCa interval requires at least one pair")
-    differences: DifferenceSeries = tuple(
-        method - reference
-        for method, reference in zip(method_values, reference_values, strict=True)
-    )
-    if any(not math.isfinite(value) for value in differences):
-        nan_point_estimate: RelativeGain = math.nan
-        return BcaInterval(None, None, nan_point_estimate, BootstrapDegeneracy(True))
-    point_estimate = _mean(differences)
-    statistics_config = active_config().scientific.statistics
-    identical_tolerance = statistics_config.identical_difference_tolerance
-    if all(abs(value - differences[0]) <= identical_tolerance for value in differences):
-        return BcaInterval(
-            point_estimate,
-            point_estimate,
-            point_estimate,
-            BootstrapDegeneracy(False),
-        )
-    method_array = np.asarray(method_values, dtype=np.float64)
-    reference_array = np.asarray(reference_values, dtype=np.float64)
-
-    def statistic(
-        x: FloatArray,
-        y: FloatArray,
-        axis: ArrayAxis = _LAST_AXIS,
-    ) -> FloatArray:
-        return np.asarray(np.mean(x - y, axis=axis), dtype=np.float64)
-
-    rng = Generator(PCG64(bootstrap_seed))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        result = _BOOTSTRAP(
-            (method_array, reference_array),
-            statistic,
-            paired=True,
-            vectorized=False,
-            method="BCa",
-            alternative="two-sided",
-            confidence_level=statistics_config.confidence_level,
-            n_resamples=statistics_config.ci_bootstrap_repetitions,
-            rng=rng,
-        )
-    lower = float(result.confidence_interval.low)
-    upper = float(result.confidence_interval.high)
-    if not math.isfinite(lower) or not math.isfinite(upper):
-        return BcaInterval(None, None, point_estimate, BootstrapDegeneracy(True))
-    bca_lower: RelativeGain = lower
-    bca_upper: RelativeGain = upper
-    return BcaInterval(
-        bca_lower,
-        bca_upper,
-        point_estimate,
-        BootstrapDegeneracy(False),
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class TostResult:
-    p_lower: SignificanceLevel
-    p_upper: SignificanceLevel
-    p_equiv: SignificanceLevel
-
-
-def tost_equivalence(
-    method_values: ScoreSeries,
-    reference_values: ScoreSeries,
-) -> TostResult:
-    if len(method_values) != len(reference_values):
-        raise StatisticsError("paired sample sizes differ")
-    config = active_config()
-    margins = config.scientific.materiality.equivalence_relative_macro_ce
-    tolerance = config.scientific.statistics.exact_sign_flip_comparison_tolerance
-    differences: DifferenceSeries = tuple(
-        method - reference
-        for method, reference in zip(method_values, reference_values, strict=True)
-    )
-    shifted_lower: DifferenceSeries = tuple(
-        difference - margins.lower for difference in differences
-    )
-    shifted_upper: DifferenceSeries = tuple(
-        difference - margins.upper for difference in differences
-    )
-    p_lower = one_sided_sign_flip_p_value(
-        shifted_lower,
-        StatisticalAlternative.GREATER,
-        tolerance,
-    )
-    p_upper = one_sided_sign_flip_p_value(
-        shifted_upper,
-        StatisticalAlternative.LESS,
-        tolerance,
-    )
-    p_equiv: SignificanceLevel = max(p_lower, p_upper)
-    return TostResult(p_lower, p_upper, p_equiv)
-
-
-def holm_step_down(raw_p_values: PValueSet) -> PValueSet:
-    ordered = sorted(raw_p_values.entries, key=lambda entry: (entry.p_value, entry.name))
-    adjusted: list[NamedPValue] = []
-    running_max = 0.0
-    family_size = len(ordered)
-    for index, entry in enumerate(ordered):
-        scaled = min(1.0, entry.p_value * (family_size - index))
-        running_max = max(running_max, scaled)
-        adjusted.append(NamedPValue(entry.name, running_max))
-    return PValueSet(tuple(adjusted))
-
-
-def mcnemar_exact_p(b01: Index, b10: Index) -> SignificanceLevel:
-    if b01 < 0 or b10 < 0:
-        raise StatisticsError("McNemar discordant counts must be nonnegative")
-    discordant = b01 + b10
-    if discordant == 0:
-        certain: SignificanceLevel = 1.0
-        return certain
-    count = min(b01, b10)
-    tail = sum(math.comb(discordant, k) for k in range(count + 1))
-    p_value: SignificanceLevel = min(1.0, 2.0 * tail / 2**discordant)
-    return p_value
-
-
-def mcnemar_asymptotic_continuity_corrected_p(
-    b01: Index,
-    b10: Index,
-) -> SignificanceLevel:
-    if b01 < 0 or b10 < 0:
-        raise StatisticsError("McNemar discordant counts must be nonnegative")
-    discordant = b01 + b10
-    if discordant == 0:
-        certain: SignificanceLevel = 1.0
-        return certain
-    chi_square = (abs(b01 - b10) - 1.0) ** 2 / discordant
-    survival = 1.0 - _CHI_SQUARE_CDF(chi_square, df=1)
-    p_value: SignificanceLevel = max(0.0, min(1.0, survival))
-    return p_value
-
-
-def mcnemar_test(
-    b01: Index,
-    b10: Index,
-) -> McNemarResult:
-    switch = (
-        active_config().scientific.statistics.mcnemar_exact_to_asymptotic_discordant_pair_switch
-    )
-    if b01 + b10 <= switch:
-        return McNemarResult(McNemarMode.EXACT, mcnemar_exact_p(b01, b10))
-    return McNemarResult(
-        McNemarMode.ASYMPTOTIC,
-        mcnemar_asymptotic_continuity_corrected_p(b01, b10),
-    )
-
-
-def minimum_valid_seeds_met(seed_count: SampleCount) -> bool:
-    return seed_count >= active_config().scientific.statistics.minimum_valid_paired_seeds
+def spearman(first: FloatVector, second: FloatVector) -> float | None:
+    if len(first) < 3:
+        return None
+    first_ranks = average_ranks(first)
+    second_ranks = average_ranks(second)
+    if first_ranks.std() == 0.0 or second_ranks.std() == 0.0:
+        return None
+    return float(np.corrcoef(first_ranks, second_ranks)[0, 1])

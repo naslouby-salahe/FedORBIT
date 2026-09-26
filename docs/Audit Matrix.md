@@ -2,6 +2,28 @@
 
 **Exact requirement count: 250**
 
+**Status (2026-09-27): the 250 rows below are the historical ledger for the retired cross-schema transfer and sparse-QAP protocol and do not verify the current study.** The current study is audited in the compact matrix that follows; scientific decisions and evidence are in `docs/audit/`.
+
+## Current study matrix (cold-start collaboration, protocol in `docs/FedORBIT_Roadmap.md`)
+
+| ID | Requirement | Status | Evidence |
+| --- | --- | --- | --- |
+| C-01 | One question, mechanism, contribution and scoped claims are defined before confirmatory execution | PASS | Roadmap sections 1, 2, 9 |
+| C-02 | Raw data support the population (physical devices, benign and attack rows, chronological files) | PASS | `docs/audit/POC Results.md` (N-BaIoT 9 devices; Gotham2025 8 attack-observing devices) |
+| C-03 | Leakage controls: chronological test third, exact-duplicate purge, no test-set use in scaling, thresholds or partner selection | PASS | `tests/unit/test_datasets.py`, `tests/e2e/test_pipeline.py` |
+| C-04 | Client semantics are honest (physical devices for the primary claim; Gotham labelled simulated) | PASS | Roadmap section 2 |
+| C-05 | Trivial baselines and controls cover the obvious alternative explanations | PASS | Roadmap sections 4 and 10; `configs/fedorbit.yaml` |
+| C-06 | Statistics match the independent unit (device); paired; exact tests; Holm over the primary family only | PASS | `tests/unit/test_metrics_and_statistics.py`, `tests/unit/test_runner_and_contrasts.py` |
+| C-07 | Gates classified; feasibility handled per cell; no arbitrary kill switches | PASS | Roadmap section 8 |
+| C-08 | Seeds derived deterministically per purpose and coordinate; nothing hardcoded | PASS | `tests/unit/test_artifacts_and_records.py`, `tests/architecture/test_configuration_ownership.py` |
+| C-09 | Artifacts typed, atomic, hashed, provenance-bound; missing, stale, malformed and incomplete evidence distinguished | PASS | `tests/unit/test_artifacts_and_records.py`, `tests/e2e/test_pipeline.py`, `tests/integration/test_lineage.py` |
+| C-10 | Wiring: CLI, configuration, datasets, detectors, channels, runner, analysis, report | PASS | `tests/integration/test_cli_workflow.py`, `tests/smoke/test_real_data_smoke.py`, real-data smoke run |
+| C-11 | Scientific mechanisms verified numerically on synthetic devices (marginal repair, covariance harm) | PASS | `tests/scientific/test_mechanisms.py` |
+| C-12 | Quality gates: Ruff, strict Pyright, Vulture, deptry, architecture tests, coverage | PASS | `make audit-all`, `make coverage` |
+| C-13 | Confirmatory execution of the four experiments and analysis | PENDING | results below when complete |
+| C-14 | Claims restated against measured evidence | PENDING | roadmap section 9 review after C-13 |
+
+
 ## Purpose and scope
 
 This matrix is the pre-experiment verification contract and records the current audit outcome in the status/evidence columns. It does **not** authorize scientific experiment execution. This audit may run genuine short/non-evidence commands and real preprocessing, but it stops before evidence-bearing experiment execution.

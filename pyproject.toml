@@ -1,7 +1,7 @@
 [project]
 name = "fedorbit"
 version = "0.1.0"
-description = "FedORBIT — cross-schema federated procedural-transfer research repository"
+description = "FedORBIT — cold-start collaboration for benign-only IoT anomaly detection: information-channel decomposition"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { file = "LICENSE" }
@@ -9,18 +9,11 @@ authors = [{ name = "FedORBIT" }]
 dependencies = [
     "torch==2.13.0",
     "numpy==2.5.2",
-    "scipy==1.18.0",
-    "scikit-learn==1.9.0",
     "pandas==3.0.5",
-    "pyarrow==25.0.1",
-    "highspy==1.15.1",
-    "pyscipopt==6.2.1",
     "pydantic==2.13.4",
     "typer==0.27.1",
-    "psutil==7.2.2",
     "pyyaml>=6.0.2",
     "structlog==25.5.0",
-    "filelock==3.32.3",
     "matplotlib>=3.11.1",
 ]
 
@@ -52,7 +45,7 @@ packages = ["src/fedorbit"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
-exclude = ["outputs", "results", "data", "stubs"]
+exclude = ["outputs", "results", "data"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF", "N", "ARG"]
@@ -60,7 +53,6 @@ ignore = ["N802", "N803", "N806", "N999"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["N802", "N803", "N806"]
-"vulture_whitelist.py" = ["F821"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -69,9 +61,7 @@ filterwarnings = ["error"]
 
 [tool.pyright]
 typeCheckingMode = "strict"
-stubPath = "stubs"
 include = ["src", "tests"]
-exclude = ["vulture_whitelist.py"]
 pythonVersion = "3.13"
 reportMissingTypeStubs = "none"
 reportMissingImports = "warning"
@@ -79,4 +69,28 @@ reportUnknownVariableType = "none"
 reportUnknownMemberType = "none"
 
 [tool.deptry]
-per_rule_ignores = { DEP001 = ["fedorbit"], DEP002 = ["scipy", "scikit-learn", "pandas", "pyarrow", "highspy", "pyscipopt", "pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }
+per_rule_ignores = { DEP001 = ["fedorbit"], DEP002 = ["pytest", "pytest-cov", "ruff", "pyright", "nox", "vulture", "deptry"], DEP003 = ["fedorbit"] }
+
+[tool.vulture]
+paths = ["src"]
+min_confidence = 60
+ignore_decorators = ["@app.command", "@model_validator"]
+ignore_names = [
+    "model_config",
+    "kind",
+    "benchmark",
+    "main",
+    "DEEP_DETECTOR",
+    "SIMULATED_BOUNDARY",
+    "SECONDARY",
+    "EXPLORATORY",
+    "TWO_SIDED",
+    "UNSATURATED",
+]
+
+[tool.coverage.run]
+source = ["fedorbit"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true

@@ -167,7 +167,6 @@ class ReportColumnName(StrEnum):
     CONFIRMATION = "confirmation"
     CONFIRMATION_COVERAGE = "confirmation_coverage"
     CONFIRMATION_SAFETY = "confirmation_safety"
-    COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION = "coupling_destruction_retained_gain_fraction"
     COVERAGE = "coverage"
     CUDA_MEMORY = "cuda_memory"
     CUTS = "cuts"

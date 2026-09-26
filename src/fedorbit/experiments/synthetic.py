@@ -318,7 +318,9 @@ def _world_is_accepted(
         )
         return (solution.certified_robust_value, diagnostics) if accepted else None
     threshold = active_config().generators.map_dependent.map_value_minimum
-    if exact_map_action_value(candidates, orbit) >= threshold:
+    map_conditioned_actions_differ = _map_conditioned_winners_disjoint(problem, orbit)
+    value_of_map_information = exact_map_action_value(candidates, orbit)
+    if map_conditioned_actions_differ and value_of_map_information >= threshold:
         return solution.certified_robust_value, diagnostics
     return None
 

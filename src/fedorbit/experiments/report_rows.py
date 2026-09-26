@@ -851,6 +851,8 @@ def _confirmation_p(
 
 def _coupling_gap_row(
     condition_or_pair: DirectedPairName | EvaluationConditionName | str,
+    support: SupportCount | None,
+    method: TransferMethod,
     gap_values: Sequence[Estimate],
     fixed_action_values: Sequence[Estimate],
     ci: ConfidenceIntervalText | None,
@@ -864,6 +866,8 @@ def _coupling_gap_row(
                 ReportColumnName.CONDITION_OR_PAIR,
                 condition_or_pair,
             ),
+            (ReportColumnName.SUPPORT, support),
+            (ReportColumnName.METHOD, method.value),
             (
                 ReportColumnName.VALID_UNITS,
                 len(gap_values),
@@ -888,43 +892,56 @@ def _coupling_gap_row(
                 ReportColumnName.HOLM_P,
                 holm_p,
             ),
-            (
-                ReportColumnName.COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION,
-                None,
-            ),
         )
     )
 
 
 def coupling_mechanism_results_rows(
-    synthetic_records: Sequence[MetricRecord],
+    synthetic_records_with_support: Sequence[tuple[MetricRecord, SupportCount | None]],
     real_packet_records: Sequence[MetricRecord],
     comparison_records: Sequence[PairedComparisonRecord],
 ) -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
     rows: list[Mapping[ReportColumnName, TableScalar]] = []
-    conditions = sorted({record.condition for record in synthetic_records})
-    for condition in conditions:
+    synthetic_cells = sorted(
+        {
+            (record.condition, support, record.method)
+            for record, support in synthetic_records_with_support
+            if record.method
+            in {
+                TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                TransferMethod.COUPLING_DESTROYED_FEDORBIT,
+            }
+        },
+        key=lambda cell: (cell[0], -1 if cell[1] is None else cell[1], cell[2].value),
+    )
+    for condition, support, method in synthetic_cells:
         gap_values = [
             float(record.metric_value)
-            for record in synthetic_records
+            for record, record_support in synthetic_records_with_support
             if record.condition == condition
-            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record_support == support
+            and record.method == method
             and record.metric_name == MetricId.ROBUST_COUPLING_VALUE_GAP
             and record.valid
             and record.metric_value is not None
         ]
         fixed_action_values = [
             float(record.metric_value)
-            for record in synthetic_records
+            for record, record_support in synthetic_records_with_support
             if record.condition == condition
-            and record.method == TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+            and record_support == support
+            and record.method == method
             and record.metric_name == MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP
             and record.valid
             and record.metric_value is not None
         ]
         if not gap_values:
             continue
-        rows.append(_coupling_gap_row(condition, gap_values, fixed_action_values, None, None))
+        rows.append(
+            _coupling_gap_row(
+                condition, support, method, gap_values, fixed_action_values, None, None
+            )
+        )
     pairs = sorted({record.pair for record in real_packet_records})
     comparisons_by_pair = OrderedDict(
         (comparison.pair, comparison)
@@ -962,7 +979,17 @@ def coupling_mechanism_results_rows(
             else None
         )
         holm_p = comparison.holm_p if comparison is not None else None
-        rows.append(_coupling_gap_row(pair, gap_values, fixed_action_values, ci, holm_p))
+        rows.append(
+            _coupling_gap_row(
+                pair,
+                None,
+                TransferMethod.MATCHED_RESOURCE_RECTANGULAR,
+                gap_values,
+                fixed_action_values,
+                ci,
+                holm_p,
+            )
+        )
     return tuple(rows)
 
 
@@ -1300,6 +1327,10 @@ def evidence_status_rows(
                 (
                     ReportColumnName.QUESTION,
                     row.question,
+                ),
+                (
+                    ReportColumnName.CLASSIFICATION,
+                    row.classification,
                 ),
                 (
                     ReportColumnName.FINAL_STATE,

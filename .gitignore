@@ -218,6 +218,8 @@ tempCodeRunnerFile.py
 /docs/.refactor-audit/
 /docs/.graphify-audit/
 /docs/.audit/
+# Temporary audit POCs and their outputs.
+/docs/audit/pocs/
 # Keep the concise audit notes; ignore generated graphs, logs, and working data.
 !/docs/.audit/
 /docs/.audit/*

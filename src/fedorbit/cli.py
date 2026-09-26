@@ -39,7 +39,6 @@ from fedorbit.experiments.report_rows import (
     failure_boundary_results_rows,
     generalization_results_rows,
     map_value_bound_series,
-    numeric_row_series,
     real_transfer_gain_series,
     scalability_figure_series,
     scalability_results_rows,
@@ -121,7 +120,6 @@ from fedorbit.types import (
     OverwritePolicy,
     PreprocessingReadiness,
     ReportArtifactName,
-    ReportColumnName,
     StableJsonPayload,
     StorageLayoutSegment,
 )
@@ -575,7 +573,7 @@ def report(
                     )
                 )
             coupling_rows = coupling_mechanism_results_rows(
-                completed_experiment_metric_records(
+                completed_experiment_metric_records_with_support(
                     store, ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION
                 ),
                 completed_experiment_metric_records(
@@ -620,16 +618,11 @@ def report(
                             )
                         )
                     )
-            coupling_series = numeric_row_series(
-                coupling_rows,
-                ReportColumnName.CONDITION_OR_PAIR,
-                ReportColumnName.FIXED_ACTION_GAP,
-            )
-            if coupling_series:
+            if coupling_rows:
                 typer.echo(
                     str(
                         writer.write_project_evidence_figure(
-                            coupling_gap_phase_figure(coupling_series),
+                            coupling_gap_phase_figure(factor_rows=coupling_rows),
                             ReportArtifactName.COUPLING_GAP_PHASE_FIGURE,
                         )
                     )

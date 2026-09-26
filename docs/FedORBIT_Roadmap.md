@@ -5,6 +5,48 @@
 
 This roadmap is the sole authority for scientific definitions, numerical values, experiment membership, statistical procedures, claim criterions, and implementation semantics. No implementation mechanism may override it, and no TEST outcome may alter a scientific definition, parameter, metric, test, experiment, baseline budget, claim threshold, or reporting rule.
 
+## Active scientific scope disposition (2026-09-26)
+
+The scientific audit in [`docs/audit/Scientific Decisions.md`](audit/Scientific%20Decisions.md) has **not identified a publishable study supported by current evidence**. A controlled synthetic optimization study remains a conditional research candidate, but is not recommended for publication: the fixed-action problem is a Koopmans–Beckmann QAP with rank-one flow, and the outer fixed-support action problem is a standard finite-scenario robust LP. A nontrivial theorem/guarantee for their composition or a valid application is needed before the candidate is worth protocol-locking. A narrow ToN benchmark-integrity study is a conditional alternative, not selected: the full configured 22.34M Network release contains 11,179 normalized feature groups with conflicting labels (217,382 rows; 0.9731%). A 2022 rectification paper already reports conflicting duplicate-flow labels within NF-ToN-IoT and produces ToN-IoT-R, which the paper says is available on request, while a 2026 preprint audits duplicates, campaign counters, feature leakage and corrected splits in the same release. The new census establishes a candidate-specific issue, but its normalization overlap with prior work and evaluation impact remain unestablished. The 2026 abstract reports 72,805 ransomware rows / 322 vectors; the local count matches rows but yields 11,598 vectors under the production key and 52 after dropping only source/destination ports. The exact published feature columns are unavailable. Under the current production feature key, which retains source/destination ports, exact-feature majority lookup implies 2,793 minimum binary disagreements (0.0125% of all rows). A separate census omitting only those ports finds 37,627 conflicting groups affecting 12,563,414 rows (56.24%) and 151,402 minimum binary disagreements (0.6777%); the affected-row share exceeds 90% for backdoor, ransomware, dos, and scanning. The production key already excludes source/destination IPs, making this closer to the 2026 address/port ablation; however, 52 versus 322 ransomware vectors means the exact feature definition is not reproduced. Under this key, an exact-feature majority lookup has a 91.20% multiclass ceiling over all rows (84.35% within conflict rows), with 1,966,364 minimum multiclass disagreements (8.80% of all rows) and 151,402 binary disagreements (0.68%). The SSRN abstract already reports Random Forest accuracy of 0.9694 without addresses/ports and 0.9981 when retained; the local deterministic lookup ceilings are not directly comparable model scores. These do not establish new model impact; a leakage-controlled evaluation beyond the preprint and class-specific/macro analysis remain unmeasured. The current full release differs in count from the 2022 paper. The local `Train_Test_Network` CSV has 211,043 rows and 50,000 normal records, whereas the 2024 study reports 461,043 rows and 300,000 normal records; the bundled Network statistics PDF instead reports 20,000 normal records, so the CSV also conflicts with its accompanying documentation. The authoritative local variant and any consequential release-specific effect remain unestablished. If the synthetic novelty gate is cleared, its action-certification question must measure the boundary of positive robust-action existence across map ambiguity, support, and response signal/heterogeneity; tiny six-node pilots found no positive robust action at high heterogeneity despite frequent map-conditioned action disagreement, and even the best worst-case-scored solver-selected single-map action did not have positive value in those sampled cells. Disagreement or point-map regret alone therefore does not establish useful robust action. Zero-action abstention is a substantive outcome. Identity is an arbitrary sensitivity commitment. The action selected in the current POC from one solver-chosen optimum per point map is only a lower-envelope diagnostic because it ignores ties within the point-optimal face. The candidate comparator should maximize worst-map value over every action that is optimal for at least one point map, with support enumeration and all orbit maps available; this is the strongest point-optimal commitment benchmark, not an estimate of an unobserved true-map oracle. The true-map oracle that reveals the realized correspondence remains a separate diagnostic. These are POC findings only and do not select a confirmatory parameter regime. ToN, CICIoMT, and CIC IoT DIAD are deferred; the current six directed ToN pairs cannot support the intended confirmatory claim because multiple configured modalities fail preprocessing and the class-wise split is not a global future holdout. No empirical cross-modality utility, IDS deployment, organization-level federated benefit, privacy, or natural fine-label unavailability claim is authorized by the current evidence. Update 2026-09-26: the QAP synthetic candidate was retired after the novelty-resolution step; the provisional identity-shortcut candidate was also retired (see `docs/audit/Scientific Decisions.md`); no candidate currently meets the novelty bar (see `docs/audit/Scientific Decisions.md`), and no protocol or confirmatory run is authorized.
+
+This disposition supersedes conflicting real-data-primary scope and pair-level majority gates in the sections below. Those sections and `configs/fedorbit.yaml` still encode the former study and have **not yet been migrated**. The old transfer catalogue is now classified exploratory; its runs are not confirmatory evidence for the candidate paper. The existing registered synthetic experiments are exploratory or diagnostic and are not the revised confirmatory protocol: their scope, primary unit, instance replication, method contrasts, and statistical synthesis have not been aligned to this algorithmic study. The newly screened local Gotham2025 alternative has device-level capture identity, but 70/78 processed device files are benign-only, all attack-labeled rows are concentrated in eight files, and the released ZIP omits the orchestration logs cited as label ground truth; it also shares public attack labels and does not support the unknown-map premise. A separately generated target response operator and matched target-local utility comparator are unnecessary while applied target-utility claims remain out of scope; restore them before making such claims. No confirmatory workload has been run for this disposition. This roadmap must be reconciled before any study is called experiment-ready.
+
+## Provisional synthetic-study direction (not protocol-locked)
+
+### Scientific question and unit
+
+Let $L$ be a directed response matrix, $w$ the target importance vector, $c$ the nonnegative linear action-cost vector, and $\Pi=\prod_g S_{n_g}$ the declared group of within-block permutations. With coordinate caps, total action budget $B$, and support limit $s$, define $\mathcal A_s=\{\alpha:0\le\alpha\le u,\mathbf1^T\alpha\le B,\|\alpha\|_0\le s\}$ and
+
+$$J(\alpha;P)=w^TP^TLP\alpha-c^T\alpha,\qquad V_{\rm rob}=\max_{\alpha\in\mathcal A_s}\min_{P\in\Pi}J(\alpha;P).$$
+
+The candidate paper is a controlled study of this finite structured optimization problem. It is not an empirical federated-learning, organization, privacy, malware, or deployment study. The independent unit for any population-style statement is one independently generated response-operator instance within a predeclared generator stratum. Methods are paired on the same instance. Optimizer tie seeds and repeated evaluations of one matrix do not create independent instances. Blocks are mathematical strata, not physical devices or clients.
+
+### Research questions and claim hierarchy
+
+* **Primary RQ:** Across predeclared response-operator strata, when does the joint-map robust problem admit a positive net action, and how do its robust value and selected action compare with allowed-information point-map and entrywise-rectangular decisions? The substantive outcome includes both positive action and safe zero-action abstention.
+* **Secondary RQ:** How do these boundaries vary with response heterogeneity/signal, admissible-map ambiguity, block pattern, support, and shared-action structure (common optimum, compromise-only, map-dependent optima)? This inference is conditional on the declared generator and must not be generalized to real response matrices.
+* **Diagnostic RQ:** On tractable instances, do exact-sparse results match exhaustive orbit truth, and how do certified error, runtime, memory, and actual solver work compare with the monolithic all-map support-indicator MILP, generic exact QAP, and specialized sparse-flow branch-and-bound methods where their matrix/domain assumptions fit, as support and map-orbit size grow? This is a correctness/scalability diagnostic, not by itself evidence of method novelty.
+
+The only candidate primary claim is a measured **conditional boundary** for robust-action existence and value under the controlled generator, paired against the allowed-information finite-orbit point-policy selector and the independent-entry rectangular hull. The claim is publishable only if a formulation-level novelty audit establishes a nontrivial theorem/guarantee for the full robust sparse-action problem or a defensible application; otherwise the correct disposition is that this project has not established a publishable contribution. No positive effect, universal regime, or threshold is assumed in advance.
+
+### Candidate evidence contract
+
+Required decision-policy contrasts are: (1) joint-map robust action; (2) matched entrywise rectangular pessimism; and (3) the face-complete point-map commitment benchmark, which maximizes worst-map value over the union of all actions optimal for at least one point map. For each nominal map $P_0$, compute $V(P_0)=\max_{\alpha\in\mathcal A_s}J(\alpha;P_0)$, then maximize $\min_{P\in\Pi}J(\alpha;P)$ subject to $\alpha\in\mathcal A_s$ and $J(\alpha;P_0)=V(P_0)$, taking the best value over $P_0$. Enumerate supports so ties over the entire point-optimal face are included. The current one-solver-action-per-map POC is a lower bound on this benchmark, not its completed implementation. The true-map decision $\min_{P\in\Pi}\max_{\alpha\in\mathcal A_s}J(\alpha;P)$ is an oracle diagnostic only. Identity-map commitment is a sensitivity baseline, not the point-policy comparator. Structural negative controls test the stated uncertainty-set contrast. The current coupling-destroyed shuffle is only exploratory because it changes map-relevant within-block structure; do not use it for causal attribution unless a separate invariant-matched intervention is defined.
+
+For solver benchmarking at the currently registered sizes, include exhaustive orbit truth and the monolithic all-map MILP: maximize `t`, impose `t <= a(P)^T alpha` for every admissible map, and link action to binary support indicators by `0 <= alpha_i <= cap_i z_i`, `sum(alpha) <= B`, `sum(z) <= s`. This is an exact solver baseline for the same robust decision, not a different policy. The current configurations have at most six action coordinates, support cap two, and 36 maps. A 24-instance POC across four seeds matched the production solver within `1.8e-18`; after one warm-up and three timed runs per solver/matrix, within-matrix median runtimes favored the MILP in 23/24 cases (median production/MILP ratio 3.92x, range 0.93–27.75x), with substantial between-case ratio variation. This selected diagnostic does not settle larger-orbit scaling or novelty, but it rules out presenting the custom separator as the only viable exact solver for the registered grid.
+
+Predeclared controls must include a constant-within-block-pair zero-gap case, incompatible entrywise minima, common optimal action, compromise-only action, and genuinely map-dependent optimal actions. The coupling-destroyed construction must preserve the intended per-block-pair value multiset and interval pairing. A shuffle-based causal statement is not part of the current candidate estimand. Generation failures, infeasible structural requests, algorithm failures, timeouts, positive robust actions, and zero-action abstentions are distinct outcomes and remain in denominators where applicable. Because zero action belongs to $\mathcal A_s$, a completed zero optimum is abstention, not infeasibility or `INSUFFICIENT_EVIDENCE`.
+
+The required instance-level outputs are worst-map net value, positive-action/abstention indicator, point-policy and rectangular regret on the same matrix, map-conditioned action disagreement/value-of-information diagnostics, exactness/certificate status, runtime, memory, and solver work. Report paired stratum effects with Monte Carlo intervals conditional on each generator; choose replication by a pre-outcome precision analysis for both continuous contrasts and positive-action rates. Do not reuse the real-data CE threshold or the legacy $0.005$ objective threshold across differently normalized strata. Sample sizes, stratum values, multiplicity rules, and materiality thresholds remain **unset** until the generator and estimands pass novelty review and variance-based design.
+
+### Novelty and execution gate
+
+For fixed $\alpha$, $w^TP^TLP\alpha=\sum_{i,j}w_i\alpha_jL_{P(i),P(j)}$ is a Koopmans–Beckmann QAP with rank-one flow over a block-preserving permutation subgroup. The QAP-R1 publisher page reports four integer-programming formulations (three using partial integer data), complexity analysis, and polynomially solvable cases, but its abstract does not expose the exact rank-one definition. The 2017 Tian MAP thesis gives a rank-one Lawler cost tensor `q_(i,k),(j,l)=a_(i,k)b_(j,l)`. In FedORBIT's assignment variables `x_(i,k)=1[P(i)=k]`, the fixed-action coefficient tensor is `q_(i,k),(j,l)=w_i alpha_j L_(k,l)`, or `(w alpha^T) kron L` after flattening. When `w` and `alpha` are nonzero, its matrix rank is `rank(L)`: if `L=u v^T`, this tensor factors as `(w_i u_k)(alpha_j v_l)` and lies in the rank-one Lawler-cost form; for general rank-r `L`, it is a sum of r such factors. This establishes an algebraic intersection for the rank-one-response subclass and a rank-r extension, not a reduction of the generic fixed-action problem to QAP-R1. The QAP-R1 article equation and formulation assumptions remain unavailable, so symmetric-cost conventions and algorithm applicability still need verification. This is stronger than saying the thesis factorization merely pairs indices differently, but still does not establish that QAP-R1 subsumes FedORBIT's directed/block-restricted cases. The action support is a vertex cover of the undirected support graph of `w alpha^T`; its treewidth is at most the cover size. This does not make the problem tractable by treewidth alone: Tree QAP is NP-complete even at treewidth one ([Christofides & Benavent, 1989](https://doi.org/10.1287/opre.37.5.760)). Milis and Magirou (1995) give exact branch-and-bound for sparse QAPs using a Task Assignment Problem relaxation on k-tree flow graphs and Gilmore–Lawler bounds on arbitrary flow graphs, with LAP-based search accelerations. A 2026 arXiv preprint on exact qubit allocation adds assigned-cost reductions, graph symmetry, and conditioned LAP screening around GLB/Hahn–Grant bounds. Its public solver documentation accepts nonnegative, possibly asymmetric interaction matrices. The shift depends on the optimization direction. For maximizing response, `D=C(J-I)-L` with a sufficient `C` maps response maximization to QAP cost minimization. The fixed-action worst-map separator instead minimizes response; for symmetric zero-diagonal `L`, `D=C(J-I)+L` with `C >= max(0,-min_offdiag(L))` gives a nonnegative symmetric zero-diagonal cost and adds only the invariant `C sum_{i!=j} F_ij`. An ignored exhaustive-orbit POC confirms this identity through 10 nodes. The Kaya solver cannot be built in the current environment because `chpl` is absent, so its direct runtime comparison remains open. For directed `L`, support for directed `D` and validity of graph-aware reductions are not established. The solver models unrestricted injections, and support for FedORBIT's block-preserving subgroup is not documented. Its practical 60-thread runs use heuristic incumbents, while the single-thread ablation uses an oracle cutoff and excludes timed-out jobs from geometric means ([Kaya, arXiv:2608.04058](https://arxiv.org/abs/2608.04058), [solver repository](https://github.com/kamerkaya/StaticQubitAllocation)); the cover structure also yields active-image enumeration plus a residual LAP directly: after fixing cover images, every remaining assignment cost is unary (with separate LAPs for FedORBIT blocks). The sparse-flow paper's abstract does not establish that it uses this exact elimination or block restriction, but it makes the structural mechanism itself a weak novelty claim. Exact coverage of the sparse asymmetric factor and restricted permutation subgroup remains unresolved. The fixed-support outer problem is a finite-scenario robust LP solved by constraint generation. Robust-QAP prior art also includes interval/budgeted uncertainty in flow coefficients, uncertain location coordinates inducing correlated distance-matrix uncertainty, and Γ-counterparts that reduce robust QAPs to nominal-QAP oracle calls. Generic claims to robust QAP, matrix/location uncertainty, or robust optimization composed with a QAP oracle are ruled out. These models use binary assignment decisions under uncertain flow coefficients or location coordinates; FedORBIT uses a continuous sparse action decision with finite subgroup-orbit scenarios. Sign reversal places both in a robust min-max convention, so the remaining distinction is the uncertainty geometry and decision-variable structure, not objective ordering ([Feizollahi & Modarres, 2012](https://www.researchgate.net/publication/285918289_Robust_quadratic_assignment_problem_with_uncertain_locations); [Feizollahi & Feyzollahi, 2015](https://doi.org/10.1016/j.orp.2015.06.001); [Adelhütte & Liers, 2023](https://arxiv.org/abs/2304.01688)). Neither component alone is a candidate novelty claim. Before protocol lock, compare the sparse/asymmetric/block-restricted inner problem with sparse-flow QAP branch-and-bound (including graph-aware GLB/Hahn–Grant methods where assumptions fit), rank-one-flow algorithms, and the exact QAP-R1 formulations and repeated-factor special cases, then determine whether the full max-min sparse-action composition yields a result beyond standard robust-LP/QAP composition. No confirmatory run is authorized by this provisional contract.
+
+## Status of remaining roadmap sections
+
+Sections 1 onward below preserve the former applied transfer proposal and its detailed mathematical/implementation record for audit traceability. Their ToN populations, RQs, pair-based experimental units, TEST outcomes, thresholds, execution counts, and claim gates are **superseded and non-operative** for the current candidate. `configs/fedorbit.yaml` and its seed-based synthesis likewise remain legacy implementation configuration; a run from them is exploratory/diagnostic only. Reuse a mathematical definition only after checking it against the provisional scope above. Do not interpret a legacy `PASS` row in [`Audit Matrix.md`](Audit%20Matrix.md) as candidate-study readiness.
+
 # 1. Contribution Boundary
 
 ## 1.1 Contribution identity
@@ -2982,6 +3024,8 @@ N_S\sum_gn_g^3
 \right).
 $$
 
+This is an operational fixed-action separator work proxy, not an end-to-end worst-case complexity bound. It counts high-level LAP calls, not the repeated assignment solves used internally for deterministic tie resolution. It does not include enumeration of candidate supports, the number or total solution cost of robust-master LP iterations, or coefficient bit complexity. For fixed $|S|$, $N_S\le n^{|S|}$ and the separator is polynomial in $n$, with an exponent depending on support size; this is an XP-style observation, not an FPT claim. The parameter is the size of an explicit flow-graph vertex cover, not treewidth alone: Tree QAP is NP-complete even though its flow graph has treewidth one ([Christofides & Benavent, 1989](https://doi.org/10.1287/opre.37.5.760)). Any paper-level complexity claim must compare this small-cover sparse-flow QAP special case with sparse-flow branch-and-bound (including graph-aware GLB/Hahn–Grant methods where assumptions fit), rank-one-flow and QAP-R1 formulations and prove the robust outer-action result separately.
+
 ## 8.2 Deterministic separator ties
 
 If several correspondences have objective values within the configured LAP/action tie tolerance:
@@ -4194,7 +4238,7 @@ Checks:
 
 ## Exact-Sparse Solver Benchmark
 
-**Classification:** Confirmatory for solver exactness/structure.
+**Current catalogue classification:** Exploratory. The former solver-benchmark contract remains documented below as legacy and has not been selected for the candidate paper.
 
 Synthetic K:
 
@@ -4237,7 +4281,7 @@ All valid primary real response packets are additionally benchmarked.
 
 ## Synthetic Coupling-Mechanism Validation
 
-**Classification:** Confirmatory mechanism.
+**Current catalogue classification:** Exploratory. The registered generator/fixed-action study has not been promoted to the candidate paper's confirmatory design.
 
 Uses the same 4,050 designed coupling instances.
 
@@ -4251,7 +4295,7 @@ Pass interpretation follows the central mechanism criteria.
 
 ## Real-Packet Coupling-Mechanism Validation
 
-**Classification:** Confirmatory mechanism.
+**Current catalogue classification:** Exploratory legacy real-data analysis; deferred from the candidate paper.
 
 Planned units:
 
@@ -4338,7 +4382,7 @@ Every fixture must respect the registered map bound.
 
 ## Primary Strict Cross-Telemetry Transfer
 
-**Classification:** Confirmatory.
+**Current catalogue classification:** Exploratory legacy real-data analysis; deferred from the candidate paper.
 
 Pairs:
 
@@ -4467,7 +4511,7 @@ Principal $s=2$ cells are reused when already complete.
 
 ## Target Confirmation and Portability
 
-**Classification:** Confirmatory safety.
+**Current catalogue classification:** Exploratory legacy real-data analysis; deferred from the candidate paper.
 
 Pairs:
 
@@ -4805,7 +4849,7 @@ Exact counters passing while the runtime-trend component is insufficient or nonp
 
 ## Statistical Synthesis
 
-**Classification:** Confirmatory ANALYSIS.
+**Current catalogue classification:** Exploratory legacy pair/seed synthesis; it does not analyze synthetic instances as independent experimental units.
 
 Inputs:
 
@@ -4825,7 +4869,7 @@ The synthesis consumes the currently valid evidence-bearing metric artifacts und
 
 ## Evidence Classification
 
-**Classification:** FINAL EVIDENCE.
+**Current catalogue classification:** Exploratory legacy claim adjudication. Its hypothesis statuses do not establish evidence for the candidate synthetic paper.
 
 Inputs:
 

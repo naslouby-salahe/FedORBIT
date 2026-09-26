@@ -51,6 +51,7 @@ from fedorbit.types import (
     EvidenceHypothesis,
     EvidenceStatus,
     ExecutionEventName,
+    ExperimentClassification,
     ExperimentName,
     ExperimentSeed,
     FieldDescription,
@@ -1542,6 +1543,7 @@ def execute_evidence_classification(
                 StableJsonPayload,
                 OrderedDict(
                     question=hypothesis.value,
+                    classification=request.definition.classification.value,
                     final_state=adjudication.status.value,
                     materiality_result=adjudication.materiality,
                     statistical_result=adjudication.statistical,
@@ -1580,6 +1582,7 @@ def execute_evidence_classification(
 
 class EvidenceStatusRow(DomainModel):
     question: EvidenceHypothesis
+    classification: ExperimentClassification = ExperimentClassification.EXPLORATORY
     final_state: EvidenceStatus
     materiality_result: FieldDescription
     statistical_result: FieldDescription

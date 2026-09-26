@@ -17,9 +17,11 @@ from fedorbit.experiments.classification import (
     utility_family_status,
 )
 from fedorbit.experiments.dispatch import ExperimentExecutionRequest
+from fedorbit.experiments.report_rows import evidence_status_rows
 from fedorbit.experiments.validation import persist_synthetic_experiment_payload
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.workspace import build_layout
+from fedorbit.reporting import evidence_status_table
 from fedorbit.types import (
     EVIDENCE_SUPPORT_BY_HYPOTHESIS,
     PAPER_FORBIDDEN_WORDING,
@@ -38,6 +40,7 @@ from fedorbit.types import (
     MetricId,
     MultiplicityFamily,
     OverwritePolicy,
+    ReportColumnName,
     Sha256Digest,
     StableJsonPayload,
     SupportSize,
@@ -61,7 +64,13 @@ def test_evidence_classification_records_not_tested_without_synthesis(tmp_path: 
     assert payload["synthesis_artifact_id"] is None
     statuses = payload["statuses"]
     assert statuses
+    assert {row["classification"] for row in statuses} == {"Exploratory"}
     assert {row["final_state"] for row in statuses} == {EvidenceStatus.NOT_TESTED.value}
+    table = evidence_status_table(
+        evidence_status_rows(classification.completed_evidence_status_rows(store))
+    )
+    classification_index = table.columns.index(ReportColumnName.CLASSIFICATION)
+    assert {row[classification_index] for row in table.rows} == {"Exploratory"}
 
 
 def test_evidence_classification_scope_and_supporting_table_are_claim_specific(

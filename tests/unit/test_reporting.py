@@ -16,6 +16,7 @@ from fedorbit.analysis.records import (
     PairedComparisonRecord,
 )
 from fedorbit.config.loading import active_config
+from fedorbit.experiments.report_rows import coupling_mechanism_results_rows
 from fedorbit.infrastructure.artifacts import ArtifactStore
 from fedorbit.infrastructure.evidence import (
     EXPORT_LEDGER_KEY,
@@ -97,9 +98,10 @@ def _metric_record(
     pair: DirectedPairName = PAIR,
     method: TransferMethod = TransferMethod.FEDORBIT_EXACT_SPARSE_SOLVER,
     condition: EvaluationConditionName = PRINCIPAL_EVALUATION_CONDITION.name,
+    experiment: ExperimentName = ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
 ) -> MetricRecord:
     return MetricRecord(
-        experiment=ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        experiment=experiment,
         pair=pair,
         method=method,
         condition=condition,
@@ -114,6 +116,95 @@ def _metric_record(
         valid=True,
         invalid_reason=None,
     )
+
+
+def test_synthetic_coupling_rows_keep_support_budgets_separate() -> None:
+    condition = EvaluationConditionName(COUPLING_CONDITION)
+    experiment = ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION
+    method = TransferMethod.MATCHED_RESOURCE_RECTANGULAR
+    support_records = (
+        (
+            _metric_record(
+                MetricId.ROBUST_COUPLING_VALUE_GAP,
+                0.1,
+                MetricUnit.SCORE,
+                method=method,
+                condition=condition,
+                experiment=experiment,
+            ),
+            1,
+        ),
+        (
+            _metric_record(
+                MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
+                0.2,
+                MetricUnit.SCORE,
+                method=method,
+                condition=condition,
+                experiment=experiment,
+            ),
+            1,
+        ),
+        (
+            _metric_record(
+                MetricId.ROBUST_COUPLING_VALUE_GAP,
+                0.9,
+                MetricUnit.SCORE,
+                method=method,
+                condition=condition,
+                experiment=experiment,
+            ),
+            2,
+        ),
+        (
+            _metric_record(
+                MetricId.FIXED_ACTION_RECTANGULARIZATION_GAP,
+                0.8,
+                MetricUnit.SCORE,
+                method=method,
+                condition=condition,
+                experiment=experiment,
+            ),
+            2,
+        ),
+        (
+            _metric_record(
+                MetricId.ROBUST_COUPLING_VALUE_GAP,
+                0.05,
+                MetricUnit.SCORE,
+                method=TransferMethod.COUPLING_DESTROYED_FEDORBIT,
+                condition=condition,
+                experiment=experiment,
+            ),
+            1,
+        ),
+        (
+            _metric_record(
+                MetricId.ROBUST_COUPLING_VALUE_GAP,
+                0.4,
+                MetricUnit.SCORE,
+                method=TransferMethod.COUPLING_DESTROYED_FEDORBIT,
+                condition=condition,
+                experiment=experiment,
+            ),
+            2,
+        ),
+    )
+
+    rows = coupling_mechanism_results_rows(support_records, (), ())
+
+    assert {
+        (
+            row[ReportColumnName.SUPPORT],
+            row[ReportColumnName.METHOD],
+        ): row[ReportColumnName.ROBUST_COUPLING_GAP]
+        for row in rows
+    } == {
+        (1, TransferMethod.MATCHED_RESOURCE_RECTANGULAR.value): 0.1,
+        (2, TransferMethod.MATCHED_RESOURCE_RECTANGULAR.value): 0.9,
+        (1, TransferMethod.COUPLING_DESTROYED_FEDORBIT.value): 0.05,
+        (2, TransferMethod.COUPLING_DESTROYED_FEDORBIT.value): 0.4,
+    }
 
 
 def _comparison(
@@ -325,6 +416,17 @@ def _coupling_rows() -> tuple[Mapping[ReportColumnName, TableScalar], ...]:
                 (ReportColumnName.FIXED_ACTION_GAP, 0.25),
                 (ReportColumnName.ROBUST_COUPLING_GAP, 0.5),
                 (ReportColumnName.SUPPORT, 2),
+            )
+        ),
+        OrderedDict(
+            (
+                (ReportColumnName.CONDITION_OR_PAIR, COUPLING_CONDITION),
+                (ReportColumnName.FIXED_ACTION_GAP, 0.125),
+                (ReportColumnName.SUPPORT, 2),
+                (
+                    ReportColumnName.METHOD,
+                    TransferMethod.COUPLING_DESTROYED_FEDORBIT.value,
+                ),
             )
         ),
         OrderedDict(
@@ -1034,6 +1136,11 @@ def test_coupling_gap_factor_series_represents_registered_factors_and_states() -
     assert "response heterogeneity | compatibility=jointly_realizable" in names
     assert "directed asymmetry | compatibility=incompatible" in names
     assert "support budget" in names
+    assert (
+        "response heterogeneity | compatibility=jointly_realizable | "
+        "method=Coupling-Destroyed FedORBIT" in names
+    )
+    assert "support budget | method=Coupling-Destroyed FedORBIT" in names
     labelled = {str(item.name): item for item in series}
     heterogeneity = labelled["response heterogeneity | compatibility=jointly_realizable"]
     assert heterogeneity.x == (0.5,)

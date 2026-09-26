@@ -74,7 +74,6 @@ COLUMN_FORMATTERS: Mapping[ReportColumnName, ColumnFormatter] = OrderedDict(
         (ReportColumnName.FIXED_ACTION_GAP, format_scientific_metric),
         (ReportColumnName.ROBUST_COUPLING_GAP, format_scientific_metric),
         (ReportColumnName.FRACTION_ABOVE_MATERIALITY, format_scientific_metric),
-        (ReportColumnName.COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION, format_scientific_metric),
         (ReportColumnName.MAXIMUM_ABSOLUTE_ERROR, format_scientific_metric),
         (ReportColumnName.CONFIRMATION_SAFETY, format_scientific_metric),
         (ReportColumnName.EQUIVALENCE, format_scientific_metric),
@@ -446,13 +445,14 @@ def coupling_mechanism_results_table(
     return _rows_table(
         (
             ReportColumnName.CONDITION_OR_PAIR,
+            ReportColumnName.SUPPORT,
+            ReportColumnName.METHOD,
             ReportColumnName.VALID_UNITS,
             ReportColumnName.FIXED_ACTION_GAP,
             ReportColumnName.ROBUST_COUPLING_GAP,
             ReportColumnName.FRACTION_ABOVE_MATERIALITY,
             ReportColumnName.CI,
             ReportColumnName.HOLM_P,
-            ReportColumnName.COUPLING_DESTRUCTION_RETAINED_GAIN_FRACTION,
         ),
         rows,
     )
@@ -755,6 +755,7 @@ def evidence_status_table(
     return _rows_table(
         (
             ReportColumnName.QUESTION,
+            ReportColumnName.CLASSIFICATION,
             ReportColumnName.FINAL_STATE,
             ReportColumnName.MATERIALITY_RESULT,
             ReportColumnName.STATISTICAL_RESULT,
@@ -790,6 +791,8 @@ def _evidence_support_row(
     if recorded is not None:
         completed.update(recorded)
     completed[ReportColumnName.QUESTION] = question.value
+    if completed.get(ReportColumnName.CLASSIFICATION) is None:
+        completed[ReportColumnName.CLASSIFICATION] = UNAVAILABLE_CELL_TEXT
     if completed.get(ReportColumnName.FINAL_STATE) is None:
         completed[ReportColumnName.FINAL_STATE] = UNAVAILABLE_CELL_TEXT
     spec = EVIDENCE_SUPPORT_BY_HYPOTHESIS[question]
@@ -987,7 +990,7 @@ def coupling_gap_factor_series(
         ("response sparsity", tuple(float(level) for level in structure.response_sparsity)),
     )
     grouped: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
-    supports: list[tuple[float, float]] = []
+    supports: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
     unparsed = 0
     for row in rows:
         condition = row.get(ReportColumnName.CONDITION_OR_PAIR)
@@ -1013,11 +1016,16 @@ def coupling_gap_factor_series(
         if not registered:
             unparsed += 1
             continue
+        method = row.get(ReportColumnName.METHOD)
+        method_suffix = f" | method={method}" if isinstance(method, str) else ""
         for factor, level in levels:
-            grouped.setdefault(f"{factor} | compatibility={parts[0]}", []).append((level, gap))
+            grouped.setdefault(f"{factor} | compatibility={parts[0]}{method_suffix}", []).append(
+                (level, gap)
+            )
         support = _numeric_cell(row, ReportColumnName.SUPPORT)
         if support is not None:
-            supports.append((support, gap))
+            support_label = f"support budget{method_suffix}"
+            supports.setdefault(support_label, []).append((support, gap))
     series = tuple(
         FigureSeries(
             name=ReportSeriesName(factor),
@@ -1027,12 +1035,13 @@ def coupling_gap_factor_series(
         for factor, points in grouped.items()
     )
     if supports:
-        series += (
+        series += tuple(
             FigureSeries(
-                name=ReportSeriesName("support budget"),
-                x=tuple(point[0] for point in supports),
-                y=tuple(point[1] for point in supports),
-            ),
+                name=ReportSeriesName(label),
+                x=tuple(point[0] for point in points),
+                y=tuple(point[1] for point in points),
+            )
+            for label, points in supports.items()
         )
     else:
         series += (_unavailable_series("support budget | unavailable in rendered rows"),)

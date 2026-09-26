@@ -4,18 +4,23 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
+from fedorbit.experiments import solvers
 from fedorbit.experiments.catalogue import build_catalogue
 from fedorbit.experiments.dispatch import ExperimentExecutionRequest
 from fedorbit.experiments.solvers import (
+    execute_synthetic_coupling_mechanism_validation,
     persist_exact_orbit_coupling_cell,
     synthetic_coupling_problem,
 )
 from fedorbit.experiments.synthetic import (
     CouplingCompatibility,
+    CouplingGenerationError,
     CouplingInstanceRequest,
     generate_coupling_instance,
 )
-from fedorbit.infrastructure.artifacts import ArtifactStore
+from fedorbit.infrastructure.artifacts import ArtifactStore, ExecutionError
 from fedorbit.infrastructure.workspace import build_layout
 from fedorbit.optimization.correspondence import enumerate_block_permutations
 from fedorbit.types import (
@@ -80,6 +85,30 @@ def test_exact_orbit_coupling_cell_is_persisted_for_a_registered_synthetic_cell(
     ):
         assert metric_name.value in metrics
     assert metrics[MetricId.COUPLING_ACTION_SET_SUPPORT.value] == float(problem.principal_support)
+
+
+def test_coupling_generation_failure_fails_closed_with_cell_coordinates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    layout = build_layout(root=tmp_path)
+    store = ArtifactStore(layout.execution_root)
+    catalogue = build_catalogue()
+    experiment = ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION
+    request = ExperimentExecutionRequest(
+        experiment=experiment,
+        definition=catalogue.definition(experiment),
+        overwrite_policy=OverwritePolicy.REPLACE,
+    )
+
+    def fail_generation(_request: CouplingInstanceRequest) -> object:
+        raise CouplingGenerationError("fixture rejection")
+
+    monkeypatch.setattr(solvers, "generate_coupling_instance", fail_generation)
+    with pytest.raises(
+        ExecutionError,
+        match=r"registered synthetic coupling cell could not be generated .*support=.*seed=",
+    ):
+        execute_synthetic_coupling_mechanism_validation(store, layout, request)
 
 
 def test_exact_orbit_cell_reuses_the_same_artifact_for_identical_inputs(tmp_path: Path) -> None:

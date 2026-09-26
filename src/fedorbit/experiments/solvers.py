@@ -1669,8 +1669,13 @@ def execute_synthetic_coupling_mechanism_validation(
                                 )
                                 try:
                                     instance = generate_coupling_instance(coupling_request)
-                                except CouplingGenerationError:
-                                    continue
+                                except CouplingGenerationError as exc:
+                                    raise ExecutionError(
+                                        "registered synthetic coupling cell could not be "
+                                        "generated "
+                                        f"(condition={condition}, support={support}, "
+                                        f"seed={seed}, instance_index=0): {exc}"
+                                    ) from exc
                                 problem, orbit, alpha, hull = synthetic_coupling_problem(
                                     instance, support
                                 )

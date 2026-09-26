@@ -339,7 +339,7 @@ def build_catalogue() -> ExperimentCatalogue:
     )
     catalogue[ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK] = definition(
         ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
-        ExperimentClassification.CONFIRMATORY,
+        ExperimentClassification.EXPLORATORY,
         experiments.exact_sparse_solver_benchmark.methods,
         (),
         (),
@@ -350,7 +350,7 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue[ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION] = definition(
         ExperimentName.SYNTHETIC_COUPLING_MECHANISM_VALIDATION,
-        ExperimentClassification.CONFIRMATORY_MECHANISM,
+        ExperimentClassification.EXPLORATORY,
         experiments.synthetic_coupling_mechanism_validation.methods,
         (),
         (),
@@ -361,7 +361,7 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue[ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION] = definition(
         ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
-        ExperimentClassification.CONFIRMATORY_MECHANISM,
+        ExperimentClassification.EXPLORATORY,
         (CatalogueMethodLabel.EXHAUSTIVE_ORBIT, TransferMethod.MATCHED_RESOURCE_RECTANGULAR),
         (CatalogueScope.PRIMARY_PAIRS_SHORT,),
         (),
@@ -426,7 +426,7 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue[ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER] = definition(
         ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
-        ExperimentClassification.CONFIRMATORY,
+        ExperimentClassification.EXPLORATORY,
         methods,
         (CatalogueScope.PRIMARY_PAIRS,),
         (),
@@ -482,7 +482,7 @@ def build_catalogue() -> ExperimentCatalogue:
     confirmation_methods = experiments.target_confirmation_and_portability.methods
     catalogue[ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY] = definition(
         ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY,
-        ExperimentClassification.CONFIRMATORY_SAFETY,
+        ExperimentClassification.EXPLORATORY,
         confirmation_methods,
         (CatalogueScope.PRIMARY_DIRECTED_PAIRS,),
         (),
@@ -576,7 +576,7 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue[ExperimentName.STATISTICAL_SYNTHESIS] = definition(
         ExperimentName.STATISTICAL_SYNTHESIS,
-        ExperimentClassification.CONFIRMATORY_ANALYSIS,
+        ExperimentClassification.EXPLORATORY,
         (),
         (),
         (),
@@ -588,7 +588,7 @@ def build_catalogue() -> ExperimentCatalogue:
 
     catalogue[ExperimentName.EVIDENCE_CLASSIFICATION] = definition(
         ExperimentName.EVIDENCE_CLASSIFICATION,
-        ExperimentClassification.FINAL_EVIDENCE,
+        ExperimentClassification.EXPLORATORY,
         (),
         (),
         (),

@@ -239,8 +239,16 @@ def test_classifications_match_roadmap(
     )
     assert (
         catalogue.definition(ExperimentName.STATISTICAL_SYNTHESIS).classification.value
-        == "Confirmatory ANALYSIS"
+        == "Exploratory"
     )
+    for deferred in (
+        ExperimentName.PRIMARY_STRICT_CROSS_TELEMETRY_TRANSFER,
+        ExperimentName.REAL_PACKET_COUPLING_MECHANISM_VALIDATION,
+        ExperimentName.EXACT_SPARSE_SOLVER_BENCHMARK,
+        ExperimentName.TARGET_CONFIRMATION_AND_PORTABILITY,
+        ExperimentName.EVIDENCE_CLASSIFICATION,
+    ):
+        assert catalogue.definition(deferred).classification.value == "Exploratory"
 
 
 def test_method_resource_manifest_covers_every_transfer_method() -> None:

@@ -6,13 +6,25 @@ Updated 2026-09-25. The matrix contains 250 rows: 246 PASS, two
 `BLOCKED_BY_PRE_EXPERIMENT_STATE` (EXEC-008). No FAIL, PARTIAL, MISSING,
 UNWIRED, or DEAD_CODE_CANDIDATE rows remain.
 
-## The remaining gate: EXEC-008
+## Historical gate state and active scientific decision
 
-The primary design requires six directed pairs among ToN Windows 10, Linux
-Process, and Network. Windows is Ready. Linux and Network are Invalid Data:
-each has exact duplicate feature rows with conflicting labels (`ddos` /
-`injection` for Linux; `ddos` / `scanning` for Network). Roadmap §4.6 requires
-such sources to be rejected. Edge-IoTset also has unparseable event times.
+The implementation audit closed with EXEC-008 blocked. The preregistered
+primary design requires six directed pairs among ToN Windows 10, Linux Process,
+and Network. Windows is timestamp-resolvable and Ready to materialize (35,975
+rows), but a later split probe found that class-wise intervals overlap globally:
+Password TRAIN begins later than DDoS TEST, so this is not one future-only test
+period. Linux and Network
+each contain normalized behavioral-feature vectors with conflicting labels
+(`ddos` / `injection` for Linux; `ddos` / `scanning` for Network). Roadmap §4.6
+rejects such sources. Edge-IoTset also has unparseable event times. A later
+complete group census quantified an exclusion policy: it would discard 91.67%
+of Linux rows, but 0.973% of Network rows, with substantial class selectivity
+in both (especially Network scanning). Thus Linux is not rescued by excluding
+every ambiguous group; any filtered Network use is a new, narrower population.
+A later 22.34M-row scan found nonzero support for all Windows-shared labels in
+all five existing per-class partitions after Network filtering. It does not
+resolve the global chronology problem or establish post-purge support under a
+future-time protocol.
 
 The configured sources are the `Processed_datasets/...` files. The alternative
 `Train_Test_*` files are explicitly excluded by roadmap §4.4 because they lack
@@ -33,10 +45,18 @@ To unblock the primary claims:
    cells, inferential coverage, claims, tables, and evidence rules. Do not
    treat fewer pairs as the original confirmatory design.
 
-Recommendation: seek corrected inputs first. Until either route is formally
-resolved and re-audited, do not start a primary confirmatory experiment. This
-cannot be cleared by more software-only changes. No raw data, pair list,
-threshold, estimator, criterion, or claim was changed.
+The subsequent scientific audit recommends a controlled synthetic optimization
+study as the candidate direction and defers ToN, DIAD, and CICIoMT. This is not
+a locked protocol amendment: production eligibility rules, pair lists,
+thresholds, estimators, statistical synthesis, and run gates still encode the
+former real-data study. The candidate scope is mathematical, not applied target
+utility, so it does not require a target operator or target-local utility
+baseline. Registered synthetic experiments still need action-level contrasts,
+a confirmatory unit, instance replication, and synthesis aligned to that scope.
+No workload is confirmatory evidence for the candidate study until the
+novelty case and roadmap/config/catalogue/implementation are reconciled.
+The full design and reviewer objections are recorded in
+`docs/audit/Scientific Decisions.md` and `docs/audit/Reviewer Audit.md`.
 
 ## Justified non-PASS rows
 

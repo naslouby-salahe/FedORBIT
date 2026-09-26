@@ -116,7 +116,7 @@ def test_robust_compromise_world_has_disjoint_map_winners_and_positive_pre_map_v
     assert robust_pre_map_value(candidates, orbit) > 0.005
 
 
-def test_map_dependent_world_meets_the_registered_delta_map_floor() -> None:
+def test_map_dependent_world_has_distinct_map_winners_and_registered_value_floor() -> None:
     world = generate_unresolved_map_world(
         UnresolvedMapWorldRequest(UnresolvedMapWorldKind.MAP_DEPENDENT, 101)
     )
@@ -128,6 +128,10 @@ def test_map_dependent_world_meets_the_registered_delta_map_floor() -> None:
         ).selected_action
         for correspondence in orbit
     )
+    distinct_winners = {
+        rounded_action_vector(action, 1e-12) for action in per_map
+    }
+    assert len(distinct_winners) > 1
     candidates = (solve_robust_action(problem).selected_action, *per_map, zero_action(problem))
     assert exact_map_action_value(candidates, orbit) >= 0.01
 

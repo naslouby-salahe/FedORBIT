@@ -124,6 +124,155 @@ negative-transfer safeguard. Script and CSV are gitignored at
 `pocs/oas_peer_target_mismatch_synthetic.py` and
 `pocs/oas_peer_target_mismatch_synthetic.csv`.
 
+**Scale-estimation risk was measured against held-out benign references.** On the same 540 stable
+support windows, each per-feature local/peer SD was compared in log space to the device's complete
+`support_pool` SD (an empirical finite-pool reference, not an oracle for future operation). Mean
+feature log-SD MSE for local vs pooled-peer scales was 19.82 vs 0.66 at n=30, 12.99 vs 0.66 at n=100,
+8.86 vs 0.66 at n=300, and 4.55 vs 0.66 at n=1000. Local scales were below the pool reference in
+100%, 97.8%, 93.3%, and 91.1% of device/window cells; local downward log-error RMSE was 3.66/2.68/2.09/
+1.40, versus peer downward RMSE 0.15 at every n. Peers also overestimated more (upward log-error RMSE
+0.66 vs local 0.08–0.10), so borrowing trades a large local downward tail for peer overestimation.
+Within each device, lower peer-vs-local log-scale risk tracked larger peer-vs-local AUROC gain by
+Spearman ρ=−0.736/−0.558/−0.406/−0.528 at n=30/100/300/1000. This is descriptive only: overlapping
+windows share data, and it does not validate a deployable risk rule. Against a separate held-out
+`test_benign` scale reference, mean log-SD MSE was local/peer 14.60/5.97, 8.69/5.97, 5.40/5.97, and
+4.12/5.97; local underestimation fractions were 72.8%, 65.6%, 57.8%, 59.4%, versus 26.7% for the fixed
+peer scales. The held-out reference also shows local wins at n=1000 on average. This suggests the
+mechanism is a substantial low-support downward-scale error in many devices, but it does not justify
+blanket peer borrowing, nor explain every device: for Ecobee, peer log-SD MSE (0.45) exceeds local
+(0.13) at n=30 while peer AUROC gain is only 0.005. Loss and detector ranking remain only partly
+aligned. Exploratory diagnostics: `pocs/oas_scale_risk_diagnostic.py/.csv` (support-pool truth) and a
+held-out benign comparison from the same stable windows (calculation recorded in this checkpoint).
+
+**Robust partner-scale aggregation and reduced-statistic sharing revisited.** A paired 15-replicate
+POC compared pooled total peer SD (the C8 endpoint), coordinatewise median peer SD, one-low/one-high
+trimmed peer SD, square root of median peer variance, and geometric mean peer SD. The latter four use
+only each partner's per-feature SD (115 scalars/device) and do not require partner means, unlike pooled
+total variance which includes between-peer mean variation. Mean deltas vs exact same-window
+`shared-marginals` at n=30/100/300/1000 were: pooled −0.00736/−0.00151/−0.00448/+0.00016; median
+−0.00956/−0.00238/−0.00397/+0.00088; trimmed −0.00668/−0.00219/−0.00384/+0.00092; median variance
+−0.00941/−0.00236/−0.00395/+0.00088; geometric −0.01044/−0.00462/−0.00400/+0.00103. No robust
+summary clearly outperforms the pooled target; trimmed SD's worst device-mean delta was
+−0.0301/−0.0105/−0.0218/−0.0007, and it had positive device means on 4/9, 3/9, 3/9, 6/9. This gives
+a plausible lower-statistic-communication near-tie, not the requested stronger/safe algorithm. The
+POC and CSV are gitignored at `pocs/robust_peer_scale_target_poc.py` and
+`pocs/robust_peer_scale_target_results.csv`.
+
+**C9 risk-optimal variance blend derived and falsified in its iid plug-in form.** For a scalar feature,
+let local unbiased variance estimate `L` have error variance `V_L`; let peer estimate `P` predict the
+new target variance with squared error `B_P=E[(P−θ_target)^2]`, independent of `L`. For
+`θhat=(1−w)L+wP`,
+`MSE(θhat)=(1−w)^2 V_L+w^2 B_P`, so the conditional minimum is
+`w*=V_L/(V_L+B_P)`. Under exchangeable device variances with between-device component `τ²`, K peer
+estimates, and per-peer sampling variances `u_k`, a peer mean has predictive error
+`B_P=τ²(1+1/K)+K⁻²∑u_k`. The local iid plug-in used the fourth-moment formula
+`V_L≈[μ4−((n−3)/(n−1))θ²]/n` with sample moments; its peer heterogeneity term used the nonnegative
+method-of-moments estimate of `τ²`. This yields a principled continuous feature-wise weight and, when
+`B_P>0`, local-only as n grows. It is not a universal safety guarantee: it assumes independent unbiased
+variance estimators and exchangeable target/peers, and says nothing directly about AUROC.
+
+The paired 15-replicate POC gave mean peer weights 5.16%/3.08%/1.58%/0.81% at n=30/100/300/1000;
+AUROC was effectively local-only (mean deltas vs `shared-marginals` −0.08494/−0.04448/−0.03156/
+−0.01116, 0/9 device means positive). The mean-within-peer variance endpoint alone nearly ties the
+baseline (−0.00288/−0.00096/−0.00340/+0.00099) but the risk rule hardly uses it. This is a meaningful
+failure of the plug-in, not of the MSE minimizer under its assumptions. Root cause evidence: support
+rows are explicitly kept chronological by `load_nbaiot_device`/`chronological_split`; median absolute
+feature lag-1 autocorrelation across devices is 0.725 (range 0.072–0.853), remaining 0.365 at lag 10.
+Across 30 random chronological windows per device/support, empirical between-window variance of the
+local sample variance exceeded the iid fourth-moment estimate by median ratios 4.09/13.93/33.29/16.75
+at n=30/100/300/1000; 84.7%/83.9%/90.3%/95.2% of feature-device cells exceeded the iid estimate.
+So the closed-form iid risk badly underestimates local instability under temporal dependence/regime
+variation, causing the near-zero peer weights. A better continuation is a defensible block-risk
+estimate, not inflating `w` with a tuned constant. POC: `pocs/random_effects_variance_risk_poc.py` /
+`random_effects_variance_risk_results.csv`; dependence calibration:
+`pocs/scale_risk_dependence_calibration.py/.json`.
+
+**C10 replaces the iid local-risk plug-in with peer chronological pseudo-window risk.** For each of the
+8 leave-target-out peer devices, the method partitions its chronological benign history into complete,
+disjoint windows of the target support size n, computes the per-feature sample variance in each block,
+and estimates (i) `P_j`, the mean within-window variance across peers, and (ii) `V_L,j`, the mean
+within-peer variance of those block variance estimates. It estimates between-device variance `τ²_j`
+from peer-level `P_{k,j}` values after subtracting their finite-block sampling noise, then plugs
+`B_P,j=τ²_j(1+1/K)+V_P,j` and `w_j=V_L,j/(V_L,j+B_P,j)` into the MSE-optimal linear blend. No attack
+labels or hand-tuned cutoff enter the rule; weights emerge feature-wise and decline from 0.533 to 0.297
+as n grows from 30 to 1000. This corrects the iid risk estimator with evidence from serially dependent
+peer histories, but assumes the target's temporal variance-estimation behavior resembles the peer
+histories and does not guarantee lower detector ranking loss.
+
+On the same stable 15-replicate windows, C10 mean AUROC deltas vs exact same-window `shared-marginals`
+were −0.00098/−0.00314/−0.00845/−0.00004 at n=30/100/300/1000. Positive device means: 3/9, 2/9, 3/9,
+4/9; worst device means: −0.02196/−0.02108/−0.02644/−0.00211; negative-transfer cells: 41/135,
+45/135, 74/135, 70/135. It beats local OAS strongly on average, but does not consistently match
+shared-marginals on individual devices, particularly at n=300. The unblended peer block-variance
+endpoint scores −0.00060/−0.00100/−0.00506/+0.00062 vs shared, so part of the benefit is still the
+peer target, not the adaptive risk weight. This is the strongest next candidate to investigate, not a
+selected algorithm; it shares mean/variance-risk information at approximately the same feature-vector
+count as the baseline and has no safety guarantee. Its mechanism is adjacent to established dependent-
+data block bootstrap methods (Zhang & Cheng, 2014), which estimate distributions for high-dimensional
+weakly dependent statistics but do not give a small-n transfer/AUROC guarantee ([paper](https://arxiv.org/abs/1406.1037)). Script/raw data:
+`pocs/block_risk_variance_blend_poc.py` and `pocs/block_risk_bias_penalty_results.csv`.
+
+**C11 target-discrepancy penalty tested; it does not improve C10.** The moment identity
+`E[(L−P)^2]=V_L+B_P+b²` motivates `b²hat=max((L−P)^2−V_L−B_P,0)` and the derived weight
+`V_L/(V_L+B_P+b²hat)`, as a feature-wise penalty for target/peer mismatch. It uses no tuned threshold.
+However, its mean peer weights fall to 0.485/0.442/0.352/0.265, and AUROC vs shared is slightly worse
+than C10 at every n: −0.00110/−0.00449/−0.01004/−0.00028; positive device means stay 3/9,2/9,3/9,4/9,
+while negative cells increase to 44/135,48/135,80/135,75/135. This plug-in discrepancy estimate
+shrinks peer use but does not find the harmful features/devices well enough to improve detection; it is
+not a safe-transfer guarantee. Result rows share the C10 POC file.
+
+**Dataset generalization audit: no valid second physical-device population identified.** The existing
+Gotham2025 artifacts contain 78 simulated assets, but only 8 attack-observing assets; 6 fail the
+registered benign-support stability gate, leaving `ip-camera-museum-1` and `ip-camera-street-1`. Both
+are already saturated: the exact archived analysis shows AUROC 1.0 for the local and collaborative
+channels at n≥30 and zero delta at n=30/100. This is simulation boundary evidence, not physical-device
+replication. The local TON-IoT Windows/Linux/network inventory is each a pooled table; the selected
+validation inputs have no usable `ts` column, and the schemas do not identify separate physical IoT
+devices. Edge-IIoTset is one scenario/capture CSV with IP endpoint fields and 122,782 rows whose
+`frame.time` is not timestamp-shaped; treating IPs or attack scenarios as physical client identities
+would change the claim and risks endpoint/capture leakage. Available dataset evidence is in
+`outputs/preprocessing/inventories/`, `outputs/preprocessing/validation/`, prepared manifests, and
+`outputs/analysis.json`; no eligible second population should be fabricated from these sources.
+
+**Deep-detector compatibility has a positive but very small local-center/peer-scale smoke POC.** The
+production autoencoder path normalizes support, benign-test, and attack rows with the same `centre` and
+`scale`, then trains a local reconstruction model (`src/fedorbit/study/channels.py` and
+`detection/autoencoder.py`). Thus a scale-only normalization arm is model-compatible at the interface,
+but its learned reconstruction loss is not the Gaussian OAS quadratic and the covariance-shrinkage
+identity does not transfer. The registered secondary experiment's shared-marginals-over-local AE gain
+was +0.1014 at n=30 and +0.0443 at n=100 (9/9 devices), but it changes both mean and scale. A new paired
+smoke POC kept the local center, substituted peer scale only, trained the same local AE on the same
+support rows, and used identical attack/benign tests and initialization seeds: at 300 training steps
+and 2 replicates/device, peer-scale minus local-normalization mean AUROC was +0.0990/+0.0551 (9/9
+positive device means) at n=30/100; peer-scale/local-center minus full shared-marginals was +0.00097/
++0.00107, positive on 4/9 and 5/9 devices. This suggests the scale-only channel can transfer beyond
+Gaussian Mahalanobis normalization, but two seeds are only a compatibility smoke, not evidence of AE
+non-inferiority or a candidate win. A larger paired AE POC is required before calling it model-agnostic.
+The older ignored AE pilot is confounded because it normalizes even its nominal local baseline with a
+pooled partner transform; do not cite it. New POC: `pocs/autoencoder_peer_scale_poc.py` /
+`pocs/autoencoder_peer_scale_results.csv`.
+
+**Communication/privacy accounting is still architectural, not a measured wire result.** A peer within-
+device SD summary contains d=115 scalars (460 bytes/client as float32, before IDs, encryption, or
+transport); a mean-plus-variance summary is 2d=230 scalars (920 bytes). For eight peers this is 3.68KB
+vs 7.36KB per target round if each peer sends those vectors directly. Pooled total variance needs
+first- and second-moment information because between-peer means contribute; robust within-peer SD
+aggregators avoid partner means but change the estimand and show only a near tie. The current runner
+retains full `MomentSummary` covariance matrices in memory, so no artifact demonstrates real network
+bytes, secure aggregation, or privacy. No privacy guarantee is claimed, and marginal statistics can
+leak traffic properties.
+
+**Development/confirmation boundary remains open.** The algorithm search has used the same nine
+physical device identities and registered support/test artifacts, including attack AUROC feedback.
+A new seed family or more windows from these same fixed arrays does not create an untouched device
+population. Nested leave-device-out analysis can estimate robustness but cannot be called independent
+confirmation after all nine devices have informed this search. The Gotham boundary is saturated and
+simulated; the locally inventoried TON-IoT/Edge-IIoTset tables do not supply an eligible physical
+client population. Before any confirmatory claim, the strongest valid route is an untouched release or
+newly collected physical-device cohort with predeclared support/attack chronology. If none becomes
+available, scope the algorithm comparison as exploratory and state that the external confirmation gate
+is unmet; do not use the original frozen study as a confirmatory test of a post-hoc candidate.
+
 **Novelty became more constrained after tracing the estimator family.** The OASD paper (IMF WP
 23/257, 2023) already derives Oracle Approximating Shrinkage toward `diag(S)` rather than OAS's
 scaled identity and targets high-dimensional inverse-covariance quality for `p>n`. Gray et al.'s
@@ -142,12 +291,26 @@ priority rather than pooling them first. It extends the approach to smooth M-est
 setting is not feature-scale OAS for anomaly detection, but it preempts a broad claim to new,
 tuning-free, risk-safe, covariance-aware, multi-source collaboration. Any next source-weighting rule
 must either instantiate its theory in this detector with a defensible OAS/AUROC loss, or explain a
-precise mathematical difference. [Full equations, v2](https://arxiv.org/html/2606.30615).
+precise mathematical difference. [Full equations, v2](https://arxiv.org/html/2606.30615). Additional
+hostile prior art: Yang et al., *Precise High-Dimensional Asymptotics for Quantifying Heterogeneous
+Transfers* (JMLR 2025), derive target-risk phase transitions under covariate/model shift and a
+rebalanced hard-sharing estimator with minimax rate; this is not OAS or anomaly ranking, but it
+preempts generic claims to deriving transfer-safety from heterogeneity alone
+([full paper](https://jmlr.org/papers/v26/24-0454.html)). FedKA (ACML 2023) uses federated feature
+distribution matching and reports reduced group-effect negative transfer for supervised unseen-domain
+classification ([paper](https://proceedings.mlr.press/v189/sun23a.html)). COMMUTE uses ordered multi-site
+source subsets plus target-label validation aggregation with a no-worse-than-best guarantee when
+validation is sufficient ([paper](https://doi.org/10.1016/j.jbi.2022.104243)); that validation safeguard
+is not available under this benign-only target contract. Together with StatAvg, these make general
+claims around moments, adaptive transfer, or safety untenable; only a specific estimator/loss/problem
+claim remains to be established.
 
-Next: derive and test a covariance-risk or ranking-risk rule that can detect mismatched peer diagonal
-targets before borrowing; evaluate a principled mismatch detector against shared-marginals under real hostile partner subsets,
-support dependence, heavy tails, and additional covariance structures; the toy Gaussian stress test
-shows a clear reason not to treat a fixed peer target as safe. The candidate remains
+Next: try to repair C10 using robust/block bootstrap risk estimates and source-wise disagreement rather
+than the failed squared-residual penalty; compare per-feature weights to an oracle risk frontier in
+controlled nonstationary, correlated, heterogeneous and contaminated-partner simulations, then test
+on paired real windows. Also test whether the one-vector peer-SD near tie can be combined with C10
+without losing the low communication footprint. C10 is only a current POC lead; no risk bound or
+deployable guarantee has been established. The candidate remains
 unselected; statistical variance-estimation risk and detector ranking loss must not be conflated.
 
 ## Live candidate ledger — no winner selected
@@ -160,10 +323,15 @@ unselected; statistical variance-estimation risk and detector ranking loss must 
 | C5 chi-square variance gate | Low; classical test; StatAvg closest IDS prior | −0.0046 → −0.0014 | 2/9 → 5/9 positive device means; worst −0.0249/−0.0134 | Borrows 76.3% → 69.3% of features | Uses peer scale on gated features | Exact pivot is invalid for heavy-tailed/dependent support | Unchecked | Miscalibrated test; no non-inferiority evidence |
 | Local MAD scale | Low; established robust statistic | −0.2493 → −0.2287 | No device mean positive at any n | No collaboration; does not recover tails needed here | None | Normal-consistent central spread, not target second moment under skew | Unchecked | Large loss on all devices |
 | Blocked CV predictive-risk scale gate | Low; standard validation/transfer-risk principle | −0.0993 → −0.0125 | 0/9 device means positive at every n | Borrows 14–20% of features but nearly reverts to local-only | Low peer-scale use; dominated by zero-communication local-only at similar AUROC | Proper marginal score, but does not target AUROC under OAS | Unchecked | Loss/metric mismatch and negative device cells |
-| OAS peer diagonal-target mechanism | Narrow/unassessed; OASD/multi-target covariance shrinkage plus 2026 safe multi-source shrinkage are close prior art | Full peer production −0.0074 → +0.0002; fixed-local-intensity target arm −0.0049 → +0.0012 vs exact shared | + on 9/9 vs local; device-level negative cells remain; Gaussian mismatch SD 0.5 reverses the n=30 gain | Peer target benefit decreases with n; peer intensity contributes little | Requires peer marginal scales | Target effect isolated empirically; no new general shrinkage theory | Model-specific; deep detector untested | Could be existing external-target covariance shrinkage applied to IDS |
+| OAS peer diagonal-target mechanism | Narrow/unassessed; OASD/multi-target covariance shrinkage plus 2026 safe multi-source shrinkage are close prior art | Full peer production −0.0074 → +0.0002; fixed-local-intensity target arm −0.0049 → +0.0012 vs exact shared | + on 9/9 vs local; device-level negative cells remain; Gaussian mismatch SD 0.5 reverses the n=30 gain | Peer target benefit decreases with n; peer intensity contributes little | Pooled total SD uses peer mean+variance summaries; robust peer-SD variants use 115 values/device but only tie | Target effect isolated empirically; no new general shrinkage theory | OAS mechanism is Gaussian-specific; scale-only AE smoke POC nearly ties shared, 2 seeds only | Could be existing external-target covariance shrinkage applied to IDS |
+| C9 iid risk-optimal local/peer variance blend | Standard random-effects/MSE shrinkage; no new general estimator claim | −0.0849 → −0.0112 vs shared | No device mean positive; near local-only | Peer weight 5.2% → 0.8%, naturally fades but starts too low | Local fourth moment + peer per-feature variance estimates | MSE-optimal only under independent unbiased estimates; observed window risk is 4–33× iid plug-in due chronology | Scale-only idea could feed AE; not tested yet | Temporal dependence breaks risk estimate; AUROC loss mismatch |
+| C10 peer-block variance-risk blend | Random-effects partial pooling with dependent-window risk proxy; bootstrap literature is adjacent | −0.0010 → −0.00004 vs shared; n=300 −0.00845 | Negative cells 30–55% by support; worst device −0.0264 | Peer weight 53% → 30% from n=30 to 1000 | Peer block means/risks, about 2d/device | Conditional linear-MSE derivation; risk proxy assumes target-peer temporal comparability | Scale-only interface could feed AE; C10 itself untested | Near-average tie can hide target-specific negative transfer; no safe bound |
+| C11 C10 with moment-estimated target mismatch penalty | Plug-in excess-discrepancy penalty; standard risk estimation | Slightly below C10 at every n | Negative-cell fraction rises vs C10 | Weight 49% → 27%, but does not protect devices | No additional peer payload | Identity-based estimate of squared bias; noisy at feature level | Not evaluated on AE | Penalizes peer use without finding harmful cells |
 
-Current strongest candidate: **none selected**. The peer diagonal-target mechanism is the leading
-mechanistic hypothesis, pending safe-mismatch tests and hostile prior-art audit; it nearly ties but does not beat shared-marginals consistently. The
+Current strongest candidate to investigate: **C10**, the peer-block variance-risk blend; it is not
+selected as the final algorithm. C8 remains the clearest Gaussian mechanism result. Robust peer-SD
+sharing is a lower-communication near-tie, and local-center/peer-scale has a two-seed AE smoke result.
+No method consistently beats shared-marginals or has a negative-transfer guarantee. The
 protocol remains unlocked, and no confirmatory campaign has started.
 
 ## Bar to beat

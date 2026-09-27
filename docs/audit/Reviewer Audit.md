@@ -1,8 +1,8 @@
-# Reviewer audit
+# Reviewer audit (retired candidate: cross-schema transfer and sparse-QAP)
 
-Statuses are audit dispositions, not claims that experiments have passed. The canonical row-by-row implementation checklist remains [Audit Matrix](../Audit%20Matrix.md).
+The active FedORBIT study is the cold-start information-channel decomposition defined in `docs/FedORBIT_Roadmap.md`; its reviewer objections and answers are in that document's section 10. Everything below concerns the retired cross-schema transfer and sparse-QAP candidate and is retained as historical audit reasoning; it does not describe the active study. Statuses are audit dispositions from that retired-candidate audit, not claims that experiments have passed. The canonical row-by-row implementation checklist for that retired candidate remains [Audit Matrix](../Audit%20Matrix.md).
 
-**Current scope decision:** no publishable study is currently selected. Controlled synthetic optimization remains conditional on novelty and a defensible application; ToN integrity remains conditional on prior-work overlap, exact release/key crosswalk, conflict-specific impact, and a valid evaluation split. All real-data applications are deferred. Legacy registered runs are exploratory/diagnostic and do not establish evidence for this candidate. The current coupling executor still lacks independent generated-instance replication and candidate-specific synthesis.
+**Scope decision on the retired candidate:** no publishable study was selected from it. Controlled synthetic optimization remained conditional on novelty and a defensible application; ToN integrity remained conditional on prior-work overlap, exact release/key crosswalk, conflict-specific impact, and a valid evaluation split. All real-data applications were deferred. Legacy registered runs were exploratory/diagnostic and did not establish evidence for this candidate. The coupling executor described below lacked independent generated-instance replication and candidate-specific synthesis.
 
 | Likely reviewer objection | Status | Cheapest strong response / evidence |
 | --- | --- | --- |

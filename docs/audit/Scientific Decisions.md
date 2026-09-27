@@ -1,6 +1,6 @@
 # Scientific decisions
 
-The row-level implementation checklist remains [the canonical Audit Matrix](../Audit%20Matrix.md). This document records the scientific interpretation and redesign decisions that matrix cannot make.
+The active FedORBIT study is the cold-start information-channel decomposition defined in `docs/FedORBIT_Roadmap.md` and selected under "Selected study" below; its confirmatory evidence is in `outputs/analysis.json` and `results/`. The row-level implementation checklist for the retired candidates discussed in most of this document remains [the canonical Audit Matrix](../Audit%20Matrix.md). This document records the scientific interpretation and redesign decisions that matrix cannot make.
 
 ## Reconstructed project and conditional candidate
 

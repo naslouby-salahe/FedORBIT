@@ -60,17 +60,95 @@ skewed benign features; shrinking away natural benign tail traffic damages separ
 MAD as a drop-in repair, not all robust scale methods. The stable POC and raw CSV are
 `pocs/robust_local_scale_poc.py` and `pocs/robust_local_scale_results.csv` (gitignored).
 
-The next design direction is risk measured on held-out benign support rows, feature by feature, rather
-than a Gaussian null test or central-spread substitution. A concrete candidate to evaluate is a
-blocked cross-validated predictive-risk comparison of local vs peer scale, with local centre retained;
-its loss would be held-out Gaussian marginal negative log-likelihood
-`L(v; x, μ)=0.5[log(v)+(x−μ)^2/v]`. For a fixed true centre, expected loss is minimized at the target
-second moment even when the marginal is non-Gaussian, provided it has finite variance. With a fitted
-centre, this becomes prediction-risk calibration and also reflects centre-estimation error. A paired
-fold comparison could give local evidence a direct abstention role and allow collaboration to fade
-when local scale predicts held-out benign support better. Its high variance at n=30 and target
-nonstationarity are unresolved; random folds would leak across adjacent support windows, so blocked
-folds are required. This is a hypothesis for a cheap POC, not a selected method or novelty claim.
+**Blocked predictive-risk scale selection tested and failed against the real bar.** The candidate kept
+the local mean, chose local vs peer scale per feature by comparing the Gaussian marginal negative
+log-likelihood `L(v;x,μ)=0.5[log(v)+(x−μ)^2/v]` on the final third of each contiguous support window,
+and refit the chosen scale on all n rows. It used a fixed true-support time split, stable CRC32 seeds,
+15 paired replicates, 9 devices, and the production Mahalanobis scorer. Mean ΔAUROC vs.
+`shared-marginals` was −0.0993/−0.0564/−0.0284/−0.0125 for n=30/100/300/1000; no device-mean delta
+was positive at any support size, and the worst device means were −0.2002/−0.2025/−0.1573/−0.0667.
+It borrowed only 19.9%/15.2%/18.6%/14.4% of features. Against local-standardised, mean delta was
++0.0017/−0.0011/+0.0004/+0.0002, with no consistent device benefit. Thus this selector nearly
+reverts to local-only and is dominated by local-only on the communication axis; it does not explain
+the fixed-peer-scale AUROC gain. The normal score is proper for second-moment prediction with a fixed
+centre, but that estimation loss is not a surrogate for attack/benign AUROC under OAS regularization.
+Failure points to a more basic mechanism question: what does “scale” control in the actual scorer?
+
+**New mathematical mechanism hypothesis: the scale chooses the OAS diagonal shrinkage target.** Let
+`S=(X−μ)^T(X−μ)/n` in raw feature units, `D=diag(s_1,…,s_d)` be the chosen normalizer, and
+`C=D⁻¹ S D⁻¹` be the standardized second moment. The production scorer shrinks
+`C_OAS=(1−λ)C + λ tr(C)/d I`. In raw units this is exactly
+`S_OAS(D) = D C_OAS D = (1−λ)S + λ [tr(D⁻¹ S D⁻¹)/d] D²`.
+Therefore, when λ>0, choosing local vs peer scales changes an anisotropic diagonal regularization
+target (and also changes λ); it is not just replacing a noisy estimate of the target's marginal
+variance. If λ=0, the raw Mahalanobis score is invariant to D. This directly links the observed scale
+effect to covariance regularization under d=115 and n as low as 30. I independently reconstructed
+the raw-space OAS covariance for Danmini n=30 and reproduced production scores to max relative errors
+3.5e−15 (local D) and 1.1e−14 (peer D). This is an exact algebraic identity and targeted numerical
+check, not yet evidence that the diagonal-target change causes the AUROC gain.
+
+**Factorial OAS target/intensity mechanism POC completed and paired to the exact baseline.** The
+factorial used stable CRC32 windows, 15 replicates × 4 supports × 9 devices (540 cells), local means,
+raw sample second moments, and the production Mahalanobis scorer. A separate run recomputed
+`shared-marginals` on the exact same windows; the peer-production endpoint reproduces its
+local-mean/peer-scale score to AUROC error ≤3.34e−16. Holding local OAS intensity and trace factor
+fixed while changing only the diagonal target from local to peer marginals gives mean AUROC gains
+against local production of +0.0799/+0.0451/+0.0273/+0.0124 at n=30/100/300/1000, positive on all
+9 device means at every n. Changing only OAS intensity while holding the local target fixed changes
+mean AUROC by +0.00012/−0.00011/−0.00034/−0.00014 against local production. Thus the diagonal target,
+not the OAS intensity, drives the measured improvement over local-only.
+
+The comparison to the registered bar is much tighter. Full peer-scale production is −0.00736/−0.00151/
+−0.00448/+0.00016 mean AUROC against exact same-window `shared-marginals` for n=30/100/300/1000;
+only 4/9 device means are positive at n=30, 2/9 at n=100 and n=300, and 4/9 at n=1000. The peer
+diagonal target with local intensity and trace factor is −0.00490/+0.00065/−0.00468/+0.00121 against
+shared; positive device means are 5/9, 5/9, 3/9, and 6/9. Worst device-mean deltas for that arm are
+−0.03234/−0.00372/−0.02343/−0.00121. It nearly matches the bar on average but is not uniformly safe
+and has no material, consistent advantage over the stronger two-summary baseline. Production local
+OAS trails shared by −0.08484/−0.04450/−0.03196/−0.01117. Across all 540 cells, reconstructed
+raw-space covariance scores match production with max relative error 8.11e−11. This supports a
+mechanism claim against local-only; it does not select C8 over shared-marginals or establish a new
+estimator. Raw rows are in the gitignored `pocs/oas_scale_target_decomposition.csv` and
+`pocs/oas_same_window_shared_baseline.csv`.
+
+**Controlled synthetic partner-mismatch stress test completed.** A separate 600-cell Gaussian simulation
+(80 features, 30 paired replicates, n=30/100/300/1000) held the target covariance fixed and varied
+feature-wise peer log-scale error `δ_j ~ N(0, q²)`, with q=0, 0.1, 0.25, 0.5, 1.0. Peer-target
+OAS uses local support mean and peer diagonal target; local OAS is the comparator. Even with a perfect
+peer diagonal (q=0), the average AUROC gain was small (+0.0068 at n=30, +0.0032 at n=100, and around
+zero for n≥300), with mixed replicate signs. At q=0.5, mean deltas were −0.0093/−0.0094/−0.0008/−0.0020;
+at q=1.0 they were −0.0214/−0.0158/−0.0146/−0.0094. Thus target mismatch can reverse the modest
+small-sample benefit, and its harm grows with mismatch. This simulation is intentionally stylized and
+cannot establish a real-data threshold or support safe deployment; it reinforces that C8 has no
+negative-transfer safeguard. Script and CSV are gitignored at
+`pocs/oas_peer_target_mismatch_synthetic.py` and
+`pocs/oas_peer_target_mismatch_synthetic.csv`.
+
+**Novelty became more constrained after tracing the estimator family.** The OASD paper (IMF WP
+23/257, 2023) already derives Oracle Approximating Shrinkage toward `diag(S)` rather than OAS's
+scaled identity and targets high-dimensional inverse-covariance quality for `p>n`. Gray et al.'s
+multi-target shrinkage estimator explicitly uses several covariance target matrices, with Bayesian
+weights and multiple external-source targets; Oriol (2024) derives a general multi-target linear
+shrinkage estimator. FedORBIT's possible difference is replacing `diag(S)` with a held-out peer
+population's diagonal target inside a benign-only anomaly detector on a new device. This is a narrow
+application/setup distinction, not a new general shrinkage estimator, and needs a direct novelty
+comparison. Primary sources: [OASD, IMF WP/23/257](https://www.imf.org/-/media/Files/Publications/WP/2023/English/wpiea2023257-print-pdf.ashx),
+[multi-target shrinkage (Gray et al.)](https://arxiv.org/abs/1809.08024), and
+[multi-target linear shrinkage (Oriol, 2024)](https://arxiv.org/abs/2405.20086). A just-updated
+2026 preprint (Jing et al., arXiv:2606.30615v2, 2026-09-21) is directly relevant to the safe-transfer
+agenda: it shrinks a target estimator toward source-specific estimates using estimator covariance,
+selects step sizes within a finite-sample risk-improving interval, and adds sources sequentially by
+priority rather than pooling them first. It extends the approach to smooth M-estimation. Its exact
+setting is not feature-scale OAS for anomaly detection, but it preempts a broad claim to new,
+tuning-free, risk-safe, covariance-aware, multi-source collaboration. Any next source-weighting rule
+must either instantiate its theory in this detector with a defensible OAS/AUROC loss, or explain a
+precise mathematical difference. [Full equations, v2](https://arxiv.org/html/2606.30615).
+
+Next: derive and test a covariance-risk or ranking-risk rule that can detect mismatched peer diagonal
+targets before borrowing; evaluate a principled mismatch detector against shared-marginals under real hostile partner subsets,
+support dependence, heavy tails, and additional covariance structures; the toy Gaussian stress test
+shows a clear reason not to treat a fixed peer target as safe. The candidate remains
+unselected; statistical variance-estimation risk and detector ranking loss must not be conflated.
 
 ## Live candidate ledger — no winner selected
 
@@ -81,11 +159,12 @@ folds are required. This is a hypothesis for a cheap POC, not a selected method 
 | C4 dimension-anchored log-scale blend | Low; conventional shrinkage | −0.0667 → −0.0104 | 1/9 positive at n=30; 0/9 thereafter | Smooth n response but still loses | Partner scale only | Heuristic pseudo-count d does not account for target mismatch | Unchecked | Dimension anchor does not establish risk optimality |
 | C5 chi-square variance gate | Low; classical test; StatAvg closest IDS prior | −0.0046 → −0.0014 | 2/9 → 5/9 positive device means; worst −0.0249/−0.0134 | Borrows 76.3% → 69.3% of features | Uses peer scale on gated features | Exact pivot is invalid for heavy-tailed/dependent support | Unchecked | Miscalibrated test; no non-inferiority evidence |
 | Local MAD scale | Low; established robust statistic | −0.2493 → −0.2287 | No device mean positive at any n | No collaboration; does not recover tails needed here | None | Normal-consistent central spread, not target second moment under skew | Unchecked | Large loss on all devices |
-| Blocked CV predictive-risk scale gate | Not assessed; untested | Not run | Not run | Hypothesized borrowing fades when local predictive risk wins | Hypothesized feature subset only | Proper Gaussian marginal score for second-moment prediction with fixed centre | Unchecked | Validation noise, temporal drift, and overlap with method development |
+| Blocked CV predictive-risk scale gate | Low; standard validation/transfer-risk principle | −0.0993 → −0.0125 | 0/9 device means positive at every n | Borrows 14–20% of features but nearly reverts to local-only | Low peer-scale use; dominated by zero-communication local-only at similar AUROC | Proper marginal score, but does not target AUROC under OAS | Unchecked | Loss/metric mismatch and negative device cells |
+| OAS peer diagonal-target mechanism | Narrow/unassessed; OASD/multi-target covariance shrinkage plus 2026 safe multi-source shrinkage are close prior art | Full peer production −0.0074 → +0.0002; fixed-local-intensity target arm −0.0049 → +0.0012 vs exact shared | + on 9/9 vs local; device-level negative cells remain; Gaussian mismatch SD 0.5 reverses the n=30 gain | Peer target benefit decreases with n; peer intensity contributes little | Requires peer marginal scales | Target effect isolated empirically; no new general shrinkage theory | Model-specific; deep detector untested | Could be existing external-target covariance shrinkage applied to IDS |
 
-Current strongest candidate: **none**. The blocked predictive-risk comparison is the next exploratory
-experiment, not a chosen algorithm. The protocol remains unlocked, and no confirmatory campaign has
-started.
+Current strongest candidate: **none selected**. The peer diagonal-target mechanism is the leading
+mechanistic hypothesis, pending safe-mismatch tests and hostile prior-art audit; it nearly ties but does not beat shared-marginals consistently. The
+protocol remains unlocked, and no confirmatory campaign has started.
 
 ## Bar to beat
 
@@ -138,12 +217,10 @@ amount (e.g. Ennio n=1000 +0.0011, Samsung n=30 +0.0001); one cell is clearly wo
 shared-marginals**, not a confirmed win — the POC has no significance test and 15 replicates is not the
 registered study's 30 — but it is the only candidate of four tested that came close.
 
-**Prior argument (now rejected as a novelty/safety claim).** It shares strictly less
-information than `shared-marginals` (never uses partner mean at all, and only uses partner variance for
-the subset of features flagged as locally unreliable — a materially smaller external-information
-footprint), it is per-feature and per-window adaptive rather than a device-level channel switch, and its
-escalation criterion is a textbook, pre-specifiable hypothesis test rather than a hand-tuned threshold or
-partner-similarity heuristic.
+**Prior argument (historical, now rejected as a novelty/safety claim).** The gate used less
+information than `shared-marginals` and was per-feature/per-window adaptive, but its classical test is
+not a novelty and its Gaussian calibration fails on heavy-tailed support data. These properties do not
+rescue it as a safe candidate.
 
 ## Why the gate is not a final candidate at this point
 

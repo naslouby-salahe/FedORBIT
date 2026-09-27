@@ -26,6 +26,19 @@ fedorbit report [--overwrite]
 
 Experiments: `cold-start-ladder`, `partner-selection`, `deep-detector`, `simulated-boundary`. `report` writes tables and figures under `results/` only from valid persisted evidence.
 
+## Experiment runtimes
+
+Measured wall-clock duration of each confirmatory run, from the `elapsed` value each experiment logs on completion, on a 10-core CPU with one CUDA GPU:
+
+| Experiment | Purpose | Measured runtime |
+| --- | --- | --- |
+| `cold-start-ladder` | primary dose-response and covariance comparison, 9 N-BaIoT devices, Gaussian detector | ≈3h 20m |
+| `partner-selection` | deployable-versus-oracle partner selection, 9 N-BaIoT devices, Gaussian detector | ≈1h 34m |
+| `deep-detector` | autoencoder replication of the channel ordering, 9 N-BaIoT devices, requires CUDA | ≈20 min |
+| `simulated-boundary` | descriptive boundary check on the 2 eligible Gotham devices, Gaussian detector | ≈4 s |
+
+The two Gaussian experiments above ran concurrently with each other and with `deep-detector`, so wall-clock time reflects CPU contention between them rather than isolated cost. `fedorbit smoke` runs a reduced version of `cold-start-ladder` on 2 synthetic devices and completes in under a minute.
+
 ## Reproducibility
 
 Every artifact has a manifest with payload digest, provenance (configuration digest, source digest, input digests) and code revision. Valid artifacts are reused; changed configuration, code or inputs mark dependent artifacts stale; corrupted or partial artifacts are rejected. All writes are atomic. Every stochastic step derives its seed from one configured base seed.

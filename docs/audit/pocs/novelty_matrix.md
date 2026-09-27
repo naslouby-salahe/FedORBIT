@@ -57,7 +57,7 @@ Scope: algorithm search through 2026-09-27. Baseline to beat is `shared-marginal
 - Plain mean/variance sharing with no adaptive mechanism — this is exactly the existing `shared-marginals` baseline; the bar to beat, not a candidate.
 - Vanilla empirical Bayes with no new mechanism — tested as Candidate 1 below; found to fail for a diagnosable, mechanism-specific reason (see POC Results).
 
-## Candidates tested (real POCs against `outputs/prepared/nbaiot`, see `POC Results.md` in this directory)
+## Candidates tested (paired real POCs and/or controlled synthetic POCs; see checkpoint for conditions and detail)
 
 | ID | Mechanism | Family | Status |
 |---|---|---|---|
@@ -73,6 +73,8 @@ Scope: algorithm search through 2026-09-27. Baseline to beat is `shared-marginal
 | C10 | Peer-block variance-risk blend with support-dependent peer window risk | Random-effects shrinkage plus dependent-data risk estimation | Paired POC nearly ties shared on average but retains negative device cells; controlled stable-target/switching-peer regime mismatch yields 1.48–1.60× oracle variance MSE |
 | C11 | C10 plus moment-estimated target-discrepancy penalty | Plug-in excess-discrepancy risk estimate | Rejected extension: slightly below C10 at every n; reduced peer weight but increased negative cells |
 | C12 | Median peer block variance with MAD-based between-peer risk | Robust aggregation / random-effects risk blend | Not selected: scalar contamination MSE improved; paired AUROC vs shared −0.0015/−0.0039/−0.0080/−0.0004; also 1.18–1.56× oracle MSE in stable-target/regime-switching-peer stress |
+| C13 | C10 with empirical maximum peer-window discrepancy penalty | Bounded-bias minimax shrinkage | Synthetic only: mostly local-like across homogeneous/heterogeneous/outlier cases; does not consistently beat C10/C12 under regime mismatch; empirical envelope is not a valid finite-sample bias bound |
+| C14 | BIC-selected mixture prior over peer block variances, updated with local variance | Empirical Bayes mixture shrinkage | Synthetic only: helps stable-target/switching-peer MSE at n≤100 but reverses at n≥300 and under ordinary heterogeneity; no AUROC result; not selected |
 
 ## Current novelty status
 

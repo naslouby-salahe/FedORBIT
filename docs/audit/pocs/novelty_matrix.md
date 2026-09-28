@@ -83,6 +83,7 @@ Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginal
 | C17 diagnostic | Satterthwaite moment matching of the centered Gaussian AR(1) sample-variance quadratic form | Standard Gaussian quadratic-form approximation; calibration aid only | Improves log-noise approximation (at ρ=.7/block20: .298 vs empirical .241, old C15 .407) but still overstates high-ρ noise and does not handle switching blocks; no transfer-risk or AUROC result |
 | C18 diagnostic | Plug C17's estimated AR(1) coefficient into the Satterthwaite noise correction | Parametric dependence calibration | With 8×4,000 peer rows, rho estimates were precise (mean error <.0005), but this did not remove high-rho approximation error; no transfer-risk or AUROC result |
 | C19 diagnostic | Lognormal moment matching from exact first two Gaussian AR(1) sample-variance quadratic-form moments | Standard moment-matching approximation; Zhang et al. (2020) establish extensive prior art on Gaussian quadratic-form approximations | On nine known-AR cells, mean absolute log-noise error .0203 (max .0532), vs 1.046 for C15; no switching, transfer-risk, or AUROC result |
+| C20 oracle-prior diagnostic | Posterior mean under a known two-point peer-regime prior and C19 local likelihood | Standard two-point empirical Bayes; oracle knows modes and weights | MSE .089 vs local 1.503 at n=30 when target matches modes, but 4.16–6.01 vs local .53–.02 for unseen intermediate target variance; no AUROC result; proves target-support mismatch risk |
 
 ## Current novelty status
 

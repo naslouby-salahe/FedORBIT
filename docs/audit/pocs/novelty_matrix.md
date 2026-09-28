@@ -1,6 +1,6 @@
 # Novelty matrix: candidate FedORBIT cold-start collaboration mechanisms vs. closest prior art
 
-Scope: algorithm search through 2026-09-27. Baseline to beat is `shared-marginals` (fixed, 100% partner replacement of local mean/std), not local-only. This is the sole live novelty matrix; the durable checkpoint summarizes the current conclusions.
+Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginals` (fixed, 100% partner replacement of local mean/std), not local-only. This is the sole live novelty matrix; the durable checkpoint summarizes the current conclusions.
 
 ## Closest prior art found (real sources, access level noted)
 
@@ -75,6 +75,7 @@ Scope: algorithm search through 2026-09-27. Baseline to beat is `shared-marginal
 | C12 | Median peer block variance with MAD-based between-peer risk | Robust aggregation / random-effects risk blend | Not selected: scalar contamination MSE improved; paired AUROC vs shared −0.0015/−0.0039/−0.0080/−0.0004; also 1.18–1.56× oracle MSE in stable-target/regime-switching-peer stress |
 | C13 | C10 with empirical maximum peer-window discrepancy penalty | Bounded-bias minimax shrinkage | Synthetic only: mostly local-like across homogeneous/heterogeneous/outlier cases; does not consistently beat C10/C12 under regime mismatch; empirical envelope is not a valid finite-sample bias bound |
 | C14 | BIC-selected mixture prior over peer block variances, updated with local variance | Empirical Bayes mixture shrinkage | Synthetic only: helps stable-target/switching-peer MSE at n≤100 but reverses at n≥300 and under ordinary heterogeneity; no AUROC result; not selected |
+| C15 | Dependence-heuristic short peer blocks, sampling-noise-corrected log-variance mixture, posterior update from local variance | Empirical Bayes with dependence-adjusted measurement noise | Failed diagnostic: selected one component throughout the 16-cell sweep because regime persistence inflated the noise floor; did not recover switching-peer regimes and was 1.58–1.80× realized-oracle MSE there; no AUROC result |
 
 ## Current novelty status
 
@@ -90,7 +91,7 @@ diagonal as the shrinkage target for a held-out physical IoT device's benign-onl
 This is not yet a novelty claim: exact same-window comparison shows a near tie to the stronger
 shared-marginals baseline, and controlled Gaussian mismatch can reverse the small-sample gain. Robust
 peer-SD aggregation also nearly ties but has no stable advantage; its one-vector summary does lower
-communication. Target-specific negative-transfer behavior on real hostile peer subsets is untested. Dependence-aware block-bootstrap inference is established for high-dimensional weakly dependent series (Zhang & Cheng); it motivates the next risk-estimation direction but does not provide a direct small-n AUROC borrowing rule. C10 also depends on standard dependent-data block-bootstrap ideas; that adjacent literature does not supply its transfer-risk or AUROC claim. A 2026 covariance-aware
+communication. Target-specific negative-transfer behavior on real hostile peer subsets is untested. Dependence-aware block-bootstrap inference is established for high-dimensional weakly dependent series (Zhang & Cheng); it motivates the next risk-estimation direction but does not provide a direct small-n AUROC borrowing rule. Automatic dependence-adaptive block-length selection is also established for dependent bootstrap methods (Politis & White, 2004, [paper](https://public.econ.duke.edu/~ap172/Politis_White_2004.pdf)); C15's rough autocorrelation heuristic is not that estimator. C10 draws on related dependent-data block ideas, while C15 uses a rough autocorrelation heuristic; this literature does not supply either method's transfer-risk or AUROC rule. A 2026 covariance-aware
 multi-source SURE shrinkage preprint is especially relevant to any subsequent safe-transfer rule; its
 source-specific risk updates and finite-sample guarantees must be compared directly. The chi-square gate is not a
 credible novelty/safety claim because its Gaussian pivot is miscalibrated on heavy tails. Blocked

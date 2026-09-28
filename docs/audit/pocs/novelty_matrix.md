@@ -89,6 +89,8 @@ Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginal
 
 | C22 target-only holdout risk selector | Choose between local variance and oracle two-mode posterior by squared error to a later target-only block variance | 2,000-replicate scalar AR screen: reduces intermediate-prior harm but still exceeds first-half local MSE; novel high-variance target incurs harmful borrowing at n=100–1000; uses half the support to fit and contiguous validation is serially dependent | Standard held-out predictive-risk selection; validation loss is noisy under serial dependence and does not certify lower estimation risk; not a candidate |
 
+| C23 AR-bias-corrected target-only holdout selector | Correct local and validation sample variances by exact stationary AR(1) centering factors; select local vs oracle two-mode posterior by later-block squared error | 2,000-replicate scalar screen: correction raises local MSE slightly vs raw variance; on novel-high θ=7.84 selected MSE remains 6.80/3.64/.96 vs raw local 6.47/2.46/.69 at n=100/300/1000; no safe rule | Standard held-out risk selection plus known-model bias correction; oracle ρ/source modes and serially dependent validation; not a candidate |
+
 ## Current novelty status
 
 No algorithm has been selected. StatAvg is the closest IDS prior art and rules out claims to having

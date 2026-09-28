@@ -87,6 +87,8 @@ Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginal
 | C20 oracle-prior diagnostic | Posterior mean under a known two-point peer-regime prior and C19 local likelihood | Standard two-point empirical Bayes; oracle knows modes and weights | MSE .014 vs local 1.587 at n=30 when target matches modes, but 4.13–6.01 vs local .55–.02 for unseen intermediate target variance; no AUROC result; proves target-support mismatch risk |
 | C21 oracle predictive-compatibility gate | Fall back to local scale when an oracle peer-mixture predictive p-value is below α | At α=.05, rejects matched targets 3.6–6.0% and outside targets .438/.938/1/1 as n grows; outside-target risk remains 3.34/.52 at n=30/100 vs local .55/.19; threshold curve has no derived no-harm rule | General conformal exchangeability testing for source-transfer decisions is direct prior art (Zhou et al., 2017); this oracle parametric gate is not safe and is not a candidate |
 
+| C22 target-only holdout risk selector | Choose between local variance and oracle two-mode posterior by squared error to a later target-only block variance | 2,000-replicate scalar AR screen: reduces intermediate-prior harm but still exceeds first-half local MSE; novel high-variance target incurs harmful borrowing at n=100–1000; uses half the support to fit and contiguous validation is serially dependent | Standard held-out predictive-risk selection; validation loss is noisy under serial dependence and does not certify lower estimation risk; not a candidate |
+
 ## Current novelty status
 
 No algorithm has been selected. StatAvg is the closest IDS prior art and rules out claims to having

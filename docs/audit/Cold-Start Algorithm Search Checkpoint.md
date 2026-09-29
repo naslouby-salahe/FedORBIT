@@ -701,3 +701,57 @@ it handles a different unit/independence model but preempts generic sparse-thres
 Accordingly C51 is a negative diagnostic, not a FedORBIT candidate or novelty claim. Continue to a
 dependency-aware threat score or a different target estimand; do not tune k on these attack labels or
 promote this diagonal score family.
+
+## C52–C53 — precision-adjusted sparse score helps one synthetic threat, then loses on real pooled attacks
+
+C51's diagonal score failure suggested separating correlation handling from sparsity. The ignored
+`pocs/covariance_aware_sparse_score_poc.py/.csv` tests the one-coordinate Gaussian score/GLR statistic
+`S₁(x)=max_j ((Ωr)_j²/Ω_jj)`, where `r` is the support-centered, feature-scaled observation and `Ω`
+is the OAS precision fitted to the same benign support under local, peer-scale/local-center, or full
+shared normalization. For fixed known Gaussian covariance this is the maximum one-coordinate mean
+shift likelihood-ratio score. C52 uses 64 correlated features, eight peer summaries of 2,000 rows,
+four support sizes, four mismatch/contamination populations, 40 paired draws/cell, and 800 benign and
+attack evaluation observations per threat. It compares this score with production OAS on the same
+test draws and includes one-feature ±1-SD and six-feature ±0.8-SD mean shifts, six-feature 4×
+variance, and two dense perturbations.
+
+The result is threat-conditional. On six-feature variance inflation, shared-normalized `S₁` exceeds
+shared OAS by mean AUROC +.0128 (80.3% paired wins, 10th percentile −.0045), and local-center/
+peer-scale `S₁` gains +.0110 (78.6% wins, 10th percentile −.0055); both have positive mean deltas
+in all 16 scenario/support cells. Full shared OAS mean AUROC is .8108 for this threat. Under a
+one-feature mean shift, local-center/peer-scale `S₁` loses .0052 on average (35.6% wins); for six-
+feature mean shifts it loses .0322 (5.2% wins). Dense mean and variance losses are .0306 and .0951.
+The local OAS score is near shared for sparse mean but loses .0035 on sparse variance. Thus the
+precision-adjusted statistic repairs C51's synthetic sparse-variance weakness, but it is not a
+general sparse threat score and the gain comes from a specified score/attack match.
+
+The direct hostile prior is Zhang, “Testing High Dimensional Mean Under Sparsity” (arXiv:1509.08444,
+version dated 2026-03-22). For a Gaussian sample with precision `Γ`, it derives the maximum
+subset likelihood-ratio statistic `LR_n(k)=n max_|S|=k Z_Sᵀ Γ_SS⁻¹ Z_S`, with a feasible
+dependence-aware diagonal approximation `T_n(k)=n max_|S|=k Z_Sᵀ diag(Γ_SS)⁻¹ Z_S`; at k=1 this
+reduces to `n max_j Z_j²/Γ_jj`, where `Z=Γ X̄`. It also proposes choosing k with a standardized
+maximum across k and simulation-based null calibration. C52's one-observation detector use is a
+different application, but the score mechanism itself is direct prior art; no novelty claim remains.
+The full equations were inspected, including the assumptions for feasible precision estimation.
+
+Because the synthetic gain was paired, consistent, and used a featurewise transfer interface, C53
+screened the rule across all nine physical N-BaIoT devices before dismissing it. The ignored
+`pocs/covariance_aware_sparse_nbaiot_poc.py/.csv` uses 15 paired contiguous support windows at each
+n=30/100/300/1000, fixed shared held-out subsets of up to 5,000 benign and 5,000 attack rows per
+device, and production `scorer_from_rows`. It compares full shared OAS, local OAS, local-center/
+median-peer-scale OAS, and each corresponding precision-max score. Across the pooled held-out attack
+mixture, the median-peer-scale OAS ΔAUROC vs shared is −.0168/−.0030/−.0002/−.0012; its paired
+window win shares are 50.4%/51.1%/57.0%/68.9%, but only 3/9, 3/9, 2/9, and 5/9 device means are
+positive, with worst device means −.0527/−.0131/−.0023/−.0173. The precision-max peer-scale score
+loses by −.0114/−.0112/−.0121/−.0190, wins only 17.8%/15.6%/11.1%/14.1% of paired windows, and
+has no positive device-mean at any support size (worst device −.0401/−.0293/−.0262/−.0571). Its
+full-shared counterpart gains a negligible +.0018 at n=30, then loses −.0073/−.0122/−.0201 as n
+increases. Mean full-shared OAS AUROC is already .9783/.9826/.9916/.9942, so ceiling limits some
+headroom, but the peer-scale max-score regressions at n≥100 remain material.
+
+C52–C53 therefore identify a valid but established score test with one narrow synthetic operating
+regime, followed by negative real-device evidence. This is not the missing general FedORBIT algorithm.
+The formula offers O(d) scoring after a precision fit, but C53 shows no detection or device-safety
+advantage; the peer-scale message payload was not separately benchmarked here. Leave the score as a
+threat-specific diagnostic. Continue on another estimand or collaboration-risk object, with a
+different prior-art search before another detector-score variant; protocol remains unlocked.

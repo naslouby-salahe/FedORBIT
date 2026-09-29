@@ -817,7 +817,7 @@ explicitly bounded estimand and derive its observable information requirements b
 attacks; repeating moment interpolation, similarity weights, or a benign likelihood selector would
 revisit established or already-failed designs.
 
-**Current single novelty matrix (updated through C55).** “FedORBIT explored family” denotes the
+**Current single novelty matrix (updated through C57).** “FedORBIT explored family” denotes the
 tested local/shared/peer scale estimators and their benign-only selectors, not a surviving algorithm.
 
 | Dimension | FedORBIT explored family | Closest prior methods | Remaining distinction / status |
@@ -833,4 +833,50 @@ tested local/shared/peer scale estimators and their benign-only selectors, not a
 | Closed form / optimization | Mostly closed-form shrinkage; CV and threat selectors tested | PN constrained optimization; FedFD-A learned adapter; Jing SURE step size | Any new rule must show an exact estimand and a genuinely different risk derivation |
 | Theoretical basis | Conditional MSE algebra for scale estimates; no AUROC guarantee | Classical empirical Bayes/shrinkage; Jing safe interval under Gaussian summary loss | Existing theory does not transfer automatically to serial benign support or AUROC |
 | IoT anomaly setting | N-BaIoT physical devices, with chronology/stability limits | Closest methods use vision or supervised regression | Setting-specific empirical evidence only; no eligible second physical population |
-| Main mathematical difference | Target raw-feature benign estimator plus OAS anomaly-ranking objective | Learned/interpolated hidden-layer BN moments or supervised coefficient transfer | Possible narrow distinction, currently unsupported empirically and not independently confirmed |
+| Main mathematical difference | Target raw-feature benign estimator plus OAS anomaly-ranking objective | Learned/interpolated hidden-layer BN moments or supervised coefficient transfer | Possible narrow distinction; C56–C57 show an exploratory low-FPR crossover but no reliable device-level or independent confirmation |
+
+## C56–C57 — low-FPR partial AUC reveals a narrow n=1000 crossover, not a safe winner
+
+C56 changes the evaluation objective rather than the estimator. The ignored POC
+`pocs/low_fpr_sparse_nbaiot_poc.py/.csv` reuses C53's exact nine physical devices, 15 paired
+chronological support starts at n=30/100/300/1000, deterministic per-device benign/attack test
+subsets of up to 5,000 rows, and all six C53 production OAS/precision-max scores. It adds
+standardized partial AUROC capped at 1% and 5% FPR plus interpolated TPR at those FPR points. The
+peer-scale candidate is still local-center/median-peer-scale OAS; the fixed comparator is full
+shared OAS. The test-benign ROC operating points are descriptive ranking diagnostics, not a
+deployment threshold or calibration guarantee.
+
+The objective changes the n=1000 comparison: shared OAS has mean full AUROC .9942, standardized
+pAUC(.01) .8905, pAUC(.05) .9532, interpolated TPR@1% .8870, and TPR@5% .9616. Local-center/
+median-peer-scale OAS has .9931, .8999, .9566, .8986, and .9742 respectively. Its paired mean
+deltas are −.00117, +.00939, +.00337, +.01161, and +.01263; standardized-pAUC window win shares are
+70.4%/69.6%, while interpolated TPR window win shares are only 21.5%/6.7% because the empirical
+benign quantiles yield many ties. Across the nine device means, pAUC(.01) is positive on 6/9 and
+pAUC(.05) on 4/9; TPR@1% is positive on 2/9. Paired 95% t intervals across the nine device means
+are [−.00364,.02242] for pAUC(.01), [−.00352,.01026] for pAUC(.05), and [−.01880,.04202] for
+TPR@1%. This is a plausible low-FPR crossover against a saturated full-AUROC baseline, but not
+device-level evidence of a reliable advantage. At n≤300, peer-scale OAS pAUC(.01) deltas are
+−.00602/−.00455/−.00233, so the effect also does not appear as a general cold-start gain.
+
+C57 (`pocs/low_fpr_nbaiot_family_poc.py/.csv`) checks whether the n=1000 partial-AUC crossover is
+specific to Gafgyt or Mirai. It reconstructs labels from raw attack files using C54's configured
+sampling seeds and verifies exact equality with prepared `test_attack`, then evaluates the same
+paired support/test indices. At n=1000, local-center/peer-scale OAS has mean pAUC(.01) deltas
++.01080 for Gafgyt (6/9 positive device means; 95% device-level t interval [−.00100,.02260]) and
++.00352 for Mirai (3/7; [−.01303,.02007]). At the 5% cap, Gafgyt is +.00446 (5/9) but Mirai is
+−.00234 (1/7); Mirai's seven-device t interval is [−.00439,−.00029]. Gafgyt/Mirai full-AUROC
+deltas remain +.00077/−.00499, with only 5/9 and 1/7 positive device means respectively. Two devices
+have no eligible Mirai rows, so that family result covers seven devices. This points to a threat-
+family and operating-region interaction rather than a generally better score. Neither family has
+positive 1%-cap device-level evidence with an interval excluding zero.
+
+The sparse precision-max scores remain far below shared OAS on these partial-AUC metrics, so the
+C52 score mechanism does not re-enter consideration. C56–C57 suggest that local-center/peer-scale
+OAS may trade a tiny full-AUROC loss for a low-FPR ranking gain at n=1000, particularly for Gafgyt;
+the evidence is exploratory, attack-family-specific, uses the same attack-exposed devices that
+informed method development, and has no untouched confirmation population. Keep the existing
+candidate disposition unchanged. A follow-up is justified only if a predeclared low-FPR operating
+region becomes the actual study estimand and an independent physical-device confirmation cohort is
+available; do not tune support sizes or operating regions to these observed crossovers. The
+chronological test FPR instability from C38–C40 also means partial-AUC improvement cannot be
+translated into a prospective 1% or 5% false-alarm guarantee.

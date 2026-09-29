@@ -662,3 +662,42 @@ refine its Monte Carlo selector as if it were the missing algorithm. Continue th
 different estimand or object—for example, featurewise score-preserving calibration or threat-
 structured detector robustness—with a concrete mechanism and a hostile prior-art comparison before
 claiming improvement. No confirmation protocol is locked.
+
+## C51 — diagonal top-k residual scores lose to shared OAS in sparse and dense screens
+
+The ignored `pocs/sparse_score_geometry_poc.py/.csv` asks whether the negative C49–C50 scale-selection
+result is only a restriction of the OAS ranking loss. It uses the production `scorer_from_rows` for
+local and shared OAS. A predeclared comparison family replaces the quadratic score with the mean of
+the largest k coordinatewise squared standardized residuals, k∈{1,4,8,16,64}; it crosses local or
+shared centers with local, median-peer, or pooled-shared scales. No attack labels choose among scores.
+There are 64 correlated features, eight peer summaries from 2,000 rows, 40 paired repetitions in
+each of four support sizes and four peer/target populations, and shared benign/attack evaluation draws
+for four declared perturbations: six-feature ±0.8-SD mean shifts, six-feature 4× variance, dense
+±0.2-SD mean shifts, and 1.1× dense residual scaling. This is a synthetic mechanism screen, not an
+all-nine-device or confirmatory evaluation.
+
+Shared OAS mean AUROC is .6121/.8101/.5758/.7489 for sparse mean, sparse variance, dense mean, and
+dense variance respectively. OAS using target-local center/scale stays close under mean shifts
+(ΔAUROC −.0010/−.0007 for sparse/dense) but trails by −.0037 for sparse variance and −.0013 for dense
+variance. Every fixed top-k diagonal score has lower mean AUROC than shared OAS in all 16
+scenario/support cell means for sparse mean and both dense families. The strongest predeclared
+featurewise version for sparse mean (top-4, shared center/local scale) still averages −.0519 AUROC,
+wins 1.9% of paired draws, and has 10th-percentile Δ −.0877. For sparse variance the strongest is
+top-1 with shared center/local scale: mean Δ −.0168, wins 17.5%, 10th percentile −.0364. In that
+family, local OAS itself wins only 15.8% of paired draws; no top-k version closes its gap to shared
+OAS. Dense-family top-k results are also substantially below baseline (best mean deltas about
+−.0387/−.0671).
+
+The failure points to loss geometry rather than an obvious benefit from diagonal sparsity: in these
+moderately correlated 64-feature populations, OAS's covariance regularization improves ranking, while
+max/top-k coordinate scores pay a multiple-comparison/noise cost. Borrowing peer or pooled scale does
+not fix the gap; the strongest top-k variants use local scales. No payload/accuracy Pareto benefit is
+shown because the accuracy loss is large. The score family is only a first sparse-aware screen; it
+does not rule out rank-HC, covariance-aware sparse scans, or other dependency-aware detectors. Hostile
+prior art includes Donoho–Jin higher criticism and Stoepker et al.'s 2025 rank-based higher criticism
+across referentials. The latter uses coordinate/referential ranks and the statistic
+`T(R)=max_q (N_q(R)-np_q)/sqrt(np_q(1-p_q))`, with finite-sample null calibration by Monte Carlo;
+it handles a different unit/independence model but preempts generic sparse-threshold aggregation.
+Accordingly C51 is a negative diagnostic, not a FedORBIT candidate or novelty claim. Continue to a
+dependency-aware threat score or a different target estimand; do not tune k on these attack labels or
+promote this diagonal score family.

@@ -188,3 +188,11 @@ ranking gains but negative lower tails and a concrete mismatch failure: zero pee
 collapses the prior variance even when the held-out target shifts. This is adjacent to C1/C9/C12 and
 requires retaining per-peer variances rather than only an aggregate; it supplies neither a novelty
 claim nor a no-harm result.
+
+**C68 confirms the threat-direction limit of peer-correlation shrinkage.** In a paired Gaussian
+factorial with exact target/peer correlation match, 75% peer-correlation targeting at n=30 gains
++.03544 standardized pAUC(.01) for sparse-coordinate mean shifts but loses .00186 for mean shifts
+along the target's leading covariance eigenvector. As peer correlation mismatch grows, the sparse
+benefit approaches zero. This strengthens the mechanism interpretation of C66 but cannot make the
+method novel or safe: target covariance does not encode the attack direction, and peer-correlation
+shrinkage remains within established multi-target covariance estimation.

@@ -1187,3 +1187,37 @@ next investigate a target-specific mismatch model that can distinguish an isolat
 from ordinary between-peer heterogeneity, while preserving low-FPR ranking under a stated threat
 family. Prior work on empirical-Bayes mixture and discrepancy estimators, plus C37/C49/C50/C65, makes
 any benign-only ranking-safety claim especially vulnerable. No protocol is locked.
+
+## C68 — matched peer correlation helps sparse shifts and hurts a different mean-shift direction
+
+The ignored `pocs/peer_correlation_transfer_factorial_poc.py` isolates C66's off-diagonal mechanism.
+It uses 32 features, eight peers with 2,000 benign rows each, target support n=30/100/300/1000, and
+60 paired replications per cell. Target and peer populations have identical unit marginal variances
+and zero centers. Peer correlation is a convex mixture of the target correlation and an unrelated
+factor correlation at mismatch levels 0/.25/.50/.75/1. The same target support, test benign rows,
+and test attack rows compare the OAS identity target with peer-correlation targets at weights
+.25/.50/.75; OAS intensity is held fixed. Two predeclared mean-shift directions are evaluated:
+five sparse coordinate shifts and shifts along the target correlation's leading eigenvector. This
+is a controlled Gaussian mechanism screen, not a general threat set or a weight-selection experiment.
+
+When peer and target correlations match and n=30, weight .75 gains +.05195 AUROC, +.03544
+standardized pAUC(.01), and +.05998 pAUC(.05) over the identity-target OAS for sparse-coordinate
+shifts; all 60 paired draws improve. Under the same target and peer covariance, that candidate loses
+−.01925 AUROC, −.00186 pAUC(.01), and −.00510 pAUC(.05) for the leading-eigenvector shifts; only
+0/60, 12/60, and 1/60 draws improve. At mismatch .50, n=30, and weight .50, sparse-shift gains
+remain (+.01999/+0.01068/+0.02106), while leading-eigenvector shifts lose
+(−.00766/−.00069/−.00212). Across support sizes, sparse-shift AUROC gains shrink from +.0157 at
+zero mismatch to approximately zero or slightly negative at full mismatch; low-FPR gains also
+approach zero. Increasing peer-target weight scales up both the sparse-shift benefit and the
+leading-eigenvector harm. Even exact correlation transfer therefore does not provide attack-family
+no-harm within these two mean-shift families.
+
+C68 supplies a controlled explanation for why peer-correlation borrowing can show strong low-support
+benefit on a particular attack mix, as in C66, while remaining unsafe as a generic anomaly-ranking
+improvement. The mechanism depends on both target-peer correlation alignment and attack direction;
+benign covariance alone does not reveal which direction will dominate. This is a direct instance of
+the C37 ranking-identifiability constraint, not a tuning problem that can be solved by selecting the
+best weight from these two attack families. Multi-target covariance shrinkage remains established
+prior art, and its dense message cost and target correlation rank issues remain. No candidate is
+promoted, no weight selected, and no protocol locked. Continue the search on an algorithm object whose
+benefit can be justified against an explicit operational loss without inspecting attack labels.

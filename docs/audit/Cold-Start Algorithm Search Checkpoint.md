@@ -780,3 +780,57 @@ family under this chronology. Retain C52–C54 as a scoped mechanism diagnostic 
 attempt. The next search should change the objective or collaboration-risk object, not add another
 unvalidated sparse score. Existing temporal FPR calibration and C37 AUROC-identifiability results
 remain constraints; do not treat the move as permission to make an arbitrary-attack safety claim.
+
+## C55 — deep-normalization literature closes broad statistic-sharing compatibility claims
+
+A fresh primary-source pass revisited whether a scale-only collaboration layer could claim general
+deep-detector compatibility or federated normalization as a contribution. It cannot. Population
+Normalization (Wang et al., CVPR 2025) replaces batch-estimated activation moments with trainable
+population mean/scale parameters. Its normalization is
+`(x−μ)/sqrt(γ²+ε)` followed by learned affine parameters; the population constraints set the
+normalized second moment to one and the population mean to `μ`. The `μ,γ` parameters are trained
+alongside model weights locally and aggregated by FedAvg. Its Noisy Population Normalization variant
+perturbs `μ` and `γ` multiplicatively during training to restore stochastic regularization. This is
+close to federated statistics in deep models, but it is learned hidden-layer normalization inside a
+supervised training objective, not a new physical client's raw-input benign estimator or anomaly
+ranking rule. Primary source: [CVPR 2025 paper and official open-access PDF](https://openaccess.thecvf.com/content/CVPR2025/html/Wang_Population_Normalization_for_Federated_Learning_CVPR_2025_paper.html).
+
+FedFD-A (Yang et al., ECCV 2024) is closer to transfer at inference: for every layer it randomly
+interpolates local and global normalization statistics as `μΔ=uμk+(1−u)μG` and
+`σΔ=uσk+(1−u)σG`, with each channel's `u` sampled from `Uniform(0,1)` during feature
+diversification. Its unseen-domain adapter also interpolates instance and global moments,
+`μ*=αμinstance+(1−α)μG` and `σ*=ασinstance+(1−α)σG`, where a learned adapter predicts `α` from
+the instance/global statistic differences. It trains supervised image classifiers and learns
+representations across source domains; it does not select an estimator from target benign-only
+support or control anomaly-ranking transfer risk. Primary source: [ECCV 2024 paper, full text and
+equations](https://arxiv.org/html/2407.08245v1).
+
+These results narrow the novelty boundary further: raw or hidden-layer moment sharing, local/global
+interpolation, stochastic statistic perturbation, and compatibility with neural models are all
+established design patterns. The remaining possible distinction is a specific target-side
+estimand—such as anomaly-ranking or operating-point risk under benign-only onboarding—and a valid
+feature-level decision rule for that estimand. That distinction is still unsupported: C37 rules out
+distribution-free AUROC no-harm, C38–C40 fail prospectively for FPR under chronology shift, and
+C49–C50's attack-prior rules do not beat fixed shared marginals. No candidate or novelty claim is
+promoted by C55, and the confirmation protocol remains unlocked. The next POC must start from a new,
+explicitly bounded estimand and derive its observable information requirements before scoring test
+attacks; repeating moment interpolation, similarity weights, or a benign likelihood selector would
+revisit established or already-failed designs.
+
+**Current single novelty matrix (updated through C55).** “FedORBIT explored family” denotes the
+tested local/shared/peer scale estimators and their benign-only selectors, not a surviving algorithm.
+
+| Dimension | FedORBIT explored family | Closest prior methods | Remaining distinction / status |
+|---|---|---|---|
+| Target problem | Cold-start one-class anomaly ranking on a new IoT device | FedFD-A: unseen-domain supervised image generalization; pFedBBN: federated test-time adaptation | Narrow application/protocol difference only; no demonstrated general method novelty |
+| New/unseen client | Yes, evaluation target excluded from peer summaries | FedFD-A zero-shot domain; pFedBBN unseen/shifted clients; PN global deployable model | New-client setup is established |
+| Benign-only | Target adaptation uses benign support and no target attack labels | Closest normalization papers use supervised source task labels or pseudo-label-balanced adaptation | Contract differs, but has not yielded a winning rule |
+| Shared information | Per-feature mean/scale summaries | PN aggregates learned hidden-layer moments; FedFD-A uses global BN moments; pFedBBN shares BN descriptors/models | Raw-feature sufficient summaries are a narrower representation, not a new sharing principle |
+| Adaptation unit | Featurewise input mean/scale or OAS covariance target | FedFD-A interpolates each channel/layer; pFedBBN weights peer models from layerwise BN distances | Target statistic/loss differs; current estimators do not beat fixed shared marginals reliably |
+| Uncertainty model | Sampling, block, robust, mixture, validation, and threat-prior variants explored | Jing et al. 2026 covariance-aware source shrinkage; PN learns moments as parameters | No deployable target-risk estimator tied to anomaly ranking has survived |
+| Negative-transfer handling | Local fallback, discrepancy penalties, gates, robust/maximin selection | pFedBBN similarity weights; TRADER target-only component and source shrinkage | No no-harm guarantee for FedORBIT AUROC/FPR; C37 impossibility remains |
+| Partner handling | Equal pool, peer scale, soft weights, selected action | pFedBBN softmax over BN-statistic distances; TRADER source-weighted regression | Generic adaptive partner selection is preempted; target loss remains distinct |
+| Closed form / optimization | Mostly closed-form shrinkage; CV and threat selectors tested | PN constrained optimization; FedFD-A learned adapter; Jing SURE step size | Any new rule must show an exact estimand and a genuinely different risk derivation |
+| Theoretical basis | Conditional MSE algebra for scale estimates; no AUROC guarantee | Classical empirical Bayes/shrinkage; Jing safe interval under Gaussian summary loss | Existing theory does not transfer automatically to serial benign support or AUROC |
+| IoT anomaly setting | N-BaIoT physical devices, with chronology/stability limits | Closest methods use vision or supervised regression | Setting-specific empirical evidence only; no eligible second physical population |
+| Main mathematical difference | Target raw-feature benign estimator plus OAS anomaly-ranking objective | Learned/interpolated hidden-layer BN moments or supervised coefficient transfer | Possible narrow distinction, currently unsupported empirically and not independently confirmed |

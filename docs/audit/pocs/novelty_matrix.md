@@ -101,6 +101,7 @@ Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginal
 | C27 fixed-calibration-noise HMM comparison | Hold the symmetric HMM and parameter count fixed; compare C15 effective-n, C17 Satterthwaite, and C19 lognormal-matched emission-noise variances | Completed: switching-model BIC wins 200/200 under all three calibrations; pure-block accuracy .993/.995/.995, but transition-block accuracy .696/.703/.707 remains below midpoint .713 | Diagnostic only: known rho and serially dependent block emissions; no transfer/detector result | HMM calibration sensitivity, not a novelty claim |
 | C34 target-side OAS blocked-CV variance-target blend | Select local/peer diagonal variance target by two-direction held-out multivariate Gaussian NLL | Standard covariance shrinkage selection; held-out Gaussian likelihood is an established covariance CV criterion (Zhou et al., 2011), and recent structured shrinkage selects targets by held-out NLL | Improves over local-only but trails shared-marginals at every support size and on all device means; selected peer weight is non-monotone in n and sensitive to CV direction | No algorithmic novelty claim; directly probes whether model likelihood predicts detector AUROC under this benign-only setting |
 | C35 joint mean/variance OAS validation blend | Select target mean and diagonal scale interpolation jointly by target benign Gaussian NLL | Standard predictive model selection; no algorithmic novelty claim | Improves over local-only but trails shared; AUROC gain over shared is negatively associated with validation-NLL gain (Spearman −.23 to −.52) | Joint CV does not recover the fixed baseline's detector ranking |
+| C36 target-benign CV simplex over peers | SLSQP chooses one global weight per peer summary by two-direction benign OAS NLL; aggregate weighted means and total variance | Generic target-specific source weighting; pFedBBN (2025) preempts soft collaboration weights from normalization statistics; no novelty claim | ΔAUROC vs equal pooling −.0072/−.0023/+.0023/+.0010 at n=30/100/300/1000; device-clustered 95% t intervals all include zero; support-quantile FPR is still .245 at n=1000; no no-harm result | Weight mass concentrates on 1.6–1.9 peers, but all peer summaries are required to optimize; no validated downlink saving |
 
 ## Current novelty status
 
@@ -135,5 +136,9 @@ for transfer already exist (Zhou et al., 2017), and 2026 federated conformal met
 heterogeneity; the nine-client rank resolution of 1/9 is too coarse for a conventional five or ten percent
 abstention rule. C35 shows joint target mean/scale NLL selection also misses shared-marginal AUROC; this
 supports a specific loss mismatch rather than only the fixed-center restriction. Continue adversarial search against StatAvg, OASD,
+supports a specific loss mismatch rather than only the fixed-center restriction. C36's per-target peer
+weighting approaches the baseline at n≥300 but retains a negative device and has no validated risk or
+communication advantage; pFedBBN already uses learned normalization-stat collaboration weights.
+Continue adversarial search against StatAvg, OASD,
 multi-target covariance estimators, federated BN/population normalization, and unseen-client
 normalization/test-time adaptation.

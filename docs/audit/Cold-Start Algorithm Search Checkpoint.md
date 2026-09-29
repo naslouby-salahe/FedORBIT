@@ -755,3 +755,28 @@ The formula offers O(d) scoring after a precision fit, but C53 shows no detectio
 advantage; the peer-scale message payload was not separately benchmarked here. Leave the score as a
 threat-specific diagnostic. Continue on another estimand or collaboration-risk object, with a
 different prior-art search before another detector-score variant; protocol remains unlocked.
+
+## C54 — attack-family stratification does not recover the sparse-score gain
+
+Because C53 pooled many attack classes, C54 re-runs the same paired methods separately on the two
+N-BaIoT attack families. The ignored `pocs/sparse_score_nbaiot_family_poc.py/.csv` rebuilds each
+family's attack rows from the raw files using the repository's configured attack sampling seed and
+then verifies exact array equality against the prepared `test_attack`; the labels are therefore
+grounded in the actual artifact order rather than guessed from row values. It retains C53's fixed
+per-device held-out benign/attack subsamples, 15 paired support windows at n=30/100/300/1000, and
+shared OAS, local-center/peer-scale OAS, and their precision-max score variants. Evaluation labels
+are used only for family-specific AUROC.
+
+The precision-max peer-scale score remains below shared OAS for both families at every support size:
+Gafgyt mean ΔAUROC −.0117/−.0113/−.0126/−.0217 and Mirai −.0085/−.0115/−.0114/−.0155. Its paired
+window win shares are 16.3%/15.6%/8.9%/12.6% for Gafgyt and 40.0%/30.5%/23.8%/21.9% for Mirai.
+The full-shared precision-max score produces only tiny gains at n=30 (+.0015 Gafgyt, +.0033 Mirai),
+with positive device means on just 1/9 and 2/9 devices, and loses for both families at n≥100. Thus
+the C53 regression is not just cancellation between Gafgyt and Mirai. C54 provides no real attack
+family in which peer-scale precision-max beats the fixed shared OAS baseline on average.
+
+C52's synthetic six-feature variance result therefore does not transport to either real attack
+family under this chronology. Retain C52–C54 as a scoped mechanism diagnostic plus a failed transfer
+attempt. The next search should change the objective or collaboration-risk object, not add another
+unvalidated sparse score. Existing temporal FPR calibration and C37 AUROC-identifiability results
+remain constraints; do not treat the move as permission to make an arbitrary-attack safety claim.

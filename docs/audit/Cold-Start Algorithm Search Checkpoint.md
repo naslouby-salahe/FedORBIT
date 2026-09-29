@@ -395,7 +395,7 @@ Continuation after C33: C24 remains retired on this N-BaIoT data contract, while
 | Local MAD scale | Low; established robust statistic | −0.2493 → −0.2287 | No device mean positive at any n | No collaboration; does not recover tails needed here | None | Normal-consistent central spread, not target second moment under skew | Unchecked | Large loss on all devices |
 | Blocked CV predictive-risk scale gate | Low; standard validation/transfer-risk principle | −0.0993 → −0.0125 | 0/9 device means positive at every n | Borrows 14–20% of features but nearly reverts to local-only | Low peer-scale use; dominated by zero-communication local-only at similar AUROC | Proper marginal score, but does not target AUROC under OAS | Unchecked | Loss/metric mismatch and negative device cells |
 | OAS peer diagonal-target mechanism | Narrow/unassessed; OASD/multi-target covariance shrinkage plus 2026 safe multi-source shrinkage are close prior art | Full peer production −0.0074 → +0.0002; fixed-local-intensity target arm −0.0049 → +0.0012 vs exact shared | + on 9/9 vs local; device-level negative cells remain; Gaussian mismatch SD 0.5 reverses the n=30 gain | Peer target benefit decreases with n; peer intensity contributes little | Pooled total SD uses peer mean+variance summaries; robust peer-SD variants use 115 values/device but only tie | Target effect isolated empirically; no new general shrinkage theory | OAS mechanism is Gaussian-specific; scale-only AE smoke POC nearly ties shared, 2 seeds only | Could be existing external-target covariance shrinkage applied to IDS |
-| C61 shared-center/median-peer-SD OAS | Low/unclear; coordinatewise robust scale aggregation inside an established external-target OAS family | ΔAUROC −.0050/−.0015/+.0003/+.0006; at n=1000 pAUC(.05) +.00364 vs shared | 2/9→8/9 positive device means; worst mean −.0265→−.00003 from n=30 to 1000 | Fixed peer scale at every n; AUROC loses at n≤100 and low-FPR benefit is mainly n=1000 | No reduction vs 2d outgoing shared moments; each peer scale summary is d values | Synthetic OAS AUROC near-tie across five mismatch/outlier cases, no no-harm property | OAS only; no AE check for this exact mean/scale combination | Objective/post-hoc selection risk, 9 devices only, no second physical cohort, and robust target aggregation prior art |
+| C61 shared-center/median-peer-SD OAS | Low/unclear; coordinatewise robust scale aggregation inside an established external-target OAS family | ΔAUROC −.0050/−.0015/+.0003/+.0006; at n=1000 pAUC(.05) +.00364 vs shared | 2/9→8/9 positive device means; worst mean −.0265→−.00003 from n=30 to 1000 | Fixed peer scale at every n; AUROC loses at n≤100 and low-FPR benefit is mainly n=1000 | No reduction vs 2d outgoing shared moments; each peer scale summary is d values | Synthetic OAS AUROC near-tie across five mismatch/outlier cases, no no-harm property | C62 AE at n=1000: AUROC +.00007, pAUC(.01) +.00436 vs shared; all device intervals cross zero | Objective/post-hoc selection risk, 9 devices only, no second physical cohort, and robust target aggregation prior art |
 | C9 iid risk-optimal local/peer variance blend | Standard random-effects/MSE shrinkage; no new general estimator claim | −0.0849 → −0.0112 vs shared | No device mean positive; near local-only | Peer weight 5.2% → 0.8%, naturally fades but starts too low | Local fourth moment + peer per-feature variance estimates | MSE-optimal only under independent unbiased estimates; observed window risk is 4–33× iid plug-in due chronology | Scale-only idea could feed AE; not tested yet | Temporal dependence breaks risk estimate; AUROC loss mismatch |
 | C10 peer-block variance-risk blend | Random-effects partial pooling with dependent-window risk proxy; bootstrap literature is adjacent | −0.0010 → −0.00004 vs shared; n=300 −0.00845 | Negative cells 30–55% by support; worst device −0.0264 | Peer weight 53% → 30% on real data, but 98% → 90% under regime-risk mismatch | Peer block means/risks, about 2d/device | Conditional linear-MSE derivation; synthetic mismatch MSE 1.48–1.60× oracle | Scale-only interface could feed AE; C10 itself untested | Target-peer temporal comparability fails under distinct stable target regime; no safe bound |
 | C11 C10 with moment-estimated target mismatch penalty | Plug-in excess-discrepancy penalty; standard risk estimation | Slightly below C10 at every n | Negative-cell fraction rises vs C10 | Weight 49% → 27%, but does not protect devices | No additional peer payload | Identity-based estimate of squared bias; noisy at feature level | Not evaluated on AE | Penalizes peer use without finding harmful cells |
@@ -818,7 +818,7 @@ explicitly bounded estimand and derive its observable information requirements b
 attacks; repeating moment interpolation, similarity weights, or a benign likelihood selector would
 revisit established or already-failed designs.
 
-**Current single novelty matrix (updated through C60).** “FedORBIT explored family” denotes the
+**Current single novelty matrix (updated through C62).** “FedORBIT explored family” denotes the
 tested local/shared/peer scale estimators and their benign-only selectors, not a surviving algorithm.
 
 | Dimension | FedORBIT explored family | Closest prior methods | Remaining distinction / status |
@@ -834,7 +834,8 @@ tested local/shared/peer scale estimators and their benign-only selectors, not a
 | Closed form / optimization | Mostly closed-form shrinkage; CV and threat selectors tested | PN constrained optimization; FedFD-A learned adapter; Jing SURE step size | Any new rule must show an exact estimand and a genuinely different risk derivation |
 | Theoretical basis | Conditional MSE algebra for scale estimates; no AUROC guarantee | Classical empirical Bayes/shrinkage; Jing safe interval under Gaussian summary loss | Existing theory does not transfer automatically to serial benign support or AUROC |
 | IoT anomaly setting | N-BaIoT physical devices, with chronology/stability limits | Closest methods use vision or supervised regression | Setting-specific empirical evidence only; no eligible second physical population |
-| Main mathematical difference | Target raw-feature benign estimator plus OAS anomaly-ranking objective; C61 varies only the peer-scale target while preserving the shared center | Learned/interpolated hidden-layer BN moments, robust target aggregation, or supervised coefficient transfer | C61 shows a small n=1000 low-FPR crossover; the estimator family is established and independent confirmation is absent |
+| Deep-detector compatibility | C62 applies the same shared-center/median-peer-scale input normalization to a local AE | FedFD-A, PN, and other normalization-transfer methods | Interface compatibility holds; C62 shows no reliable AE gain and no new model-agnostic claim |
+| Main mathematical difference | Target raw-feature benign estimator plus OAS ranking objective; C61 varies the peer-scale target and C62 reuses it for AE input normalization | Learned/interpolated hidden-layer BN moments, robust target aggregation, or supervised coefficient transfer | C61's n=1000 low-FPR crossover is small; C62 adds compatibility evidence only; novelty and independent confirmation remain absent |
 
 ## C56–C57 — low-FPR partial AUC reveals a narrow n=1000 crossover, not a safe winner
 
@@ -935,6 +936,39 @@ alternative diagonal covariance target, all already in the novelty ledger. The m
 distinction is only the combination of shared center plus robust peer-scale target for this specific
 new-device OAS ranking objective; novelty is weak and unsupported. Communication remains 2d values
 for a shared center/scale message, the rule borrows on every feature at every support size, no
-automatic fade or safe-transfer property is established, and this exact combination has not been
-tested with the AE. The full shared-marginals comparator still wins on AUROC at n≤100. Keep the
-protocol unlocked; do not tune a support cutoff or call the observed operating region confirmatory.
+automatic fade or safe-transfer property is established. C62 now tests the exact combination with
+the AE and finds only a small, uncertain n=1000 low-FPR near-tie. The full shared-marginals
+comparator still wins on AUROC at n≤100. Keep the protocol unlocked; do not tune a support cutoff or
+call the observed operating region confirmatory.
+
+## C62 — exact C61 normalization is compatible with the local AE, without a demonstrated gain
+
+The ignored `pocs/autoencoder_shared_center_median_scale_poc.py/.csv` evaluates the exact C61
+transform in the secondary reconstruction detector, addressing the prior C48 gap. It uses all nine
+N-BaIoT devices, six paired contiguous support draws at n=30/100/300/1000, the same held-out benign
+and attack rows for every condition, and identical model initialization and minibatch RNG seeds
+within each paired draw. Every AE is trained locally for 300 steps with hidden/bottleneck widths
+64/16, batch size 64, and learning rate .001, using only normalized benign support. Five conditions
+are compared: local center/local scale; full shared-marginals center/scale; exact C61 shared center/
+median peer SD; local center/median peer SD; and C48 local center/pooled peer scale. AUROC and
+standardized pAUC capped at 1%/5% FPR are evaluation metrics only; no threshold or online calibration
+claim is made.
+
+For exact C61 versus full shared AE at n=30/100/300/1000, mean AUROC deltas are
+−.00259/−.00386/−.00163/+.00007; positive device means are 4/9, 1/9, 3/9, and 6/9. At n=1000,
+the device-level mean is +.00007 with 95% t interval [−.00015,+.00029], worst device −.00031, and
+63.0% paired-window wins. The pAUC(.01) deltas are −.00028/−.00242/−.00068/+.00436, with 6/9,
+5/9, 4/9, and 7/9 positive device means. At n=1000 pAUC(.01) has a +.00436 device-mean delta,
+95% interval [−.00451,+.01323], worst device −.01617, and 66.7% paired-window wins. The pAUC(.05)
+deltas are −.00379/−.00648/−.00195/+.00072; at n=1000 the device interval is
+[−.00150,+.00294], 6/9 device means are positive, worst device −.00322, and paired-window wins are
+63.0%. Thus the raw-input transform can feed a deep detector, and its low-FPR direction at n=1000
+is similar to OAS, but the effect is small and uncertain. At n≤300 it does not outperform full shared
+normalization on mean AUROC or either partial-AUC cap.
+
+C62 therefore supports interface-level AE compatibility, not a model-agnostic performance claim or
+non-inferiority to fixed shared marginals. It does not alter C61's provisional status: AUROC is
+essentially tied only at n=1000, all paired device-level intervals for C61's AE gains cross zero,
+and the same nine attack-exposed device/test populations informed the broader search. The AE result
+does not repair C61's synthetic near-tie, weak novelty, absence of automatic collaboration fading,
+or lack of independent physical-device confirmation. No protocol is locked.

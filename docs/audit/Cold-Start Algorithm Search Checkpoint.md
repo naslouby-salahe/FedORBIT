@@ -395,7 +395,7 @@ Continuation after C33: C24 remains retired on this N-BaIoT data contract, while
 | Local MAD scale | Low; established robust statistic | −0.2493 → −0.2287 | No device mean positive at any n | No collaboration; does not recover tails needed here | None | Normal-consistent central spread, not target second moment under skew | Unchecked | Large loss on all devices |
 | Blocked CV predictive-risk scale gate | Low; standard validation/transfer-risk principle | −0.0993 → −0.0125 | 0/9 device means positive at every n | Borrows 14–20% of features but nearly reverts to local-only | Low peer-scale use; dominated by zero-communication local-only at similar AUROC | Proper marginal score, but does not target AUROC under OAS | Unchecked | Loss/metric mismatch and negative device cells |
 | OAS peer diagonal-target mechanism | Narrow/unassessed; OASD/multi-target covariance shrinkage plus 2026 safe multi-source shrinkage are close prior art | Full peer production −0.0074 → +0.0002; fixed-local-intensity target arm −0.0049 → +0.0012 vs exact shared | + on 9/9 vs local; device-level negative cells remain; Gaussian mismatch SD 0.5 reverses the n=30 gain | Peer target benefit decreases with n; peer intensity contributes little | Pooled total SD uses peer mean+variance summaries; robust peer-SD variants use 115 values/device but only tie | Target effect isolated empirically; no new general shrinkage theory | OAS mechanism is Gaussian-specific; scale-only AE smoke POC nearly ties shared, 2 seeds only | Could be existing external-target covariance shrinkage applied to IDS |
-| C61 shared-center/median-peer-SD OAS | Low/unclear; coordinatewise robust scale aggregation inside an established external-target OAS family | ΔAUROC −.0050/−.0015/+.0003/+.0006; at n=1000 pAUC(.05) +.00364 vs shared | 2/9→8/9 positive device means; worst mean −.0265→−.00003 from n=30 to 1000 | Fixed peer scale at every n; AUROC loses at n≤100 and low-FPR benefit is mainly n=1000 | No reduction vs 2d outgoing shared moments; each peer scale summary is d values | Synthetic OAS AUROC near-tie across five mismatch/outlier cases, no no-harm property | C62 AE at n=1000: AUROC +.00007, pAUC(.01) +.00436 vs shared; all device intervals cross zero | Objective/post-hoc selection risk, 9 devices only, no second physical cohort, and robust target aggregation prior art |
+| C61 shared-center/median-peer-SD OAS | Low/unclear; coordinatewise robust scale aggregation inside an established external-target OAS family | ΔAUROC −.0050/−.0015/+.0003/+.0006; at n=1000 pAUC(.05) +.00364 vs shared | 2/9→8/9 positive device means; worst mean −.0265→−.00003 from n=30 to 1000 | Fixed peer scale at every n; AUROC loses at n≤100 and low-FPR benefit is mainly n=1000 | No reduction vs 2d outgoing shared moments; each peer scale summary is d values | Synthetic OAS AUROC near-tie across five mismatch/outlier cases, no no-harm property; C63 locates the change in OAS's effective diagonal covariance target, not its shrinkage intensity | C62 AE at n=1000: AUROC +.00007, pAUC(.01) +.00436 vs shared; all device intervals cross zero | Objective/post-hoc selection risk, 9 devices only, no second physical cohort, and robust target aggregation prior art |
 | C9 iid risk-optimal local/peer variance blend | Standard random-effects/MSE shrinkage; no new general estimator claim | −0.0849 → −0.0112 vs shared | No device mean positive; near local-only | Peer weight 5.2% → 0.8%, naturally fades but starts too low | Local fourth moment + peer per-feature variance estimates | MSE-optimal only under independent unbiased estimates; observed window risk is 4–33× iid plug-in due chronology | Scale-only idea could feed AE; not tested yet | Temporal dependence breaks risk estimate; AUROC loss mismatch |
 | C10 peer-block variance-risk blend | Random-effects partial pooling with dependent-window risk proxy; bootstrap literature is adjacent | −0.0010 → −0.00004 vs shared; n=300 −0.00845 | Negative cells 30–55% by support; worst device −0.0264 | Peer weight 53% → 30% on real data, but 98% → 90% under regime-risk mismatch | Peer block means/risks, about 2d/device | Conditional linear-MSE derivation; synthetic mismatch MSE 1.48–1.60× oracle | Scale-only interface could feed AE; C10 itself untested | Target-peer temporal comparability fails under distinct stable target regime; no safe bound |
 | C11 C10 with moment-estimated target mismatch penalty | Plug-in excess-discrepancy penalty; standard risk estimation | Slightly below C10 at every n | Negative-cell fraction rises vs C10 | Weight 49% → 27%, but does not protect devices | No additional peer payload | Identity-based estimate of squared bias; noisy at feature level | Not evaluated on AE | Penalizes peer use without finding harmful cells |
@@ -818,7 +818,7 @@ explicitly bounded estimand and derive its observable information requirements b
 attacks; repeating moment interpolation, similarity weights, or a benign likelihood selector would
 revisit established or already-failed designs.
 
-**Current single novelty matrix (updated through C62).** “FedORBIT explored family” denotes the
+**Current single novelty matrix (updated through C63).** “FedORBIT explored family” denotes the
 tested local/shared/peer scale estimators and their benign-only selectors, not a surviving algorithm.
 
 | Dimension | FedORBIT explored family | Closest prior methods | Remaining distinction / status |
@@ -827,7 +827,7 @@ tested local/shared/peer scale estimators and their benign-only selectors, not a
 | New/unseen client | Yes, evaluation target excluded from peer summaries | FedFD-A zero-shot domain; pFedBBN unseen/shifted clients; PN global deployable model | New-client setup is established |
 | Benign-only | Target adaptation uses benign support and no target attack labels | Closest normalization papers use supervised source task labels or pseudo-label-balanced adaptation | Contract differs, but has not yielded a winning rule |
 | Shared information | Per-feature mean/scale summaries | PN aggregates learned hidden-layer moments; FedFD-A uses global BN moments; pFedBBN shares BN descriptors/models | Raw-feature sufficient summaries are a narrower representation, not a new sharing principle |
-| Adaptation unit | Featurewise input mean/scale or OAS covariance target | FedFD-A interpolates each channel/layer; pFedBBN weights peer models from layerwise BN distances | Target statistic/loss differs; current estimators do not beat fixed shared marginals reliably |
+| Adaptation unit | Featurewise input mean/scale or OAS covariance target | FedFD-A interpolates each channel/layer; pFedBBN weights peer models from layerwise BN distances | C63 derives the exact effective raw-space OAS diagonal target; this is a parameterization of established OAS shrinkage, not a new adaptation principle |
 | Uncertainty model | Sampling, block, robust, mixture, validation, and threat-prior variants explored | Jing et al. 2026 covariance-aware source shrinkage; PN learns moments as parameters | No deployable target-risk estimator tied to anomaly ranking has survived |
 | Negative-transfer handling | Local fallback, discrepancy penalties, gates, robust/maximin selection | pFedBBN similarity weights; TRADER target-only component and source shrinkage | No no-harm guarantee for FedORBIT AUROC/FPR; C37 impossibility remains |
 | Partner handling | Equal pool, peer scale, soft weights, selected action | pFedBBN softmax over BN-statistic distances; TRADER source-weighted regression | Generic adaptive partner selection is preempted; target loss remains distinct |
@@ -972,3 +972,45 @@ essentially tied only at n=1000, all paired device-level intervals for C61's AE 
 and the same nine attack-exposed device/test populations informed the broader search. The AE result
 does not repair C61's synthetic near-tie, weak novelty, absence of automatic collaboration fading,
 or lack of independent physical-device confirmation. No protocol is locked.
+
+## C63 — C61 changes OAS's effective diagonal target; no reliable benign-only gain predictor emerges
+
+The ignored `pocs/oas_peer_scale_diagonal_target_audit.py/.csv` reuses the paired n=1000 C59 OAS
+windows and scores; it does not retrain or rescore attacks. It calculates peer-only scale and
+between/within descriptors from benign `support_pool` arrays, then joins those descriptors to the
+already-computed device-level AUROC and standardized pAUC deltas strictly for post-hoc diagnosis.
+No attack labels enter any descriptor or candidate rule.
+
+For fixed shared center and support second moment `S`, let `D=diag(s)` be the external scale,
+`C=D^-1 S D^-1`, and let OAS shrink `C` to `(1-alpha)C + alpha*tau*I`, where
+`tau=trace(C)/d`. The raw-unit covariance represented by the resulting quadratic score is exactly
+`(1-alpha)S + alpha*tau*D^2`. Thus a change from full shared scale to coordinatewise median peer SD
+changes the *shape of the OAS diagonal target* as well as the standardized sample covariance; it is
+not merely a different way of expressing the same pooled estimate. This also explains why the
+scale choice is not generally score-invariant under OAS, despite exact invariance to a uniform
+rescaling when the corresponding covariance transform is applied.
+
+Across the nine targets, median peer SD is below the full pooled peer SD on 96.5%–100% of features.
+The median across-feature SD of log scale ratios is 0.193–0.249. Across the 15 n=1000 windows/device,
+the RMS log ratio between effective candidate and shared OAS diagonal targets is 0.405–0.505, while
+the mean change in OAS `alpha` is only −0.00040 to +0.00015. The candidate therefore materially
+changes which diagonal target is used, while barely changing the scalar shrinkage intensity.
+
+The post-hoc rank association between the 10th percentile of effective-target log ratios and C61's
+device-level deltas is negative for AUROC (Spearman −0.80), pAUC(.01) (−0.85), and pAUC(.05)
+(−0.77); the 90th-percentile associations are also negative (−0.77/−0.73/−0.73). These are only
+nine device-level observations, with feature summaries and outcomes examined after the C61 screen;
+they are neither valid selector evidence nor confirmation. The single low-FPR-harmed Provision
+camera is consistent with a target-shape mismatch explanation, but cannot establish it. Peer
+between-center/within-variance ratios show no stable direction that would enable a safe gate. The
+mechanism audit therefore explains the implementation mathematically but does not explain the
+performance crossover or yield a reliable benign-only prediction rule.
+
+C63 strengthens the hostile novelty reading: C61 is an externally chosen coordinatewise diagonal
+target inside conventional OAS shrinkage. Robust diagonal targets and scale aggregation are
+established statistical patterns, and no distinct estimand or safety principle has appeared. Keep
+C61 provisional and do not tune a selector against these nine post-hoc associations. A useful next
+mechanism check is a controlled factorial experiment that varies target-vs-peer diagonal mismatch
+and off-diagonal correlation separately, scores the raw-space OAS target directly, and checks when
+local, full-shared, and median-peer targets win on covariance error and anomaly ranking. No protocol
+lock or candidate promotion follows from C63.

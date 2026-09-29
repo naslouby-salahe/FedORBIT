@@ -581,3 +581,84 @@ Local-center/peer-scale versus full shared marginals has mean ΔAUROC −.00510 
 The payload reduction is exactly half for the normalization moments under float32: one 115-value scale vector is 460 bytes per peer versus 230 mean+scale values (920 bytes) for full shared marginals, before IDs, framing, or cryptographic overhead. This is a 460-byte saving per peer and a 50% reduction in this tiny message; it is not evidence of a meaningful system-level communication improvement without measured protocol overhead or repeated communication rounds. UniFed and client-agnostic FL normalization already preempt broad unseen-client normalization novelty, while the scale-only raw-input transform is an interface-level adaptation only. No update was made to the AE architecture or FedAvg path.
 
 This strengthens the claim that scale-only collaboration can be consumed by both OAS and a local AE, but not the stronger claim that it is model-agnostic, safe, or as accurate as shared marginals. The closest attack-specific outlier-detection prior found for the next threat-model audit is Kalan, Neugut & Kpotufe, “Transfer Neyman-Pearson Algorithm for Outlier Detection” (AISTATS 2025; [PMLR paper](https://proceedings.mlr.press/v258/kalan25a.html)). It studies transfer with rare target abnormal data and guarantees over changes in abnormal distributions, so it is adjacent to attack-distribution-aware selection but does not satisfy this benign-only cold-start information contract. Continue by stating a threat family explicitly and determine whether a benign-only plug-in expected-ranking criterion adds information beyond an assumed attack prior; compare against this prior art and test reversal under a neighboring attack family. Do not make a distribution-free AUROC safety claim. Protocol remains unlocked.
+
+## C49 — benign-only expected-AUROC scale choice depends on the threat prior and does not beat shared
+
+The ignored POC pocs/benign_only_threat_model_selection_poc.py chooses among local-center scale blends
+v(λ)=(1−λ)s²_target+λ median_k(s²_peer,k), λ∈{0,.25,.5,.75,1}, and full shared-marginals.
+The threat family is fixed before fitting: either (A) sparse additive mean shifts on six of 64 features,
+independent random signs, magnitude .8 × robust peer SD, or (B) sparse scale inflation on six
+features by multiplying residuals by two (fourfold variance). There are four synthetic populations:
+matched clean, heterogeneous peers, one 4×-variance peer, and a target with 2× peer scale. There are
+40 paired draws per cell, eight peers with 2,000-row scale summaries, and production OAS. Selection uses
+only the n target-benign support rows, peer summaries, and synthetic perturbations; a three-fold
+out-of-fold protocol keeps each benign validation row out of its scoring-model fit. Held-out simulated
+Gaussian benign/attack draws are shared across candidate actions and selection rules and are evaluation
+only.
+
+The first in-sample-bootstrap implementation was invalid: it scored bootstrap copies of support rows
+used to fit the detector, and overestimated selected-versus-shared AUROC by +.00668 for sparse shifts
+and +.00516 for variance inflation. Its ignored raw file is preserved as
+pocs/benign_only_threat_model_selection_resubstitution_diagnostic.csv; the corrected script and final
+CSV are pocs/benign_only_threat_model_selection_poc.py and
+pocs/benign_only_threat_model_selection_results.csv.
+
+Cross-fitting reduces but does not eliminate selector optimism. The mean out-of-fold predicted gain
+over shared is +.00116 for sparse shifts and +.00187 for variance inflation; actual held-out gains are
+−.00018 and −.00145 (prediction-minus-evaluation gaps +.00134/+ .00332). Against the matching held-out
+threat, the selected action beats shared in only 24.7%/7.5% of paired draws, with lower-tail
+ΔAUROC quantiles −.00182/−.00535; the selected method's cell-average is below shared in 10/16 and
+16/16 scenario/support cells. For the sparse mean-shift prior, matching-family cell means range
+−.00158 to +.00128 across settings; for the variance-inflation prior they are negative in every cell
+(n=30 losses range −.00340 to −.00487 across scenarios, approaching zero by n=1000). A neighboring
+family check further weakens transport: sparse-shift-selected actions lose to shared on all 16
+variance-inflation cells (mean −.00170), while variance-inflation-selected actions lose on 12/16
+sparse-shift cells (mean −.00059). The selector chooses different conditional weights (mean λ=.223
+vs .699 among non-shared choices) but does not convert that adaptation into reliable AUROC benefit.
+
+This is not a general benign-only ranking predictor: its positive simulated score advantage fails on
+fresh draws, especially under scale inflation. C37 still rules out distribution-free AUROC no-harm.
+Closest prior art now includes Kalan et al.'s TLNP, which tunes a target/source abnormal-data loss
+under a Type-I error range (it has scarce target anomalies, unlike this contract), and normal-only
+synthetic anomaly/perturbation methods. Schlüter et al.'s NSA creates labeled image anomalies from
+normal images via Poisson-blended patches and reports that perturbation parameters encode assumptions
+about unknown anomalies ([paper](https://arxiv.org/abs/2109.15222)); 2026 PCU trains a tabular
+representation on controlled corruption magnitudes to measure epistemic uncertainty
+([paper](https://proceedings.mlr.press/v337/allaoui26a.html)). These preempt generic novelty for
+perturbation-defined threat families. C49's specific issue is whether such a family can select a
+peer/local scale action for a new IoT device, but it has no observed gain and no novelty claim. C50
+now tests a no-mixture-weight redesign: maximize the minimum out-of-fold AUROC across the two declared
+threats, then evaluate both separately. Do not treat this two-family set as exhaustive.
+
+**Attack-label oracle diagnostic.** C49 also records, strictly as an evaluation upper bound, the best
+λ from the five scale blends under each actual held-out attack family. Even this unavailable
+attack-label oracle has mean AUROC change vs full shared marginals −.00015 for sparse shifts and
+−.00197 for variance inflation; eight of 16 and 15 of 16 scenario/support cell means are negative,
+respectively. Under the variance-inflation family, no choice from the local-center scale-blend grid
+matches the fixed shared baseline in 15/16 cells. This identifies an action-space limitation as well
+as selector noise; it is not an available training signal.
+
+## C50 — maximin out-of-fold threat-set selection does not improve on shared
+
+The ignored pocs/benign_only_threat_set_robust_selection_poc.py chooses the action maximizing the
+minimum of the two C49 out-of-fold pseudo-AUROCs across sparse mean-shift and sparse variance-
+inflation attacks. Its candidates and four populations are unchanged, and it adds no hand-chosen
+threat-mixture weight. It uses 40 paired synthetic replications per scenario/support cell, then
+evaluates each chosen action on both held-out threat families.
+
+Against shared marginals, maximin selection has mean ΔAUROC −.00018 on sparse mean-shift and −.00170
+on variance-inflation draws, wins 24.7%/9.2% of paired draws, and has 10/16/16 of 16 cell means below
+shared. Its 10th-percentile paired differences are −.00182/−.00650. The procedure chooses full shared
+in 49.7% of draws; its mean selected non-shared λ is .223, so it lands close to the sparse-shift-only
+selector and does not improve the variance-inflation failure. This controlled maximin rule therefore
+does not establish Pareto improvement or negative-transfer protection, even for the declared two-
+family set.
+
+C49–C50 provide a sharper statement than the initial benign-only rank-prediction question: this OAS
+scale action family has little headroom over shared marginals for the declared synthetic attacks,
+and the empirical out-of-fold maximizer fails to identify the small conditional differences. The
+simple five-point scale blend is also not rescued by an oracle λ on variance-inflation attacks. Do not
+refine its Monte Carlo selector as if it were the missing algorithm. Continue the broader search on a
+different estimand or object—for example, featurewise score-preserving calibration or threat-
+structured detector robustness—with a concrete mechanism and a hostile prior-art comparison before
+claiming improvement. No confirmation protocol is locked.

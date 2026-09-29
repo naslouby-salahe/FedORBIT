@@ -818,7 +818,7 @@ explicitly bounded estimand and derive its observable information requirements b
 attacks; repeating moment interpolation, similarity weights, or a benign likelihood selector would
 revisit established or already-failed designs.
 
-**Current single novelty matrix (updated through C64).** “FedORBIT explored family” denotes the
+**Current single novelty matrix (updated through C65).** “FedORBIT explored family” denotes the
 tested local/shared/peer scale estimators and their benign-only selectors, not a surviving algorithm.
 
 | Dimension | FedORBIT explored family | Closest prior methods | Remaining distinction / status |
@@ -828,7 +828,7 @@ tested local/shared/peer scale estimators and their benign-only selectors, not a
 | Benign-only | Target adaptation uses benign support and no target attack labels | Closest normalization papers use supervised source task labels or pseudo-label-balanced adaptation | Contract differs, but has not yielded a winning rule |
 | Shared information | Per-feature mean/scale summaries | PN aggregates learned hidden-layer moments; FedFD-A uses global BN moments; pFedBBN shares BN descriptors/models | Raw-feature sufficient summaries are a narrower representation, not a new sharing principle |
 | Adaptation unit | Featurewise input mean/scale or OAS covariance target | FedFD-A interpolates each channel/layer; pFedBBN weights peer models from layerwise BN distances | C63 derives the exact effective raw-space OAS diagonal target; C64 finds no systematic ranking or covariance-risk gain for the median-peer target over full shared. This remains a parameterization of established OAS shrinkage, not a new adaptation principle |
-| Uncertainty model | Sampling, block, robust, mixture, validation, and threat-prior variants explored | Jing et al. 2026 covariance-aware source shrinkage; PN learns moments as parameters | No deployable target-risk estimator tied to anomaly ranking has survived |
+| Uncertainty model | Sampling, block, robust, mixture, validation, and threat-prior variants explored | Jing et al. 2026 covariance-aware source shrinkage; PN learns moments as parameters | C65 finds covariance-estimation error is nearly uncorrelated with AUROC/pAUC gain within the controlled cells; a generic variance/covariance-risk weight is not detector-risk adaptation |
 | Negative-transfer handling | Local fallback, discrepancy penalties, gates, robust/maximin selection | pFedBBN similarity weights; TRADER target-only component and source shrinkage | No no-harm guarantee for FedORBIT AUROC/FPR; C37 impossibility remains |
 | Partner handling | Equal pool, peer scale, soft weights, selected action | pFedBBN softmax over BN-statistic distances; TRADER source-weighted regression | Generic adaptive partner selection is preempted; target loss remains distinct |
 | Closed form / optimization | Mostly closed-form shrinkage; CV and threat selectors tested | PN constrained optimization; FedFD-A learned adapter; Jing SURE step size | Any new rule must show an exact estimand and a genuinely different risk derivation |
@@ -1070,3 +1070,42 @@ baselines; it must be evaluated as a statistical-risk rule, not selected from th
 This candidate family is adjacent to standard random-effects/empirical-Bayes variance shrinkage, so
 novelty remains weak until a distinct estimand or justified safety property is established. No
 protocol is locked.
+
+## C65 — covariance-estimation error is not a useful stand-alone proxy for ranking gain
+
+The ignored `pocs/oas_covariance_error_ranking_alignment_audit.py` reuses C64's paired 24,000-row
+synthetic output; it does not fit models, change any method, or rescore attacks. For each of the 48
+factorial cells and 100 paired replications, it compares an estimator's reduction in relative
+covariance Frobenius error or diagonal-variance RMSE against its AUROC and standardized pAUC gains
+over full shared. This isolates the relationship within fixed target-mismatch, heterogeneity,
+correlation, and support-size conditions, avoiding pooled correlations driven by the scenario grid.
+
+Across the 48 cells, local-scale covariance-risk gain has essentially zero median Spearman
+association with ranking gain: for Frobenius error, rho is +.011 for AUROC, −.008 for pAUC(.01),
+and +.011 for pAUC(.05); for diagonal RMSE the corresponding medians are +.019, +.003, and +.002.
+Only 48%–56% of cellwise correlations are positive. The shared-center/local-scale arm is similar.
+Even the oracle-target-scale arm has small median correlations (+.039 at most), despite its much
+larger average covariance-error reduction. Across paired replications, covariance error improves
+while ranking gets worse in about 18%–30% of cases, depending on estimator/loss; the reverse
+discordance also occurs in about 9%–26%. Among nonzero changes, sign discordance is roughly 39%–51%.
+These are descriptive summaries over a controlled Gaussian mean-shift attack family, not tests of
+independence or universal claims.
+
+This explains why earlier variance-risk improvements did not reliably translate into detector
+ranking improvements. For quadratic score matrix `A`, common-covariance Gaussian benign and
+mean-shift attack distributions have expected score gap
+`E[Z^T A Z]−E[X^T A X]=δ^T A δ`; the attack direction `δ` therefore matters, while a global
+Frobenius covariance error weights all directions and does not encode that attack objective. Score
+variance and the attack distribution also affect AUROC/pAUC, so this identity is explanatory, not
+an AUROC formula or a selector. C37 already establishes that arbitrary-attack AUROC no-harm is
+unidentifiable from benign data alone. C65 reinforces that a Gaussian covariance-MSE result cannot
+be presented as anomaly-ranking safety or used to select collaboration without a bounded threat
+model.
+
+C65 does not retire the target-scale problem: C64 shows settings where local scale reduces
+covariance error and sometimes improves low-FPR ranking, while its harmful lower tail remains. It
+does retire covariance MSE as a sufficient surrogate for choosing that scale in this detector.
+Any next risk-based candidate needs an explicit decision estimand that is observable under benign-
+only onboarding and a mathematically stated attack/threat scope; otherwise evaluate scale estimation
+as a statistical subproblem without claiming it selects a safer anomaly score. No new candidate,
+novelty claim, or protocol lock follows from C65.

@@ -100,6 +100,7 @@ Scope: algorithm search through 2026-09-28. Baseline to beat is `shared-marginal
 | C26 estimated two-state HMM model-selection diagnostic | Fit shared two-state Gaussian HMM to peer block log-variance histories and compare with one-state Gaussian BIC | 200 homogeneous runs: HMM selected 1/200 (median BIC improvement −17.1); 200 switching runs: selected 200/200 (median BIC improvement 1429.1); pure-block accuracy .995 vs .984 midpoint threshold, but transition-block majority accuracy .700 vs .703 threshold | Exploratory only: block-emission serial dependence invalidates nominal BIC calibration; transitions remain hard to classify; no target risk or detector result | Markov-switching variance models are established prior art; only regime-recovery diagnostic, not a novelty claim |
 | C27 fixed-calibration-noise HMM comparison | Hold the symmetric HMM and parameter count fixed; compare C15 effective-n, C17 Satterthwaite, and C19 lognormal-matched emission-noise variances | Completed: switching-model BIC wins 200/200 under all three calibrations; pure-block accuracy .993/.995/.995, but transition-block accuracy .696/.703/.707 remains below midpoint .713 | Diagnostic only: known rho and serially dependent block emissions; no transfer/detector result | HMM calibration sensitivity, not a novelty claim |
 | C34 target-side OAS blocked-CV variance-target blend | Select local/peer diagonal variance target by two-direction held-out multivariate Gaussian NLL | Standard covariance shrinkage selection; held-out Gaussian likelihood is an established covariance CV criterion (Zhou et al., 2011), and recent structured shrinkage selects targets by held-out NLL | Improves over local-only but trails shared-marginals at every support size and on all device means; selected peer weight is non-monotone in n and sensitive to CV direction | No algorithmic novelty claim; directly probes whether model likelihood predicts detector AUROC under this benign-only setting |
+| C35 joint mean/variance OAS validation blend | Select target mean and diagonal scale interpolation jointly by target benign Gaussian NLL | Standard predictive model selection; no algorithmic novelty claim | Improves over local-only but trails shared; AUROC gain over shared is negatively associated with validation-NLL gain (Spearman −.23 to −.52) | Joint CV does not recover the fixed baseline's detector ranking |
 
 ## Current novelty status
 
@@ -132,6 +133,7 @@ selection itself is established (Zhou et al., 2011), with recent held-out target
 covariance shrinkage ([2026 preprint](https://arxiv.org/abs/2605.17111)). Conformal exchangeability tests
 for transfer already exist (Zhou et al., 2017), and 2026 federated conformal methods handle client
 heterogeneity; the nine-client rank resolution of 1/9 is too coarse for a conventional five or ten percent
-abstention rule. Continue adversarial search against StatAvg, OASD,
+abstention rule. C35 shows joint target mean/scale NLL selection also misses shared-marginal AUROC; this
+supports a specific loss mismatch rather than only the fixed-center restriction. Continue adversarial search against StatAvg, OASD,
 multi-target covariance estimators, federated BN/population normalization, and unseen-client
 normalization/test-time adaptation.

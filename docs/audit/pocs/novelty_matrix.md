@@ -172,3 +172,19 @@ against attack law `Q` is the `Q`-expectation of the benign percentile transform
 **C43–C44 automatic block bootstrap does not resolve the transport problem.** The corrected Politis–White circular block-length selector is prior statistical machinery. On N-BaIoT its target-influence bootstrap estimates still underpredict later-block risk (median ratios .033/.073/.104/.029, n=30/100/300/1000) and its C10 blend loses to shared marginals by .0709/.0365/.0133/.0093 AUROC. Controlled simulation shows the distinction: it approaches the realized risk under stationary Gaussian AR(1) as n grows (mean risk ratios .432/.672/.759/.975), but badly misses unconditional risk under a two-regime switching-variance process (.158/.162/.223/.361). This suggests the real-data weakness is temporal regime risk beyond one target window, not a missing HAC or automatic block-length formula. A future CUSUM/risk diagnostic would be an application of established change-point methods; novelty would have to come from a validated cold-start decision and a concrete advantage over shared marginals, neither of which is established.
 
 **C45 variance-influence CUSUM prognostic screen is inconclusive.** A featurewise normalized bridge CUSUM from one n-row target support window has weak, device-unstable association with future chronological block-risk underprediction (median Spearman −.121/−.038/−.038/−.049 at n=30/100/300/1000; positive device medians only 2/9 then 4/9). Even the top-CUSUM feature quintile remains substantially underpredicted. Standard change-point evidence therefore has not supplied a useful cold-start risk gate here; do not treat this diagnostic as a novel method or safety claim.
+
+**C66 peer-correlation target is an established covariance-target family and is not promoted.** The
+leave-target-out mean peer correlation matrix is a multi-target covariance shrinkage construction
+with a different target shape; interpolating it with identity to restore invertibility does not
+create a new adaptation principle. On N-BaIoT its low-support pAUC(.01) gains are attack-family
+weighted, have large worst-device losses, reverse at larger support for stronger weights, and cost
+28.5x the scalar payload of shared mean/scale under dense triangular encoding. No independent
+confirmation or benign-only weight selector exists.
+
+**C67 featurewise log-variance empirical Bayes is standard random-effects shrinkage.** It estimates
+between-peer log-variance heterogeneity after subtracting known Gaussian sampling noise, then uses the
+usual normal-normal posterior with target sampling variance. The same C64 factorial gives modest mean
+ranking gains but negative lower tails and a concrete mismatch failure: zero peer heterogeneity
+collapses the prior variance even when the held-out target shifts. This is adjacent to C1/C9/C12 and
+requires retaining per-peer variances rather than only an aggregate; it supplies neither a novelty
+claim nor a no-harm result.

@@ -1109,3 +1109,81 @@ Any next risk-based candidate needs an explicit decision estimand that is observ
 only onboarding and a mathematically stated attack/threat scope; otherwise evaluate scale estimation
 as a statistical subproblem without claiming it selects a safer anomaly score. No new candidate,
 novelty claim, or protocol lock follows from C65.
+
+## C66 — peer-correlation OAS targets show a low-support signal, but no safe or efficient candidate
+
+The ignored `pocs/peer_correlation_oas_target_poc.py` replaces only the OAS covariance target's
+shape. It keeps C59's shared center/scale, support windows, attack and benign test subsets, and
+standard OAS shrink intensity fixed. For each target device, it averages the other eight devices'
+benign correlation matrices, then interpolates that matrix with identity at weights .25/.50/.75.
+The result CSV contains 4,500 paired candidate rows across nine devices, four support sizes
+(30/100/300/1000), 15 windows per device/size, three weights, and pooled plus family-specific
+metrics. Summaries are paired to the exact C59 shared-center/shared-scale rows. The weight sweep is
+exploratory and uses the same N-BaIoT attack sets; it is not validation of a tuning rule.
+
+Pooled results have a small-support low-FPR signal, strongest at n=30, that fades or reverses as
+support grows. At weight .50, mean device deltas over shared are +.03593 standardized pAUC(.01) at
+n=30 and +.01436 at n=100, but the worst device means are −.06428 and −.05192; only 7/9 and 5/9
+device means are positive. At n=300/1000 the same arm falls to +.00651/−.00140, and pooled AUROC
+is −.00002/−.00048. Weight .75 gives larger n=30 pAUC(.01) mean (+.03710), with a worse-device
+loss of −.07753; its pAUC(.01) mean turns negative at n=300/1000 (−.00729/−.01343). Weight .25 is
+less volatile but has the smallest n=30 gain (+.03062) and nearly zero n=1000 AUROC/pAUC(.05).
+No setting avoids material device harm.
+
+The apparent pooled gain is attack-family dependent. At weight .50 and n=30, mean pAUC(.01) gains
+are +.08003 for Mirai versus +.00787 for Gafgyt; Gafgyt's worst device mean is −.13122. At n=1000,
+Mirai's gain is only +.00472 on average (2/7 positive device means), while Gafgyt averages −.00618
+(3/9 positive). This is consistent with the C37 limit: benign-only evidence cannot certify ranking
+safety for arbitrary attacks, and the observed same-dataset gains cannot justify a family-aware
+selection rule.
+
+The raw peer mean correlation target is rank deficient in this dataset, so using it directly caused
+singular covariance inversion. The evaluated identity interpolation makes each target invertible,
+but adds another weight with no benign-only selection rule. A dense 115-feature correlation matrix
+has 6,555 unique off-diagonal values per client, versus 230 values for the two shared mean/scale
+vectors: 28.5x the outgoing scalar payload under triangular encoding (52,440 scalars from eight
+peers to the aggregator, versus 1,840 baseline scalars). This ignores headers, quantization, and
+secure-aggregation overhead. Multiple-target covariance shrinkage is established prior art, as
+recorded in the novelty matrix; C66 supplies no distinct novelty claim. It is a provisional
+low-support mechanism observation only, not a candidate promotion, independent confirmation, or
+protocol recommendation. No weight is selected and no protocol is locked.
+
+## C67 — featurewise empirical Bayes adapts to some mismatch, but the peer prior cannot detect an isolated target shift
+
+The ignored `pocs/featurewise_random_effects_oas_target_poc.py` adds one arm to C64's exact paired
+48-cell Gaussian factorial, recreating the same seeded support, peer summaries, and held-out benign
+and mean-shift attack rows. For feature j, it bias-corrects peer and target log sample variances under
+the Gaussian chi-square model. The peer mean log variance is the prior mean; its between-peer
+variance minus known peer sampling variance, truncated at zero, estimates the random-effect variance
+`tau_j^2`. Given target log sample variance `z_tj` with known sampling variance `v_n`, it uses normal-
+normal shrinkage: `v_post=(1/tau_j^2+1/v_n)^−1`, `m_post=v_post*(mu_j/tau_j^2+z_tj/v_n)`, and
+sets the target scale to `sqrt(E[sigma_j^2|data]) = exp((m_post+v_post/2)/2)`. OAS intensity, shared
+center, correlation, attack generation, and evaluation remain unchanged. This is a standard
+random-effects empirical-Bayes construction adjacent to C1/C9/C12, not a novelty claim.
+
+Across all 48 cells and 100 paired replications per cell, the EB arm's mean deltas versus full
+shared are +.00350 AUROC, +.00077 standardized pAUC(.01), and +.00162 pAUC(.05). The corresponding
+10th percentiles over paired replications are −.00583/−.00267/−.00463, and only 34/48, 32/48, and
+34/48 cell means are positive. Its worst cell is the matched-target condition with peer heterogeneity
+.40, correlation .65, and n=30: AUROC −.00758, pAUC(.01) −.00223, and pAUC(.05) −.00491. In that
+condition the target is at the peer-population center, but empirical heterogeneity makes the prior
+expect a new target effect and the short support cannot reliably identify that it is the central
+case. Conversely, when peer heterogeneity is zero but the target has a featurewise scale shift, the
+estimated prior variance is zero and the estimator remains near shared instead of adapting to the
+novel target. It therefore fails in both directions of the cold-start problem: it can over-adapt to
+a matched target and under-adapt to a shifted one.
+
+The EB arm reduces mean relative covariance Frobenius error by .02380 and diagonal variance RMSE by
+.01014 versus full shared, but ranking changes do not follow these error improvements. Covariance
+error improves while AUROC worsens in 23.3% of paired cases and while pAUC(.01) worsens in 23.0%;
+this is consistent with C65's loss-mismatch finding. The candidate needs each peer's per-feature
+variance vector to estimate `tau_j^2`, preserving between-peer detail (8d values at the aggregator
+in this simulation, versus 2d in one final shared mean/scale vector). This may be smaller than
+collecting every peer's full 2d moment pair, but it prevents simple secure aggregation and exposes
+between-peer heterogeneity. It remains synthetic-only and does not establish target/device safety.
+Do not promote it or tune its
+prior from these attack outcomes. The strongest current algorithmic direction remains unresolved;
+next investigate a target-specific mismatch model that can distinguish an isolated newcomer shift
+from ordinary between-peer heterogeneity, while preserving low-FPR ranking under a stated threat
+family. Prior work on empirical-Bayes mixture and discrepancy estimators, plus C37/C49/C50/C65, makes
+any benign-only ranking-safety claim especially vulnerable. No protocol is locked.

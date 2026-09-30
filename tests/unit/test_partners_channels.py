@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch
 
 from fedorbit.config.loading import load_config
-from fedorbit.config.models import ConditionSpec
+from fedorbit.config.models import AutoencoderDetectorConfig, ConditionSpec
 from fedorbit.detection.moments import summarise
+from fedorbit.study import channels
 from fedorbit.study.channels import (
+    AutoencoderInputs,
     ChannelError,
     SharedSummaries,
+    build_autoencoder_scorer,
     build_gaussian_scorer,
     standardisation_for,
 )
@@ -18,7 +22,7 @@ from fedorbit.study.partners import (
     scale_profile_distance,
     select_partners,
 )
-from fedorbit.types import DeviceName, PartnerPolicy, RandomSeed, ShareChannel
+from fedorbit.types import DeviceName, FloatMatrix, PartnerPolicy, RandomSeed, ShareChannel
 
 
 def context(seed: int = 1) -> PartnerSelectionContext:
@@ -148,3 +152,69 @@ def test_local_full_support_equals_local_standardisation() -> None:
         ConditionSpec(channel=ShareChannel.LOCAL_STANDARDISED), rows, None, config
     )
     assert np.array_equal(full.scale, local.scale)
+
+
+def test_federated_autoencoder_samples_selected_partner_rows_and_uses_shared_normalisation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = load_config()
+    normaliser = config.detectors.gaussian
+    autoencoder = config.detectors.autoencoder
+    rows = np.arange(24, dtype=np.float64).reshape(12, 2)
+    partner_rows = np.arange(80, dtype=np.float64).reshape(40, 2) + 100.0
+    partner = DeviceName("partner")
+    inputs = AutoencoderInputs(
+        rows=rows,
+        shared=SharedSummaries((summarise(partner_rows),)),
+        partner_pools={partner: partner_rows},
+        selected_partners=(partner,),
+        initialisation_seed=RandomSeed(11),
+        partner_sample_seed=RandomSeed(17),
+    )
+    captured: list[list[FloatMatrix]] = []
+
+    def fake_training(
+        clients: list[FloatMatrix],
+        detector_config: AutoencoderDetectorConfig,
+        seed: RandomSeed,
+        device: torch.device,
+    ) -> torch.nn.Module:
+        captured.append(clients)
+        assert detector_config is autoencoder
+        assert seed == inputs.initialisation_seed
+        assert device == torch.device("cpu")
+        return torch.nn.Identity()
+
+    monkeypatch.setattr(channels, "train_federated_autoencoder", fake_training)
+    scorer = build_autoencoder_scorer(
+        ConditionSpec(
+            channel=ShareChannel.FEDERATED_AVERAGING,
+            partner_policy=PartnerPolicy.ALL,
+        ),
+        inputs,
+        normaliser,
+        autoencoder,
+        torch.device("cpu"),
+    )
+
+    assert len(captured) == 1
+    assert len(captured[0]) == 2
+    standardisation = standardisation_for(
+        ConditionSpec(
+            channel=ShareChannel.FEDERATED_AVERAGING,
+            partner_policy=PartnerPolicy.ALL,
+        ),
+        rows,
+        inputs.shared,
+        normaliser,
+    )
+    assert np.allclose(captured[0][0], (rows - standardisation.centre) / standardisation.scale)
+    sample_indices = np.random.default_rng(inputs.partner_sample_seed).choice(
+        len(partner_rows), size=len(partner_rows), replace=False
+    )
+    expected_partner_rows = partner_rows[sample_indices]
+    assert np.allclose(
+        captured[0][1],
+        (expected_partner_rows - standardisation.centre) / standardisation.scale,
+    )
+    assert np.array_equal(scorer.score(rows), np.zeros(len(rows)))

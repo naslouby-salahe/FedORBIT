@@ -23,6 +23,30 @@ Shared-marginals collaboration versus three local-only baselines, nine N-BaIoT d
 
 All three contrasts are Holm-significant with unanimous positive sign across devices. Mean recovery of the gap to the shared-covariance ceiling: 0.880 (vs. local-standardised, 9/9 devices), 0.752 (vs. local-unscaled, 8/9), 0.808 (vs. local-standard-deviation-floor, 8/9).
 
+## Support-calibrated operating-point diagnostic
+
+The Gaussian thresholds use two-fold cross-fitting on each sampled local support window: its first and second halves score one another, and the threshold is the linear empirical 99th percentile of the resulting support scores. This is a nominal threshold target, not a finite-sample calibration guarantee; at support n=30 it is estimated from only 30 cross-fitted scores. The realized false-positive rate on the later benign test partition is not close to 1%; therefore these values must not be presented as performance at an achieved 1% test FPR. The table reports unweighted means across the nine physical devices (30 paired support windows per device):
+
+| Benign support n | Local-standardised test FPR | Local-standardised test TPR | Shared-marginals test FPR | Shared-marginals test TPR |
+|---:|---:|---:|---:|---:|
+| 30 | 15.88% | 25.97% | 19.54% | 96.91% |
+| 100 | 12.56% | 43.53% | 14.61% | 90.37% |
+| 300 | 12.16% | 58.12% | 11.48% | 82.01% |
+| 1000 | 9.67% | 73.19% | 8.65% | 86.84% |
+
+This is an important threshold-transfer failure, despite the positive AUROC ranking results. The primary inferential claim is about AUROC; the study does not establish a deployable 1% false-alarm operating point. The persisted records contain empirical FPR/TPR; the descriptive FPR intervals below are derived from those records. The available data do not identify how much of the excess FPR comes from the finite support calibration sample versus chronological benign-distribution change, so that cause remains unresolved and is not tuned against the test partition.
+
+To show the uncertainty across target devices, the secondary FPR means also have descriptive 95% percentile cluster-bootstrap intervals. For each condition and support size, the 30 paired support-draw FPRs are averaged within each of the nine devices, then devices are resampled 10,000 times; the seed is `derive_seed(260926, BOOTSTRAP, "operating-point", condition, str(support_size))` as implemented in `src/fedorbit/infrastructure/runtime.py`. The intervals are not calibrated operating guarantees and do not resolve the source of threshold-transfer error:
+
+| Benign support n | Local-standardised test FPR (95% device-bootstrap CI) | Shared-marginals test FPR (95% device-bootstrap CI) |
+|---:|---:|---:|
+| 30 | 15.88% (9.94–21.94%) | 19.54% (12.79–27.01%) |
+| 100 | 12.56% (7.22–19.23%) | 14.61% (9.62–20.44%) |
+| 300 | 12.16% (7.50–18.23%) | 11.48% (7.09–17.01%) |
+| 1000 | 9.67% (5.20–16.14%) | 8.65% (4.81–14.03%) |
+
+These intervals resample only the nine observed devices. Because the 30 support-draw FPRs are averaged within each device before resampling, the intervals do not describe support-window variability within a device, uncertainty from a broader device population, or separate calibration-sample noise from temporal drift.
+
 ## Dose-response
 
 Shared-marginals vs. local-standardised effect shrinks monotonically as local benign support grows, all contrasts unanimous positive sign (9/9 devices) and significant (signed-rank p = 0.001953 at every n):
@@ -91,5 +115,9 @@ Local detection is already near-ceiling on both eligible devices (AUROC ≥ 0.99
 **Null findings.** Shared covariance shows no reliable advantage over marginals (mixed sign, non-significant at every n and partner size); the registered unsaturated-device covariance analysis had no eligible devices because all nine devices saturate under full local support. Deployable nearest-2 partner selection is no better than random and significantly worse than using all partners.
 
 **Claim boundaries.** All physical-device claims are scoped to Mirai/Gafgyt botnet detection on the nine N-BaIoT devices. Gotham2025 evidence is simulated-testbed evidence describing only 2 evaluable devices and is explicitly not extended to the six ineligible devices or to physical deployments.
+
+**Contribution maturity.** The strongest defensible contribution is the measured low-support information-channel decomposition: what peer statistics add for held-out devices with 30–1,000 benign support windows. The implementation and locked within-cohort evidence are mature, while the journal-level scientific contribution remains developing. The study does not establish broad algorithmic novelty, independent physical generalisation, deployment performance, or an achieved 1% test-FPR operating point.
+
+**Novelty boundary.** This is a measured low-support peer-information channel decomposition, not a new detector or a broad first claim to federated IoT anomaly detection. FedGroup (2024) studies functional-group federated parameter aggregation for supervised attack detection on the same UNSW IoT Analytics cohort, with 253 port/byte/packet features and stratified random splits. That is close prior art for federated, group-based IoT attack detection; it does not compare peer marginal, covariance, and model-weight channels under benign-only target onboarding and future chronological testing. The repository’s Project 2 notebook reads flow and annotation CSVs from an external Google Drive path, derives attack labels from `Timestamp` intervals, retains `Timestamp` among predictors, and uses per-device stratified random splits. This creates a direct timestamp label-proxy risk and provides no chronological test. The repository declares AGPL-3.0 for project/software but no separate processed-data license. FedGroup remains method/code prior art, not a verified reproduction ([paper](https://doi.org/10.1007/s10922-023-09782-9); [repository](https://github.com/BasemSuleiman/2023_Anomaly_Detection_IoT); [Project 2 notebook](https://github.com/BasemSuleiman/2023_Anomaly_Detection_IoT/blob/main/Project%202%20Privacy-Aware%20Anomaly%20Detection%20in%20IoT%20Environments%20using%20FedGroup%20A%20Group-Based%20Federated%20Learning%20Approach/%5Bupdate%5DFL.ipynb)).
 
 **Primary limitations.** Nine physical devices, one botnet family pair, attack rows subsampled per file; Gotham contributes only two evaluable devices; no adaptive attacker; not a privacy analysis; per-feature moments can leak device traffic information; covariance and partner-selection contrasts are descriptive/exploratory without multiplicity-adjusted inferential guarantees.

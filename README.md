@@ -2,7 +2,11 @@
 
 Research code for a measured decomposition of cold-start collaboration in benign-only IoT anomaly detection: when a new device has only a few benign windows, which shared information (per-feature marginals, covariance, model weights) recovers detection quality, and when does sharing more hurt?
 
-The protocol is in `docs/FedORBIT_Roadmap.md` and the executable scientific contract is `configs/fedorbit.yaml`. The retired earlier direction (cross-schema transfer, sparse-QAP robust action) and the audit trail are in `docs/audit/`; the historical implementation ledger for it is `docs/Audit Matrix.md`.
+The protocol is in `docs/FedORBIT_Roadmap.md` and the executable scientific contract is `configs/fedorbit.yaml`. The active implementation matrix, progress, reviewer audit, scientific decisions, and consolidated POC findings are in `docs/audit/`. The retired QAP direction is summarized in Git history and is not part of the active study.
+
+The contribution is a focused empirical comparison of peer-information channels at low benign support, not a new detector or a broad claim to federated IoT anomaly detection. Prior work includes FedGroup, which studies functional-group federated attack detection on the same UNSW IoT Analytics cohort using supervised features and random splits; it does not test this study's benign-only support and future-test design. Its public notebook derives labels from timestamp intervals, retains `Timestamp` among predictors, and uses randomized per-device splits, so it does not supply chronological transfer evidence. The roadmap and reviewer audit detail this boundary ([FedGroup paper](https://doi.org/10.1007/s10922-023-09782-9); [notebook](https://github.com/BasemSuleiman/2023_Anomaly_Detection_IoT/blob/main/Project%202%20Privacy-Aware%20Anomaly%20Detection%20in%20IoT%20Environments%20using%20FedGroup%20A%20Group-Based%20Federated%20Learning%20Approach/%5Bupdate%5DFL.ipynb)).
+
+The locked physical-device evidence is limited to nine N-BaIoT devices and Mirai/Gafgyt detection; Gotham contributes descriptive evidence from two eligible simulated devices. The nominal 1% support-calibrated threshold does not transfer to later benign traffic (mean test FPR 8.65–19.54% for shared marginals and 9.67–15.88% for local-standardised). The study makes no achieved low-FPR, deployment, or broad generalisation claim, and the journal-level contribution remains developing.
 
 ## Setup
 

@@ -1,0 +1,12 @@
+check,heterogeneity,rho,method,log_mse,ess_median,ess_target,mean_local_weight
+ar1_ess,,0.0,hac_ess,,978.4962374992222,1000.0,
+ar1_ess,,0.5,hac_ess,,663.712522390784,600.0,
+ar1_ess,,0.8,hac_ess,,328.9971540060475,219.51219512195112,
+iid_variance_hierarchy,0.1,,local,0.021297901026153747,,,
+iid_variance_hierarchy,0.1,,peer,0.012262325732122083,,,
+iid_variance_hierarchy,0.1,,posterior_mean,0.008950402748390722,,,
+iid_variance_hierarchy,0.1,,predictive_variance,0.009055324128648038,,,0.251322017043309
+iid_variance_hierarchy,0.7,,local,0.02041032516257406,,,
+iid_variance_hierarchy,0.7,,peer,0.5547093587893674,,,
+iid_variance_hierarchy,0.7,,posterior_mean,0.03238194623279446,,,
+iid_variance_hierarchy,0.7,,predictive_variance,0.03279773538909672,,,0.8924633661661057
